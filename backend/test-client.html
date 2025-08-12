@@ -1,0 +1,1027 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lepu Medical Device API - Test Client</title>
+    <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .section {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+
+        .section h2 {
+            color: #333;
+            border-bottom: 2px solid #e0e0e0;
+            padding-bottom: 10px;
+            margin-top: 0;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+
+        .status-connected {
+            background-color: #4CAF50;
+        }
+
+        .status-disconnected {
+            background-color: #f44336;
+        }
+
+        .status-connecting {
+            background-color: #ff9800;
+        }
+
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            margin: 5px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: transform 0.2s;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        input[type="text"] {
+            padding: 8px 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 5px;
+            margin: 5px;
+            width: 200px;
+        }
+
+        .data-display {
+            background: #f8f9fa;
+            border: 1px solid #e0e0e0;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 10px 0;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .real-time-data {
+            background: linear-gradient(135deg, #e8f5e8 0%, #d4f8d4 100%);
+            border-left: 4px solid #4CAF50;
+        }
+
+        .error-data {
+            background: linear-gradient(135deg, #ffe8e8 0%, #ffd4d4 100%);
+            border-left: 4px solid #f44336;
+        }
+
+        .device-card {
+            background: #f8f9fa;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 10px 0;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .device-card:hover {
+            background: #e9ecef;
+            transform: translateY(-2px);
+        }
+
+        .device-card.selected {
+            border-color: #667eea;
+            background: #e8f2ff;
+        }
+
+        .metric-card {
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 10px 0;
+            text-align: center;
+        }
+
+        .metric-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .metric-label {
+            font-size: 12px;
+            color: #666;
+            text-transform: uppercase;
+        }
+
+        .log-entry {
+            padding: 5px 0;
+            border-bottom: 1px solid #eee;
+        }
+
+        .log-time {
+            color: #666;
+            font-size: 11px;
+        }
+
+        .log-type {
+            font-weight: bold;
+            margin: 0 5px;
+        }
+
+        .full-width {
+            grid-column: 1 / -1;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="header">
+        <h1>🏥 Lepu Medical Device API - Mobile-Ready Test Client</h1>
+        <p>Test interface simulating mobile app communication • No native Bluetooth required</p>
+        <p><strong>📱 Mobile-First Architecture:</strong> Mobile App ↔ Medical Device ↔ Backend API ↔ Real-time
+            Dashboard</p>
+    </div>
+
+    <div class="container">
+        <!-- Connection Status -->
+        <div class="section">
+            <h2>📡 Connection Status</h2>
+            <div id="connection-status">
+                <span class="status-indicator status-disconnected"></span>
+                Disconnected from API
+            </div>
+            <div style="margin-top: 15px;">
+                <button onclick="checkHealth()">🔍 Check API Health</button>
+                <button onclick="reconnectWebSocket()">🔄 Reconnect WebSocket</button>
+            </div>
+            <div class="data-display" id="health-data" style="max-height: 150px;"></div>
+        </div>
+
+        <!-- Mobile Device Simulation -->
+        <div class="section">
+            <h2>📱 Mobile Device Simulation</h2>
+            <p><small>Simulate mobile app connecting and registering devices</small></p>
+            <div>
+                <select id="device-type">
+                    <option value="BP">Blood Pressure Monitor</option>
+                    <option value="ECG">ECG Device</option>
+                    <option value="OXIMETER">Pulse Oximeter</option>
+                    <option value="GLUCOSE">Glucose Meter</option>
+                </select>
+                <button onclick="simulateDeviceConnection()">📱 Simulate Mobile Connection</button>
+                <button onclick="getDevices()">📋 Refresh Devices</button>
+            </div>
+            <div id="simulation-status" style="margin: 10px 0; font-style: italic;"></div>
+            <div id="devices-list"></div>
+        </div>
+
+        <!-- Device Control -->
+        <div class="section">
+            <h2>🔌 Device Control</h2>
+            <div>
+                <input type="text" id="device-id" placeholder="Device ID (auto-selected)">
+                <button onclick="connectDevice()" id="connect-btn">🔗 Connect</button>
+                <button onclick="disconnectDevice()" id="disconnect-btn">🔌 Disconnect</button>
+            </div>
+            <div id="selected-device" style="margin: 10px 0;"></div>
+            <div class="data-display" id="device-status"></div>
+        </div>
+
+        <!-- Real-time Metrics -->
+        <div class="section">
+            <h2>📊 Real-time Metrics</h2>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px;">
+                <div class="metric-card">
+                    <div class="metric-value" id="bp-systolic">--</div>
+                    <div class="metric-label">Systolic (mmHg)</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value" id="bp-diastolic">--</div>
+                    <div class="metric-label">Diastolic (mmHg)</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value" id="heart-rate">--</div>
+                    <div class="metric-label">Heart Rate (bpm)</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value" id="spo2">--</div>
+                    <div class="metric-label">SpO2 (%)</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value" id="glucose">--</div>
+                    <div class="metric-label">Glucose</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value" id="battery">--</div>
+                    <div class="metric-label">Battery (%)</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Blood Pressure -->
+        <div class="section">
+            <h2>🩸 Blood Pressure Monitor</h2>
+            <div>
+                <button onclick="startBP()">▶️ Start Measurement</button>
+                <button onclick="stopBP()">⏹️ Stop Measurement</button>
+                <button onclick="getBPRealTime()">📊 Get Real-time Data</button>
+                <button onclick="getBPHistory()">📝 Get History</button>
+            </div>
+            <div class="data-display real-time-data" id="bp-data"></div>
+        </div>
+
+        <!-- ECG -->
+        <div class="section">
+            <h2>❤️ ECG Monitor</h2>
+            <div>
+                <input type="number" id="ecg-duration" placeholder="Duration (s)" value="30" style="width: 100px;">
+                <button onclick="startECG()">▶️ Start Recording</button>
+                <button onclick="stopECG()">⏹️ Stop Recording</button>
+                <button onclick="getECGRealTime()">📊 Get Real-time Data</button>
+                <button onclick="getECGFiles()">📁 Get Files</button>
+            </div>
+            <div class="data-display real-time-data" id="ecg-data"></div>
+        </div>
+
+        <!-- Pulse Oximeter -->
+        <div class="section">
+            <h2>🫁 Pulse Oximeter</h2>
+            <div>
+                <button onclick="getOxyRealTime()">📊 Get Real-time Data</button>
+                <button onclick="getWaveform()">〰️ Get Waveform</button>
+                <button onclick="startOxyMonitoring()">▶️ Start Monitoring</button>
+                <button onclick="stopOxyMonitoring()">⏹️ Stop Monitoring</button>
+            </div>
+            <div class="data-display real-time-data" id="oxy-data"></div>
+        </div>
+
+        <!-- Glucose Meter -->
+        <div class="section">
+            <h2>🩸 Glucose Meter</h2>
+            <div>
+                <button onclick="startGlucose()">▶️ Start Measurement</button>
+                <button onclick="getLatestGlucose()">📊 Get Latest Reading</button>
+                <button onclick="getGlucoseHistory()">📝 Get History</button>
+                <button onclick="getGlucoseInfo()">ℹ️ Get Device Info</button>
+            </div>
+            <div class="data-display real-time-data" id="glucose-data"></div>
+        </div>
+
+        <!-- Real-time Events Log -->
+        <div class="section full-width">
+            <h2>📋 Real-time Events Log</h2>
+            <div style="margin-bottom: 10px;">
+                <button onclick="clearLog()">🗑️ Clear Log</button>
+                <button onclick="exportLog()">💾 Export Log</button>
+                <label>
+                    <input type="checkbox" id="auto-scroll" checked> Auto-scroll
+                </label>
+            </div>
+            <div class="data-display" id="real-time-events" style="max-height: 400px;"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:3000/api';
+        let currentDeviceId = '';
+        let selectedDevice = null;
+        let socket = null;
+        let logEntries = [];
+        let isScanning = false;
+
+        // Initialize application
+        function init() {
+            initWebSocket();
+            checkHealth();
+            getDevices();
+            setInterval(updateMetrics, 1000); // Update metrics every second
+        }
+
+        // WebSocket Management
+        function initWebSocket() {
+            try {
+                socket = io('http://localhost:3000');
+
+                socket.on('connect', () => {
+                    updateConnectionStatus('Connected to WebSocket', 'connected');
+                    addLogEntry('WebSocket', 'Connected to API server');
+                });
+
+                socket.on('disconnect', () => {
+                    updateConnectionStatus('Disconnected from WebSocket', 'disconnected');
+                    addLogEntry('WebSocket', 'Disconnected from API server');
+                });
+
+                socket.on('connect_error', (error) => {
+                    updateConnectionStatus('Connection Error', 'disconnected');
+                    addLogEntry('WebSocket Error', error.message);
+                });
+
+                setupDeviceEventListeners();
+
+            } catch (error) {
+                updateConnectionStatus('WebSocket Error: ' + error.message, 'disconnected');
+                addLogEntry('Error', 'Failed to initialize WebSocket: ' + error.message);
+            }
+        }
+
+        function reconnectWebSocket() {
+            if (socket) {
+                socket.disconnect();
+            }
+            setTimeout(initWebSocket, 1000);
+        }
+
+        function setupDeviceEventListeners() {
+            // Device events
+            socket.on('device_discovered', (device) => {
+                addLogEntry('Device Discovery', `Found: ${device.name} (${device.model})`);
+                getDevices(); // Refresh device list
+            });
+
+            socket.on('device_connected', (data) => {
+                addLogEntry('Device Connection', `Connected: ${data.deviceId}`);
+                updateSelectedDeviceStatus();
+            });
+
+            socket.on('device_disconnected', (data) => {
+                addLogEntry('Device Connection', `Disconnected: ${data.deviceId}`);
+                updateSelectedDeviceStatus();
+            });
+
+            // Blood pressure events
+            socket.on('bp_real_time_pressure', (data) => {
+                addLogEntry('BP Real-time', `Pressure: ${data.pressure} mmHg, PR: ${data.pulseRate} bpm`);
+                updateBPDisplay(data);
+            });
+
+            socket.on('bp_measurement_complete', (data) => {
+                addLogEntry('BP Complete', `${data.systolic}/${data.diastolic} mmHg, PR: ${data.pulseRate} bpm`);
+                updateBPResult(data);
+            });
+
+            // ECG events
+            socket.on('ecg_real_time_data', (data) => {
+                addLogEntry('ECG Real-time', `HR: ${data.heartRate} bpm, Samples: ${data.waveformData?.length || 0}`);
+                updateECGDisplay(data);
+            });
+
+            // Oximeter events
+            socket.on('oxy_real_time_params', (data) => {
+                addLogEntry('Oximeter', `SpO2: ${data.spo2}%, PR: ${data.pulseRate} bpm, PI: ${data.pi}%`);
+                updateOxyDisplay(data);
+            });
+
+            // Glucose events
+            socket.on('glucose_result', (data) => {
+                addLogEntry('Glucose', `${data.value} ${data.unit}, Result: ${data.result}`);
+                updateGlucoseDisplay(data);
+            });
+
+            socket.on('glucose_countdown', (data) => {
+                addLogEntry('Glucose', `Countdown: ${data.countdown}s`);
+            });
+        }
+
+        // UI Update Functions
+        function updateConnectionStatus(message, status) {
+            const statusEl = document.getElementById('connection-status');
+            const indicator = statusEl.querySelector('.status-indicator');
+
+            indicator.className = `status-indicator status-${status}`;
+            statusEl.innerHTML = `<span class="status-indicator status-${status}"></span>${message}`;
+        }
+
+        function updateMetrics() {
+            // This function updates the metric cards with the latest values
+            // Values are updated by real-time event handlers
+        }
+
+        function updateBPDisplay(data) {
+            document.getElementById('bp-data').innerHTML =
+                `<strong>Real-time Pressure:</strong> ${data.pressure} mmHg<br>
+                 <strong>Pulse Rate:</strong> ${data.pulseRate} bpm<br>
+                 <strong>Deflating:</strong> ${data.isDeflate ? 'Yes' : 'No'}<br>
+                 <strong>Pulse Detected:</strong> ${data.isPulse ? 'Yes' : 'No'}<br>
+                 <strong>Timestamp:</strong> ${new Date().toLocaleTimeString()}`;
+
+            // Update metrics
+            if (data.pulseRate > 0) {
+                document.getElementById('heart-rate').textContent = data.pulseRate;
+            }
+        }
+
+        function updateBPResult(data) {
+            document.getElementById('bp-systolic').textContent = data.systolic;
+            document.getElementById('bp-diastolic').textContent = data.diastolic;
+            document.getElementById('heart-rate').textContent = data.pulseRate;
+
+            document.getElementById('bp-data').innerHTML =
+                `<strong>✅ Measurement Complete</strong><br>
+                 <strong>Systolic:</strong> ${data.systolic} mmHg<br>
+                 <strong>Diastolic:</strong> ${data.diastolic} mmHg<br>
+                 <strong>Mean:</strong> ${data.mean} mmHg<br>
+                 <strong>Pulse Rate:</strong> ${data.pulseRate} bpm<br>
+                 <strong>Result:</strong> ${data.result}<br>
+                 <strong>Timestamp:</strong> ${new Date(data.timestamp).toLocaleTimeString()}`;
+        }
+
+        function updateECGDisplay(data) {
+            document.getElementById('heart-rate').textContent = data.heartRate || '--';
+
+            document.getElementById('ecg-data').innerHTML =
+                `<strong>Heart Rate:</strong> ${data.heartRate} bpm<br>
+                 <strong>Lead Off:</strong> ${data.leadOff ? 'Yes' : 'No'}<br>
+                 <strong>Waveform Samples:</strong> ${data.waveformData?.length || 0}<br>
+                 <strong>Sampling Rate:</strong> ${data.samplingRate || 125} Hz<br>
+                 <strong>Timestamp:</strong> ${new Date().toLocaleTimeString()}`;
+        }
+
+        function updateOxyDisplay(data) {
+            document.getElementById('spo2').textContent = data.spo2 + '%';
+            document.getElementById('heart-rate').textContent = data.pulseRate;
+
+            document.getElementById('oxy-data').innerHTML =
+                `<strong>SpO2:</strong> ${data.spo2}%<br>
+                 <strong>Pulse Rate:</strong> ${data.pulseRate} bpm<br>
+                 <strong>Perfusion Index:</strong> ${data.pi}%<br>
+                 <strong>Probe Off:</strong> ${data.probeOff ? 'Yes' : 'No'}<br>
+                 <strong>Pulse Searching:</strong> ${data.pulseSearching ? 'Yes' : 'No'}<br>
+                 <strong>Timestamp:</strong> ${new Date().toLocaleTimeString()}`;
+        }
+
+        function updateGlucoseDisplay(data) {
+            document.getElementById('glucose').textContent = data.value + ' ' + data.unit;
+
+            document.getElementById('glucose-data').innerHTML =
+                `<strong>✅ Measurement Complete</strong><br>
+                 <strong>Value:</strong> ${data.value} ${data.unit}<br>
+                 <strong>Result:</strong> ${data.result}<br>
+                 <strong>Timestamp:</strong> ${new Date(data.timestamp).toLocaleTimeString()}`;
+        }
+
+        // Logging Functions
+        function addLogEntry(type, message) {
+            const timestamp = new Date().toLocaleTimeString();
+            const entry = { timestamp, type, message };
+            logEntries.unshift(entry);
+
+            // Keep only last 100 entries
+            if (logEntries.length > 100) {
+                logEntries = logEntries.slice(0, 100);
+            }
+
+            updateLogDisplay();
+        }
+
+        function updateLogDisplay() {
+            const eventsDiv = document.getElementById('real-time-events');
+            eventsDiv.innerHTML = logEntries.map(entry =>
+                `<div class="log-entry">
+                    <span class="log-time">[${entry.timestamp}]</span>
+                    <span class="log-type">${entry.type}:</span>
+                    ${entry.message}
+                </div>`
+            ).join('');
+
+            // Auto-scroll if enabled
+            if (document.getElementById('auto-scroll').checked) {
+                eventsDiv.scrollTop = 0;
+            }
+        }
+
+        function clearLog() {
+            logEntries = [];
+            updateLogDisplay();
+        }
+
+        function exportLog() {
+            const logText = logEntries.map(entry =>
+                `[${entry.timestamp}] ${entry.type}: ${entry.message}`
+            ).join('\n');
+
+            const blob = new Blob([logText], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `medical-device-log-${new Date().toISOString().slice(0, 19)}.txt`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        // API Functions
+        async function apiCall(endpoint, method = 'GET', body = null) {
+            try {
+                const options = {
+                    method: method,
+                    headers: { 'Content-Type': 'application/json' }
+                };
+
+                if (body) {
+                    options.body = JSON.stringify(body);
+                }
+
+                const response = await fetch(API_BASE + endpoint, options);
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || `HTTP ${response.status}`);
+                }
+
+                return data;
+            } catch (error) {
+                addLogEntry('API Error', `${method} ${endpoint}: ${error.message}`);
+                throw error;
+            }
+        }
+
+        function getCurrentDeviceId() {
+            return document.getElementById('device-id').value || currentDeviceId;
+        }
+
+        // Device Management Functions
+        async function checkHealth() {
+            try {
+                const data = await apiCall('/health');
+                document.getElementById('health-data').innerHTML =
+                    `<strong>Status:</strong> ${data.status}<br>
+                     <strong>Uptime:</strong> ${Math.round(data.uptime)}s<br>
+                     <strong>Devices:</strong> ${data.devices.discovered} discovered, ${data.devices.connected} connected<br>
+                     <strong>Bluetooth:</strong> ${data.bluetooth.state}, Scanning: ${data.bluetooth.scanning}`;
+                addLogEntry('Health Check', `API Status: ${data.status}, Devices: ${data.devices.discovered}/${data.devices.connected}`);
+            } catch (error) {
+                document.getElementById('health-data').innerHTML = `<span class="error-data">Health check failed: ${error.message}</span>`;
+            }
+        }
+
+        // Simulate mobile app connecting a device
+        async function simulateDeviceConnection() {
+            const deviceType = document.getElementById('device-type').value;
+            const deviceId = 'sim-' + deviceType.toLowerCase() + '-' + Date.now();
+
+            const deviceModels = {
+                'BP': { model: 'BP2', name: 'BP2-Simulator' },
+                'ECG': { model: 'ER1', name: 'ER1-Simulator' },
+                'OXIMETER': { model: 'PC60FW', name: 'PC60FW-Simulator' },
+                'GLUCOSE': { model: 'Bioland-BGM', name: 'BGM-Simulator' }
+            };
+
+            const deviceInfo = deviceModels[deviceType];
+
+            try {
+                document.getElementById('simulation-status').innerHTML = '📱 Simulating mobile connection...';
+
+                await apiCall(`/devices/${deviceId}/connect`, 'POST', {
+                    name: deviceInfo.name,
+                    model: deviceInfo.model,
+                    macAddress: `AA:BB:CC:DD:EE:${Math.floor(Math.random() * 256).toString(16).padStart(2, '0').toUpperCase()}`,
+                    type: deviceType,
+                    battery: Math.floor(Math.random() * 40) + 60, // 60-100%
+                    firmware: '1.0.' + Math.floor(Math.random() * 10)
+                });
+
+                document.getElementById('simulation-status').innerHTML = `✅ Simulated ${deviceType} device connected: ${deviceId}`;
+                currentDeviceId = deviceId;
+                document.getElementById('device-id').value = deviceId;
+
+                addLogEntry('Mobile Simulation', `Connected ${deviceType} device: ${deviceInfo.name}`);
+
+                // Auto-refresh devices list
+                setTimeout(getDevices, 500);
+
+            } catch (error) {
+                document.getElementById('simulation-status').innerHTML = `❌ Simulation failed: ${error.message}`;
+                addLogEntry('Simulation Error', error.message);
+            }
+        }
+
+        async function getDevices() {
+            try {
+                const data = await apiCall('/devices');
+                const devicesList = document.getElementById('devices-list');
+
+                if (data.devices.length === 0) {
+                    devicesList.innerHTML = '<p>No devices discovered. Click "Start Scan" to find devices.</p>';
+                    return;
+                }
+
+                devicesList.innerHTML = '<h3>📱 Discovered Devices:</h3>';
+
+                data.devices.forEach(device => {
+                    const isSelected = device.id === currentDeviceId;
+                    const deviceCard = document.createElement('div');
+                    deviceCard.className = `device-card ${isSelected ? 'selected' : ''}`;
+                    deviceCard.onclick = () => selectDevice(device);
+
+                    deviceCard.innerHTML =
+                        `<div style="display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <strong>${device.name || 'Unknown Device'}</strong><br>
+                                <small>${device.model} • ${device.id}</small><br>
+                                <small>RSSI: ${device.rssi || 'N/A'} dBm</small>
+                            </div>
+                            <div>
+                                ${device.connected ?
+                            '<span style="color: green;">🟢 Connected</span>' :
+                            '<span style="color: gray;">⚫ Disconnected</span>'
+                        }
+                            </div>
+                        </div>`;
+
+                    devicesList.appendChild(deviceCard);
+                });
+
+                addLogEntry('Device List', `Found ${data.devices.length} devices`);
+            } catch (error) {
+                document.getElementById('devices-list').innerHTML = `<span class="error-data">Failed to get devices: ${error.message}</span>`;
+            }
+        }
+
+        function selectDevice(device) {
+            selectedDevice = device;
+            currentDeviceId = device.id;
+            document.getElementById('device-id').value = device.id;
+
+            document.getElementById('selected-device').innerHTML =
+                `<strong>Selected:</strong> ${device.name} (${device.model})<br>
+                 <strong>ID:</strong> ${device.id}<br>
+                 <strong>Status:</strong> ${device.connected ? 'Connected' : 'Disconnected'}`;
+
+            addLogEntry('Device Selection', `Selected: ${device.name} (${device.model})`);
+            getDevices(); // Refresh to show selection
+        }
+
+        async function connectDevice() {
+            const deviceId = getCurrentDeviceId();
+            if (!deviceId) {
+                alert('Please select a device first');
+                return;
+            }
+
+            try {
+                await apiCall(`/devices/${deviceId}/connect`, 'POST');
+                addLogEntry('Device Connection', `Connecting to ${deviceId}...`);
+                setTimeout(updateSelectedDeviceStatus, 1000);
+            } catch (error) {
+                addLogEntry('Connection Error', error.message);
+            }
+        }
+
+        async function disconnectDevice() {
+            const deviceId = getCurrentDeviceId();
+            if (!deviceId) return;
+
+            try {
+                await apiCall(`/devices/${deviceId}/connect`, 'DELETE');
+                addLogEntry('Device Connection', `Disconnecting from ${deviceId}...`);
+                setTimeout(updateSelectedDeviceStatus, 1000);
+            } catch (error) {
+                addLogEntry('Disconnection Error', error.message);
+            }
+        }
+
+        async function updateSelectedDeviceStatus() {
+            const deviceId = getCurrentDeviceId();
+            if (!deviceId) return;
+
+            try {
+                const data = await apiCall(`/devices/${deviceId}/status`);
+                document.getElementById('device-status').innerHTML =
+                    `<strong>Device Status:</strong><br>
+                     <strong>Connected:</strong> ${data.connected ? 'Yes' : 'No'}<br>
+                     <strong>Name:</strong> ${data.status.name}<br>
+                     <strong>Model:</strong> ${data.status.model}<br>
+                     <strong>MAC:</strong> ${data.status.macAddress}<br>
+                     <strong>Battery:</strong> ${data.status.battery || 'N/A'}%<br>
+                     <strong>Last Seen:</strong> ${data.status.lastSeen || 'N/A'}`;
+
+                if (data.status.battery) {
+                    document.getElementById('battery').textContent = data.status.battery + '%';
+                }
+
+                getDevices(); // Refresh device list to update connection status
+            } catch (error) {
+                document.getElementById('device-status').innerHTML = `<span class="error-data">Status check failed: ${error.message}</span>`;
+            }
+        }
+
+        // Device-specific Functions
+        // Simulate BP measurement from mobile app
+        async function startBP() {
+            const deviceId = getCurrentDeviceId();
+            if (!deviceId) return;
+
+            try {
+                // Simulate mobile app sending BP measurement data
+                const bpData = {
+                    systolic: Math.floor(Math.random() * 50) + 110, // 110-160
+                    diastolic: Math.floor(Math.random() * 30) + 70,  // 70-100
+                    mean: Math.floor(Math.random() * 30) + 85,       // 85-115
+                    pulseRate: Math.floor(Math.random() * 40) + 60,  // 60-100
+                    unit: 'mmHg'
+                };
+
+                await apiCall(`/bp/${deviceId}/measurement`, 'POST', bpData);
+                addLogEntry('BP Simulation', `Simulated BP: ${bpData.systolic}/${bpData.diastolic} mmHg, PR: ${bpData.pulseRate}`);
+
+                // Update display immediately
+                updateBPResult(bpData);
+
+            } catch (error) {
+                addLogEntry('BP Error', error.message);
+            }
+        }
+
+        async function stopBP() {
+            addLogEntry('BP Measurement', 'Mobile simulation: measurement stopped');
+        }
+
+        async function getBPRealTime() {
+            const deviceId = getCurrentDeviceId();
+            if (!deviceId) return;
+
+            try {
+                const data = await apiCall(`/bp/${deviceId}/history`);
+                document.getElementById('bp-data').innerHTML = JSON.stringify(data, null, 2);
+            } catch (error) {
+                document.getElementById('bp-data').innerHTML = `<span class="error-data">${error.message}</span>`;
+            }
+        }
+
+        async function getBPHistory() {
+            const deviceId = getCurrentDeviceId();
+            if (!deviceId) return;
+
+            try {
+                const data = await apiCall(`/bp/${deviceId}/history`);
+                document.getElementById('bp-data').innerHTML = JSON.stringify(data, null, 2);
+            } catch (error) {
+                document.getElementById('bp-data').innerHTML = `<span class="error-data">${error.message}</span>`;
+            }
+        }
+
+        // Simulate ECG data from mobile app
+        async function startECG() {
+            const deviceId = getCurrentDeviceId();
+            if (!deviceId) return;
+
+            const duration = document.getElementById('ecg-duration').value || 30;
+
+            try {
+                // Generate simulated ECG waveform data
+                const sampleRate = 125; // Hz
+                const samples = duration * sampleRate;
+                const waveformData = [];
+
+                for (let i = 0; i < samples; i++) {
+                    // Simple ECG-like waveform simulation
+                    const t = i / sampleRate;
+                    const heartRate = 75; // bpm
+                    const value = Math.sin(2 * Math.PI * heartRate / 60 * t) * 100 +
+                        Math.random() * 20 - 10; // Add some noise
+                    waveformData.push(Math.round(value));
+                }
+
+                const ecgData = {
+                    heartRate: Math.floor(Math.random() * 40) + 60, // 60-100 bpm
+                    waveformData: waveformData,
+                    samplingRate: sampleRate,
+                    duration: parseInt(duration),
+                    leadOff: Math.random() < 0.1 // 10% chance of lead off
+                };
+
+                await apiCall(`/ecg/${deviceId}/data`, 'POST', ecgData);
+                addLogEntry('ECG Simulation', `Simulated ECG: HR ${ecgData.heartRate} bpm, ${duration}s, ${samples} samples`);
+
+                // Update display immediately
+                updateECGDisplay(ecgData);
+
+            } catch (error) {
+                addLogEntry('ECG Error', error.message);
+            }
+        }
+
+        async function stopECG() {
+            const deviceId = getCurrentDeviceId();
+            if (!deviceId) return;
+
+            try {
+                await apiCall(`/ecg/${deviceId}/stop-recording`, 'POST');
+                addLogEntry('ECG Recording', 'Stopped ECG recording');
+            } catch (error) {
+                addLogEntry('ECG Error', error.message);
+            }
+        }
+
+        async function getECGRealTime() {
+            const deviceId = getCurrentDeviceId();
+            if (!deviceId) return;
+
+            try {
+                const data = await apiCall(`/ecg/${deviceId}/real-time`);
+                document.getElementById('ecg-data').innerHTML = JSON.stringify(data, null, 2);
+            } catch (error) {
+                document.getElementById('ecg-data').innerHTML = `<span class="error-data">${error.message}</span>`;
+            }
+        }
+
+        async function getECGFiles() {
+            const deviceId = getCurrentDeviceId();
+            if (!deviceId) return;
+
+            try {
+                const data = await apiCall(`/ecg/${deviceId}/files`);
+                document.getElementById('ecg-data').innerHTML = JSON.stringify(data, null, 2);
+            } catch (error) {
+                document.getElementById('ecg-data').innerHTML = `<span class="error-data">${error.message}</span>`;
+            }
+        }
+
+        // Simulate oximeter measurement from mobile app
+        async function getOxyRealTime() {
+            const deviceId = getCurrentDeviceId();
+            if (!deviceId) return;
+
+            try {
+                // Simulate mobile app sending oximeter data
+                const oxyData = {
+                    spo2: Math.floor(Math.random() * 5) + 95,        // 95-100%
+                    pulseRate: Math.floor(Math.random() * 40) + 60,  // 60-100 bpm
+                    pi: (Math.random() * 3 + 1).toFixed(1),         // 1.0-4.0%
+                    probeOff: Math.random() < 0.05,                 // 5% chance probe off
+                    pulseSearching: Math.random() < 0.1             // 10% chance searching
+                };
+
+                await apiCall(`/oximeter/${deviceId}/measurement`, 'POST', oxyData);
+                addLogEntry('Oximeter Simulation', `Simulated SpO2: ${oxyData.spo2}%, PR: ${oxyData.pulseRate}, PI: ${oxyData.pi}%`);
+
+                // Update display immediately
+                updateOxyDisplay(oxyData);
+
+            } catch (error) {
+                document.getElementById('oxy-data').innerHTML = `<span class="error-data">${error.message}</span>`;
+                addLogEntry('Oximeter Error', error.message);
+            }
+        }
+
+        async function getWaveform() {
+            const deviceId = getCurrentDeviceId();
+            if (!deviceId) return;
+
+            try {
+                const data = await apiCall(`/oximeter/${deviceId}/waveform`);
+                document.getElementById('oxy-data').innerHTML = JSON.stringify(data, null, 2);
+            } catch (error) {
+                document.getElementById('oxy-data').innerHTML = `<span class="error-data">${error.message}</span>`;
+            }
+        }
+
+        async function startOxyMonitoring() {
+            const deviceId = getCurrentDeviceId();
+            if (!deviceId) return;
+
+            try {
+                await apiCall(`/oximeter/${deviceId}/start-monitoring`, 'POST');
+                addLogEntry('Oximeter', 'Started continuous monitoring');
+            } catch (error) {
+                addLogEntry('Oximeter Error', error.message);
+            }
+        }
+
+        async function stopOxyMonitoring() {
+            const deviceId = getCurrentDeviceId();
+            if (!deviceId) return;
+
+            try {
+                await apiCall(`/oximeter/${deviceId}/stop-monitoring`, 'POST');
+                addLogEntry('Oximeter', 'Stopped continuous monitoring');
+            } catch (error) {
+                addLogEntry('Oximeter Error', error.message);
+            }
+        }
+
+        // Simulate glucose measurement from mobile app
+        async function startGlucose() {
+            const deviceId = getCurrentDeviceId();
+            if (!deviceId) return;
+
+            try {
+                // Simulate mobile app sending glucose measurement
+                const glucoseValue = Math.floor(Math.random() * 100) + 80; // 80-180 mg/dL
+                let result = 'Normal';
+                if (glucoseValue < 70) result = 'Low';
+                else if (glucoseValue > 140) result = 'High';
+
+                const glucoseData = {
+                    value: glucoseValue,
+                    unit: 'mg/dL',
+                    result: result,
+                    testType: Math.random() > 0.5 ? 'fasting' : 'random'
+                };
+
+                await apiCall(`/glucose/${deviceId}/measurement`, 'POST', glucoseData);
+                addLogEntry('Glucose Simulation', `Simulated glucose: ${glucoseData.value} ${glucoseData.unit} (${glucoseData.result})`);
+
+                // Update display immediately
+                updateGlucoseDisplay(glucoseData);
+
+            } catch (error) {
+                addLogEntry('Glucose Error', error.message);
+            }
+        }
+
+        async function getLatestGlucose() {
+            const deviceId = getCurrentDeviceId();
+            if (!deviceId) return;
+
+            try {
+                const data = await apiCall(`/glucose/${deviceId}/latest`);
+                document.getElementById('glucose-data').innerHTML = JSON.stringify(data, null, 2);
+            } catch (error) {
+                document.getElementById('glucose-data').innerHTML = `<span class="error-data">${error.message}</span>`;
+            }
+        }
+
+        async function getGlucoseHistory() {
+            const deviceId = getCurrentDeviceId();
+            if (!deviceId) return;
+
+            try {
+                const data = await apiCall(`/glucose/${deviceId}/history`);
+                document.getElementById('glucose-data').innerHTML = JSON.stringify(data, null, 2);
+            } catch (error) {
+                document.getElementById('glucose-data').innerHTML = `<span class="error-data">${error.message}</span>`;
+            }
+        }
+
+        async function getGlucoseInfo() {
+            const deviceId = getCurrentDeviceId();
+            if (!deviceId) return;
+
+            try {
+                const data = await apiCall(`/glucose/${deviceId}/info`);
+                document.getElementById('glucose-data').innerHTML = JSON.stringify(data, null, 2);
+            } catch (error) {
+                document.getElementById('glucose-data').innerHTML = `<span class="error-data">${error.message}</span>`;
+            }
+        }
+
+        // Initialize when page loads
+        window.onload = init;
+    </script>
+</body>
+
+</html>

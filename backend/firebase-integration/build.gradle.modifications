@@ -1,0 +1,52 @@
+// Add these to your app/build.gradle file
+// Firebase integration for Lepu Medical Device App
+
+android {
+    compileSdk 34
+    
+    defaultConfig {
+        // ... existing config
+        multiDexEnabled true
+    }
+    
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+    
+    kotlinOptions {
+        jvmTarget = '1.8'
+    }
+}
+
+dependencies {
+    // 🔥 Firebase Core (REQUIRED)
+    implementation platform('com.google.firebase:firebase-bom:32.7.0')
+    
+    // 🔐 Firebase Authentication
+    implementation 'com.google.firebase:firebase-auth-ktx'
+    
+    // 📊 Firestore Database  
+    implementation 'com.google.firebase:firebase-firestore-ktx'
+    
+    // 📂 Cloud Storage (for ECG files)
+    implementation 'com.google.firebase:firebase-storage-ktx'
+    
+    // ⚡ Cloud Functions (optional)
+    implementation 'com.google.firebase:firebase-functions-ktx'
+    
+    // 📱 Firebase Analytics (optional)
+    implementation 'com.google.firebase:firebase-analytics-ktx'
+    
+    // 🔄 Coroutines for async Firebase calls
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3'
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.7.3'
+    
+    // ... keep your existing dependencies
+    implementation 'androidx.core:core-ktx:1.12.0'
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+    // ... etc
+}
+
+// 🔥 Apply Firebase plugin (ADD TO BOTTOM OF FILE)
+apply plugin: 'com.google.gms.google-services'

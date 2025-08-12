@@ -1,0 +1,15 @@
+// Add these to your PROJECT-LEVEL build.gradle file
+// (The one in the root directory, not the app folder)
+
+buildscript {
+    dependencies {
+        // ... existing dependencies
+        classpath 'com.android.tools.build:gradle:8.1.4'
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:1.9.10"
+        
+        // 🔥 ADD THIS: Firebase Google Services plugin  
+        classpath 'com.google.gms:google-services:4.4.0'
+    }
+}
+
+// ... rest of your existing build.gradle stays the same
