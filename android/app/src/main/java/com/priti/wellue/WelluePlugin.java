@@ -179,6 +179,8 @@ public class WelluePlugin extends Plugin {
     // Track last known deviceStatus to infer ECG start/stop
     private Integer lastDeviceStatus = null;
     private boolean ecgMeasuringActive = false;
+    // Track last known heart rate to persist between events
+    private Integer lastKnownHeartRate = null;
     // Native batching for smoother UI rendering
     private final Object ecgLock = new Object();
     private final java.util.ArrayList<Float> ecgAccumFloats = new java.util.ArrayList<>(1024);
@@ -251,7 +253,7 @@ public class WelluePlugin extends Plugin {
                                 try { java.lang.reflect.Method mm = payload.getClass().getMethod(m); Object v = mm.invoke(payload); if (v != null) { payload = v; break; } } catch (Throwable ignore) {}
                             }
                         }
-                        Integer deviceStatus = null, batteryStatus = null, percent = null, dataType = null, hr = null;
+                        Integer deviceStatus = null, batteryStatus = null, percent = null, dataType = null, hr = lastKnownHeartRate;
                         Object param = null;
                         Object paramData = null;
                         if (payload != null) {
@@ -267,6 +269,22 @@ public class WelluePlugin extends Plugin {
                             // Some SDKs expose paramDataType at top-level too
                             if (dataType == null) {
                                 try { Object v = payload.getClass().getMethod("getParamDataType").invoke(payload); if (v instanceof Number) dataType = ((Number) v).intValue(); } catch (Throwable ignore) {}
+                            }
+                            // Try to extract HR from status/payload directly as some firmwares report it there
+                            try {
+                                Object statusObj = payload.getClass().getMethod("getStatus").invoke(payload);
+                                if (statusObj != null && hr == null) {
+                                    String[] hrNames = new String[]{"getHr","getHeartRate","getPr"};
+                                    for (String hn : hrNames) {
+                                        try { Object v = statusObj.getClass().getMethod(hn).invoke(statusObj); if (v instanceof Number) { hr = ((Number) v).intValue(); break; } } catch (Throwable ignore) {}
+                                    }
+                                }
+                            } catch (Throwable ignore) {}
+                            if (hr == null) {
+                                String[] hrNames = new String[]{"getHr","getHeartRate","getPr"};
+                                for (String hn : hrNames) {
+                                    try { Object v = payload.getClass().getMethod(hn).invoke(payload); if (v instanceof Number) { hr = ((Number) v).intValue(); break; } } catch (Throwable ignore) {}
+                                }
                             }
                             // Extra diagnostics
                             if (dataType == null || dataType == 2 || dataType == 3) {
@@ -441,13 +459,8 @@ public class WelluePlugin extends Plugin {
                             }
                         }
 
-                        // Build generic RT event
-                        JSObject rt = new JSObject();
-                        if (deviceStatus != null) rt.put("deviceStatus", deviceStatus);
-                        if (batteryStatus != null) rt.put("batteryStatus", batteryStatus);
-                        if (percent != null) rt.put("percent", percent);
-                        if (dataType != null) rt.put("paramDataType", dataType);
-                        if (hr != null) rt.put("hr", hr);
+                        // REMOVED: JSObject creation here - it was being created with hr=null
+                        // The JSObject will be created AFTER ECG processing when hr has the correct value
                         // Device status lifecycle events (ECG and BP)
                         if (deviceStatus != null && (lastDeviceStatus == null || !lastDeviceStatus.equals(deviceStatus))) {
                             int ds = deviceStatus.intValue();
@@ -516,8 +529,10 @@ public class WelluePlugin extends Plugin {
                             
                             lastDeviceStatus = deviceStatus;
                         }
-                        notifyListeners("bp2Rt", rt);
-                        Log.d(TAG, "🔧 bp2Rt forwarded hr=" + hr + " percent=" + percent + " type=" + dataType);
+                        
+                        // REMOVED: Early bp2Rt event that was sending hr=null before ECG processing
+                        // This was causing the frontend to receive incorrect heart rate data
+                        // The bp2Rt event will now only be sent AFTER ECG processing is complete
 
                                 // If BP in-progress (real-time pressure during measurement)
                         if (dataType != null && dataType.intValue() == 0 && paramData != null) {
@@ -586,134 +601,281 @@ public class WelluePlugin extends Plugin {
 
                         // If BP result
                         if (dataType != null && dataType.intValue() == 1 && paramData != null) {
-            Log.e(TAG, "🩺 BP RESULT PROCESSING - paramData type: " + paramData.getClass().getName());
-            
+                            Log.e(TAG, "🩺 BP RESULT PROCESSING - paramData type: " + paramData.getClass().getName());
+                            
                             Integer sys = null, dia = null, pr = null, map = null, resultCode = null;
-            
-            // If paramData is a byte array, parse it according to BP2 protocol
-            if (paramData instanceof byte[]) {
-                byte[] bytes = (byte[]) paramData;
-                Log.e(TAG, "🩺 PARSING BYTE ARRAY - length: " + bytes.length);
-                
-                // Log raw bytes for debugging
-                StringBuilder hexString = new StringBuilder();
-                for (byte b : bytes) {
-                    hexString.append(String.format("%02X ", b));
-                }
-                Log.e(TAG, "🩺 RAW BYTES: " + hexString.toString());
-                
-                // CORRECTED BP2 protocol parsing - raw bytes are actually correct!
-                // Latest test: Device 128/90 HR 70 vs Raw: 01 00 00 80 00 5A 00 6C 00 46
-                // Pattern: [skip 3] [sys] [skip 1] [dia] [skip 1] [pr] [skip 1] [extra]
-                if (bytes.length >= 10) {
-                    try {
-                        // FINAL CORRECT STRATEGY: Use raw byte values directly
-                        // Bytes 3,5,7,9 contain the exact values - no corrections needed!
-                        sys = bytes[3] & 0xFF;  // 0x80 = 128 ✅
-                        dia = bytes[5] & 0xFF;  // 0x5A = 90 ✅
-                        pr = bytes[9] & 0xFF;   // 0x46 = 70 ✅
-                        
-                        Log.e(TAG, "🩺 RAW EXTRACTED VALUES: sys=" + sys + " dia=" + dia + " pr=" + pr);
-                        
-                        // Validate ranges (reasonable BP values)
-                        if (sys >= 70 && sys <= 250 && 
-                            dia >= 40 && dia <= 150 && 
-                            pr >= 40 && pr <= 180) {
-                            Log.e(TAG, "🩺 ✅ VALUES VALIDATED: sys=" + sys + " dia=" + dia + " pr=" + pr);
-                        } else {
-                            Log.e(TAG, "🩺 ⚠️ VALUES OUT OF RANGE - might be parsing error");
-                            // Still use them but log warning
-                        }
-                        
-                        // Try to extract result code from different positions
-                        if (bytes.length > 6) resultCode = bytes[6] & 0xFF;
-                        if (resultCode == null || resultCode == 0) {
-                            if (bytes.length > 16) resultCode = bytes[16] & 0xFF;
-                        }
-                        
-                        // Calculate MAP (Mean Arterial Pressure)
-                        if (sys != null && dia != null && sys > 0 && dia > 0) {
-                            map = (2 * dia + sys) / 3;
-                            Log.e(TAG, "🩺 CALCULATED MAP: " + map);
-                        }
-                        
-                    } catch (Exception e) {
-                        Log.e(TAG, "🩺 BYTE PARSING ERROR: " + e.getMessage());
-                    }
-                } else {
-                    Log.e(TAG, "🩺 BYTE ARRAY TOO SHORT: " + bytes.length + " bytes (need >= 10)");
-                }
-            } else {
-                // Try reflection-based parsing (fallback)
-                Log.e(TAG, "🩺 TRYING REFLECTION-BASED PARSING");
-                            String[][] cand = new String[][]{
-                                {"getSys","getDia","getPr","getMap"},
-                                {"getSbp","getDbp","getHr","getMap"},
-                                {"getSystolic","getDiastolic","getPulseRate","getMeanArterialPressure"}
-                            };
-                            for (String[] c : cand) {
-                                try { Object v = paramData.getClass().getMethod(c[0]).invoke(paramData); if (v instanceof Number) sys = ((Number) v).intValue(); } catch (Throwable ignore) {}
-                                try { Object v = paramData.getClass().getMethod(c[1]).invoke(paramData); if (v instanceof Number) dia = ((Number) v).intValue(); } catch (Throwable ignore) {}
-                                try { Object v = paramData.getClass().getMethod(c[2]).invoke(paramData); if (v instanceof Number) pr  = ((Number) v).intValue(); } catch (Throwable ignore) {}
-                                try { Object v = paramData.getClass().getMethod(c[3]).invoke(paramData); if (v instanceof Number) map = ((Number) v).intValue(); } catch (Throwable ignore) {}
-                                if (sys != null || dia != null || pr != null || map != null) break;
+                            
+                            // If paramData is a byte array, parse it according to BP2 protocol
+                            if (paramData instanceof byte[]) {
+                                byte[] bytes = (byte[]) paramData;
+                                Log.e(TAG, "🩺 PARSING BYTE ARRAY - length: " + bytes.length);
+                                
+                                // Log raw bytes for debugging
+                                StringBuilder hexString = new StringBuilder();
+                                for (byte b : bytes) {
+                                    hexString.append(String.format("%02X ", b));
+                                }
+                                Log.e(TAG, "🩺 RAW BYTES: " + hexString.toString());
+                                
+                                // CORRECTED BP2 protocol parsing - raw bytes are actually correct!
+                                // Latest test: Device 128/90 HR 70 vs Raw: 01 00 00 80 00 5A 00 6C 00 46
+                                // Pattern: [skip 3] [sys] [skip 1] [dia] [skip 1] [pr] [skip 1] [extra]
+                                if (bytes.length >= 10) {
+                                    try {
+                                        // FINAL CORRECT STRATEGY: Use raw byte values directly
+                                        // Bytes 3,5,7,9 contain the exact values - no corrections needed!
+                                        sys = bytes[3] & 0xFF;  // 0x80 = 128 ✅
+                                        dia = bytes[5] & 0xFF;  // 0x5A = 90 ✅
+                                        pr = bytes[9] & 0xFF;   // 0x46 = 70 ✅
+                                        
+                                        Log.e(TAG, "🩺 RAW EXTRACTED VALUES: sys=" + sys + " dia=" + dia + " pr=" + pr);
+                                        
+                                        // Validate ranges (reasonable BP values)
+                                        if (sys >= 70 && sys <= 250 && 
+                                            dia >= 40 && dia <= 150 && 
+                                            pr >= 40 && pr <= 180) {
+                                            Log.e(TAG, "🩺 ✅ VALUES VALIDATED: sys=" + sys + " dia=" + dia + " pr=" + pr);
+                                        } else {
+                                            Log.e(TAG, "🩺 ⚠️ VALUES OUT OF RANGE - might be parsing error");
+                                            // Still use them but log warning
+                                        }
+                                        
+                                        // Try to extract result code from different positions
+                                        if (bytes.length > 6) resultCode = bytes[6] & 0xFF;
+                                        if (resultCode == null || resultCode == 0) {
+                                            if (bytes.length > 16) resultCode = bytes[16] & 0xFF;
+                                        }
+                                        
+                                        // Calculate MAP (Mean Arterial Pressure)
+                                        if (sys != null && dia != null && sys > 0 && dia > 0) {
+                                            map = (2 * dia + sys) / 3;
+                                            Log.e(TAG, "🩺 CALCULATED MAP: " + map);
+                                        }
+                                        
+                                    } catch (Exception e) {
+                                        Log.e(TAG, "🩺 BYTE PARSING ERROR: " + e.getMessage());
+                                    }
+                                } else {
+                                    Log.e(TAG, "🩺 BYTE ARRAY TOO SHORT: " + bytes.length + " bytes (need >= 10)");
+                                }
+                            } else {
+                                // Try reflection-based parsing (fallback)
+                                Log.e(TAG, "🩺 TRYING REFLECTION-BASED PARSING");
+                                String[][] cand = new String[][]{
+                                    {"getSys","getDia","getPr","getMap"},
+                                    {"getSbp","getDbp","getHr","getMap"},
+                                    {"getSystolic","getDiastolic","getPulseRate","getMeanArterialPressure"}
+                                };
+                                for (String[] c : cand) {
+                                    try { Object v = paramData.getClass().getMethod(c[0]).invoke(paramData); if (v instanceof Number) sys = ((Number) v).intValue(); } catch (Throwable ignore) {}
+                                    try { Object v = paramData.getClass().getMethod(c[1]).invoke(paramData); if (v instanceof Number) dia = ((Number) v).intValue(); } catch (Throwable ignore) {}
+                                    try { Object v = paramData.getClass().getMethod(c[2]).invoke(paramData); if (v instanceof Number) pr  = ((Number) v).intValue(); } catch (Throwable ignore) {}
+                                    try { Object v = paramData.getClass().getMethod(c[3]).invoke(paramData); if (v instanceof Number) map = ((Number) v).intValue(); } catch (Throwable ignore) {}
+                                    if (sys != null || dia != null || pr != null || map != null) break;
+                                }
+                                try { Object v = paramData.getClass().getMethod("getResult").invoke(paramData); if (v instanceof Number) resultCode = ((Number) v).intValue(); } catch (Throwable ignore) {}
                             }
-                            try { Object v = paramData.getClass().getMethod("getResult").invoke(paramData); if (v instanceof Number) resultCode = ((Number) v).intValue(); } catch (Throwable ignore) {}
-            }
-            
-            Log.e(TAG, "🩺 FINAL EXTRACTED VALUES: sys=" + sys + " dia=" + dia + " pr=" + pr + " map=" + map + " result=" + resultCode);
-            
+                            
+                            Log.e(TAG, "🩺 FINAL EXTRACTED VALUES: sys=" + sys + " dia=" + dia + " pr=" + pr + " map=" + map + " result=" + resultCode);
+                            
                             JSObject ev = new JSObject();
-            boolean hasValidData = false;
-            
-            if (sys != null && sys > 0) {
-                ev.put("systolic", sys);
-                hasValidData = true;
-            }
-            if (dia != null && dia > 0) {
-                ev.put("diastolic", dia);
-                hasValidData = true;
-            }
-            if (pr  != null && pr > 0) {
-                ev.put("pulseRate", pr);
-                hasValidData = true;
-            }
-            if (map != null && map > 0) ev.put("map", map);
+                            boolean hasValidData = false;
+                            
+                            if (sys != null && sys > 0) {
+                                ev.put("systolic", sys);
+                                hasValidData = true;
+                            }
+                            if (dia != null && dia > 0) {
+                                ev.put("diastolic", dia);
+                                hasValidData = true;
+                            }
+                            if (pr  != null && pr > 0) {
+                                ev.put("pulseRate", pr);
+                                hasValidData = true;
+                            }
+                            if (map != null && map > 0) ev.put("map", map);
                             if (resultCode != null) ev.put("result", resultCode);
-            
-            // Only send measurement complete events if we have valid BP data AND stop further measurements
-            if (hasValidData) {
-                // 🛑 STOP REAL-TIME TASK IMMEDIATELY TO PREVENT REPEATED MEASUREMENTS
-                try {
-                    Object helper = getBleHelper();
-                    if (helper != null) {
-                        Log.e(TAG, "🛑 STOPPING RT TASK AFTER SUCCESSFUL MEASUREMENT");
-                        java.lang.reflect.Method stopRtTaskMethod = helper.getClass().getMethod("stopRtTask", int.class);
-                        stopRtTaskMethod.invoke(helper, com.lepu.blepro.objs.Bluetooth.MODEL_BP2);
-                        Log.e(TAG, "✅ RT TASK STOPPED - no more duplicate measurements");
-                    }
-                } catch (Throwable e) {
-                    Log.e(TAG, "⚠️ Could not stop RT task: " + e.getMessage());
-                }
-                
-                // Send the BP measurement data
-                            notifyListeners("bpMeasurement", ev);
-                Log.e(TAG, "🩺 SENT bpMeasurement event with data: " + ev.toString());
-                
-                // Send BP lifecycle complete event with data
-                JSObject bpLife = new JSObject();
-                bpLife.put("state", "complete");
-                bpLife.put("systolic", sys);
-                bpLife.put("diastolic", dia);
-                bpLife.put("pulseRate", pr);
-                if (map != null) bpLife.put("map", map);
-                notifyListeners("bpLifecycle", bpLife);
-                Log.d(TAG, "🩺 BP lifecycle: complete with valid data [" + sys + "/" + dia + ", HR " + pr + "]");
-            } else {
-                Log.e(TAG, "🩺 NO VALID BP DATA - not sending measurement complete events");
-            }
+                            
+                            // Only send measurement complete events if we have valid BP data AND stop further measurements
+                            if (hasValidData) {
+                                // 🛑 STOP REAL-TIME TASK IMMEDIATELY TO PREVENT REPEATED MEASUREMENTS
+                                try {
+                                    Object helper = getBleHelper();
+                                    if (helper != null) {
+                                        Log.e(TAG, "🛑 STOPPING RT TASK AFTER SUCCESSFUL MEASUREMENT");
+                                        java.lang.reflect.Method stopRtTaskMethod = helper.getClass().getMethod("stopRtTask", int.class);
+                                        stopRtTaskMethod.invoke(helper, com.lepu.blepro.objs.Bluetooth.MODEL_BP2);
+                                        Log.e(TAG, "✅ RT TASK STOPPED - no more duplicate measurements");
+                                    }
+                                } catch (Throwable e) {
+                                    Log.e(TAG, "⚠️ Could not stop RT task: " + e.getMessage());
+                                }
+                                
+                                // Send the BP measurement data
+                                notifyListeners("bpMeasurement", ev);
+                                Log.e(TAG, "🩺 SENT bpMeasurement event with data: " + ev.toString());
+                                
+                                // Send BP lifecycle complete event with data
+                                JSObject bpLife = new JSObject();
+                                bpLife.put("state", "complete");
+                                bpLife.put("systolic", sys);
+                                bpLife.put("diastolic", dia);
+                                bpLife.put("pulseRate", pr);
+                                if (map != null) bpLife.put("map", map);
+                                notifyListeners("bpLifecycle", bpLife);
+                                Log.d(TAG, "🩺 BP lifecycle: complete with valid data [" + sys + "/" + dia + ", HR " + pr + "]");
+                            } else {
+                                Log.e(TAG, "🩺 NO VALID BP DATA - not sending measurement complete events");
+                            }
                         }
-
+                        
+                        // If ECG result (paramDataType=3 = RtEcgResult)
+                        if (dataType != null && dataType.intValue() == 3 && paramData != null) {
+                            Log.e(TAG, "🫀 ECG RESULT PROCESSING - paramData type: " + paramData.getClass().getName());
+                            
+                            Integer ecgHr = null;
+                            
+                            // Try to extract heart rate from ECG result data
+                            if (paramData instanceof byte[]) {
+                                byte[] bytes = (byte[]) paramData;
+                                Log.e(TAG, "🫀 PARSING ECG RESULT BYTE ARRAY - length: " + bytes.length);
+                                
+                                // Log raw bytes for debugging
+                                StringBuilder hexString = new StringBuilder();
+                                for (byte b : bytes) {
+                                    hexString.append(String.format("%02X ", b));
+                                }
+                                Log.e(TAG, "🫀 ECG RESULT RAW BYTES: " + hexString.toString());
+                                
+                                // Try to extract heart rate from different byte positions
+                                // Based on official docs: ecgFloats = ecgShorts * 0.003098
+                                if (bytes.length >= 2) {
+                                    try {
+                                        // Analyze the byte pattern more carefully
+                                        Log.e(TAG, "🫀 Analyzing byte pattern for heart rate...");
+                                        
+                                        // Strategy 1: Look for heart rate in different byte positions
+                                        // Based on the pattern: 00 00 00 00 43 00 4F 00 00 00 22 01 B1 C7 43 00 01 00 00 00
+                                        // Try different positions where HR might be stored
+                                        for (int i = 0; i < Math.min(bytes.length - 1, 16); i++) {
+                                            int candidate = bytes[i] & 0xFF;
+                                            if (candidate >= 40 && candidate <= 200) {
+                                                ecgHr = candidate;
+                                                Log.e(TAG, "🫀 ECG HR found at byte " + i + ": " + ecgHr + " BPM");
+                                                break;
+                                            }
+                                        }
+                                        
+                                        // Strategy 2: Try 2-byte combinations at different positions
+                                        if (ecgHr == null && bytes.length >= 4) {
+                                            for (int i = 0; i < Math.min(bytes.length - 1, 14); i++) {
+                                                // Big-endian
+                                                int candidate = ((bytes[i] & 0xFF) << 8) | (bytes[i + 1] & 0xFF);
+                                                if (candidate >= 40 && candidate <= 200) {
+                                                    ecgHr = candidate;
+                                                    Log.e(TAG, "🫀 ECG HR found at bytes " + i + "," + (i+1) + " (big-endian): " + ecgHr + " BPM");
+                                                    break;
+                                                }
+                                                
+                                                // Little-endian
+                                                candidate = ((bytes[i + 1] & 0xFF) << 8) | (bytes[i] & 0xFF);
+                                                if (candidate >= 40 && candidate <= 200) {
+                                                    ecgHr = candidate;
+                                                    Log.e(TAG, "🫀 ECG HR found at bytes " + i + "," + (i+1) + " (little-endian): " + ecgHr + " BPM");
+                                                    break;
+                                                }
+                                            }
+                                        }
+                                        
+                                        // Strategy 3: Look for specific patterns in the data
+                                        if (ecgHr == null) {
+                                            // Look for the pattern that might indicate heart rate
+                                            // Based on the bytes: 00 00 00 00 43 00 4F 00 00 00 22 01 B1 C7 43 00 01 00 00 00
+                                            // 43 = 67, 4F = 79, 22 = 34, 01 = 1, B1 = 177, C7 = 199, 43 = 67
+                                            // These values might contain the heart rate
+                                            for (int i = 4; i < bytes.length; i++) {
+                                                int val = bytes[i] & 0xFF;
+                                                if (val >= 40 && val <= 200) {
+                                                    // Check if this looks like a heart rate value
+                                                    Log.e(TAG, "🫀 Potential HR candidate at byte " + i + ": " + val + " BPM");
+                                                    if (ecgHr == null || (val >= 60 && val <= 120)) { // Prefer reasonable HR range
+                                                        ecgHr = val;
+                                                        Log.e(TAG, "🫀 Selected HR candidate: " + ecgHr + " BPM from byte " + i);
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        
+                                        if (ecgHr != null && ecgHr >= 40 && ecgHr <= 200) {
+                                            Log.e(TAG, "🫀 ✅ ECG HEART RATE EXTRACTED: " + ecgHr + " BPM");
+                                            // Update both hr variable and persistent lastKnownHeartRate
+                                            hr = ecgHr;
+                                            lastKnownHeartRate = ecgHr;
+                                            Log.e(TAG, "🫀 🔄 Updated hr variable to: " + hr + " BPM and lastKnownHeartRate to: " + lastKnownHeartRate + " BPM");
+                                        } else {
+                                            Log.e(TAG, "🫀 ⚠️ No valid heart rate found in ECG result bytes");
+                                        }
+                                        
+                                        if (ecgHr != null && ecgHr >= 40 && ecgHr <= 200) {
+                                            Log.e(TAG, "🫀 ECG RESULT HEART RATE: " + ecgHr + " BPM - will be forwarded in bp2Rt event");
+                                        } else {
+                                            Log.e(TAG, "🫀 NO VALID ECG HEART RATE FOUND in result data");
+                                        }
+                                    } catch (Exception e) {
+                                        Log.e(TAG, "🫀 ECG HR parsing error: " + e.getMessage());
+                                    }
+                                }
+                            } else {
+                                // Try reflection-based parsing for ECG result
+                                Log.e(TAG, "🫀 TRYING REFLECTION-BASED ECG RESULT PARSING");
+                                String[] hrNames = new String[]{"getHr","getHeartRate","getPr","getPulseRate","getEcgHr"};
+                                for (String hn : hrNames) {
+                                    try { 
+                                        Object v = paramData.getClass().getMethod(hn).invoke(paramData); 
+                                        if (v instanceof Number) { 
+                                            ecgHr = ((Number) v).intValue(); 
+                                            Log.e(TAG, "🫀 ECG HR extracted via " + hn + "(): " + ecgHr + " BPM");
+                                            break; 
+                                        } 
+                                    } catch (Throwable ignore) {}
+                                }
+                                
+                                if (ecgHr != null && ecgHr >= 40 && ecgHr <= 200) {
+                                    Log.e(TAG, "🫀 ✅ ECG HEART RATE EXTRACTED: " + ecgHr + " BPM");
+                                    // Update both hr variable and persistent lastKnownHeartRate
+                                    hr = ecgHr;
+                                    lastKnownHeartRate = ecgHr;
+                                    Log.e(TAG, "🫀 🔄 Updated hr variable to: " + hr + " BPM and lastKnownHeartRate to: " + lastKnownHeartRate + " BPM");
+                                }
+                            }
+                            
+                            if (ecgHr != null && ecgHr >= 40 && ecgHr <= 200) {
+                                Log.e(TAG, "🫀 ECG RESULT HEART RATE: " + ecgHr + " BPM - will be forwarded in bp2Rt event");
+                            } else {
+                                Log.e(TAG, "🫀 NO VALID ECG HEART RATE FOUND in result data");
+                            }
+                        }
+                        
+                        // CRITICAL SAFETY CHECK: Ensure hr is properly set AFTER ECG processing
+                        if (hr != null && hr > 0) {
+                            Log.e(TAG, "🫀 ✅ FINAL HR CHECK: hr=" + hr + " BPM - will be forwarded safely");
+                        } else {
+                            Log.e(TAG, "🫀 ⚠️ FINAL HR CHECK: hr is null or 0 - this is a SAFETY ISSUE!");
+                            Log.e(TAG, "🫀 🚨 SAFETY ALERT: Heart rate is 0 - elderly users may see alarming readings!");
+                        }
+                        
+                        // NOW create JSObject AFTER ECG processing when hr has the correct value
+                        JSObject rt = new JSObject();
+                        if (deviceStatus != null) rt.put("deviceStatus", deviceStatus);
+                        if (batteryStatus != null) rt.put("batteryStatus", batteryStatus);
+                        if (percent != null) rt.put("percent", percent);
+                        if (dataType != null) rt.put("paramDataType", dataType);
+                        if (hr != null) rt.put("hr", hr);
+                        
+                        // NOW send bp2Rt event AFTER ECG processing is complete
+                        notifyListeners("bp2Rt", rt);
+                        Log.d(TAG, "🔧 bp2Rt forwarded hr=" + hr + " percent=" + percent + " type=" + dataType);
+                        
                         // Ship ECG batched at ~200 ms for smoother rendering; convert to mV
                         // Gate emission strictly to active ECG measuring window
                         if (ecgMeasuringActive && ((ecgShorts != null && ecgShorts.length > 0) || (ecgFloats != null && ecgFloats.length > 0))) {

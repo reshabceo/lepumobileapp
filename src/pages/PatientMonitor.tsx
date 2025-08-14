@@ -3,9 +3,33 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, User, Activity, Heart, Droplets, Wind, Settings, Loader2, Wifi, WifiOff, Battery, TrendingUp, AlertCircle, Wrench } from 'lucide-react';
 import { MobileAppContainer } from '@/components/MobileAppContainer';
 import { useQuery } from '@tanstack/react-query';
-import apiService, { Device, Measurement } from '@/lib/api';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { ArrowLeft, Activity, Battery, Wifi, WifiOff } from 'lucide-react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
-// Simple CSS-based chart visualization
+
+// Define interfaces locally since we're not using the old API service
+export interface Device {
+    id: string;
+    name: string;
+    model: string;
+    macAddress: string;
+    type: 'BP' | 'ECG' | 'OXIMETER' | 'GLUCOSE';
+    connected: boolean;
+    lastSeen: string;
+    battery?: number;
+    firmware?: string;
+}
+
+export interface Measurement {
+    id: string;
+    deviceId: string;
+    timestamp: string;
+    type: string;
+    [key: string]: any;
+}
 
 // Get device type info with colors
 const getDeviceInfo = (type: string) => {

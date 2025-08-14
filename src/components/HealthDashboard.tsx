@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Filesystem, Directory } from '@capacitor/filesystem';
-import { Video, Phone, MessageSquare, FileText, Siren, LayoutGrid, BarChart2, Droplets, Heart, Wind, User, LogOut, Loader2, Activity, Thermometer, Users, Bluetooth, Wifi, WifiOff } from 'lucide-react';
+import { Video, Phone, MessageSquare, FileText, Siren, LayoutGrid, BarChart2, Droplets, Heart, Wind, User, LogOut, Loader2, Activity, Thermometer, Users, Bluetooth, Wifi, WifiOff, BarChart3, ChevronUp, ChevronDown } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
 import { useHealthData, HealthMetric } from '@/hooks/useHealthData';
@@ -98,6 +98,10 @@ const HealthMetricCard = ({ metric, onClick }: { metric: HealthMetric, onClick: 
 // Main Dashboard Component
 export const HealthDashboard = () => {
   const navigate = useNavigate();
+  
+  // DEBUG: Add console log to verify this component is being rendered
+  console.log('🔍 [DEBUG] HealthDashboard component is rendering - version with arrow button and no Live Health Overview');
+  
   const { toast } = useToast();
   const { devices, metrics, loading, error } = useHealthData();
   const { 
@@ -132,7 +136,12 @@ export const HealthDashboard = () => {
   const [filterType, setFilterType] = useState<'all' | 'ecg' | 'bp'>('all');
   const [savedFilesFromPhone, setSavedFilesFromPhone] = useState<StoredItem[]>([]);
   const [isLoadingSaved, setIsLoadingSaved] = useState(false);
+  const [isConnecting, setIsConnecting] = useState(false);
   const previewCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const [deviceStatusExpanded, setDeviceStatusExpanded] = useState(true);
+  
+  // DEBUG: Log the current state after declaration
+  console.log('🔍 [DEBUG] deviceStatusExpanded state:', deviceStatusExpanded);
 
   const fetchStoredECG = async () => {
     try {
@@ -415,6 +424,7 @@ export const HealthDashboard = () => {
   };
 
   const handleViewReports = () => {
+    // Navigate to reports page which will include stored files functionality
     navigate('/reports');
   };
 
@@ -497,7 +507,13 @@ export const HealthDashboard = () => {
               </div>
             </div>
             
+            {/* Collapsible Device Status Content */}
+            <div className={`transition-all duration-300 overflow-hidden ${
+              deviceStatusExpanded ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
+            }`}>
+              {/* BP & ECG Device Status */}
             {connectedDevice ? (
+                <div className="mb-3 p-3 bg-green-500/10 border border-green-500/20 rounded-lg">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="bg-green-500 p-2 rounded-full">
@@ -514,36 +530,26 @@ export const HealthDashboard = () => {
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
                   <span className="text-sm text-green-400">Connected</span>
-                  <button
-                    onClick={() => navigate('/live-bp-monitor')}
-                    className="bg-blue-500 hover:bg-blue-600 text-white text-xs font-semibold py-1 px-3 rounded-lg transition-all duration-200 hover:scale-105 active:scale-95 ml-2"
-                  >
-                    BP Monitor
-                  </button>
-                  <button
-                    onClick={fetchStoredECG}
-                    className="bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold py-1 px-3 rounded-lg transition-all duration-200 hover:scale-105 active:scale-95 ml-1"
-                    title="Fetch stored ECG files from device and save to Documents"
-                  >
-                    Fetch Stored ECG
-                  </button>
+                    </div>
                 </div>
               </div>
             ) : (
+                <div className="mb-3 p-3 bg-gray-500/10 border border-gray-500/20 rounded-lg">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="bg-gray-500 p-2 rounded-full">
                     <WifiOff className="h-5 w-5 text-white" />
                   </div>
                   <div>
-                    <p className="font-semibold text-gray-400">No Device Connected</p>
-                    <p className="text-sm text-gray-500">Connect your BP monitor to start</p>
+                        <p className="font-semibold text-gray-400">BP & ECG Device</p>
+                        <p className="text-sm text-gray-500">Not connected</p>
                   </div>
                 </div>
                 <div className="flex gap-2">
                 <button
                     onClick={async () => {
                       try {
+                            setIsConnecting(true);
                         // Try to connect to last known device first
                         const lastDeviceId = localStorage.getItem('lastConnectedDevice');
                         if (lastDeviceId) {
@@ -553,25 +559,82 @@ export const HealthDashboard = () => {
                           // No last known device, start scanning
                           console.log('🔍 Starting scan to find devices...');
                           await startScan();
-                          setTimeout(() => {
-                            stopScan();
+                              // Wait longer for scan and connection
+                              await new Promise(resolve => setTimeout(resolve, 5000));
                             if (availableDevices.length > 0) {
                               // Auto-connect to first available device
-                              connectToDevice(availableDevices[0]);
+                                await connectToDevice(availableDevices[0]);
                             }
-                          }, 3000);
                         }
                       } catch (error) {
                         console.error('Failed to connect:', error);
-                      }
-                    }}
-                  className="bg-blue-500 hover:bg-blue-600 text-white text-sm font-semibold py-2 px-4 rounded-lg transition-all duration-200 hover:scale-105 active:scale-95"
-                >
-                  Connect
+                            // Only reset connecting state on error
+                            setIsConnecting(false);
+                          }
+                          // Don't reset connecting state on success - let the device context handle it
+                        }}
+                        disabled={isConnecting}
+                        className="bg-blue-500 hover:bg-blue-600 disabled:bg-blue-400 disabled:cursor-not-allowed text-white text-sm font-semibold py-2 px-4 rounded-lg transition-all duration-200 hover:scale-105 active:scale-95 flex items-center gap-2"
+                      >
+                        {isConnecting ? (
+                          <>
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            <span>Connecting...</span>
+                          </>
+                        ) : (
+                          <span>Connect</span>
+                        )}
                 </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* CGM Device Status */}
+              <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="bg-blue-500 p-2 rounded-full">
+                      <Activity className="h-5 w-5 text-white" />
+                    </div>
+                    <div>
+                      <p className="font-semibold text-white">Dexcom CGM</p>
+                      <p className="text-sm text-gray-400">Continuous Glucose Monitor</p>
+                      <p className="text-xs text-gray-500">API Connected</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
+                    <span className="text-sm text-blue-400">Connected</span>
+                  </div>
                 </div>
               </div>
-            )}
+            </div>
+
+            {/* Compact Status Summary (Always Visible) */}
+            <div className="flex items-center justify-between pt-2 border-t border-slate-600">
+              <div className="flex items-center gap-4 text-sm">
+                <div className="flex items-center gap-2">
+                  <div className={`w-2 h-2 rounded-full ${connectedDevice ? 'bg-green-500' : 'bg-gray-500'}`} />
+                  <span className="text-gray-400">BP/ECG</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-blue-500" />
+                  <span className="text-gray-400">CGM</span>
+                </div>
+              </div>
+              <button
+                onClick={() => setDeviceStatusExpanded(!deviceStatusExpanded)}
+                className="p-2 rounded-lg bg-blue-600/20 hover:bg-blue-600/30 transition-all duration-200 border border-blue-500/30 hover:border-blue-500/50"
+                title={deviceStatusExpanded ? 'Collapse Device Status' : 'Expand Device Status'}
+              >
+                {deviceStatusExpanded ? (
+                  <ChevronUp className="w-5 h-5 text-blue-400" />
+                ) : (
+                  <ChevronDown className="w-5 h-5 text-blue-400" />
+                )}
+              </button>
+            </div>
             
             {/* Show device errors if any */}
             {deviceError && (
@@ -633,106 +696,9 @@ export const HealthDashboard = () => {
           </div>
         </div>
 
-        {/* Live Health Overview Section */}
-        <div className="mb-4">
-          <h3 className="text-xl font-bold mb-3">Live Health Overview</h3>
-          <div className="flex gap-2">
-            <button
-              onClick={() => navigate('/patients')}
-              className="bg-purple-500/90 text-white text-xs font-semibold py-2 px-3 rounded-lg flex items-center gap-2 hover:bg-purple-600 transition-all duration-200 hover:scale-105 active:scale-95"
-            >
-              <Users size={14} />
-              <span>Patients</span>
-            </button>
-            <button
-              onClick={() => navigate('/devices')}
-              className="bg-blue-500/90 text-white text-xs font-semibold py-2 px-3 rounded-lg flex items-center gap-2 hover:bg-blue-600 transition-all duration-200 hover:scale-105 active:scale-95"
-            >
-              <Activity size={14} />
-              <span>Devices</span>
-            </button>
-            <button className="bg-green-500/90 text-white text-xs font-semibold py-2 px-3 rounded-lg flex items-center gap-2 hover:bg-green-600 transition-all duration-200 hover:scale-105 active:scale-95">
-              <BarChart2 size={14} />
-              <span>Analytics</span>
-            </button>
-          </div>
-        </div>
 
-        {/* In-App Stored ECG Viewer */}
-        <div className="mb-4">
-          <div className="bg-[#1E1E1E] rounded-2xl p-4 border border-slate-700">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="text-lg font-semibold text-white">Stored Files (Device + Phone)</h3>
-              <div className="text-xs text-gray-400">
-                {isFetchingStored ? 'Loading…' : storedFilesInApp.length ? `${storedFilesInApp.length} loaded` : 'None loaded'}
-              </div>
-            </div>
-            <div className="flex gap-2 mb-3">
-              <button
-                onClick={fetchStoredECG}
-                disabled={isFetchingStored}
-                className="flex-1 bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg font-medium disabled:opacity-50"
-              >
-                {isFetchingStored ? 'Fetching...' : 'Fetch from Device'}
-              </button>
-              <button
-                onClick={loadSavedFilesFromPhone}
-                disabled={isLoadingSaved}
-                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium disabled:opacity-50"
-              >
-                {isLoadingSaved ? 'Loading...' : 'Load Saved Files'}
-              </button>
-            </div>
 
-            {storedFilesInApp.length > 0 ? (
-              <div className="grid grid-cols-1 gap-3">
-                <div className="flex gap-2 overflow-x-auto pb-2">
-                  {/* Filter controls */}
-                  <div className="flex items-center gap-2 mr-2">
-                    <button onClick={() => setFilterType('all')} className={`text-xs px-2 py-1 rounded ${filterType==='all'?'bg-gray-600 text-white':'bg-gray-800 text-gray-300'}`}>All</button>
-                    <button onClick={() => setFilterType('ecg')} className={`text-xs px-2 py-1 rounded ${filterType==='ecg'?'bg-blue-600 text-white':'bg-gray-800 text-gray-300'}`}>ECG</button>
-                    <button onClick={() => setFilterType('bp')} className={`text-xs px-2 py-1 rounded ${filterType==='bp'?'bg-green-600 text-white':'bg-gray-800 text-gray-300'}`}>BP</button>
-                  </div>
-                  {storedFilesInApp.filter(f => filterType==='all' || (filterType==='ecg' ? f.fileType===2 : f.fileType===1)).map((f, i) => (
-                    <button
-                      key={`${f.fileName}-${i}`}
-                      onClick={() => setSelectedIdx(storedFilesInApp.findIndex(sf => sf.fileName===f.fileName && sf.fileType===f.fileType))}
-                      className={`text-xs px-3 py-1.5 rounded-lg border ${selectedIdx === i ? 'bg-blue-600 border-blue-500 text-white' : 'bg-transparent border-gray-700 text-gray-300'} whitespace-nowrap`}
-                      title={f.fileName}
-                    >
-                      {f.fileType===2 ? 'ECG' : f.fileType===1 ? 'BP' : 'UNK'} • {f.fileName}
-                    </button>
-                  ))}
-                </div>
 
-                {selectedIdx != null && storedFilesInApp[selectedIdx] && (
-                  <div className="grid grid-cols-1 gap-3">
-                    <div className="text-sm text-gray-300">
-                      <div><span className="text-gray-400">File:</span> {storedFilesInApp[selectedIdx].fileName}</div>
-                      <div><span className="text-gray-400">Type:</span> {storedFilesInApp[selectedIdx].fileType === 2 ? 'ECG' : storedFilesInApp[selectedIdx].fileType === 1 ? 'BP' : storedFilesInApp[selectedIdx].fileType ?? '-'}</div>
-                      <div><span className="text-gray-400">Sample Rate:</span> {storedFilesInApp[selectedIdx].sampleRate ? `${storedFilesInApp[selectedIdx].sampleRate} Hz` : 'Not available'}</div>
-                      <div><span className="text-gray-400">Duration:</span> {storedFilesInApp[selectedIdx].recordingTimeSec || storedFilesInApp[selectedIdx].measureTimeSec ? `${storedFilesInApp[selectedIdx].recordingTimeSec || storedFilesInApp[selectedIdx].measureTimeSec} seconds` : 'Not available'}</div>
-                      <div><span className="text-gray-400">Diagnosis:</span> {storedFilesInApp[selectedIdx].diagnosis || 'Not available'}</div>
-                      <div><span className="text-gray-400">Waveform Data:</span> {storedFilesInApp[selectedIdx].waveformCounts ? `${storedFilesInApp[selectedIdx].waveformCounts.length} samples` : 'Not available'}</div>
-                      <div><span className="text-gray-400">Raw Content:</span> {storedFilesInApp[selectedIdx].base64 ? `${Math.round(storedFilesInApp[selectedIdx].base64.length * 0.75)} bytes` : 'Not available'}</div>
-                    </div>
-                    {storedFilesInApp[selectedIdx].fileType === 2 ? (
-                      <div className="rounded-lg overflow-hidden border border-gray-700 w-full">
-                        <canvas ref={previewCanvasRef} className="block" />
-                      </div>
-                    ) : (
-                      <div className="rounded-lg border border-gray-700 p-3 text-sm text-gray-300">
-                        BP Record preview not supported in graph yet. File saved to Documents for analysis.
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="text-sm text-gray-400">No stored files loaded yet. Connect device and press "Fetch from Device" or "Load Saved Files" to view previously saved data.</div>
-            )}
-          </div>
-        </div>
 
         {/* Health Metrics Grid */}
         <div className="grid grid-cols-2 gap-4 mb-6">
@@ -745,12 +711,42 @@ export const HealthDashboard = () => {
               />
             ))
           ) : (
-            <div className="col-span-2 bg-[#1E1E1E] rounded-2xl p-8 text-center">
-              <Activity className="h-12 w-12 text-gray-500 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-gray-400 mb-2">No Devices Connected</h3>
-              <p className="text-sm text-gray-500">
-                Connect your medical devices to start monitoring your health metrics
-              </p>
+            <div className="col-span-2 grid grid-cols-3 gap-4">
+              {/* BP Monitor Button */}
+              <button
+                onClick={() => navigate('/live-bp-monitor')}
+                className="bg-gradient-to-br from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white p-6 rounded-2xl flex flex-col items-center justify-center gap-3 transition-all duration-300 hover:scale-105 active:scale-95 shadow-lg hover:shadow-xl border border-blue-400/20"
+              >
+                <Heart className="h-8 w-8 text-white" />
+                <div className="text-center">
+                  <h3 className="font-bold text-lg">BP Monitor</h3>
+                  <p className="text-xs text-blue-100 opacity-80">Blood Pressure</p>
+                </div>
+              </button>
+              
+              {/* ECG Monitor Button */}
+              <button
+                onClick={() => navigate('/ecg-monitor')}
+                className="bg-gradient-to-br from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white p-6 rounded-2xl flex flex-col items-center justify-center gap-3 transition-all duration-300 hover:scale-105 active:scale-95 shadow-lg hover:shadow-xl border border-purple-400/20"
+              >
+                <Activity className="h-8 w-8 text-white" />
+                <div className="text-center">
+                  <h3 className="font-bold text-lg">ECG Monitor</h3>
+                  <p className="text-xs text-purple-100 opacity-80">Heart Activity</p>
+                </div>
+              </button>
+
+              {/* CGM Monitor Button */}
+              <button
+                onClick={() => navigate('/cgm-monitor')}
+                className="bg-gradient-to-br from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white p-6 rounded-2xl flex flex-col items-center justify-center gap-3 transition-all duration-300 hover:scale-105 active:scale-95 shadow-lg hover:shadow-xl border border-green-400/20"
+              >
+                <BarChart3 className="h-8 w-8 text-white" />
+                <div className="text-center">
+                  <h3 className="font-bold text-lg">CGM Monitor</h3>
+                  <p className="text-xs text-green-100 opacity-80">Glucose Levels</p>
+                </div>
+              </button>
             </div>
           )}
         </div>

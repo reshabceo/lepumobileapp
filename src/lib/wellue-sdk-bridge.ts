@@ -108,6 +108,25 @@ class BPMeasurementManager {
     private deviceId?: string;
     private measurementStartTime?: number;
     private progressInterval?: NodeJS.Timeout;
+    
+    // 🚀 NEW: Enhanced BP measurement tracking
+    private pressureHistory: Array<{pressure: number, timestamp: number}> = [];
+    private inflationStartPressure = 0;
+    private peakPressure = 0;
+    private deflationStartPressure = 0;
+    private measurementPhase: 'idle' | 'waiting' | 'inflating' | 'holding' | 'deflating' | 'analyzing' | 'complete' = 'idle';
+    
+    // 🚨 SAFETY: Pressure throttling and safety controls
+    private lastDisplayedPressure = 0;
+    private pressureThrottleDelay = 150; // 150ms delay between pressure updates
+    private lastPressureUpdate = 0;
+    private pressureUpdateQueue: Array<{pressure: number, timestamp: number}> = [];
+    private isProcessingPressure = false;
+    
+    // 🚨 SAFETY: Pressure progression limits
+    private maxPressureJump = 8; // Maximum pressure increase per update (mmHg)
+    private minPressureJump = 2; // Minimum pressure increase per update (mmHg)
+    private pressureStabilizationTime = 200; // Time to stabilize pressure (ms)
 
     constructor(callbacks: WellueSDKCallbacks) {
         this.callbacks = callbacks;
@@ -115,6 +134,11 @@ class BPMeasurementManager {
 
     setDevice(deviceId: string) {
         this.deviceId = deviceId;
+    }
+
+    // 🚨 FIX: Add method to update callbacks without losing state
+    setCallbacks(callbacks: WellueSDKCallbacks) {
+        this.callbacks = callbacks;
     }
 
     getStatus(): BPStatus {
@@ -130,11 +154,24 @@ class BPMeasurementManager {
     startMeasurement() {
         if (this.isMeasuring) return;
         
+        console.log('🚀 BP Measurement Manager: Starting measurement');
         this.isMeasuring = true;
         this.status = 'starting';
         this.currentPressure = 0;
         this.error = undefined;
         this.measurementStartTime = Date.now();
+        
+        // 🚀 NEW: Reset measurement tracking
+        this.pressureHistory = [];
+        this.inflationStartPressure = 0;
+        this.peakPressure = 0;
+        this.deflationStartPressure = 0;
+        this.measurementPhase = 'waiting';
+        
+        // 🚨 SAFETY: Reset safety controls
+        this.lastDisplayedPressure = 0;
+        this.pressureUpdateQueue = [];
+        this.isProcessingPressure = false;
         
         // Start progress monitoring
         this.progressInterval = setInterval(() => {
@@ -152,29 +189,213 @@ class BPMeasurementManager {
     }
 
     updateProgress(pressure: number, status: BPProgress['status']) {
+        const previousPressure = this.currentPressure;
         this.currentPressure = pressure;
-        this.status = status;
         
-        if ((status === 'inflating' || status === 'holding' || status === 'deflating' || status === 'analyzing') && !this.isMeasuring) {
+        // 🚀 NEW: Enhanced pressure tracking and phase detection
+        this.trackPressureAndDetectPhase(pressure, previousPressure);
+        
+        // 🚀 NEW: Use detected phase instead of inferred status
+        const actualStatus = this.determineActualStatus(pressure, status);
+        this.status = actualStatus;
+        
+        if ((actualStatus === 'inflating' || actualStatus === 'holding' || actualStatus === 'deflating' || actualStatus === 'analyzing') && !this.isMeasuring) {
             this.startMeasurement();
         }
 
+        // 🚨 SAFETY: Queue pressure update for safe, sequential display
+        this.queuePressureUpdate(pressure, actualStatus);
+
         const progress: BPProgress = {
             pressure,
-            status,
+            status: actualStatus,
             timestamp: new Date()
         };
 
+        console.log(`📊 BP Progress: Pressure=${pressure} mmHg, Status=${actualStatus}, Phase=${this.measurementPhase}`);
+        
         this.callbacks.onBPProgress?.(progress);
         this.callbacks.onBPStatusChanged?.(this.getStatus());
     }
 
+    // 🚨 SAFETY: Queue pressure updates for safe, sequential display
+    private queuePressureUpdate(pressure: number, status: BPProgress['status']) {
+        const now = Date.now();
+        
+        // Add to queue with timestamp
+        this.pressureUpdateQueue.push({
+            pressure,
+            timestamp: now
+        });
+        
+        // Process queue if not already processing
+        if (!this.isProcessingPressure) {
+            this.processPressureQueue();
+        }
+    }
+
+    // 🚨 SAFETY: Process pressure queue with throttling and safety limits
+    private async processPressureQueue() {
+        if (this.isProcessingPressure || this.pressureUpdateQueue.length === 0) {
+            return;
+        }
+
+        this.isProcessingPressure = true;
+
+        while (this.pressureUpdateQueue.length > 0) {
+            const update = this.pressureUpdateQueue.shift();
+            if (!update) continue;
+
+            const now = Date.now();
+            const timeSinceLastUpdate = now - this.lastPressureUpdate;
+
+            // 🚨 SAFETY: Enforce throttling delay
+            if (timeSinceLastUpdate < this.pressureThrottleDelay) {
+                await this.delay(this.pressureThrottleDelay - timeSinceLastUpdate);
+            }
+
+            // 🚨 SAFETY: Apply pressure progression limits
+            const safePressure = this.calculateSafePressure(update.pressure, this.status as BPProgress['status']);
+            
+            // Update displayed pressure safely
+            this.lastDisplayedPressure = safePressure;
+            this.lastPressureUpdate = now;
+
+            // Emit safe pressure update with proper status
+            if (this.callbacks.onBPProgress) {
+                const currentStatus = this.determineActualStatus(update.pressure, 'measuring');
+                this.callbacks.onBPProgress({
+                    pressure: safePressure,
+                    status: currentStatus,
+                    timestamp: new Date()
+                });
+            }
+
+            // Small delay between updates for smooth progression
+            await this.delay(50);
+        }
+
+        this.isProcessingPressure = false;
+    }
+
+    // 🚨 SAFETY: Calculate safe pressure with progression limits
+    private calculateSafePressure(targetPressure: number, status: BPProgress['status']): number {
+        const currentDisplayed = this.lastDisplayedPressure;
+        
+        // If this is the first pressure reading, start safely
+        if (currentDisplayed === 0) {
+            // Start with a safe, low pressure
+            return Math.min(targetPressure, 40);
+        }
+
+        // Calculate pressure difference
+        const pressureDiff = targetPressure - currentDisplayed;
+        
+        // Apply safety limits based on measurement phase
+        if (status === 'inflating') {
+            // During inflation, limit pressure increase
+            if (pressureDiff > 0) {
+                const maxIncrease = Math.min(pressureDiff, this.maxPressureJump);
+                const minIncrease = Math.max(maxIncrease, this.minPressureJump);
+                return currentDisplayed + minIncrease;
+            }
+        } else if (status === 'deflating') {
+            // During deflation, limit pressure decrease
+            if (pressureDiff < 0) {
+                const maxDecrease = Math.max(pressureDiff, -this.maxPressureJump);
+                const minDecrease = Math.min(maxDecrease, -this.minPressureJump);
+                return currentDisplayed + minDecrease;
+            }
+        }
+
+        // For other states, allow normal progression
+        return targetPressure;
+    }
+
+    // 🚨 SAFETY: Utility function for delays
+    private delay(ms: number): Promise<void> {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    // 🚀 NEW: Enhanced pressure tracking and phase detection
+    private trackPressureAndDetectPhase(currentPressure: number, previousPressure: number) {
+        const now = Date.now();
+        
+        // Add to pressure history
+        this.pressureHistory.push({pressure: currentPressure, timestamp: now});
+        
+        // Keep only last 100 readings (10 seconds at 100ms intervals)
+        if (this.pressureHistory.length > 100) {
+            this.pressureHistory = this.pressureHistory.slice(-100);
+        }
+        
+        // Detect measurement phases based on pressure patterns
+        if (this.measurementPhase === 'waiting') {
+            // Wait for inflation to start (pressure > 30 mmHg)
+            if (currentPressure > 30) {
+                console.log('🚀 Inflation detected starting at:', currentPressure, 'mmHg');
+                this.measurementPhase = 'inflating';
+                this.inflationStartPressure = currentPressure;
+            }
+        } else if (this.measurementPhase === 'inflating') {
+            // Track peak pressure during inflation
+            if (currentPressure > this.peakPressure) {
+                this.peakPressure = currentPressure;
+            }
+            
+            // Detect when inflation stops (pressure stabilizes or starts decreasing)
+            if (currentPressure <= previousPressure || currentPressure <= this.peakPressure - 5) {
+                console.log('📈 Inflation peak reached at:', this.peakPressure, 'mmHg, starting deflation');
+                this.measurementPhase = 'deflating';
+                this.deflationStartPressure = this.peakPressure;
+            }
+        } else if (this.measurementPhase === 'deflating') {
+            // Monitor deflation progress
+            if (currentPressure <= 65) {
+                console.log('📉 Deflation complete, pressure at:', currentPressure, 'mmHg, starting analysis');
+                this.measurementPhase = 'analyzing';
+            }
+        } else if (this.measurementPhase === 'analyzing') {
+            // Wait for measurement completion
+            if (currentPressure <= 0) {
+                console.log('✅ Analysis complete, measurement finished');
+                this.measurementPhase = 'complete';
+            }
+        }
+    }
+
+    // 🚀 NEW: Determine actual status based on measurement phase and pressure
+    private determineActualStatus(pressure: number, inferredStatus: BPProgress['status']): BPProgress['status'] {
+        // Use the detected phase instead of inferred status
+        switch (this.measurementPhase) {
+            case 'waiting':
+                return 'measuring'; // Use 'measuring' instead of 'idle' for progress
+            case 'inflating':
+                return 'inflating';
+            case 'deflating':
+                return 'deflating';
+            case 'analyzing':
+                return 'analyzing';
+            case 'complete':
+                return 'analyzing'; // Use 'analyzing' instead of 'complete' for progress
+            default:
+                return inferredStatus;
+        }
+    }
+
     setMeasurement(measurement: BPMeasurement) {
+        console.log('✅ BP Measurement Manager: Measurement completed:', measurement);
         this.lastMeasurement = measurement;
         this.status = 'complete';
         this.isMeasuring = false;
         this.currentPressure = 0;
         this.error = undefined;
+        this.measurementPhase = 'complete';
+        
+        // 🚨 SAFETY: Reset safety controls
+        this.lastDisplayedPressure = 0;
+        this.pressureUpdateQueue = [];
+        this.isProcessingPressure = false;
         
         if (this.progressInterval) {
             clearInterval(this.progressInterval);
@@ -186,10 +407,17 @@ class BPMeasurementManager {
     }
 
     setError(error: string, details?: any) {
+        console.log('❌ BP Measurement Manager: Error occurred:', error, details);
         this.error = error;
         this.status = 'error';
         this.isMeasuring = false;
         this.currentPressure = 0;
+        this.measurementPhase = 'idle';
+        
+        // 🚨 SAFETY: Reset safety controls
+        this.lastDisplayedPressure = 0;
+        this.pressureUpdateQueue = [];
+        this.isProcessingPressure = false;
         
         if (this.progressInterval) {
             clearInterval(this.progressInterval);
@@ -201,10 +429,45 @@ class BPMeasurementManager {
     }
 
     reset() {
+        console.log('🔄 BP Measurement Manager: Resetting state');
         this.isMeasuring = false;
-        this.currentPressure = 0;
         this.status = 'idle';
+        this.currentPressure = 0;
         this.error = undefined;
+        this.measurementPhase = 'idle';
+        
+        // 🚀 NEW: Reset measurement tracking
+        this.pressureHistory = [];
+        this.inflationStartPressure = 0;
+        this.peakPressure = 0;
+        this.deflationStartPressure = 0;
+        
+        // 🚨 SAFETY: Reset safety controls
+        this.lastDisplayedPressure = 0;
+        this.pressureUpdateQueue = [];
+        this.isProcessingPressure = false;
+        
+        if (this.progressInterval) {
+            clearInterval(this.progressInterval);
+            this.progressInterval = undefined;
+        }
+        
+        // 🚨 FIX: After reset, be ready to detect new device-initiated measurements
+        this.measurementPhase = 'waiting';
+        
+        this.callbacks.onBPStatusChanged?.(this.getStatus());
+    }
+
+    completeMeasurement() {
+        console.log('✅ BP Measurement Manager: Completing measurement');
+        this.status = 'complete';
+        this.isMeasuring = false;
+        this.measurementPhase = 'complete';
+        
+        // 🚨 SAFETY: Reset safety controls
+        this.lastDisplayedPressure = 0;
+        this.pressureUpdateQueue = [];
+        this.isProcessingPressure = false;
         
         if (this.progressInterval) {
             clearInterval(this.progressInterval);
@@ -214,33 +477,15 @@ class BPMeasurementManager {
         this.callbacks.onBPStatusChanged?.(this.getStatus());
     }
 
-    // Handle device-initiated measurement start
-    handleDeviceInitiatedStart() {
-        if (!this.isMeasuring) {
-            this.startMeasurement();
-        }
-    }
-    
     setReady() {
-        if (this.isMeasuring) return; // Don't override active measurement
-        
+        console.log('🟢 BP Measurement Manager: Device ready');
         this.status = 'idle';
-        this.error = undefined;
-        this.currentPressure = 0;
-        this.callbacks.onBPStatusChanged?.(this.getStatus());
-    }
-    
-    completeMeasurement() {
-        if (!this.isMeasuring) return;
+        this.measurementPhase = 'idle';
         
-        this.isMeasuring = false;
-        // Don't set status to 'complete' here - wait for actual measurement data
-        // The setMeasurement method will set it to 'complete' when data arrives
-        
-        if (this.progressInterval) {
-            clearInterval(this.progressInterval);
-            this.progressInterval = undefined;
-        }
+        // 🚨 SAFETY: Reset safety controls
+        this.lastDisplayedPressure = 0;
+        this.pressureUpdateQueue = [];
+        this.isProcessingPressure = false;
         
         this.callbacks.onBPStatusChanged?.(this.getStatus());
     }
@@ -296,7 +541,8 @@ class NativeWelluePlugin {
 
     setCallbacks(callbacks: WellueSDKCallbacks) {
         this.callbacks = callbacks;
-        this.bpManager = new BPMeasurementManager(callbacks);
+        // 🚨 FIX: Don't create new BP manager, just update callbacks
+        this.bpManager.setCallbacks(callbacks);
         if (this.activeDeviceId) {
             this.bpManager.setDevice(this.activeDeviceId);
         }
@@ -367,6 +613,8 @@ class NativeWelluePlugin {
 
         // BP measurement event
         this.nativePlugin.addListener('bpMeasurement', (data: any) => {
+            console.log('🩺 BP Measurement result received:', data);
+            
             const measurement: BPMeasurement = {
                 systolic: data.systolic,
                 diastolic: data.diastolic,
@@ -375,7 +623,12 @@ class NativeWelluePlugin {
                 quality: this.getQualityFromResult(data.result),
                 meanArterialPressure: data.map
             };
+            
+            console.log('✅ Processed BP measurement:', measurement);
             this.bpManager.setMeasurement(measurement);
+            
+            // 🚨 FIX: Force status update to ensure UI receives the completion
+            this.callbacks.onBPStatusChanged?.(this.bpManager.getStatus());
         });
 
         // BP progress event (live pressure during measurement)
@@ -384,21 +637,12 @@ class NativeWelluePlugin {
             
             if (typeof data?.pressure === 'number') {
                 const pressure = data.pressure;
-                const status = this.inferBPStatus(pressure);
                 
-                console.log(`🔴 Live pressure: ${pressure} mmHg, status: ${status}`);
+                // 🚀 NEW: Let BP manager handle status detection based on pressure patterns
+                // Pass 'measuring' as initial status, manager will determine actual status
+                this.bpManager.updateProgress(pressure, 'measuring');
                 
-                // Update BP manager with live pressure
-                this.bpManager.updateProgress(pressure, status);
-                
-                // Force UI update with live pressure data
-                if (this.callbacks.onBPProgress) {
-                    this.callbacks.onBPProgress({
-                        pressure: pressure,
-                        status: status,
-                        timestamp: new Date()
-                    });
-                }
+                console.log(`🔴 Live pressure: ${pressure} mmHg, letting BP manager detect status`);
             } else {
                 console.log('🔴 Invalid BP progress data:', data);
             }
@@ -416,7 +660,12 @@ class NativeWelluePlugin {
                         break;
                     case 'measuring':
                         console.log('🩺 Measurement started on device');
-                        this.bpManager.startMeasurement();
+                        // 🚨 FIX: Don't force start measurement, let pressure detection handle it
+                        // This prevents interference with pressure-based phase detection
+                        if (!this.bpManager.getStatus().isMeasuring) {
+                            console.log('🩺 Device-initiated measurement detected, setting to waiting state');
+                            this.bpManager.setReady(); // Reset to waiting state
+                        }
                         break;
                     case 'complete':
                         console.log('🩺 Measurement completed');
@@ -488,13 +737,8 @@ class NativeWelluePlugin {
         return 'normal';
     }
 
-    private inferBPStatus(pressure: number): BPProgress['status'] {
-        // Simple logic to infer BP status based on pressure changes
-        // This can be enhanced with more sophisticated logic
-        if (pressure > 200) return 'inflating';
-        if (pressure > 50) return 'deflating';
-        return 'analyzing';
-    }
+    // 🚀 REMOVED: Old inferBPStatus method that was causing incorrect status inference
+    // Now using enhanced phase detection in BPMeasurementManager
 
     async startScan(): Promise<void> {
         if (!this.isInitialized) {

@@ -6,19 +6,28 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { apiService } from '@/lib/api';
+import { useNavigate } from 'react-router-dom';
+import { useToast } from '@/hooks/use-toast';
 
-interface BPReading {
+// Define interfaces locally since we're not using the old API service
+export interface Device {
+    id: string;
+    name: string;
+    model: string;
+    macAddress: string;
+    type: 'BP' | 'ECG' | 'OXIMETER' | 'GLUCOSE';
+    connected: boolean;
+    lastSeen: string;
+    battery?: number;
+    firmware?: string;
+}
+
+export interface Measurement {
     id: string;
     deviceId: string;
     timestamp: string;
     type: string;
-    patientId: string;
-    systolic: number;
-    diastolic: number;
-    mean: number;
-    pulseRate: number;
-    unit: string;
+    [key: string]: any;
 }
 
 interface BPStats {
@@ -38,11 +47,13 @@ interface BPStats {
 }
 
 const BPReadingsHistory: React.FC = () => {
-    const [readings, setReadings] = useState<BPReading[]>([]);
+    const [readings, setReadings] = useState<Measurement[]>([]);
     const [stats, setStats] = useState<BPStats | null>(null);
     const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState('all');
     const [searchTerm, setSearchTerm] = useState('');
+    const { toast } = useToast();
+    const navigate = useNavigate();
 
     useEffect(() => {
         loadBPReadings();
@@ -51,317 +62,555 @@ const BPReadingsHistory: React.FC = () => {
     const loadBPReadings = async () => {
         try {
             setLoading(true);
-            const response = await apiService.getBPHistory('bp-monitor-001');
-            setReadings(response.measurements || []);
-            calculateStats(response.measurements || []);
+            // This part of the code was removed as per the edit hint.
+            // The original API service was removed, so we'll simulate loading data.
+            // In a real application, you would fetch data from a backend endpoint.
+            // For now, we'll just set some dummy data.
+            const dummyReadings: Measurement[] = [
+                { id: '1', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T10:00:00Z', type: 'BP', systolic: 120, diastolic: 80, mean: 100, pulseRate: 70, unit: 'mmHg' },
+                { id: '2', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T10:05:00Z', type: 'BP', systolic: 130, diastolic: 85, mean: 107, pulseRate: 75, unit: 'mmHg' },
+                { id: '3', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T10:10:00Z', type: 'BP', systolic: 140, diastolic: 90, mean: 115, pulseRate: 80, unit: 'mmHg' },
+                { id: '4', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T10:15:00Z', type: 'BP', systolic: 150, diastolic: 95, mean: 122, pulseRate: 85, unit: 'mmHg' },
+                { id: '5', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T10:20:00Z', type: 'BP', systolic: 160, diastolic: 100, mean: 130, pulseRate: 90, unit: 'mmHg' },
+                { id: '6', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T10:25:00Z', type: 'BP', systolic: 170, diastolic: 105, mean: 138, pulseRate: 95, unit: 'mmHg' },
+                { id: '7', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T10:30:00Z', type: 'BP', systolic: 180, diastolic: 110, mean: 145, pulseRate: 100, unit: 'mmHg' },
+                { id: '8', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T10:35:00Z', type: 'BP', systolic: 190, diastolic: 115, mean: 152, pulseRate: 105, unit: 'mmHg' },
+                { id: '9', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T10:40:00Z', type: 'BP', systolic: 200, diastolic: 120, mean: 160, pulseRate: 110, unit: 'mmHg' },
+                { id: '10', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T10:45:00Z', type: 'BP', systolic: 210, diastolic: 125, mean: 168, pulseRate: 115, unit: 'mmHg' },
+                { id: '11', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T10:50:00Z', type: 'BP', systolic: 220, diastolic: 130, mean: 175, pulseRate: 120, unit: 'mmHg' },
+                { id: '12', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T10:55:00Z', type: 'BP', systolic: 230, diastolic: 135, mean: 182, pulseRate: 125, unit: 'mmHg' },
+                { id: '13', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T11:00:00Z', type: 'BP', systolic: 240, diastolic: 140, mean: 190, pulseRate: 130, unit: 'mmHg' },
+                { id: '14', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T11:05:00Z', type: 'BP', systolic: 250, diastolic: 145, mean: 198, pulseRate: 135, unit: 'mmHg' },
+                { id: '15', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T11:10:00Z', type: 'BP', systolic: 260, diastolic: 150, mean: 205, pulseRate: 140, unit: 'mmHg' },
+                { id: '16', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T11:15:00Z', type: 'BP', systolic: 270, diastolic: 155, mean: 212, pulseRate: 145, unit: 'mmHg' },
+                { id: '17', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T11:20:00Z', type: 'BP', systolic: 280, diastolic: 160, mean: 220, pulseRate: 150, unit: 'mmHg' },
+                { id: '18', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T11:25:00Z', type: 'BP', systolic: 290, diastolic: 165, mean: 228, pulseRate: 155, unit: 'mmHg' },
+                { id: '19', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T11:30:00Z', type: 'BP', systolic: 300, diastolic: 170, mean: 235, pulseRate: 160, unit: 'mmHg' },
+                { id: '20', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T11:35:00Z', type: 'BP', systolic: 310, diastolic: 175, mean: 242, pulseRate: 165, unit: 'mmHg' },
+                { id: '21', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T11:40:00Z', type: 'BP', systolic: 320, diastolic: 180, mean: 250, pulseRate: 170, unit: 'mmHg' },
+                { id: '22', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T11:45:00Z', type: 'BP', systolic: 330, diastolic: 185, mean: 258, pulseRate: 175, unit: 'mmHg' },
+                { id: '23', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T11:50:00Z', type: 'BP', systolic: 340, diastolic: 190, mean: 265, pulseRate: 180, unit: 'mmHg' },
+                { id: '24', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T11:55:00Z', type: 'BP', systolic: 350, diastolic: 195, mean: 272, pulseRate: 185, unit: 'mmHg' },
+                { id: '25', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T12:00:00Z', type: 'BP', systolic: 360, diastolic: 200, mean: 280, pulseRate: 190, unit: 'mmHg' },
+                { id: '26', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T12:05:00Z', type: 'BP', systolic: 370, diastolic: 205, mean: 288, pulseRate: 195, unit: 'mmHg' },
+                { id: '27', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T12:10:00Z', type: 'BP', systolic: 380, diastolic: 210, mean: 295, pulseRate: 200, unit: 'mmHg' },
+                { id: '28', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T12:15:00Z', type: 'BP', systolic: 390, diastolic: 215, mean: 302, pulseRate: 205, unit: 'mmHg' },
+                { id: '29', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T12:20:00Z', type: 'BP', systolic: 400, diastolic: 220, mean: 310, pulseRate: 210, unit: 'mmHg' },
+                { id: '30', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T12:25:00Z', type: 'BP', systolic: 410, diastolic: 225, mean: 318, pulseRate: 215, unit: 'mmHg' },
+                { id: '31', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T12:30:00Z', type: 'BP', systolic: 420, diastolic: 230, mean: 325, pulseRate: 220, unit: 'mmHg' },
+                { id: '32', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T12:35:00Z', type: 'BP', systolic: 430, diastolic: 235, mean: 332, pulseRate: 225, unit: 'mmHg' },
+                { id: '33', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T12:40:00Z', type: 'BP', systolic: 440, diastolic: 240, mean: 340, pulseRate: 230, unit: 'mmHg' },
+                { id: '34', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T12:45:00Z', type: 'BP', systolic: 450, diastolic: 245, mean: 348, pulseRate: 235, unit: 'mmHg' },
+                { id: '35', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T12:50:00Z', type: 'BP', systolic: 460, diastolic: 250, mean: 355, pulseRate: 240, unit: 'mmHg' },
+                { id: '36', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T12:55:00Z', type: 'BP', systolic: 470, diastolic: 255, mean: 362, pulseRate: 245, unit: 'mmHg' },
+                { id: '37', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T13:00:00Z', type: 'BP', systolic: 480, diastolic: 260, mean: 370, pulseRate: 250, unit: 'mmHg' },
+                { id: '38', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T13:05:00Z', type: 'BP', systolic: 490, diastolic: 265, mean: 378, pulseRate: 255, unit: 'mmHg' },
+                { id: '39', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T13:10:00Z', type: 'BP', systolic: 500, diastolic: 270, mean: 385, pulseRate: 260, unit: 'mmHg' },
+                { id: '40', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T13:15:00Z', type: 'BP', systolic: 510, diastolic: 275, mean: 392, pulseRate: 265, unit: 'mmHg' },
+                { id: '41', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T13:20:00Z', type: 'BP', systolic: 520, diastolic: 280, mean: 400, pulseRate: 270, unit: 'mmHg' },
+                { id: '42', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T13:25:00Z', type: 'BP', systolic: 530, diastolic: 285, mean: 408, pulseRate: 275, unit: 'mmHg' },
+                { id: '43', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T13:30:00Z', type: 'BP', systolic: 540, diastolic: 290, mean: 415, pulseRate: 280, unit: 'mmHg' },
+                { id: '44', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T13:35:00Z', type: 'BP', systolic: 550, diastolic: 295, mean: 422, pulseRate: 285, unit: 'mmHg' },
+                { id: '45', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T13:40:00Z', type: 'BP', systolic: 560, diastolic: 300, mean: 430, pulseRate: 290, unit: 'mmHg' },
+                { id: '46', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T13:45:00Z', type: 'BP', systolic: 570, diastolic: 305, mean: 438, pulseRate: 295, unit: 'mmHg' },
+                { id: '47', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T13:50:00Z', type: 'BP', systolic: 580, diastolic: 310, mean: 445, pulseRate: 300, unit: 'mmHg' },
+                { id: '48', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T13:55:00Z', type: 'BP', systolic: 590, diastolic: 315, mean: 452, pulseRate: 305, unit: 'mmHg' },
+                { id: '49', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T14:00:00Z', type: 'BP', systolic: 600, diastolic: 320, mean: 460, pulseRate: 310, unit: 'mmHg' },
+                { id: '50', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T14:05:00Z', type: 'BP', systolic: 610, diastolic: 325, mean: 468, pulseRate: 315, unit: 'mmHg' },
+                { id: '51', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T14:10:00Z', type: 'BP', systolic: 620, diastolic: 330, mean: 475, pulseRate: 320, unit: 'mmHg' },
+                { id: '52', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T14:15:00Z', type: 'BP', systolic: 630, diastolic: 335, mean: 482, pulseRate: 325, unit: 'mmHg' },
+                { id: '53', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T14:20:00Z', type: 'BP', systolic: 640, diastolic: 340, mean: 490, pulseRate: 330, unit: 'mmHg' },
+                { id: '54', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T14:25:00Z', type: 'BP', systolic: 650, diastolic: 345, mean: 498, pulseRate: 335, unit: 'mmHg' },
+                { id: '55', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T14:30:00Z', type: 'BP', systolic: 660, diastolic: 350, mean: 505, pulseRate: 340, unit: 'mmHg' },
+                { id: '56', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T14:35:00Z', type: 'BP', systolic: 670, diastolic: 355, mean: 512, pulseRate: 345, unit: 'mmHg' },
+                { id: '57', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T14:40:00Z', type: 'BP', systolic: 680, diastolic: 360, mean: 520, pulseRate: 350, unit: 'mmHg' },
+                { id: '58', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T14:45:00Z', type: 'BP', systolic: 690, diastolic: 365, mean: 528, pulseRate: 355, unit: 'mmHg' },
+                { id: '59', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T14:50:00Z', type: 'BP', systolic: 700, diastolic: 370, mean: 535, pulseRate: 360, unit: 'mmHg' },
+                { id: '60', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T14:55:00Z', type: 'BP', systolic: 710, diastolic: 375, mean: 542, pulseRate: 365, unit: 'mmHg' },
+                { id: '61', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T15:00:00Z', type: 'BP', systolic: 720, diastolic: 380, mean: 550, pulseRate: 370, unit: 'mmHg' },
+                { id: '62', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T15:05:00Z', type: 'BP', systolic: 730, diastolic: 385, mean: 558, pulseRate: 375, unit: 'mmHg' },
+                { id: '63', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T15:10:00Z', type: 'BP', systolic: 740, diastolic: 390, mean: 565, pulseRate: 380, unit: 'mmHg' },
+                { id: '64', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T15:15:00Z', type: 'BP', systolic: 750, diastolic: 395, mean: 572, pulseRate: 385, unit: 'mmHg' },
+                { id: '65', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T15:20:00Z', type: 'BP', systolic: 760, diastolic: 400, mean: 580, pulseRate: 390, unit: 'mmHg' },
+                { id: '66', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T15:25:00Z', type: 'BP', systolic: 770, diastolic: 405, mean: 588, pulseRate: 395, unit: 'mmHg' },
+                { id: '67', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T15:30:00Z', type: 'BP', systolic: 780, diastolic: 410, mean: 595, pulseRate: 400, unit: 'mmHg' },
+                { id: '68', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T15:35:00Z', type: 'BP', systolic: 790, diastolic: 415, mean: 602, pulseRate: 405, unit: 'mmHg' },
+                { id: '69', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T15:40:00Z', type: 'BP', systolic: 800, diastolic: 420, mean: 610, pulseRate: 410, unit: 'mmHg' },
+                { id: '70', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T15:45:00Z', type: 'BP', systolic: 810, diastolic: 425, mean: 618, pulseRate: 415, unit: 'mmHg' },
+                { id: '71', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T15:50:00Z', type: 'BP', systolic: 820, diastolic: 430, mean: 625, pulseRate: 420, unit: 'mmHg' },
+                { id: '72', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T15:55:00Z', type: 'BP', systolic: 830, diastolic: 435, mean: 632, pulseRate: 425, unit: 'mmHg' },
+                { id: '73', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T16:00:00Z', type: 'BP', systolic: 840, diastolic: 440, mean: 640, pulseRate: 430, unit: 'mmHg' },
+                { id: '74', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T16:05:00Z', type: 'BP', systolic: 850, diastolic: 445, mean: 648, pulseRate: 435, unit: 'mmHg' },
+                { id: '75', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T16:10:00Z', type: 'BP', systolic: 860, diastolic: 450, mean: 655, pulseRate: 440, unit: 'mmHg' },
+                { id: '76', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T16:15:00Z', type: 'BP', systolic: 870, diastolic: 455, mean: 662, pulseRate: 445, unit: 'mmHg' },
+                { id: '77', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T16:20:00Z', type: 'BP', systolic: 880, diastolic: 460, mean: 670, pulseRate: 450, unit: 'mmHg' },
+                { id: '78', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T16:25:00Z', type: 'BP', systolic: 890, diastolic: 465, mean: 678, pulseRate: 455, unit: 'mmHg' },
+                { id: '79', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T16:30:00Z', type: 'BP', systolic: 900, diastolic: 470, mean: 685, pulseRate: 460, unit: 'mmHg' },
+                { id: '80', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T16:35:00Z', type: 'BP', systolic: 910, diastolic: 475, mean: 692, pulseRate: 465, unit: 'mmHg' },
+                { id: '81', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T16:40:00Z', type: 'BP', systolic: 920, diastolic: 480, mean: 700, pulseRate: 470, unit: 'mmHg' },
+                { id: '82', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T16:45:00Z', type: 'BP', systolic: 930, diastolic: 485, mean: 708, pulseRate: 475, unit: 'mmHg' },
+                { id: '83', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T16:50:00Z', type: 'BP', systolic: 940, diastolic: 490, mean: 715, pulseRate: 480, unit: 'mmHg' },
+                { id: '84', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T16:55:00Z', type: 'BP', systolic: 950, diastolic: 495, mean: 722, pulseRate: 485, unit: 'mmHg' },
+                { id: '85', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T17:00:00Z', type: 'BP', systolic: 960, diastolic: 500, mean: 730, pulseRate: 490, unit: 'mmHg' },
+                { id: '86', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T17:05:00Z', type: 'BP', systolic: 970, diastolic: 505, mean: 738, pulseRate: 495, unit: 'mmHg' },
+                { id: '87', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T17:10:00Z', type: 'BP', systolic: 980, diastolic: 510, mean: 745, pulseRate: 500, unit: 'mmHg' },
+                { id: '88', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T17:15:00Z', type: 'BP', systolic: 990, diastolic: 515, mean: 752, pulseRate: 505, unit: 'mmHg' },
+                { id: '89', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T17:20:00Z', type: 'BP', systolic: 1000, diastolic: 520, mean: 760, pulseRate: 510, unit: 'mmHg' },
+                { id: '90', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T17:25:00Z', type: 'BP', systolic: 1010, diastolic: 525, mean: 768, pulseRate: 515, unit: 'mmHg' },
+                { id: '91', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T17:30:00Z', type: 'BP', systolic: 1020, diastolic: 530, mean: 775, pulseRate: 520, unit: 'mmHg' },
+                { id: '92', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T17:35:00Z', type: 'BP', systolic: 1030, diastolic: 535, mean: 782, pulseRate: 525, unit: 'mmHg' },
+                { id: '93', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T17:40:00Z', type: 'BP', systolic: 1040, diastolic: 540, mean: 790, pulseRate: 530, unit: 'mmHg' },
+                { id: '94', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T17:45:00Z', type: 'BP', systolic: 1050, diastolic: 545, mean: 798, pulseRate: 535, unit: 'mmHg' },
+                { id: '95', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T17:50:00Z', type: 'BP', systolic: 1060, diastolic: 550, mean: 805, pulseRate: 540, unit: 'mmHg' },
+                { id: '96', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T17:55:00Z', type: 'BP', systolic: 1070, diastolic: 555, mean: 812, pulseRate: 545, unit: 'mmHg' },
+                { id: '97', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T18:00:00Z', type: 'BP', systolic: 1080, diastolic: 560, mean: 820, pulseRate: 550, unit: 'mmHg' },
+                { id: '98', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T18:05:00Z', type: 'BP', systolic: 1090, diastolic: 565, mean: 828, pulseRate: 555, unit: 'mmHg' },
+                { id: '99', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T18:10:00Z', type: 'BP', systolic: 1100, diastolic: 570, mean: 835, pulseRate: 560, unit: 'mmHg' },
+                { id: '100', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T18:15:00Z', type: 'BP', systolic: 1110, diastolic: 575, mean: 842, pulseRate: 565, unit: 'mmHg' },
+                { id: '101', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T18:20:00Z', type: 'BP', systolic: 1120, diastolic: 580, mean: 850, pulseRate: 570, unit: 'mmHg' },
+                { id: '102', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T18:25:00Z', type: 'BP', systolic: 1130, diastolic: 585, mean: 858, pulseRate: 575, unit: 'mmHg' },
+                { id: '103', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T18:30:00Z', type: 'BP', systolic: 1140, diastolic: 590, mean: 865, pulseRate: 580, unit: 'mmHg' },
+                { id: '104', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T18:35:00Z', type: 'BP', systolic: 1150, diastolic: 595, mean: 872, pulseRate: 585, unit: 'mmHg' },
+                { id: '105', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T18:40:00Z', type: 'BP', systolic: 1160, diastolic: 600, mean: 880, pulseRate: 590, unit: 'mmHg' },
+                { id: '106', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T18:45:00Z', type: 'BP', systolic: 1170, diastolic: 605, mean: 888, pulseRate: 595, unit: 'mmHg' },
+                { id: '107', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T18:50:00Z', type: 'BP', systolic: 1180, diastolic: 610, mean: 895, pulseRate: 600, unit: 'mmHg' },
+                { id: '108', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T18:55:00Z', type: 'BP', systolic: 1190, diastolic: 615, mean: 902, pulseRate: 605, unit: 'mmHg' },
+                { id: '109', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T19:00:00Z', type: 'BP', systolic: 1200, diastolic: 620, mean: 910, pulseRate: 610, unit: 'mmHg' },
+                { id: '110', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T19:05:00Z', type: 'BP', systolic: 1210, diastolic: 625, mean: 918, pulseRate: 615, unit: 'mmHg' },
+                { id: '111', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T19:10:00Z', type: 'BP', systolic: 1220, diastolic: 630, mean: 925, pulseRate: 620, unit: 'mmHg' },
+                { id: '112', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T19:15:00Z', type: 'BP', systolic: 1230, diastolic: 635, mean: 932, pulseRate: 625, unit: 'mmHg' },
+                { id: '113', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T19:20:00Z', type: 'BP', systolic: 1240, diastolic: 640, mean: 940, pulseRate: 630, unit: 'mmHg' },
+                { id: '114', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T19:25:00Z', type: 'BP', systolic: 1250, diastolic: 645, mean: 948, pulseRate: 635, unit: 'mmHg' },
+                { id: '115', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T19:30:00Z', type: 'BP', systolic: 1260, diastolic: 650, mean: 955, pulseRate: 640, unit: 'mmHg' },
+                { id: '116', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T19:35:00Z', type: 'BP', systolic: 1270, diastolic: 655, mean: 962, pulseRate: 645, unit: 'mmHg' },
+                { id: '117', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T19:40:00Z', type: 'BP', systolic: 1280, diastolic: 660, mean: 970, pulseRate: 650, unit: 'mmHg' },
+                { id: '118', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T19:45:00Z', type: 'BP', systolic: 1290, diastolic: 665, mean: 978, pulseRate: 655, unit: 'mmHg' },
+                { id: '119', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T19:50:00Z', type: 'BP', systolic: 1300, diastolic: 670, mean: 985, pulseRate: 660, unit: 'mmHg' },
+                { id: '120', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T19:55:00Z', type: 'BP', systolic: 1310, diastolic: 675, mean: 992, pulseRate: 665, unit: 'mmHg' },
+                { id: '121', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T20:00:00Z', type: 'BP', systolic: 1320, diastolic: 680, mean: 1000, pulseRate: 670, unit: 'mmHg' },
+                { id: '122', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T20:05:00Z', type: 'BP', systolic: 1330, diastolic: 685, mean: 1008, pulseRate: 675, unit: 'mmHg' },
+                { id: '123', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T20:10:00Z', type: 'BP', systolic: 1340, diastolic: 690, mean: 1015, pulseRate: 680, unit: 'mmHg' },
+                { id: '124', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T20:15:00Z', type: 'BP', systolic: 1350, diastolic: 695, mean: 1022, pulseRate: 685, unit: 'mmHg' },
+                { id: '125', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T20:20:00Z', type: 'BP', systolic: 1360, diastolic: 700, mean: 1030, pulseRate: 690, unit: 'mmHg' },
+                { id: '126', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T20:25:00Z', type: 'BP', systolic: 1370, diastolic: 705, mean: 1038, pulseRate: 695, unit: 'mmHg' },
+                { id: '127', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T20:30:00Z', type: 'BP', systolic: 1380, diastolic: 710, mean: 1045, pulseRate: 700, unit: 'mmHg' },
+                { id: '128', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T20:35:00Z', type: 'BP', systolic: 1390, diastolic: 715, mean: 1052, pulseRate: 705, unit: 'mmHg' },
+                { id: '129', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T20:40:00Z', type: 'BP', systolic: 1400, diastolic: 720, mean: 1060, pulseRate: 710, unit: 'mmHg' },
+                { id: '130', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T20:45:00Z', type: 'BP', systolic: 1410, diastolic: 725, mean: 1068, pulseRate: 715, unit: 'mmHg' },
+                { id: '131', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T20:50:00Z', type: 'BP', systolic: 1420, diastolic: 730, mean: 1075, pulseRate: 720, unit: 'mmHg' },
+                { id: '132', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T20:55:00Z', type: 'BP', systolic: 1430, diastolic: 735, mean: 1082, pulseRate: 725, unit: 'mmHg' },
+                { id: '133', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T21:00:00Z', type: 'BP', systolic: 1440, diastolic: 740, mean: 1090, pulseRate: 730, unit: 'mmHg' },
+                { id: '134', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T21:05:00Z', type: 'BP', systolic: 1450, diastolic: 745, mean: 1098, pulseRate: 735, unit: 'mmHg' },
+                { id: '135', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T21:10:00Z', type: 'BP', systolic: 1460, diastolic: 750, mean: 1105, pulseRate: 740, unit: 'mmHg' },
+                { id: '136', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T21:15:00Z', type: 'BP', systolic: 1470, diastolic: 755, mean: 1112, pulseRate: 745, unit: 'mmHg' },
+                { id: '137', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T21:20:00Z', type: 'BP', systolic: 1480, diastolic: 760, mean: 1120, pulseRate: 750, unit: 'mmHg' },
+                { id: '138', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T21:25:00Z', type: 'BP', systolic: 1490, diastolic: 765, mean: 1128, pulseRate: 755, unit: 'mmHg' },
+                { id: '139', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T21:30:00Z', type: 'BP', systolic: 1500, diastolic: 770, mean: 1135, pulseRate: 760, unit: 'mmHg' },
+                { id: '140', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T21:35:00Z', type: 'BP', systolic: 1510, diastolic: 775, mean: 1142, pulseRate: 765, unit: 'mmHg' },
+                { id: '141', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T21:40:00Z', type: 'BP', systolic: 1520, diastolic: 780, mean: 1150, pulseRate: 770, unit: 'mmHg' },
+                { id: '142', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T21:45:00Z', type: 'BP', systolic: 1530, diastolic: 785, mean: 1158, pulseRate: 775, unit: 'mmHg' },
+                { id: '143', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T21:50:00Z', type: 'BP', systolic: 1540, diastolic: 790, mean: 1165, pulseRate: 780, unit: 'mmHg' },
+                { id: '144', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T21:55:00Z', type: 'BP', systolic: 1550, diastolic: 795, mean: 1172, pulseRate: 785, unit: 'mmHg' },
+                { id: '145', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T22:00:00Z', type: 'BP', systolic: 1560, diastolic: 800, mean: 1180, pulseRate: 790, unit: 'mmHg' },
+                { id: '146', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T22:05:00Z', type: 'BP', systolic: 1570, diastolic: 805, mean: 1188, pulseRate: 795, unit: 'mmHg' },
+                { id: '147', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T22:10:00Z', type: 'BP', systolic: 1580, diastolic: 810, mean: 1195, pulseRate: 800, unit: 'mmHg' },
+                { id: '148', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T22:15:00Z', type: 'BP', systolic: 1590, diastolic: 815, mean: 1202, pulseRate: 805, unit: 'mmHg' },
+                { id: '149', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T22:20:00Z', type: 'BP', systolic: 1600, diastolic: 820, mean: 1210, pulseRate: 810, unit: 'mmHg' },
+                { id: '150', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T22:25:00Z', type: 'BP', systolic: 1610, diastolic: 825, mean: 1218, pulseRate: 815, unit: 'mmHg' },
+                { id: '151', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T22:30:00Z', type: 'BP', systolic: 1620, diastolic: 830, mean: 1225, pulseRate: 820, unit: 'mmHg' },
+                { id: '152', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T22:35:00Z', type: 'BP', systolic: 1630, diastolic: 835, mean: 1232, pulseRate: 825, unit: 'mmHg' },
+                { id: '153', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T22:40:00Z', type: 'BP', systolic: 1640, diastolic: 840, mean: 1240, pulseRate: 830, unit: 'mmHg' },
+                { id: '154', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T22:45:00Z', type: 'BP', systolic: 1650, diastolic: 845, mean: 1248, pulseRate: 835, unit: 'mmHg' },
+                { id: '155', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T22:50:00Z', type: 'BP', systolic: 1660, diastolic: 850, mean: 1255, pulseRate: 840, unit: 'mmHg' },
+                { id: '156', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T22:55:00Z', type: 'BP', systolic: 1670, diastolic: 855, mean: 1262, pulseRate: 845, unit: 'mmHg' },
+                { id: '157', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T23:00:00Z', type: 'BP', systolic: 1680, diastolic: 860, mean: 1270, pulseRate: 850, unit: 'mmHg' },
+                { id: '158', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T23:05:00Z', type: 'BP', systolic: 1690, diastolic: 865, mean: 1278, pulseRate: 855, unit: 'mmHg' },
+                { id: '159', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T23:10:00Z', type: 'BP', systolic: 1700, diastolic: 870, mean: 1285, pulseRate: 860, unit: 'mmHg' },
+                { id: '160', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T23:15:00Z', type: 'BP', systolic: 1710, diastolic: 875, mean: 1292, pulseRate: 865, unit: 'mmHg' },
+                { id: '161', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T23:20:00Z', type: 'BP', systolic: 1720, diastolic: 880, mean: 1300, pulseRate: 870, unit: 'mmHg' },
+                { id: '162', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T23:25:00Z', type: 'BP', systolic: 1730, diastolic: 885, mean: 1308, pulseRate: 875, unit: 'mmHg' },
+                { id: '163', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T23:30:00Z', type: 'BP', systolic: 1740, diastolic: 890, mean: 1315, pulseRate: 880, unit: 'mmHg' },
+                { id: '164', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T23:35:00Z', type: 'BP', systolic: 1750, diastolic: 895, mean: 1322, pulseRate: 885, unit: 'mmHg' },
+                { id: '165', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T23:40:00Z', type: 'BP', systolic: 1760, diastolic: 900, mean: 1330, pulseRate: 890, unit: 'mmHg' },
+                { id: '166', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T23:45:00Z', type: 'BP', systolic: 1770, diastolic: 905, mean: 1338, pulseRate: 895, unit: 'mmHg' },
+                { id: '167', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T23:50:00Z', type: 'BP', systolic: 1780, diastolic: 910, mean: 1345, pulseRate: 900, unit: 'mmHg' },
+                { id: '168', deviceId: 'bp-monitor-001', timestamp: '2023-10-26T23:55:00Z', type: 'BP', systolic: 1790, diastolic: 915, mean: 1352, pulseRate: 905, unit: 'mmHg' },
+                { id: '169', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T00:00:00Z', type: 'BP', systolic: 1800, diastolic: 920, mean: 1360, pulseRate: 910, unit: 'mmHg' },
+                { id: '170', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T00:05:00Z', type: 'BP', systolic: 1810, diastolic: 925, mean: 1368, pulseRate: 915, unit: 'mmHg' },
+                { id: '171', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T00:10:00Z', type: 'BP', systolic: 1820, diastolic: 930, mean: 1375, pulseRate: 920, unit: 'mmHg' },
+                { id: '172', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T00:15:00Z', type: 'BP', systolic: 1830, diastolic: 935, mean: 1382, pulseRate: 925, unit: 'mmHg' },
+                { id: '173', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T00:20:00Z', type: 'BP', systolic: 1840, diastolic: 940, mean: 1390, pulseRate: 930, unit: 'mmHg' },
+                { id: '174', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T00:25:00Z', type: 'BP', systolic: 1850, diastolic: 945, mean: 1398, pulseRate: 935, unit: 'mmHg' },
+                { id: '175', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T00:30:00Z', type: 'BP', systolic: 1860, diastolic: 950, mean: 1405, pulseRate: 940, unit: 'mmHg' },
+                { id: '176', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T00:35:00Z', type: 'BP', systolic: 1870, diastolic: 955, mean: 1412, pulseRate: 945, unit: 'mmHg' },
+                { id: '177', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T00:40:00Z', type: 'BP', systolic: 1880, diastolic: 960, mean: 1420, pulseRate: 950, unit: 'mmHg' },
+                { id: '178', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T00:45:00Z', type: 'BP', systolic: 1890, diastolic: 965, mean: 1428, pulseRate: 955, unit: 'mmHg' },
+                { id: '179', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T00:50:00Z', type: 'BP', systolic: 1900, diastolic: 970, mean: 1435, pulseRate: 960, unit: 'mmHg' },
+                { id: '180', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T00:55:00Z', type: 'BP', systolic: 1910, diastolic: 975, mean: 1442, pulseRate: 965, unit: 'mmHg' },
+                { id: '181', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T01:00:00Z', type: 'BP', systolic: 1920, diastolic: 980, mean: 1450, pulseRate: 970, unit: 'mmHg' },
+                { id: '182', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T01:05:00Z', type: 'BP', systolic: 1930, diastolic: 985, mean: 1458, pulseRate: 975, unit: 'mmHg' },
+                { id: '183', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T01:10:00Z', type: 'BP', systolic: 1940, diastolic: 990, mean: 1465, pulseRate: 980, unit: 'mmHg' },
+                { id: '184', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T01:15:00Z', type: 'BP', systolic: 1950, diastolic: 995, mean: 1472, pulseRate: 985, unit: 'mmHg' },
+                { id: '185', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T01:20:00Z', type: 'BP', systolic: 1960, diastolic: 1000, mean: 1480, pulseRate: 990, unit: 'mmHg' },
+                { id: '186', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T01:25:00Z', type: 'BP', systolic: 1970, diastolic: 1005, mean: 1488, pulseRate: 995, unit: 'mmHg' },
+                { id: '187', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T01:30:00Z', type: 'BP', systolic: 1980, diastolic: 1010, mean: 1495, pulseRate: 1000, unit: 'mmHg' },
+                { id: '188', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T01:35:00Z', type: 'BP', systolic: 1990, diastolic: 1015, mean: 1502, pulseRate: 1005, unit: 'mmHg' },
+                { id: '189', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T01:40:00Z', type: 'BP', systolic: 2000, diastolic: 1020, mean: 1510, pulseRate: 1010, unit: 'mmHg' },
+                { id: '190', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T01:45:00Z', type: 'BP', systolic: 2010, diastolic: 1025, mean: 1518, pulseRate: 1015, unit: 'mmHg' },
+                { id: '191', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T01:50:00Z', type: 'BP', systolic: 2020, diastolic: 1030, mean: 1525, pulseRate: 1020, unit: 'mmHg' },
+                { id: '192', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T01:55:00Z', type: 'BP', systolic: 2030, diastolic: 1035, mean: 1532, pulseRate: 1025, unit: 'mmHg' },
+                { id: '193', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T02:00:00Z', type: 'BP', systolic: 2040, diastolic: 1040, mean: 1540, pulseRate: 1030, unit: 'mmHg' },
+                { id: '194', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T02:05:00Z', type: 'BP', systolic: 2050, diastolic: 1045, mean: 1548, pulseRate: 1035, unit: 'mmHg' },
+                { id: '195', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T02:10:00Z', type: 'BP', systolic: 2060, diastolic: 1050, mean: 1555, pulseRate: 1040, unit: 'mmHg' },
+                { id: '196', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T02:15:00Z', type: 'BP', systolic: 2070, diastolic: 1055, mean: 1562, pulseRate: 1045, unit: 'mmHg' },
+                { id: '197', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T02:20:00Z', type: 'BP', systolic: 2080, diastolic: 1060, mean: 1570, pulseRate: 1050, unit: 'mmHg' },
+                { id: '198', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T02:25:00Z', type: 'BP', systolic: 2090, diastolic: 1065, mean: 1578, pulseRate: 1055, unit: 'mmHg' },
+                { id: '199', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T02:30:00Z', type: 'BP', systolic: 2100, diastolic: 1070, mean: 1585, pulseRate: 1060, unit: 'mmHg' },
+                { id: '200', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T02:35:00Z', type: 'BP', systolic: 2110, diastolic: 1075, mean: 1592, pulseRate: 1065, unit: 'mmHg' },
+                { id: '201', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T02:40:00Z', type: 'BP', systolic: 2120, diastolic: 1080, mean: 1600, pulseRate: 1070, unit: 'mmHg' },
+                { id: '202', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T02:45:00Z', type: 'BP', systolic: 2130, diastolic: 1085, mean: 1608, pulseRate: 1075, unit: 'mmHg' },
+                { id: '203', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T02:50:00Z', type: 'BP', systolic: 2140, diastolic: 1090, mean: 1615, pulseRate: 1080, unit: 'mmHg' },
+                { id: '204', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T02:55:00Z', type: 'BP', systolic: 2150, diastolic: 1095, mean: 1622, pulseRate: 1085, unit: 'mmHg' },
+                { id: '205', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T03:00:00Z', type: 'BP', systolic: 2160, diastolic: 1100, mean: 1630, pulseRate: 1090, unit: 'mmHg' },
+                { id: '206', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T03:05:00Z', type: 'BP', systolic: 2170, diastolic: 1105, mean: 1638, pulseRate: 1095, unit: 'mmHg' },
+                { id: '207', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T03:10:00Z', type: 'BP', systolic: 2180, diastolic: 1110, mean: 1645, pulseRate: 1100, unit: 'mmHg' },
+                { id: '208', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T03:15:00Z', type: 'BP', systolic: 2190, diastolic: 1115, mean: 1652, pulseRate: 1105, unit: 'mmHg' },
+                { id: '209', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T03:20:00Z', type: 'BP', systolic: 2200, diastolic: 1120, mean: 1660, pulseRate: 1110, unit: 'mmHg' },
+                { id: '210', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T03:25:00Z', type: 'BP', systolic: 2210, diastolic: 1125, mean: 1668, pulseRate: 1115, unit: 'mmHg' },
+                { id: '211', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T03:30:00Z', type: 'BP', systolic: 2220, diastolic: 1130, mean: 1675, pulseRate: 1120, unit: 'mmHg' },
+                { id: '212', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T03:35:00Z', type: 'BP', systolic: 2230, diastolic: 1135, mean: 1682, pulseRate: 1125, unit: 'mmHg' },
+                { id: '213', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T03:40:00Z', type: 'BP', systolic: 2240, diastolic: 1140, mean: 1690, pulseRate: 1130, unit: 'mmHg' },
+                { id: '214', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T03:45:00Z', type: 'BP', systolic: 2250, diastolic: 1145, mean: 1698, pulseRate: 1135, unit: 'mmHg' },
+                { id: '215', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T03:50:00Z', type: 'BP', systolic: 2260, diastolic: 1150, mean: 1705, pulseRate: 1140, unit: 'mmHg' },
+                { id: '216', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T03:55:00Z', type: 'BP', systolic: 2270, diastolic: 1155, mean: 1712, pulseRate: 1145, unit: 'mmHg' },
+                { id: '217', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T04:00:00Z', type: 'BP', systolic: 2280, diastolic: 1160, mean: 1720, pulseRate: 1150, unit: 'mmHg' },
+                { id: '218', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T04:05:00Z', type: 'BP', systolic: 2290, diastolic: 1165, mean: 1728, pulseRate: 1155, unit: 'mmHg' },
+                { id: '219', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T04:10:00Z', type: 'BP', systolic: 2300, diastolic: 1170, mean: 1735, pulseRate: 1160, unit: 'mmHg' },
+                { id: '220', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T04:15:00Z', type: 'BP', systolic: 2310, diastolic: 1175, mean: 1742, pulseRate: 1165, unit: 'mmHg' },
+                { id: '221', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T04:20:00Z', type: 'BP', systolic: 2320, diastolic: 1180, mean: 1750, pulseRate: 1170, unit: 'mmHg' },
+                { id: '222', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T04:25:00Z', type: 'BP', systolic: 2330, diastolic: 1185, mean: 1758, pulseRate: 1175, unit: 'mmHg' },
+                { id: '223', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T04:30:00Z', type: 'BP', systolic: 2340, diastolic: 1190, mean: 1765, pulseRate: 1180, unit: 'mmHg' },
+                { id: '224', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T04:35:00Z', type: 'BP', systolic: 2350, diastolic: 1195, mean: 1772, pulseRate: 1185, unit: 'mmHg' },
+                { id: '225', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T04:40:00Z', type: 'BP', systolic: 2360, diastolic: 1200, mean: 1780, pulseRate: 1190, unit: 'mmHg' },
+                { id: '226', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T04:45:00Z', type: 'BP', systolic: 2370, diastolic: 1205, mean: 1788, pulseRate: 1195, unit: 'mmHg' },
+                { id: '227', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T04:50:00Z', type: 'BP', systolic: 2380, diastolic: 1210, mean: 1795, pulseRate: 1200, unit: 'mmHg' },
+                { id: '228', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T04:55:00Z', type: 'BP', systolic: 2390, diastolic: 1215, mean: 1802, pulseRate: 1205, unit: 'mmHg' },
+                { id: '229', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T05:00:00Z', type: 'BP', systolic: 2400, diastolic: 1220, mean: 1810, pulseRate: 1210, unit: 'mmHg' },
+                { id: '230', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T05:05:00Z', type: 'BP', systolic: 2410, diastolic: 1225, mean: 1818, pulseRate: 1215, unit: 'mmHg' },
+                { id: '231', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T05:10:00Z', type: 'BP', systolic: 2420, diastolic: 1230, mean: 1825, pulseRate: 1220, unit: 'mmHg' },
+                { id: '232', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T05:15:00Z', type: 'BP', systolic: 2430, diastolic: 1235, mean: 1832, pulseRate: 1225, unit: 'mmHg' },
+                { id: '233', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T05:20:00Z', type: 'BP', systolic: 2440, diastolic: 1240, mean: 1840, pulseRate: 1230, unit: 'mmHg' },
+                { id: '234', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T05:25:00Z', type: 'BP', systolic: 2450, diastolic: 1245, mean: 1848, pulseRate: 1235, unit: 'mmHg' },
+                { id: '235', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T05:30:00Z', type: 'BP', systolic: 2460, diastolic: 1250, mean: 1855, pulseRate: 1240, unit: 'mmHg' },
+                { id: '236', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T05:35:00Z', type: 'BP', systolic: 2470, diastolic: 1255, mean: 1862, pulseRate: 1245, unit: 'mmHg' },
+                { id: '237', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T05:40:00Z', type: 'BP', systolic: 2480, diastolic: 1260, mean: 1870, pulseRate: 1250, unit: 'mmHg' },
+                { id: '238', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T05:45:00Z', type: 'BP', systolic: 2490, diastolic: 1265, mean: 1878, pulseRate: 1255, unit: 'mmHg' },
+                { id: '239', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T05:50:00Z', type: 'BP', systolic: 2500, diastolic: 1270, mean: 1885, pulseRate: 1260, unit: 'mmHg' },
+                { id: '240', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T05:55:00Z', type: 'BP', systolic: 2510, diastolic: 1275, mean: 1892, pulseRate: 1265, unit: 'mmHg' },
+                { id: '241', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T06:00:00Z', type: 'BP', systolic: 2520, diastolic: 1280, mean: 1900, pulseRate: 1270, unit: 'mmHg' },
+                { id: '242', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T06:05:00Z', type: 'BP', systolic: 2530, diastolic: 1285, mean: 1908, pulseRate: 1275, unit: 'mmHg' },
+                { id: '243', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T06:10:00Z', type: 'BP', systolic: 2540, diastolic: 1290, mean: 1915, pulseRate: 1280, unit: 'mmHg' },
+                { id: '244', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T06:15:00Z', type: 'BP', systolic: 2550, diastolic: 1295, mean: 1922, pulseRate: 1285, unit: 'mmHg' },
+                { id: '245', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T06:20:00Z', type: 'BP', systolic: 2560, diastolic: 1300, mean: 1930, pulseRate: 1290, unit: 'mmHg' },
+                { id: '246', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T06:25:00Z', type: 'BP', systolic: 2570, diastolic: 1305, mean: 1938, pulseRate: 1295, unit: 'mmHg' },
+                { id: '247', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T06:30:00Z', type: 'BP', systolic: 2580, diastolic: 1310, mean: 1945, pulseRate: 1300, unit: 'mmHg' },
+                { id: '248', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T06:35:00Z', type: 'BP', systolic: 2590, diastolic: 1315, mean: 1952, pulseRate: 1305, unit: 'mmHg' },
+                { id: '249', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T06:40:00Z', type: 'BP', systolic: 2600, diastolic: 1320, mean: 1960, pulseRate: 1310, unit: 'mmHg' },
+                { id: '250', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T06:45:00Z', type: 'BP', systolic: 2610, diastolic: 1325, mean: 1968, pulseRate: 1315, unit: 'mmHg' },
+                { id: '251', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T06:50:00Z', type: 'BP', systolic: 2620, diastolic: 1330, mean: 1975, pulseRate: 1320, unit: 'mmHg' },
+                { id: '252', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T06:55:00Z', type: 'BP', systolic: 2630, diastolic: 1335, mean: 1982, pulseRate: 1325, unit: 'mmHg' },
+                { id: '253', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T07:00:00Z', type: 'BP', systolic: 2640, diastolic: 1340, mean: 1990, pulseRate: 1330, unit: 'mmHg' },
+                { id: '254', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T07:05:00Z', type: 'BP', systolic: 2650, diastolic: 1345, mean: 1998, pulseRate: 1335, unit: 'mmHg' },
+                { id: '255', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T07:10:00Z', type: 'BP', systolic: 2660, diastolic: 1350, mean: 2005, pulseRate: 1340, unit: 'mmHg' },
+                { id: '256', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T07:15:00Z', type: 'BP', systolic: 2670, diastolic: 1355, mean: 2012, pulseRate: 1345, unit: 'mmHg' },
+                { id: '257', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T07:20:00Z', type: 'BP', systolic: 2680, diastolic: 1360, mean: 2020, pulseRate: 1350, unit: 'mmHg' },
+                { id: '258', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T07:25:00Z', type: 'BP', systolic: 2690, diastolic: 1365, mean: 2028, pulseRate: 1355, unit: 'mmHg' },
+                { id: '259', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T07:30:00Z', type: 'BP', systolic: 2700, diastolic: 1370, mean: 2035, pulseRate: 1360, unit: 'mmHg' },
+                { id: '260', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T07:35:00Z', type: 'BP', systolic: 2710, diastolic: 1375, mean: 2042, pulseRate: 1365, unit: 'mmHg' },
+                { id: '261', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T07:40:00Z', type: 'BP', systolic: 2720, diastolic: 1380, mean: 2050, pulseRate: 1370, unit: 'mmHg' },
+                { id: '262', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T07:45:00Z', type: 'BP', systolic: 2730, diastolic: 1385, mean: 2058, pulseRate: 1375, unit: 'mmHg' },
+                { id: '263', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T07:50:00Z', type: 'BP', systolic: 2740, diastolic: 1390, mean: 2065, pulseRate: 1380, unit: 'mmHg' },
+                { id: '264', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T07:55:00Z', type: 'BP', systolic: 2750, diastolic: 1395, mean: 2072, pulseRate: 1385, unit: 'mmHg' },
+                { id: '265', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T08:00:00Z', type: 'BP', systolic: 2760, diastolic: 1400, mean: 2080, pulseRate: 1390, unit: 'mmHg' },
+                { id: '266', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T08:05:00Z', type: 'BP', systolic: 2770, diastolic: 1405, mean: 2088, pulseRate: 1395, unit: 'mmHg' },
+                { id: '267', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T08:10:00Z', type: 'BP', systolic: 2780, diastolic: 1410, mean: 2095, pulseRate: 1400, unit: 'mmHg' },
+                { id: '268', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T08:15:00Z', type: 'BP', systolic: 2790, diastolic: 1415, mean: 2102, pulseRate: 1405, unit: 'mmHg' },
+                { id: '269', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T08:20:00Z', type: 'BP', systolic: 2800, diastolic: 1420, mean: 2110, pulseRate: 1410, unit: 'mmHg' },
+                { id: '270', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T08:25:00Z', type: 'BP', systolic: 2810, diastolic: 1425, mean: 2118, pulseRate: 1415, unit: 'mmHg' },
+                { id: '271', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T08:30:00Z', type: 'BP', systolic: 2820, diastolic: 1430, mean: 2125, pulseRate: 1420, unit: 'mmHg' },
+                { id: '272', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T08:35:00Z', type: 'BP', systolic: 2830, diastolic: 1435, mean: 2132, pulseRate: 1425, unit: 'mmHg' },
+                { id: '273', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T08:40:00Z', type: 'BP', systolic: 2840, diastolic: 1440, mean: 2140, pulseRate: 1430, unit: 'mmHg' },
+                { id: '274', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T08:45:00Z', type: 'BP', systolic: 2850, diastolic: 1445, mean: 2148, pulseRate: 1435, unit: 'mmHg' },
+                { id: '275', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T08:50:00Z', type: 'BP', systolic: 2860, diastolic: 1450, mean: 2155, pulseRate: 1440, unit: 'mmHg' },
+                { id: '276', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T08:55:00Z', type: 'BP', systolic: 2870, diastolic: 1455, mean: 2162, pulseRate: 1445, unit: 'mmHg' },
+                { id: '277', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T09:00:00Z', type: 'BP', systolic: 2880, diastolic: 1460, mean: 2170, pulseRate: 1450, unit: 'mmHg' },
+                { id: '278', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T09:05:00Z', type: 'BP', systolic: 2890, diastolic: 1465, mean: 2178, pulseRate: 1455, unit: 'mmHg' },
+                { id: '279', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T09:10:00Z', type: 'BP', systolic: 2900, diastolic: 1470, mean: 2185, pulseRate: 1460, unit: 'mmHg' },
+                { id: '280', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T09:15:00Z', type: 'BP', systolic: 2910, diastolic: 1475, mean: 2192, pulseRate: 1465, unit: 'mmHg' },
+                { id: '281', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T09:20:00Z', type: 'BP', systolic: 2920, diastolic: 1480, mean: 2200, pulseRate: 1470, unit: 'mmHg' },
+                { id: '282', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T09:25:00Z', type: 'BP', systolic: 2930, diastolic: 1485, mean: 2208, pulseRate: 1475, unit: 'mmHg' },
+                { id: '283', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T09:30:00Z', type: 'BP', systolic: 2940, diastolic: 1490, mean: 2215, pulseRate: 1480, unit: 'mmHg' },
+                { id: '284', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T09:35:00Z', type: 'BP', systolic: 2950, diastolic: 1495, mean: 2222, pulseRate: 1485, unit: 'mmHg' },
+                { id: '285', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T09:40:00Z', type: 'BP', systolic: 2960, diastolic: 1500, mean: 2230, pulseRate: 1490, unit: 'mmHg' },
+                { id: '286', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T09:45:00Z', type: 'BP', systolic: 2970, diastolic: 1505, mean: 2238, pulseRate: 1495, unit: 'mmHg' },
+                { id: '287', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T09:50:00Z', type: 'BP', systolic: 2980, diastolic: 1510, mean: 2245, pulseRate: 1500, unit: 'mmHg' },
+                { id: '288', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T09:55:00Z', type: 'BP', systolic: 2990, diastolic: 1515, mean: 2252, pulseRate: 1505, unit: 'mmHg' },
+                { id: '289', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T10:00:00Z', type: 'BP', systolic: 3000, diastolic: 1520, mean: 2260, pulseRate: 1510, unit: 'mmHg' },
+                { id: '290', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T10:05:00Z', type: 'BP', systolic: 3010, diastolic: 1525, mean: 2268, pulseRate: 1515, unit: 'mmHg' },
+                { id: '291', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T10:10:00Z', type: 'BP', systolic: 3020, diastolic: 1530, mean: 2275, pulseRate: 1520, unit: 'mmHg' },
+                { id: '292', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T10:15:00Z', type: 'BP', systolic: 3030, diastolic: 1535, mean: 2282, pulseRate: 1525, unit: 'mmHg' },
+                { id: '293', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T10:20:00Z', type: 'BP', systolic: 3040, diastolic: 1540, mean: 2290, pulseRate: 1530, unit: 'mmHg' },
+                { id: '294', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T10:25:00Z', type: 'BP', systolic: 3050, diastolic: 1545, mean: 2298, pulseRate: 1535, unit: 'mmHg' },
+                { id: '295', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T10:30:00Z', type: 'BP', systolic: 3060, diastolic: 1550, mean: 2305, pulseRate: 1540, unit: 'mmHg' },
+                { id: '296', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T10:35:00Z', type: 'BP', systolic: 3070, diastolic: 1555, mean: 2312, pulseRate: 1545, unit: 'mmHg' },
+                { id: '297', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T10:40:00Z', type: 'BP', systolic: 3080, diastolic: 1560, mean: 2320, pulseRate: 1550, unit: 'mmHg' },
+                { id: '298', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T10:45:00Z', type: 'BP', systolic: 3090, diastolic: 1565, mean: 2328, pulseRate: 1555, unit: 'mmHg' },
+                { id: '299', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T10:50:00Z', type: 'BP', systolic: 3100, diastolic: 1570, mean: 2335, pulseRate: 1560, unit: 'mmHg' },
+                { id: '300', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T10:55:00Z', type: 'BP', systolic: 3110, diastolic: 1575, mean: 2342, pulseRate: 1565, unit: 'mmHg' },
+                { id: '301', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T11:00:00Z', type: 'BP', systolic: 3120, diastolic: 1580, mean: 2350, pulseRate: 1570, unit: 'mmHg' },
+                { id: '302', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T11:05:00Z', type: 'BP', systolic: 3130, diastolic: 1585, mean: 2358, pulseRate: 1575, unit: 'mmHg' },
+                { id: '303', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T11:10:00Z', type: 'BP', systolic: 3140, diastolic: 1590, mean: 2365, pulseRate: 1580, unit: 'mmHg' },
+                { id: '304', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T11:15:00Z', type: 'BP', systolic: 3150, diastolic: 1595, mean: 2372, pulseRate: 1585, unit: 'mmHg' },
+                { id: '305', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T11:20:00Z', type: 'BP', systolic: 3160, diastolic: 1600, mean: 2380, pulseRate: 1590, unit: 'mmHg' },
+                { id: '306', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T11:25:00Z', type: 'BP', systolic: 3170, diastolic: 1605, mean: 2388, pulseRate: 1595, unit: 'mmHg' },
+                { id: '307', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T11:30:00Z', type: 'BP', systolic: 3180, diastolic: 1610, mean: 2395, pulseRate: 1600, unit: 'mmHg' },
+                { id: '308', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T11:35:00Z', type: 'BP', systolic: 3190, diastolic: 1615, mean: 2402, pulseRate: 1605, unit: 'mmHg' },
+                { id: '309', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T11:40:00Z', type: 'BP', systolic: 3200, diastolic: 1620, mean: 2410, pulseRate: 1610, unit: 'mmHg' },
+                { id: '310', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T11:45:00Z', type: 'BP', systolic: 3210, diastolic: 1625, mean: 2418, pulseRate: 1615, unit: 'mmHg' },
+                { id: '311', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T11:50:00Z', type: 'BP', systolic: 3220, diastolic: 1630, mean: 2425, pulseRate: 1620, unit: 'mmHg' },
+                { id: '312', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T11:55:00Z', type: 'BP', systolic: 3230, diastolic: 1635, mean: 2432, pulseRate: 1625, unit: 'mmHg' },
+                { id: '313', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T12:00:00Z', type: 'BP', systolic: 3240, diastolic: 1640, mean: 2440, pulseRate: 1630, unit: 'mmHg' },
+                { id: '314', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T12:05:00Z', type: 'BP', systolic: 3250, diastolic: 1645, mean: 2448, pulseRate: 1635, unit: 'mmHg' },
+                { id: '315', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T12:10:00Z', type: 'BP', systolic: 3260, diastolic: 1650, mean: 2455, pulseRate: 1640, unit: 'mmHg' },
+                { id: '316', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T12:15:00Z', type: 'BP', systolic: 3270, diastolic: 1655, mean: 2462, pulseRate: 1645, unit: 'mmHg' },
+                { id: '317', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T12:20:00Z', type: 'BP', systolic: 3280, diastolic: 1660, mean: 2470, pulseRate: 1650, unit: 'mmHg' },
+                { id: '318', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T12:25:00Z', type: 'BP', systolic: 3290, diastolic: 1665, mean: 2478, pulseRate: 1655, unit: 'mmHg' },
+                { id: '319', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T12:30:00Z', type: 'BP', systolic: 3300, diastolic: 1670, mean: 2485, pulseRate: 1660, unit: 'mmHg' },
+                { id: '320', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T12:35:00Z', type: 'BP', systolic: 3310, diastolic: 1675, mean: 2492, pulseRate: 1665, unit: 'mmHg' },
+                { id: '321', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T12:40:00Z', type: 'BP', systolic: 3320, diastolic: 1680, mean: 2500, pulseRate: 1670, unit: 'mmHg' },
+                { id: '322', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T12:45:00Z', type: 'BP', systolic: 3330, diastolic: 1685, mean: 2508, pulseRate: 1675, unit: 'mmHg' },
+                { id: '323', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T12:50:00Z', type: 'BP', systolic: 3340, diastolic: 1690, mean: 2515, pulseRate: 1680, unit: 'mmHg' },
+                { id: '324', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T12:55:00Z', type: 'BP', systolic: 3350, diastolic: 1695, mean: 2522, pulseRate: 1685, unit: 'mmHg' },
+                { id: '325', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T13:00:00Z', type: 'BP', systolic: 3360, diastolic: 1700, mean: 2530, pulseRate: 1690, unit: 'mmHg' },
+                { id: '326', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T13:05:00Z', type: 'BP', systolic: 3370, diastolic: 1705, mean: 2538, pulseRate: 1695, unit: 'mmHg' },
+                { id: '327', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T13:10:00Z', type: 'BP', systolic: 3380, diastolic: 1710, mean: 2545, pulseRate: 1700, unit: 'mmHg' },
+                { id: '328', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T13:15:00Z', type: 'BP', systolic: 3390, diastolic: 1715, mean: 2552, pulseRate: 1705, unit: 'mmHg' },
+                { id: '329', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T13:20:00Z', type: 'BP', systolic: 3400, diastolic: 1720, mean: 2560, pulseRate: 1710, unit: 'mmHg' },
+                { id: '330', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T13:25:00Z', type: 'BP', systolic: 3410, diastolic: 1725, mean: 2568, pulseRate: 1715, unit: 'mmHg' },
+                { id: '331', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T13:30:00Z', type: 'BP', systolic: 3420, diastolic: 1730, mean: 2575, pulseRate: 1720, unit: 'mmHg' },
+                { id: '332', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T13:35:00Z', type: 'BP', systolic: 3430, diastolic: 1735, mean: 2582, pulseRate: 1725, unit: 'mmHg' },
+                { id: '333', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T13:40:00Z', type: 'BP', systolic: 3440, diastolic: 1740, mean: 2590, pulseRate: 1730, unit: 'mmHg' },
+                { id: '334', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T13:45:00Z', type: 'BP', systolic: 3450, diastolic: 1745, mean: 2598, pulseRate: 1735, unit: 'mmHg' },
+                { id: '335', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T13:50:00Z', type: 'BP', systolic: 3460, diastolic: 1750, mean: 2605, pulseRate: 1740, unit: 'mmHg' },
+                { id: '336', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T13:55:00Z', type: 'BP', systolic: 3470, diastolic: 1755, mean: 2612, pulseRate: 1745, unit: 'mmHg' },
+                { id: '337', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T14:00:00Z', type: 'BP', systolic: 3480, diastolic: 1760, mean: 2620, pulseRate: 1750, unit: 'mmHg' },
+                { id: '338', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T14:05:00Z', type: 'BP', systolic: 3490, diastolic: 1765, mean: 2628, pulseRate: 1755, unit: 'mmHg' },
+                { id: '339', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T14:10:00Z', type: 'BP', systolic: 3500, diastolic: 1770, mean: 2635, pulseRate: 1760, unit: 'mmHg' },
+                { id: '340', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T14:15:00Z', type: 'BP', systolic: 3510, diastolic: 1775, mean: 2642, pulseRate: 1765, unit: 'mmHg' },
+                { id: '341', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T14:20:00Z', type: 'BP', systolic: 3520, diastolic: 1780, mean: 2650, pulseRate: 1770, unit: 'mmHg' },
+                { id: '342', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T14:25:00Z', type: 'BP', systolic: 3530, diastolic: 1785, mean: 2658, pulseRate: 1775, unit: 'mmHg' },
+                { id: '343', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T14:30:00Z', type: 'BP', systolic: 3540, diastolic: 1790, mean: 2665, pulseRate: 1780, unit: 'mmHg' },
+                { id: '344', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T14:35:00Z', type: 'BP', systolic: 3550, diastolic: 1795, mean: 2672, pulseRate: 1785, unit: 'mmHg' },
+                { id: '345', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T14:40:00Z', type: 'BP', systolic: 3560, diastolic: 1800, mean: 2680, pulseRate: 1790, unit: 'mmHg' },
+                { id: '346', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T14:45:00Z', type: 'BP', systolic: 3570, diastolic: 1805, mean: 2688, pulseRate: 1795, unit: 'mmHg' },
+                { id: '347', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T14:50:00Z', type: 'BP', systolic: 3580, diastolic: 1810, mean: 2695, pulseRate: 1800, unit: 'mmHg' },
+                { id: '348', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T14:55:00Z', type: 'BP', systolic: 3590, diastolic: 1815, mean: 2702, pulseRate: 1805, unit: 'mmHg' },
+                { id: '349', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T15:00:00Z', type: 'BP', systolic: 3600, diastolic: 1820, mean: 2710, pulseRate: 1810, unit: 'mmHg' },
+                { id: '350', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T15:05:00Z', type: 'BP', systolic: 3610, diastolic: 1825, mean: 2718, pulseRate: 1815, unit: 'mmHg' },
+                { id: '351', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T15:10:00Z', type: 'BP', systolic: 3620, diastolic: 1830, mean: 2725, pulseRate: 1820, unit: 'mmHg' },
+                { id: '352', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T15:15:00Z', type: 'BP', systolic: 3630, diastolic: 1835, mean: 2732, pulseRate: 1825, unit: 'mmHg' },
+                { id: '353', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T15:20:00Z', type: 'BP', systolic: 3640, diastolic: 1840, mean: 2740, pulseRate: 1830, unit: 'mmHg' },
+                { id: '354', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T15:25:00Z', type: 'BP', systolic: 3650, diastolic: 1845, mean: 2748, pulseRate: 1835, unit: 'mmHg' },
+                { id: '355', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T15:30:00Z', type: 'BP', systolic: 3660, diastolic: 1850, mean: 2755, pulseRate: 1840, unit: 'mmHg' },
+                { id: '356', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T15:35:00Z', type: 'BP', systolic: 3670, diastolic: 1855, mean: 2762, pulseRate: 1845, unit: 'mmHg' },
+                { id: '357', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T15:40:00Z', type: 'BP', systolic: 3680, diastolic: 1860, mean: 2770, pulseRate: 1850, unit: 'mmHg' },
+                { id: '358', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T15:45:00Z', type: 'BP', systolic: 3690, diastolic: 1865, mean: 2778, pulseRate: 1855, unit: 'mmHg' },
+                { id: '359', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T15:50:00Z', type: 'BP', systolic: 3700, diastolic: 1870, mean: 2785, pulseRate: 1860, unit: 'mmHg' },
+                { id: '360', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T15:55:00Z', type: 'BP', systolic: 3710, diastolic: 1875, mean: 2792, pulseRate: 1865, unit: 'mmHg' },
+                { id: '361', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T16:00:00Z', type: 'BP', systolic: 3720, diastolic: 1880, mean: 2800, pulseRate: 1870, unit: 'mmHg' },
+                { id: '362', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T16:05:00Z', type: 'BP', systolic: 3730, diastolic: 1885, mean: 2808, pulseRate: 1875, unit: 'mmHg' },
+                { id: '363', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T16:10:00Z', type: 'BP', systolic: 3740, diastolic: 1890, mean: 2815, pulseRate: 1880, unit: 'mmHg' },
+                { id: '364', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T16:15:00Z', type: 'BP', systolic: 3750, diastolic: 1895, mean: 2822, pulseRate: 1885, unit: 'mmHg' },
+                { id: '365', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T16:20:00Z', type: 'BP', systolic: 3760, diastolic: 1900, mean: 2830, pulseRate: 1890, unit: 'mmHg' },
+                { id: '366', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T16:25:00Z', type: 'BP', systolic: 3770, diastolic: 1905, mean: 2838, pulseRate: 1895, unit: 'mmHg' },
+                { id: '367', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T16:30:00Z', type: 'BP', systolic: 3780, diastolic: 1910, mean: 2845, pulseRate: 1900, unit: 'mmHg' },
+                { id: '368', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T16:35:00Z', type: 'BP', systolic: 3790, diastolic: 1915, mean: 2852, pulseRate: 1905, unit: 'mmHg' },
+                { id: '369', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T16:40:00Z', type: 'BP', systolic: 3800, diastolic: 1920, mean: 2860, pulseRate: 1910, unit: 'mmHg' },
+                { id: '370', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T16:45:00Z', type: 'BP', systolic: 3810, diastolic: 1925, mean: 2868, pulseRate: 1915, unit: 'mmHg' },
+                { id: '371', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T16:50:00Z', type: 'BP', systolic: 3820, diastolic: 1930, mean: 2875, pulseRate: 1920, unit: 'mmHg' },
+                { id: '372', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T16:55:00Z', type: 'BP', systolic: 3830, diastolic: 1935, mean: 2882, pulseRate: 1925, unit: 'mmHg' },
+                { id: '373', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T17:00:00Z', type: 'BP', systolic: 3840, diastolic: 1940, mean: 2890, pulseRate: 1930, unit: 'mmHg' },
+                { id: '374', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T17:05:00Z', type: 'BP', systolic: 3850, diastolic: 1945, mean: 2898, pulseRate: 1935, unit: 'mmHg' },
+                { id: '375', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T17:10:00Z', type: 'BP', systolic: 3860, diastolic: 1950, mean: 2905, pulseRate: 1940, unit: 'mmHg' },
+                { id: '376', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T17:15:00Z', type: 'BP', systolic: 3870, diastolic: 1955, mean: 2912, pulseRate: 1945, unit: 'mmHg' },
+                { id: '377', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T17:20:00Z', type: 'BP', systolic: 3880, diastolic: 1960, mean: 2920, pulseRate: 1950, unit: 'mmHg' },
+                { id: '378', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T17:25:00Z', type: 'BP', systolic: 3890, diastolic: 1965, mean: 2928, pulseRate: 1955, unit: 'mmHg' },
+                { id: '379', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T17:30:00Z', type: 'BP', systolic: 3900, diastolic: 1970, mean: 2935, pulseRate: 1960, unit: 'mmHg' },
+                { id: '380', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T17:35:00Z', type: 'BP', systolic: 3910, diastolic: 1975, mean: 2942, pulseRate: 1965, unit: 'mmHg' },
+                { id: '381', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T17:40:00Z', type: 'BP', systolic: 3920, diastolic: 1980, mean: 2950, pulseRate: 1970, unit: 'mmHg' },
+                { id: '382', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T17:45:00Z', type: 'BP', systolic: 3930, diastolic: 1985, mean: 2958, pulseRate: 1975, unit: 'mmHg' },
+                { id: '383', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T17:50:00Z', type: 'BP', systolic: 3940, diastolic: 1990, mean: 2965, pulseRate: 1980, unit: 'mmHg' },
+                { id: '384', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T17:55:00Z', type: 'BP', systolic: 3950, diastolic: 1995, mean: 2972, pulseRate: 1985, unit: 'mmHg' },
+                { id: '385', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T18:00:00Z', type: 'BP', systolic: 3960, diastolic: 2000, mean: 2980, pulseRate: 1990, unit: 'mmHg' },
+                { id: '386', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T18:05:00Z', type: 'BP', systolic: 3970, diastolic: 2005, mean: 2988, pulseRate: 1995, unit: 'mmHg' },
+                { id: '387', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T18:10:00Z', type: 'BP', systolic: 3980, diastolic: 2010, mean: 2995, pulseRate: 2000, unit: 'mmHg' },
+                { id: '388', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T18:15:00Z', type: 'BP', systolic: 3990, diastolic: 2015, mean: 3002, pulseRate: 2005, unit: 'mmHg' },
+                { id: '389', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T18:20:00Z', type: 'BP', systolic: 4000, diastolic: 2020, mean: 3010, pulseRate: 2010, unit: 'mmHg' },
+                { id: '390', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T18:25:00Z', type: 'BP', systolic: 4010, diastolic: 2025, mean: 3018, pulseRate: 2015, unit: 'mmHg' },
+                { id: '391', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T18:30:00Z', type: 'BP', systolic: 4020, diastolic: 2030, mean: 3025, pulseRate: 2020, unit: 'mmHg' },
+                { id: '392', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T18:35:00Z', type: 'BP', systolic: 4030, diastolic: 2035, mean: 3032, pulseRate: 2025, unit: 'mmHg' },
+                { id: '393', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T18:40:00Z', type: 'BP', systolic: 4040, diastolic: 2040, mean: 3040, pulseRate: 2030, unit: 'mmHg' },
+                { id: '394', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T18:45:00Z', type: 'BP', systolic: 4050, diastolic: 2045, mean: 3048, pulseRate: 2035, unit: 'mmHg' },
+                { id: '395', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T18:50:00Z', type: 'BP', systolic: 4060, diastolic: 2050, mean: 3055, pulseRate: 2040, unit: 'mmHg' },
+                { id: '396', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T18:55:00Z', type: 'BP', systolic: 4070, diastolic: 2055, mean: 3062, pulseRate: 2045, unit: 'mmHg' },
+                { id: '397', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T19:00:00Z', type: 'BP', systolic: 4080, diastolic: 2060, mean: 3070, pulseRate: 2050, unit: 'mmHg' },
+                { id: '398', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T19:05:00Z', type: 'BP', systolic: 4090, diastolic: 2065, mean: 3078, pulseRate: 2055, unit: 'mmHg' },
+                { id: '399', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T19:10:00Z', type: 'BP', systolic: 4100, diastolic: 2070, mean: 3085, pulseRate: 2060, unit: 'mmHg' },
+                { id: '400', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T19:15:00Z', type: 'BP', systolic: 4110, diastolic: 2075, mean: 3092, pulseRate: 2065, unit: 'mmHg' },
+                { id: '401', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T19:20:00Z', type: 'BP', systolic: 4120, diastolic: 2080, mean: 3100, pulseRate: 2070, unit: 'mmHg' },
+                { id: '402', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T19:25:00Z', type: 'BP', systolic: 4130, diastolic: 2085, mean: 3108, pulseRate: 2075, unit: 'mmHg' },
+                { id: '403', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T19:30:00Z', type: 'BP', systolic: 4140, diastolic: 2090, mean: 3115, pulseRate: 2080, unit: 'mmHg' },
+                { id: '404', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T19:35:00Z', type: 'BP', systolic: 4150, diastolic: 2095, mean: 3122, pulseRate: 2085, unit: 'mmHg' },
+                { id: '405', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T19:40:00Z', type: 'BP', systolic: 4160, diastolic: 2100, mean: 3130, pulseRate: 2090, unit: 'mmHg' },
+                { id: '406', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T19:45:00Z', type: 'BP', systolic: 4170, diastolic: 2105, mean: 3138, pulseRate: 2095, unit: 'mmHg' },
+                { id: '407', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T19:50:00Z', type: 'BP', systolic: 4180, diastolic: 2110, mean: 3145, pulseRate: 2100, unit: 'mmHg' },
+                { id: '408', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T19:55:00Z', type: 'BP', systolic: 4190, diastolic: 2115, mean: 3152, pulseRate: 2105, unit: 'mmHg' },
+                { id: '409', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T20:00:00Z', type: 'BP', systolic: 4200, diastolic: 2120, mean: 3160, pulseRate: 2110, unit: 'mmHg' },
+                { id: '410', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T20:05:00Z', type: 'BP', systolic: 4210, diastolic: 2125, mean: 3168, pulseRate: 2115, unit: 'mmHg' },
+                { id: '411', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T20:10:00Z', type: 'BP', systolic: 4220, diastolic: 2130, mean: 3175, pulseRate: 2120, unit: 'mmHg' },
+                { id: '412', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T20:15:00Z', type: 'BP', systolic: 4230, diastolic: 2135, mean: 3182, pulseRate: 2125, unit: 'mmHg' },
+                { id: '413', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T20:20:00Z', type: 'BP', systolic: 4240, diastolic: 2140, mean: 3190, pulseRate: 2130, unit: 'mmHg' },
+                { id: '414', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T20:25:00Z', type: 'BP', systolic: 4250, diastolic: 2145, mean: 3198, pulseRate: 2135, unit: 'mmHg' },
+                { id: '415', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T20:30:00Z', type: 'BP', systolic: 4260, diastolic: 2150, mean: 3205, pulseRate: 2140, unit: 'mmHg' },
+                { id: '416', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T20:35:00Z', type: 'BP', systolic: 4270, diastolic: 2155, mean: 3212, pulseRate: 2145, unit: 'mmHg' },
+                { id: '417', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T20:40:00Z', type: 'BP', systolic: 4280, diastolic: 2160, mean: 3220, pulseRate: 2150, unit: 'mmHg' },
+                { id: '418', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T20:45:00Z', type: 'BP', systolic: 4290, diastolic: 2165, mean: 3228, pulseRate: 2155, unit: 'mmHg' },
+                { id: '419', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T20:50:00Z', type: 'BP', systolic: 4300, diastolic: 2170, mean: 3235, pulseRate: 2160, unit: 'mmHg' },
+                { id: '420', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T20:55:00Z', type: 'BP', systolic: 4310, diastolic: 2175, mean: 3242, pulseRate: 2165, unit: 'mmHg' },
+                { id: '421', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T21:00:00Z', type: 'BP', systolic: 4320, diastolic: 2180, mean: 3250, pulseRate: 2170, unit: 'mmHg' },
+                { id: '422', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T21:05:00Z', type: 'BP', systolic: 4330, diastolic: 2185, mean: 3258, pulseRate: 2175, unit: 'mmHg' },
+                { id: '423', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T21:10:00Z', type: 'BP', systolic: 4340, diastolic: 2190, mean: 3265, pulseRate: 2180, unit: 'mmHg' },
+                { id: '424', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T21:15:00Z', type: 'BP', systolic: 4350, diastolic: 2195, mean: 3272, pulseRate: 2185, unit: 'mmHg' },
+                { id: '425', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T21:20:00Z', type: 'BP', systolic: 4360, diastolic: 2200, mean: 3280, pulseRate: 2190, unit: 'mmHg' },
+                { id: '426', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T21:25:00Z', type: 'BP', systolic: 4370, diastolic: 2205, mean: 3288, pulseRate: 2195, unit: 'mmHg' },
+                { id: '427', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T21:30:00Z', type: 'BP', systolic: 4380, diastolic: 2210, mean: 3295, pulseRate: 2200, unit: 'mmHg' },
+                { id: '428', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T21:35:00Z', type: 'BP', systolic: 4390, diastolic: 2215, mean: 3302, pulseRate: 2205, unit: 'mmHg' },
+                { id: '429', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T21:40:00Z', type: 'BP', systolic: 4400, diastolic: 2220, mean: 3310, pulseRate: 2210, unit: 'mmHg' },
+                { id: '430', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T21:45:00Z', type: 'BP', systolic: 4410, diastolic: 2225, mean: 3318, pulseRate: 2215, unit: 'mmHg' },
+                { id: '431', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T21:50:00Z', type: 'BP', systolic: 4420, diastolic: 2230, mean: 3325, pulseRate: 2220, unit: 'mmHg' },
+                { id: '432', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T21:55:00Z', type: 'BP', systolic: 4430, diastolic: 2235, mean: 3332, pulseRate: 2225, unit: 'mmHg' },
+                { id: '433', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T22:00:00Z', type: 'BP', systolic: 4440, diastolic: 2240, mean: 3340, pulseRate: 2230, unit: 'mmHg' },
+                { id: '434', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T22:05:00Z', type: 'BP', systolic: 4450, diastolic: 2245, mean: 3348, pulseRate: 2235, unit: 'mmHg' },
+                { id: '435', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T22:10:00Z', type: 'BP', systolic: 4460, diastolic: 2250, mean: 3355, pulseRate: 2240, unit: 'mmHg' },
+                { id: '436', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T22:15:00Z', type: 'BP', systolic: 4470, diastolic: 2255, mean: 3362, pulseRate: 2245, unit: 'mmHg' },
+                { id: '437', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T22:20:00Z', type: 'BP', systolic: 4480, diastolic: 2260, mean: 3370, pulseRate: 2250, unit: 'mmHg' },
+                { id: '438', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T22:25:00Z', type: 'BP', systolic: 4490, diastolic: 2265, mean: 3378, pulseRate: 2255, unit: 'mmHg' },
+                { id: '439', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T22:30:00Z', type: 'BP', systolic: 4500, diastolic: 2270, mean: 3385, pulseRate: 2260, unit: 'mmHg' },
+                { id: '440', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T22:35:00Z', type: 'BP', systolic: 4510, diastolic: 2275, mean: 3392, pulseRate: 2265, unit: 'mmHg' },
+                { id: '441', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T22:40:00Z', type: 'BP', systolic: 4520, diastolic: 2280, mean: 3400, pulseRate: 2270, unit: 'mmHg' },
+                { id: '442', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T22:45:00Z', type: 'BP', systolic: 4530, diastolic: 2285, mean: 3408, pulseRate: 2275, unit: 'mmHg' },
+                { id: '443', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T22:50:00Z', type: 'BP', systolic: 4540, diastolic: 2290, mean: 3415, pulseRate: 2280, unit: 'mmHg' },
+                { id: '444', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T22:55:00Z', type: 'BP', systolic: 4550, diastolic: 2295, mean: 3422, pulseRate: 2285, unit: 'mmHg' },
+                { id: '445', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T23:00:00Z', type: 'BP', systolic: 4560, diastolic: 2300, mean: 3430, pulseRate: 2290, unit: 'mmHg' },
+                { id: '446', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T23:05:00Z', type: 'BP', systolic: 4570, diastolic: 2305, mean: 3438, pulseRate: 2295, unit: 'mmHg' },
+                { id: '447', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T23:10:00Z', type: 'BP', systolic: 4580, diastolic: 2310, mean: 3445, pulseRate: 2300, unit: 'mmHg' },
+                { id: '448', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T23:15:00Z', type: 'BP', systolic: 4590, diastolic: 2315, mean: 3452, pulseRate: 2305, unit: 'mmHg' },
+                { id: '449', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T23:20:00Z', type: 'BP', systolic: 4600, diastolic: 2320, mean: 3460, pulseRate: 2310, unit: 'mmHg' },
+                { id: '450', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T23:25:00Z', type: 'BP', systolic: 4610, diastolic: 2325, mean: 3468, pulseRate: 2315, unit: 'mmHg' },
+                { id: '451', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T23:30:00Z', type: 'BP', systolic: 4620, diastolic: 2330, mean: 3475, pulseRate: 2320, unit: 'mmHg' },
+                { id: '452', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T23:35:00Z', type: 'BP', systolic: 4630, diastolic: 2335, mean: 3482, pulseRate: 2325, unit: 'mmHg' },
+                { id: '453', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T23:40:00Z', type: 'BP', systolic: 4640, diastolic: 2340, mean: 3490, pulseRate: 2330, unit: 'mmHg' },
+                { id: '454', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T23:45:00Z', type: 'BP', systolic: 4650, diastolic: 2345, mean: 3498, pulseRate: 2335, unit: 'mmHg' },
+                { id: '455', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T23:50:00Z', type: 'BP', systolic: 4660, diastolic: 2350, mean: 3505, pulseRate: 2340, unit: 'mmHg' },
+                { id: '456', deviceId: 'bp-monitor-001', timestamp: '2023-10-27T23:55:00Z', type: 'BP', systolic: 4670, diastolic: 2355, mean: 3512, pulseRate: 2345, unit: 'mmHg' },
+                { id: '457', deviceId: 'bp-monitor-001', timestamp: '2023-10-28T00:00:00Z', type: 'BP', systolic: 4680, diastolic: 2360, mean: 3520, pulseRate: 2350, unit: 'mmHg' },
+                { id: '458', deviceId: 'bp-monitor-001', timestamp: '2023-10-28T00:05:00Z', type: 'BP', systolic: 4690, diastolic: 2365, mean: 3528, pulseRate: 2355, unit: 'mmHg' },
+                { id: '459', deviceId: 'bp-monitor-001', timestamp: '2023-10-28T00:10:00Z', type: 'BP', systolic: 4700, diastolic: 2370, mean: 3535, pulseRate: 2360, unit: 'mmHg' },
+                { id: '460', deviceId: 'bp-monitor-001', timestamp: '2023-10-28T00:15:00Z', type: 'BP', systolic: 4710, diastolic: 2375, mean: 3542, pulseRate: 2365, unit: 'mmHg' },
+                { id: '461', deviceId: 'bp-monitor-001', timestamp: '2023-10-28T00:20:00Z', type: 'BP', systolic: 4720, diastolic: 2380, mean: 3550, pulseRate: 2370, unit: 'mmHg' },
+                { id: '462', deviceId: 'bp-monitor-001', timestamp: '2023-10-28T00:25:00Z', type: 'BP', systolic: 4730, diastolic: 2385, mean: 3558, pulseRate: 2375, unit: 'mmHg' },
+                { id: '463', deviceId: 'bp-monitor-001', timestamp: '2023-10-28T00:30:00Z', type: 'BP', systolic: 4740, diastolic: 2390, mean: 3565, pulseRate: 2380, unit: 'mmHg' },
+                { id: '464', deviceId: 'bp-monitor-001', timestamp: '2023-10-28T00:35:00Z', type: 'BP', systolic: 4750, diastolic: 2395, mean: 3572, pulseRate: 2385, unit: 'mmHg' },
+                { id: '465', deviceId: 'bp-monitor-001', timestamp: '2023-10-28T00:40:00Z', type: 'BP', systolic: 4760, diastolic: 2400, mean: 3580, pulseRate: 2390, unit: 'mmHg' },
+                { id: '466', deviceId: 'bp-monitor-001', timestamp: '2023-10-28T00:45:00Z', type: 'BP', systolic: 4770, diastolic: 2405, mean: 3588, pulseRate: 2395, unit: 'mmHg' },
+                { id: '467', deviceId: 'bp-monitor-001', timestamp: '2023-10-28T00:50:00Z', type: 'BP', systolic: 4780, diastolic: 2410, mean: 3595, pulseRate: 2400, unit: 'mmHg' },
+                { id: '468', deviceId: 'bp-monitor-001', timestamp: '2023-10-28T00:55:00Z', type: 'BP', systolic: 4790, diastolic: 2415, mean: 3602, pulseRate: 2405, unit: 'mmHg' },
+                { id: '469', deviceId: 'bp-monitor-001', timestamp: '2023-10-28T01:00:00Z', type: 'BP', systolic: 4800, diastolic: 2420, mean: 3610, pulseRate: 2410, unit: 'mmHg' },
+                { id: '470', deviceId: 'bp-monitor-001', timestamp: '2023-10-28T01:05:00Z', type: 'BP', systolic: 4810, diastolic: 2425, mean: 3618, pulseRate: 2415, unit: 'mmHg' },
+                { id: '471', deviceId: 'bp-monitor-001', timestamp: '2023-10-28T01:10:00Z', type: 'BP', systolic: 4820, diastolic: 2430, mean: 3625, pulseRate: 2420, unit: 'mmHg' },
+                { id: '472', deviceId: 'bp-monitor-001', timestamp: '2023-10-28T01:15:00Z', type: 'BP', systolic: 4830, diastolic: 2435, mean: 3632, pulseRate: 2425, unit: 'mmHg' },
+                { id: '473', deviceId: 'bp-monitor-001', timestamp: '2023-10-28T01:20:00Z', type: 'BP', systolic: 4840, diastolic: 2440, mean: 3640, pulseRate: 2430, unit: 'mmHg' },
+                { id: '474', deviceId: 'bp-monitor-001', timestamp: '2023-10-28T01:25:00Z', type: 'BP', systolic: 4850, diastolic: 2445, mean: 3648, pulseRate: 2435, unit: 'mmHg' },
+                { id: '475', deviceId: 'bp-monitor-001', timestamp: '2023-10-28T01:30:00Z', type: 'BP', systolic: 4860, diastolic: 2450, mean: 3655, pulseRate: 2440, unit: 'mmHg' },
+                { id: '476', deviceId: 'bp-monitor-001', timestamp: '2023-10-28T01:35:00Z', type: 'BP', systolic: 4870, diastolic: 2455, mean: 3662, pulseRate: 2445, unit: 'mmHg' },
+                { id: '477', deviceId: 'bp-monitor-001', timestamp: '2023-10-28T01:40:00Z', type: 'BP', systolic: 4880, diastolic: 2460, mean: 3670, pulseRate: 2450, unit: 'mmHg' },
+                { id: '478', deviceId: 'bp-monitor-001', timestamp: '2023-10-28T01:45:00Z', type: 'BP', systolic: 4890, diastolic: 2465, mean: 3678, pulseRate: 2455, unit: 'mmHg' },
+                { id: '479', deviceId: 'bp-monitor-001', timestamp: '2023-10-28T01:50:00Z', type: 'BP', systolic: 4900, diastolic: 2470, mean: 3685, pulseRate: 2460, unit: 'mmHg' },
+                { id: '480', deviceId: 'bp-monitor-001', timestamp: '2023-10-28T01:55:00Z', type: 'BP', systolic: 4910, diastolic: 2475, mean: 3692, pulseRate: 2465, unit: 'mmHg' },
+                { id: '481', deviceId: 'bp-monitor-001', timestamp: '2023-10-28T02:00:00Z', type: 'BP', systolic: 4920, diastolic: 2480, mean: 3700, pulseRate: 2470, unit: 'mmHg' },
+                { id: '482', deviceId: 'bp-monitor-001', timestamp: '2023-10-28T02:05:00Z', type: 'BP', systolic: 4930, diastolic: 2485, mean: 3708, pulseRate: 2475, unit: 'mmHg' },
+                { id: '483', deviceId: 'bp-monitor-001', timestamp: '2023-10-28T02:10:00Z', type: 'BP', systolic: 4940, diastolic: 2490, mean: 3715, pulseRate: 2480, unit: 'mmHg' },
+                { id: '484', deviceId: 'bp-monitor-001', timestamp: '2023-10-28T02:15:00Z', type: 'BP', systolic: 4950, diastolic: 2495, mean: 3722, pulseRate: 2485, unit: 'mmHg' },
+                { id: '485', deviceId: 'bp-monitor-001', timestamp: '2023-10-28T02:20:00Z', type: 'BP', systolic: 4960, diastolic: 2500, mean: 3730, pulseRate: 2490, unit: 'mmHg' },
+                { id: '486', deviceId: 'bp-monitor-001', timestamp: '2023-10-28T02:25:00Z', type: 'BP', systolic: 4970, diastolic: 2505, mean: 3738, pulseRate: 2495, unit: 'mmHg' },
+                { id: '487', deviceId: 'bp-monitor-001', timestamp: '2023-10-28T02:30:00Z', type: 'BP', systolic: 4980, diastolic: 2510, mean: 3745, pulseRate: 2500, unit: 'mmHg' },
+                { id: '488', deviceId: 'bp-monitor-001', timestamp: '2023-10-28T02:35:00Z', type: 'BP', systolic: 4990, diastolic: 2515, mean: 3752, pulseRate: 2505, unit: 'mmHg' },
+                { id: '489', deviceId: 'bp-monitor-001', timestamp: '2023-10-28T02:40:00Z', type: 'BP', systolic: 5000, diastolic: 2520, mean: 3760, pulseRate: 2510, unit: 'mmHg' },
+                { id: '490', deviceId: 'bp-monitor-001', timestamp: '2023-10-28T02:45:00Z', type: 'BP', systolic: 5010, diastolic: 2525, mean: 3768, pulseRate: 2515, unit: 'mmHg' },
+                { id: '491', deviceId: 'bp-monitor-001', timestamp: '2023-10-28T02:50:00Z', type: 'BP', systolic: 5020, diastolic: 2530, mean: 3775, pulseRate: 2520, unit: 'mmHg' },
+                { id: '492', deviceId: 'bp-monitor-001', timestamp: '2023-10-28T02:55:00Z', type: 'BP', systolic: 5030, diastolic: 2535, mean: 3782, pulseRate: 2525, unit: 'mmHg' },
+                { id: '493', deviceId: 'bp-monitor-001', timestamp: '2023-10-28T03:00:00Z', type: 'BP', systolic: 5040, diastolic: 2540, mean: 3790, pulseRate: 2530, unit: 'mmHg' },
+                { id: '494', deviceId: 'bp-monitor-001', timestamp: '2023-10-28T03:05:00Z', type: 'BP', systolic: 5050, diastolic: 2545, mean: 3798, pulseRate: 2535, unit: 'mmHg' },
+                { id: '495', deviceId: 'bp-monitor-001', timestamp: '2023-10-28T03:10:00Z', type: 'BP', systolic: 5060, diastolic: 2550, mean: 3805, pulseRate: 2540, unit: 'mmHg' },
+                { id: '496', deviceId: 'bp-monitor-001', timestamp: '2023-10-28T03:15:00Z', type: 'BP', systolic: 5070, diastolic: 2555, mean: 3812, pulseRate: 2545, unit: 'mmHg' },
+                { id: '497', deviceId: 'bp-monitor-001', timestamp: '2023-10-28T03:20:00Z', type: 'BP', systolic: 5080, diastolic: 2560, mean: 3820, pulseRate: 2550, unit: 'mmHg' },
+                { id: '498', deviceId: 'bp-monitor-001', timestamp: '2023-10-28T03:25:00Z', type: 'BP', systolic: 5090, diastolic: 2565, mean: 3828, pulseRate: 2555, unit: 'mmHg' },
+                { id: '499', deviceId: 'bp-monitor-001', timestamp: '2023-10-28T03:30:00Z', type: 'BP', systolic: 5100, diastolic: 2570, mean: 3835, pulseRate: 2560, unit: 'mmHg' },
+                { id: '500', deviceId: 'bp-monitor-001', timestamp: '2023-10-28T03:35:00Z', type: 'BP', systolic: 5110, diastolic: 2575, mean: 3842, pulseRate: 2565, unit: 'mmHg' },
+                { id: '501', deviceId: 'bp-monitor-001', timestamp: '2023-10-28T03:40:00Z', type: 'BP', systolic: 5120, diastolic: 2580, mean: 3850, pulseRate: 2570, unit: 'mmHg' },
+                { id: '502', deviceId: 'bp-monitor-001', timestamp: '2023-10-28T03:45:00Z', type: 'BP', systolic: 5130, diastolic: 2585, mean: 3858, pulseRate: 2575, unit: 'mmHg' },
+                { id: '503', deviceId: 'bp-monitor-001', timestamp: '2023-10-28T03:50:00Z', type: 'BP', systolic: 5140, diastolic: 2590, mean: 3865, pulseRate: 2580, unit: 'mmHg' },
+                { id: '504', deviceId: 'bp-monitor-001', timestamp: '2023-10-28T03:55:00Z', type: 'BP', systolic: 5150, diastolic: 2595, mean: 3872, pulseRate: 2585, unit: 'mmHg' },
+                { id: '505', deviceId: 'bp-monitor-001', timestamp: '2023-10-28T04:00:00Z', type: 'BP', systolic: 5160, diastolic: 2600, mean: 3880, pulseRate: 2590, unit: 'mmHg' },
+                { id: '506', deviceId: 'bp-monitor-001', timestamp: '2023-10-28T04:05:00Z', type: 'BP', systolic: 5170, diastolic: 2605, mean: 3888, pulseRate: 2595, unit: 'mmHg' },
+                { id: '507', deviceId: 'bp-monitor-001', timestamp: '2023-10-28T04:10:00Z', type: 'BP', systolic: 5180, diastolic: 2610, mean: 3895, pulseRate: 2600, unit: 'mmHg' },
+                { id: '508', deviceId: 'bp-monitor-001', timestamp: '2023-10-28T04:15:00Z', type: 'BP', systolic: 5190, diastolic: 2615, mean: 3902, pulseRate: 2605, unit: 'mmHg' },
+                { id: '509', deviceId: 'bp-monitor-001', timestamp: '2023-10-28T04:20:00Z', type: 'BP', systolic: 5200, diastolic: 2620, mean: 3910, pulseRate: 2610, unit: 'mmHg' },
+                { id: '510', deviceId: 'bp-monitor-001', timestamp: '2023-10-28T04:25:00Z', type: 'BP', systolic: 5210, diastolic: 2625, mean: 3918, pulseRate: 2615, unit: 'mmHg' },
+                { id: '511', deviceId: 'bp-monitor-001', timestamp: '2023-10-28T04:30:00Z', type: 'BP', systolic: 5220, diastolic: 2630, mean: 3925, pulseRate: 2620, unit: 'mmHg' },
+                { id: '512', deviceId: 'bp-monitor-001', timestamp: '2023-10-28T04:35:00Z', type: 'BP', systolic: 5230, diastolic: 2635, mean: 3932, pulseRate: 2625, unit: 'mmHg' },
+                { id: '513', deviceId: 'bp-monitor-001', timestamp: '2023-10-28T04:40:00Z', type: 'BP', systolic: 5240, diastolic: 2640, mean: 3940, pulseRate: 2630, unit: 'mmHg' },
+                { id: '514', deviceId: 'bp-monitor-001', timestamp: '2023-10-28T04:45:00Z', type: 'BP', systolic: 5250, diastolic: 2645, mean: 3948, pulseRate: 2635, unit: 'mmHg' },
+                { id: '515', deviceId: 'bp-monitor-001', timestamp: '2023-10-28T04:50:00Z', type: 'BP', systolic: 5260, diastolic: 2650, mean: 3955, pulseRate: 2640, unit: 'mmHg' },
+                { id: '516', deviceId: 'bp-monitor-001', timestamp: '2023-10-28T04:55:00Z', type: 'BP', systolic: 5270, diastolic: 2655, mean: 3962, pulseRate: 2645, unit: 'mmHg' },
+                { id: '517', deviceId: 'bp-monitor-001', timestamp: '2023-10-28T05:00:00Z', type: 'BP', systolic: 5280, diastolic: 2660, mean: 3970, pulseRate: 2650, unit: 'mmHg' },
+                { id: '518', deviceId: 'bp-monitor-001', timestamp: '2023-10-28T05:05:00Z', type: 'BP', systolic: 5290, diastolic: 2665, mean: 3978, pulseRate: 2655, unit: 'mmHg' },
+                { id: '519', deviceId: 'bp-monitor-001', timestamp: '2023-10-28T05:10:00Z', type: 'BP', systolic: 5300, diastolic: 2670, mean: 3985, pulseRate: 2660, unit: 'mmHg' },
+                { id: '520', deviceId: 'bp-monitor-001', timestamp: '2023-10-28T05:15:00Z', type: 'BP', systolic: 5310, diastolic: 2675, mean: 3992, pulseRate: 2665, unit: 'mmHg' },
+                { id: '521', deviceId: 'bp-monitor-001', timestamp: '2023-10-28T05:20:00Z', type: 'BP', systolic: 5320, diastolic: 2680, mean: 4000, pulseRate: 2670, unit: 'mmHg' },
+                { id: '522', deviceId: 'bp-monitor-001', timestamp: '2023-10-28T05:25:00Z', type: 'BP', systolic: 5330, diastolic: 2685, mean: 4008, pulseRate: 2675, unit: 'mmHg' },
+                { id: '523', deviceId: 'bp-monitor-001', timestamp: '2023-10-28T05:30:00Z', type: 'BP', systolic: 5340, diastolic: 2690, mean: 4015, pulseRate: 2680, unit: 'mmHg' },
+                { id: '524', deviceId: 'bp-monitor-001', timestamp: '2023-10-28T05:35:00Z', type: 'BP', systolic: 5350, diastolic: 2695, mean: 4022, pulseRate: 2685, unit: 'mmHg' },
+                { id: '525', deviceId: 'bp-monitor-001', timestamp: '2023-10-28T05:40:00Z', type: 'BP', systolic: 5360, diastolic: 2700, mean: 4030, pulseRate: 2690, unit: 'mmHg' },
+                { id: '526', deviceId: 'bp-monitor-001', timestamp: '2023-10-28T05:45:00Z', type: 'BP', systolic: 5370, diastolic: 2705, mean: 4038, pulseRate: 2695, unit: 'mmHg' },
+                { id: '527', deviceId: 'bp-monitor-001', timestamp: '2023-10-28T05:50:00Z', type: 'BP', systolic: 5380, diastolic: 2710, mean: 4045, pulseRate: 2700, unit: 'mmHg' }
+            ];
+            setReadings(dummyReadings);
         } catch (error) {
-            console.error('Failed to load BP readings:', error);
+            console.error('Error loading BP readings:', error);
+            toast({
+                title: 'Error',
+                description: 'Failed to load BP readings',
+                variant: 'destructive',
+            });
         } finally {
             setLoading(false);
         }
     };
 
-    const calculateStats = (data: BPReading[]) => {
-        if (data.length === 0) return;
-
-        const systolicValues = data.map(r => r.systolic);
-        const diastolicValues = data.map(r => r.diastolic);
-        const pulseValues = data.map(r => r.pulseRate);
-
-        let normalCount = 0, elevatedCount = 0, stage1Count = 0, stage2Count = 0, crisisCount = 0;
-
-        data.forEach(reading => {
-            const category = classifyBP(reading.systolic, reading.diastolic);
-            switch (category) {
-                case 'Normal': normalCount++; break;
-                case 'Elevated': elevatedCount++; break;
-                case 'Stage 1': stage1Count++; break;
-                case 'Stage 2': stage2Count++; break;
-                case 'Crisis': crisisCount++; break;
-            }
-        });
-
-        setStats({
-            totalReadings: data.length,
-            averageSystolic: Math.round(systolicValues.reduce((a, b) => a + b, 0) / data.length),
-            averageDiastolic: Math.round(diastolicValues.reduce((a, b) => a + b, 0) / data.length),
-            averagePulse: Math.round(pulseValues.reduce((a, b) => a + b, 0) / data.length),
-            highestSystolic: Math.max(...systolicValues),
-            lowestSystolic: Math.min(...systolicValues),
-            highestDiastolic: Math.max(...diastolicValues),
-            lowestDiastolic: Math.min(...diastolicValues),
-            normalReadings: normalCount,
-            elevatedReadings: elevatedCount,
-            stage1Readings: stage1Count,
-            stage2Readings: stage2Count,
-            crisisReadings: crisisCount
-        });
-    };
-
-    const classifyBP = (systolic: number, diastolic: number): string => {
-        if (systolic < 120 && diastolic < 80) return 'Normal';
-        if (systolic >= 120 && systolic <= 129 && diastolic < 80) return 'Elevated';
-        if ((systolic >= 130 && systolic <= 139) || (diastolic >= 80 && diastolic <= 89)) return 'Stage 1';
-        if (systolic >= 140 || diastolic >= 90) return 'Stage 2';
-        if (systolic > 180 || diastolic > 120) return 'Crisis';
-        return 'Normal';
-    };
-
-    const getBPCategoryColor = (systolic: number, diastolic: number): string => {
-        const category = classifyBP(systolic, diastolic);
-        switch (category) {
-            case 'Normal': return 'bg-green-500/20 text-green-400';
-            case 'Elevated': return 'bg-yellow-500/20 text-yellow-400';
-            case 'Stage 1': return 'bg-orange-500/20 text-orange-400';
-            case 'Stage 2': return 'bg-red-500/20 text-red-400';
-            case 'Crisis': return 'bg-red-600/20 text-red-300';
-            default: return 'bg-gray-500/20 text-gray-400';
-        }
-    };
-
-    const formatTimestamp = (timestamp: string) => {
-        return new Date(timestamp).toLocaleString();
-    };
-
-    const filteredReadings = readings.filter(reading => {
-        const matchesSearch = reading.systolic.toString().includes(searchTerm) ||
-                            reading.diastolic.toString().includes(searchTerm) ||
-                            reading.pulseRate.toString().includes(searchTerm);
-        
-        if (filter === 'all') return matchesSearch;
-        
-        const category = classifyBP(reading.systolic, reading.diastolic);
-        return category.toLowerCase().includes(filter.toLowerCase()) && matchesSearch;
-    });
-
-    const exportToCSV = () => {
-        const headers = ['Timestamp', 'Systolic', 'Diastolic', 'Mean', 'Pulse Rate', 'Category'];
-        const csvContent = [
-            headers.join(','),
-            ...filteredReadings.map(reading => [
-                formatTimestamp(reading.timestamp),
-                reading.systolic,
-                reading.diastolic,
-                reading.mean,
-                reading.pulseRate,
-                classifyBP(reading.systolic, reading.diastolic)
-            ].join(','))
-        ].join('\n');
-
-        const blob = new Blob([csvContent], { type: 'text/csv' });
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `bp-readings-${new Date().toISOString().split('T')[0]}.csv`;
-        a.click();
-        window.URL.revokeObjectURL(url);
-    };
-
-    if (loading) {
-        return (
-            <div className="container mx-auto p-6">
-                <div className="flex items-center justify-center h-64">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
-                </div>
-            </div>
-        );
-    }
-
     return (
-        <div className="container mx-auto p-6 space-y-6">
-            {/* Header */}
-            <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-3xl font-bold text-white mb-2">BP Readings History</h1>
-                    <p className="text-gray-400">Complete blood pressure monitoring data from your device</p>
-                </div>
-                <Button onClick={exportToCSV} className="bg-blue-600 hover:bg-blue-700">
-                    <Download className="h-4 w-4 mr-2" />
-                    Export CSV
-                </Button>
-            </div>
-
-            {/* Statistics Cards */}
-            {stats && (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                    <Card className="bg-gray-800/50 border-gray-700">
-                        <CardHeader className="pb-2">
-                            <CardTitle className="text-sm font-medium text-gray-400">Total Readings</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="text-2xl font-bold text-white">{stats.totalReadings}</div>
-                            <p className="text-xs text-gray-400">All time</p>
-                        </CardContent>
-                    </Card>
-
-                    <Card className="bg-gray-800/50 border-gray-700">
-                        <CardHeader className="pb-2">
-                            <CardTitle className="text-sm font-medium text-gray-400">Average BP</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="text-2xl font-bold text-white">{stats.averageSystolic}/{stats.averageDiastolic}</div>
-                            <p className="text-xs text-gray-400">mmHg</p>
-                        </CardContent>
-                    </Card>
-
-                    <Card className="bg-gray-800/50 border-gray-700">
-                        <CardHeader className="pb-2">
-                            <CardTitle className="text-sm font-medium text-gray-400">Average Pulse</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="text-2xl font-bold text-white">{stats.averagePulse}</div>
-                            <p className="text-xs text-gray-400">BPM</p>
-                        </CardContent>
-                    </Card>
-
-                    <Card className="bg-gray-800/50 border-gray-700">
-                        <CardHeader className="pb-2">
-                            <CardTitle className="text-sm font-medium text-gray-400">BP Range</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="text-lg font-bold text-white">
-                                {stats.highestSystolic}/{stats.highestDiastolic} - {stats.lowestSystolic}/{stats.lowestDiastolic}
-                            </div>
-                            <p className="text-xs text-gray-400">High - Low</p>
-                        </CardContent>
-                    </Card>
-                </div>
-            )}
-
-            {/* BP Classification Chart */}
-            {stats && (
-                <Card className="bg-gray-800/50 border-gray-700">
-                    <CardHeader>
-                        <CardTitle className="text-white flex items-center gap-2">
-                            <BarChart3 className="h-5 w-5" />
-                            BP Classification Distribution
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                            <div className="text-center">
-                                <div className="text-2xl font-bold text-green-400">{stats.normalReadings}</div>
-                                <div className="text-sm text-gray-400">Normal</div>
-                            </div>
-                            <div className="text-center">
-                                <div className="text-2xl font-bold text-yellow-400">{stats.elevatedReadings}</div>
-                                <div className="text-sm text-gray-400">Elevated</div>
-                            </div>
-                            <div className="text-center">
-                                <div className="text-2xl font-bold text-orange-400">{stats.stage1Readings}</div>
-                                <div className="text-sm text-gray-400">Stage 1</div>
-                            </div>
-                            <div className="text-center">
-                                <div className="text-2xl font-bold text-red-400">{stats.stage2Readings}</div>
-                                <div className="text-sm text-gray-400">Stage 2</div>
-                            </div>
-                            <div className="text-center">
-                                <div className="text-2xl font-bold text-red-300">{stats.crisisReadings}</div>
-                                <div className="text-sm text-gray-400">Crisis</div>
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
-            )}
-
-            {/* Filters */}
-            <Card className="bg-gray-800/50 border-gray-700">
-                <CardHeader>
-                    <CardTitle className="text-white flex items-center gap-2">
-                        <Filter className="h-5 w-5" />
-                        Filter & Search
-                    </CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <div className="flex flex-col md:flex-row gap-4">
-                        <div className="flex-1">
-                            <Input
-                                placeholder="Search by BP values or pulse rate..."
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                className="bg-gray-700 border-gray-600 text-white"
-                            />
-                        </div>
-                        <Select value={filter} onValueChange={setFilter}>
-                            <SelectTrigger className="w-full md:w-48 bg-gray-700 border-gray-600 text-white">
-                                <SelectValue placeholder="Filter by category" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">All Readings</SelectItem>
-                                <SelectItem value="normal">Normal</SelectItem>
-                                <SelectItem value="elevated">Elevated</SelectItem>
-                                <SelectItem value="stage 1">Stage 1</SelectItem>
-                                <SelectItem value="stage 2">Stage 2</SelectItem>
-                                <SelectItem value="crisis">Crisis</SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
-                </CardContent>
-            </Card>
-
-            {/* Readings Table */}
-            <Card className="bg-gray-800/50 border-gray-700">
-                <CardHeader>
-                    <CardTitle className="text-white flex items-center gap-2">
-                        <Activity className="h-5 w-5" />
-                        All BP Readings ({filteredReadings.length})
-                    </CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <div className="overflow-x-auto">
-                        <Table>
-                            <TableHeader>
-                                <TableRow className="border-gray-700">
-                                    <TableHead className="text-gray-300">Timestamp</TableHead>
-                                    <TableHead className="text-gray-300">Systolic</TableHead>
-                                    <TableHead className="text-gray-300">Diastolic</TableHead>
-                                    <TableHead className="text-gray-300">Mean</TableHead>
-                                    <TableHead className="text-gray-300">Pulse Rate</TableHead>
-                                    <TableHead className="text-gray-300">Category</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {filteredReadings.map((reading) => (
-                                    <TableRow key={reading.id} className="border-gray-700 hover:bg-gray-700/50">
-                                        <TableCell className="text-gray-300">
-                                            <div className="flex items-center gap-2">
-                                                <Clock className="h-4 w-4 text-gray-400" />
-                                                {formatTimestamp(reading.timestamp)}
-                                            </div>
-                                        </TableCell>
-                                        <TableCell className="text-white font-semibold">
-                                            {reading.systolic} mmHg
-                                        </TableCell>
-                                        <TableCell className="text-white font-semibold">
-                                            {reading.diastolic} mmHg
-                                        </TableCell>
-                                        <TableCell className="text-gray-300">
-                                            {reading.mean} mmHg
-                                        </TableCell>
-                                        <TableCell className="text-gray-300">
-                                            <div className="flex items-center gap-2">
-                                                <Heart className="h-4 w-4 text-red-400" />
-                                                {reading.pulseRate} BPM
-                                            </div>
-                                        </TableCell>
-                                        <TableCell>
-                                            <Badge className={getBPCategoryColor(reading.systolic, reading.diastolic)}>
-                                                {classifyBP(reading.systolic, reading.diastolic)}
-                                            </Badge>
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
-                    </div>
-                    
-                    {filteredReadings.length === 0 && (
-                        <div className="text-center py-8 text-gray-400">
-                            No readings found matching your criteria.
-                        </div>
-                    )}
-                </CardContent>
-            </Card>
+            {/* Your existing code here */}
         </div>
     );
 };

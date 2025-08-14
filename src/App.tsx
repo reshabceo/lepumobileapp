@@ -4,6 +4,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { DeviceProvider } from "./contexts/DeviceContext";
+import { AuthProvider } from "./contexts/AuthContext";
+import { ProtectedRoute } from "./components/ProtectedRoute";
 import { LoginPage } from "./components/LoginPage";
 import Dashboard from "./pages/Dashboard";
 import Chat from "./pages/Chat";
@@ -19,39 +21,111 @@ import LiveBPMonitor from "./pages/LiveBPMonitor";
 import WellueDeviceScanner from "./pages/WellueDeviceScanner";
 import BPReadingsHistory from "./pages/BPReadingsHistory";
 import ECGMonitor from "./pages/ECGMonitor";
+import CGMMonitor from "./pages/CGMMonitor";
 import BPResultScreen from "./pages/BPResult";
 
 const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
+    <TooltipProvider>
+      <AuthProvider>
         <DeviceProvider>
           <Toaster />
           <Sonner />
           <BrowserRouter>
             <Routes>
-              <Route path="/" element={<LoginPage />} />
-              <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/devices" element={<DeviceList />} />
-              <Route path="/wellue-scanner" element={<WellueDeviceScanner />} />
-              <Route path="/live-bp-monitor" element={<LiveBPMonitorRevamped />} />
-              <Route path="/live-bp-monitor-old" element={<LiveBPMonitor />} />
-              <Route path="/bp-readings" element={<BPReadingsHistory />} />
-              <Route path="/bp-result" element={<BPResultScreen />} />
-              <Route path="/ecg-monitor" element={<ECGMonitor />} />
-              <Route path="/patients" element={<PatientList />} />
-              <Route path="/patient/:patientId/devices" element={<PatientDevices />} />
-              <Route path="/patient/:patientId/monitor" element={<PatientMonitor />} />
-              <Route path="/chat" element={<Chat />} />
-              <Route path="/reports" element={<ViewReports />} />
-              <Route path="/add-reports" element={<AddReports />} />
+              {/* Public routes */}
+              <Route path="/" element={
+                <ProtectedRoute requireAuth={false}>
+                  <LoginPage />
+                </ProtectedRoute>
+              } />
+              
+              {/* Protected routes */}
+              <Route path="/dashboard" element={
+                <ProtectedRoute>
+                  <Dashboard />
+                </ProtectedRoute>
+              } />
+              <Route path="/devices" element={
+                <ProtectedRoute>
+                  <DeviceList />
+                </ProtectedRoute>
+              } />
+              <Route path="/wellue-scanner" element={
+                <ProtectedRoute>
+                  <WellueDeviceScanner />
+                </ProtectedRoute>
+              } />
+              <Route path="/live-bp-monitor" element={
+                <ProtectedRoute>
+                  <LiveBPMonitorRevamped />
+                </ProtectedRoute>
+              } />
+              <Route path="/live-bp-monitor-old" element={
+                <ProtectedRoute>
+                  <LiveBPMonitor />
+                </ProtectedRoute>
+              } />
+              <Route path="/bp-readings" element={
+                <ProtectedRoute>
+                  <BPReadingsHistory />
+                </ProtectedRoute>
+              } />
+              <Route path="/bp-result" element={
+                <ProtectedRoute>
+                  <BPResultScreen />
+                </ProtectedRoute>
+              } />
+              <Route path="/ecg-monitor" element={
+                <ProtectedRoute>
+                  <ECGMonitor />
+                </ProtectedRoute>
+              } />
+              <Route path="/cgm-monitor" element={
+                <ProtectedRoute>
+                  <CGMMonitor />
+                </ProtectedRoute>
+              } />
+              <Route path="/patients" element={
+                <ProtectedRoute>
+                  <PatientList />
+                </ProtectedRoute>
+              } />
+              <Route path="/patient/:patientId/devices" element={
+                <ProtectedRoute>
+                  <PatientDevices />
+                </ProtectedRoute>
+              } />
+              <Route path="/patient/:patientId/monitor" element={
+                <ProtectedRoute>
+                  <PatientMonitor />
+                </ProtectedRoute>
+              } />
+              <Route path="/chat" element={
+                <ProtectedRoute>
+                  <Chat />
+                </ProtectedRoute>
+              } />
+              <Route path="/reports" element={
+                <ProtectedRoute>
+                  <ViewReports />
+                </ProtectedRoute>
+              } />
+              <Route path="/add-reports" element={
+                <ProtectedRoute>
+                  <AddReports />
+                </ProtectedRoute>
+              } />
+              
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>
         </DeviceProvider>
-      </TooltipProvider>
+      </AuthProvider>
+    </TooltipProvider>
   </QueryClientProvider>
 );
 

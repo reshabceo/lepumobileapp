@@ -1,6 +1,26 @@
 import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import apiService, { Device, Measurement } from '@/lib/api';
+
+// Define interfaces locally since we're not using the old API service
+export interface Device {
+    id: string;
+    name: string;
+    model: string;
+    macAddress: string;
+    type: 'BP' | 'ECG' | 'OXIMETER' | 'GLUCOSE';
+    connected: boolean;
+    lastSeen: string;
+    battery?: number;
+    firmware?: string;
+}
+
+export interface Measurement {
+    id: string;
+    deviceId: string;
+    timestamp: string;
+    type: string;
+    [key: string]: any;
+}
 
 export interface HealthMetric {
     id: string;

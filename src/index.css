@@ -120,4 +120,51 @@ All colors MUST be HSL.
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
   }
+  
+  /* ECG Waveform Animations */
+  @keyframes sweepGlow {
+    0% { 
+      stroke-dasharray: 0 400; 
+      stroke-dashoffset: 0; 
+    }
+    50% { 
+      stroke-dasharray: 400 0; 
+      stroke-dashoffset: 0; 
+    }
+    100% { 
+      stroke-dasharray: 0 400; 
+      stroke-dashoffset: 400; 
+    }
+  }
+  
+  @keyframes ecgMove {
+    0% {
+      transform: translateX(0);
+    }
+    100% {
+      transform: translateX(-400px);
+    }
+  }
+  
+  @keyframes ecgPulse {
+    0%, 100% {
+      opacity: 0.8;
+      stroke-width: 2;
+    }
+    50% {
+      opacity: 1;
+      stroke-width: 3;
+    }
+  }
+  
+  @keyframes ecgBreath {
+    0%, 100% {
+      opacity: 0.1;
+      transform: scaleY(1);
+    }
+    50% {
+      opacity: 0.3;
+      transform: scaleY(1.1);
+    }
+  }
 }

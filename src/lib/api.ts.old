@@ -1,0 +1,287 @@
+import { getApiUrl } from '@/config/environment';
+
+// Dynamic API URL that works for both web and Android
+const getApiBaseUrl = () => {
+    // Check if we're running in a Capacitor environment (Android/iOS)
+    if (typeof window !== 'undefined') {
+        // Check if we're in a mobile environment
+        const userAgent = navigator.userAgent.toLowerCase();
+        const isMobile = /android|iphone|ipad|ipod|blackberry|windows phone/.test(userAgent);
+        
+        console.log('🔍 API Debug - User Agent:', userAgent);
+        console.log('🔍 API Debug - Is Mobile:', isMobile);
+        
+        const apiUrl = getApiUrl(isMobile);
+        console.log('🔍 API Debug - Using API URL:', apiUrl);
+        return apiUrl;
+    }
+    
+    // Fallback for server-side rendering
+    const apiUrl = getApiUrl(false);
+    console.log('🔍 API Debug - Fallback API URL:', apiUrl);
+    return apiUrl;
+};
+
+const API_BASE_URL = getApiBaseUrl();
+console.log('🔍 API Debug - Final API_BASE_URL:', API_BASE_URL);
+
+// Authentication types
+export interface LoginRequest {
+    email: string;
+    password: string;
+}
+
+export interface SignupRequest {
+    email: string;
+    password: string;
+    name: string;
+}
+
+export interface LoginResponse {
+    success: boolean;
+    token?: string;
+    user?: {
+        id: string;
+        email: string;
+        name: string;
+        role: string;
+    };
+    error?: string;
+}
+
+export interface SignupResponse {
+    success: boolean;
+    token?: string;
+    user?: {
+        id: string;
+        email: string;
+        name: string;
+        role: string;
+    };
+    error?: string;
+}
+
+export interface Patient {
+    id: string;
+    name: string;
+    age: number;
+    condition: string;
+    devices: string[];
+    deviceStatus?: {
+        deviceId: string;
+        type: string;
+        connected: boolean;
+        battery: number;
+    }[];
+}
+
+export interface Device {
+    id: string;
+    name: string;
+    model: string;
+    macAddress: string;
+    type: 'BP' | 'ECG' | 'OXIMETER' | 'GLUCOSE';
+    connected: boolean;
+    lastSeen: string;
+    connectedAt?: string;
+    connectedAtFormatted?: string;
+    connectionDuration?: number;
+    connectionDurationFormatted?: string;
+    battery?: number;
+    firmware?: string;
+    manufacturer?: string;
+    capabilities?: string[];
+}
+
+export interface Measurement {
+    id: string;
+    deviceId: string;
+    timestamp: string;
+    type: string;
+    [key: string]: any;
+}
+
+export interface ApiResponse<T> {
+    success: boolean;
+    data?: T;
+    error?: string;
+    count?: number;
+}
+
+class ApiService {
+    private baseUrl: string;
+    private token: string | null = null;
+
+    constructor(baseUrl: string = API_BASE_URL) {
+        this.baseUrl = baseUrl;
+        // Load token from localStorage on initialization
+        if (typeof window !== 'undefined') {
+            this.token = localStorage.getItem('auth_token');
+        }
+    }
+
+    setToken(token: string) {
+        this.token = token;
+        if (typeof window !== 'undefined') {
+            localStorage.setItem('auth_token', token);
+        }
+    }
+
+    removeToken() {
+        this.token = null;
+        if (typeof window !== 'undefined') {
+            localStorage.removeItem('auth_token');
+        }
+    }
+
+    private async request<T>(endpoint: string, options?: RequestInit): Promise<T> {
+        const url = `${this.baseUrl}${endpoint}`;
+
+        const headers: Record<string, string> = {
+            'Content-Type': 'application/json',
+        };
+
+        // Add authorization header if token exists
+        if (this.token) {
+            headers['Authorization'] = `Bearer ${this.token}`;
+        }
+
+        // Merge with any additional headers from options
+        if (options?.headers) {
+            Object.assign(headers, options.headers);
+        }
+
+        const config: RequestInit = {
+            headers,
+            ...options,
+        };
+
+        try {
+            const response = await fetch(url, config);
+
+            if (!response.ok) {
+                if (response.status === 401) {
+                    this.removeToken();
+                    throw new Error('Authentication required');
+                }
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const data = await response.json();
+            return data;
+        } catch (error) {
+            console.error(`API request failed: ${endpoint}`, error);
+            throw error;
+        }
+    }
+
+    // Authentication methods
+    async login(credentials: LoginRequest): Promise<LoginResponse> {
+        console.log('🔍 Login Debug - Attempting login with:', credentials);
+        console.log('🔍 Login Debug - API URL:', this.baseUrl);
+        
+        try {
+            const response = await this.request<LoginResponse>('/auth/login', {
+                method: 'POST',
+                body: JSON.stringify(credentials),
+            });
+            console.log('🔍 Login Debug - Response:', response);
+            return response;
+        } catch (error) {
+            console.error('🔍 Login Debug - Error:', error);
+            throw error;
+        }
+    }
+
+    async signup(credentials: SignupRequest): Promise<SignupResponse> {
+        console.log('🔍 Signup Debug - Attempting signup with:', credentials);
+        console.log('🔍 Signup Debug - API URL:', this.baseUrl);
+        
+        try {
+            const response = await this.request<SignupResponse>('/auth/signup', {
+                method: 'POST',
+                body: JSON.stringify(credentials),
+            });
+            console.log('🔍 Signup Debug - Response:', response);
+            return response;
+        } catch (error) {
+            console.error('🔍 Signup Debug - Error:', error);
+            throw error;
+        }
+    }
+
+    async verifyToken(): Promise<{ success: boolean; user?: any }> {
+        if (!this.token) {
+            return { success: false };
+        }
+        try {
+            return await this.request<{ success: boolean; user?: any }>('/auth/verify');
+        } catch {
+            return { success: false };
+        }
+    }
+
+    // Device endpoints
+    async getDevices(): Promise<{ success: boolean; devices: Device[]; count: number }> {
+        return this.request<{ success: boolean; devices: Device[]; count: number }>('/devices');
+    }
+
+    async getDevice(deviceId: string): Promise<{ success: boolean; device: Device }> {
+        return this.request<{ success: boolean; device: Device }>(`/devices/${deviceId}`);
+    }
+
+    async connectDevice(deviceId: string, deviceData: Partial<Device>): Promise<{ success: boolean; device: Device }> {
+        return this.request<{ success: boolean; device: Device }>(`/devices/${deviceId}/connect`, {
+            method: 'POST',
+            body: JSON.stringify(deviceData),
+        });
+    }
+
+    async disconnectDevice(deviceId: string): Promise<{ success: boolean; message: string }> {
+        return this.request<{ success: boolean; message: string }>(`/devices/${deviceId}/connect`, {
+            method: 'DELETE',
+        });
+    }
+
+    async getDeviceStatus(deviceId: string): Promise<{ success: boolean; connected: boolean; status: Device }> {
+        return this.request<{ success: boolean; connected: boolean; status: Device }>(`/devices/${deviceId}/status`);
+    }
+
+    // Measurement endpoints
+    async getBPHistory(deviceId: string, limit?: number): Promise<{ success: boolean; measurements: Measurement[]; count: number }> {
+        const query = limit ? `?limit=${limit}` : '';
+        return this.request<{ success: boolean; measurements: Measurement[]; count: number }>(`/bp/${deviceId}/history${query}`);
+    }
+
+    async getECGHistory(deviceId: string, limit?: number): Promise<{ success: boolean; rhythms: Measurement[]; count: number }> {
+        const query = limit ? `?limit=${limit}` : '';
+        return this.request<{ success: boolean; rhythms: Measurement[]; count: number }>(`/ecg/${deviceId}/history${query}`);
+    }
+
+    async getOximeterHistory(deviceId: string, limit?: number): Promise<{ success: boolean; measurements: Measurement[]; count: number }> {
+        const query = limit ? `?limit=${limit}` : '';
+        return this.request<{ success: boolean; measurements: Measurement[]; count: number }>(`/oximeter/${deviceId}/history${query}`);
+    }
+
+    async getGlucoseHistory(deviceId: string, limit?: number): Promise<{ success: boolean; measurements: Measurement[]; count: number }> {
+        const query = limit ? `?limit=${limit}` : '';
+        return this.request<{ success: boolean; measurements: Measurement[]; count: number }>(`/glucose/${deviceId}/history${query}`);
+    }
+
+    // Patient endpoints
+    async getPatients(): Promise<{ success: boolean; patients: Patient[]; count: number }> {
+        return this.request<{ success: boolean; patients: Patient[]; count: number }>('/patients');
+    }
+
+    async getPatient(patientId: string): Promise<{ success: boolean; patient: Patient }> {
+        return this.request<{ success: boolean; patient: Patient }>(`/patients/${patientId}`);
+    }
+
+    // Health check
+    async getHealth(): Promise<any> {
+        return this.request<any>('/health');
+    }
+}
+
+export const apiService = new ApiService();
+export default apiService;

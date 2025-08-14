@@ -1,53 +1,70 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { ArrowLeft, Plus, Settings, Trash2, Wifi, WifiOff, Battery, Clock, Info, AlertTriangle, Loader2, Heart, Activity, Wind, Droplets } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, User, Activity, Heart, Droplets, Wind, Settings, Info, Loader2, Wifi, WifiOff, Battery, Clock, AlertTriangle, Monitor } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 import { MobileAppContainer } from '@/components/MobileAppContainer';
 import { useQuery } from '@tanstack/react-query';
-import apiService, { Device } from '@/lib/api';
-import { useToast } from '@/hooks/use-toast';
+
+// Define interfaces locally since we're not using the old API service
+export interface Device {
+    id: string;
+    name: string;
+    model: string;
+    macAddress: string;
+    type: 'BP' | 'ECG' | 'OXIMETER' | 'GLUCOSE';
+    connected: boolean;
+    lastSeen: string;
+    battery?: number;
+    firmware?: string;
+}
+
+export interface User {
+    id: string;
+    name: string;
+    email: string;
+    role: string;
+}
 
 // Get device type info
-const getDeviceInfo = (type: string) => {
+const getDeviceTypeInfo = (type: string) => {
     switch (type) {
         case 'BP':
             return {
                 icon: Heart,
                 color: 'text-red-400',
                 bgColor: 'bg-red-500/20',
-                name: 'Blood Pressure Monitor',
-                unit: 'mmHg'
+                label: 'Blood Pressure'
             };
         case 'ECG':
             return {
                 icon: Activity,
                 color: 'text-green-400',
                 bgColor: 'bg-green-500/20',
-                name: 'ECG Monitor',
-                unit: 'bpm'
+                label: 'ECG Monitor'
             };
         case 'OXIMETER':
             return {
                 icon: Wind,
                 color: 'text-blue-400',
                 bgColor: 'bg-blue-500/20',
-                name: 'Pulse Oximeter',
-                unit: 'SpO2'
+                label: 'Pulse Oximeter'
             };
         case 'GLUCOSE':
             return {
                 icon: Droplets,
                 color: 'text-yellow-400',
                 bgColor: 'bg-yellow-500/20',
-                name: 'Blood Glucose Meter',
-                unit: 'mg/dL'
+                label: 'Glucose Monitor'
             };
         default:
             return {
                 icon: Activity,
                 color: 'text-gray-400',
                 bgColor: 'bg-gray-500/20',
-                name: 'Unknown Device',
-                unit: ''
+                label: 'Unknown Device'
             };
     }
 };
@@ -61,7 +78,7 @@ const getBatteryColor = (level: number) => {
 
 // Device Card Component
 const PatientDeviceCard = ({ device, onInfoClick }: { device: Device; onInfoClick: () => void }) => {
-    const deviceInfo = getDeviceInfo(device.type);
+    const deviceInfo = getDeviceTypeInfo(device.type);
     const Icon = deviceInfo.icon;
     const batteryColor = getBatteryColor(device.battery || 0);
     const lastSeenDate = new Date(device.lastSeen);
@@ -77,7 +94,7 @@ const PatientDeviceCard = ({ device, onInfoClick }: { device: Device; onInfoClic
                     </div>
                     <div>
                         <h3 className="font-bold text-white text-lg">{device.name}</h3>
-                        <p className="text-gray-400 text-sm">{deviceInfo.name}</p>
+                        <p className="text-gray-400 text-sm">{deviceInfo.label}</p>
                         <p className="text-gray-500 text-xs">Model: {device.model}</p>
                     </div>
                 </div>
