@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Mail, Lock, User, Eye, EyeOff, Loader2 } from 'lucide-react';
+import { Mail, Lock, User, Eye, EyeOff, Loader2, Stethoscope } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 
@@ -12,7 +12,8 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onSwitchToLogin }) => {
     name: '',
     email: '',
     password: '',
-    confirmPassword: ''
+    confirmPassword: '',
+    doctorCode: ''
   });
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -49,6 +50,12 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onSwitchToLogin }) => {
       newErrors.confirmPassword = 'Passwords do not match';
     }
 
+    if (!formData.doctorCode.trim()) {
+      newErrors.doctorCode = 'Doctor code is required';
+    } else if (!/^DR\d{4}$/.test(formData.doctorCode.trim().toUpperCase())) {
+      newErrors.doctorCode = 'Doctor code must be in format DR#### (e.g., DR1234)';
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -59,7 +66,7 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onSwitchToLogin }) => {
       ...prev,
       [name]: value
     }));
-    
+
     // Clear error when user starts typing
     if (errors[name]) {
       setErrors(prev => ({ ...prev, [name]: '' }));
@@ -68,7 +75,7 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onSwitchToLogin }) => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!validateForm()) {
       return;
     }
@@ -76,18 +83,37 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onSwitchToLogin }) => {
     setLoading(true);
 
     try {
-      const success = await signup(formData.email, formData.password, formData.name);
-      
+      const success = await signup(formData.email, formData.password, formData.name, formData.doctorCode);
+
       if (success) {
         toast({
           title: "Account Created Successfully!",
-          description: "Welcome to Vital Signs Monitor!",
+          description: "Please check your email to confirm your account, then return to login.",
         });
+
+        // Redirect to login page after showing the message
+        setTimeout(() => {
+          onToggleMode();
+        }, 3000); // Give more time to read the email confirmation message
       }
     } catch (error) {
+      console.error('Signup error:', error);
+      let errorMessage = 'An error occurred during signup';
+
+      if (error instanceof Error) {
+        // Check for specific doctor code error
+        if (error.message.includes('Doctor not found') || error.message.includes('doctor_code')) {
+          errorMessage = 'Invalid doctor code. Please check with your doctor for the correct code.';
+        } else if (error.message.includes('Cannot coerce the result to a single JSON object')) {
+          errorMessage = 'Database connection error. Please try again.';
+        } else {
+          errorMessage = error.message;
+        }
+      }
+
       toast({
         title: "Signup Failed",
-        description: error instanceof Error ? error.message : 'An error occurred during signup',
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -114,9 +140,8 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onSwitchToLogin }) => {
             value={formData.name}
             onChange={handleInputChange}
             placeholder="Full Name"
-            className={`w-full pl-12 pr-4 py-3 bg-[#21262D] text-white border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 placeholder-gray-500 ${
-              errors.name ? 'border-red-500' : 'border-gray-700'
-            }`}
+            className={`w-full pl-12 pr-4 py-3 bg-[#21262D] text-white border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 placeholder-gray-500 ${errors.name ? 'border-red-500' : 'border-gray-700'
+              }`}
             aria-label="Full Name"
             required
           />
@@ -136,15 +161,38 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onSwitchToLogin }) => {
             value={formData.email}
             onChange={handleInputChange}
             placeholder="Email Address"
-            className={`w-full pl-12 pr-4 py-3 bg-[#21262D] text-white border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 placeholder-gray-500 ${
-              errors.email ? 'border-red-500' : 'border-gray-700'
-            }`}
+            className={`w-full pl-12 pr-4 py-3 bg-[#21262D] text-white border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 placeholder-gray-500 ${errors.email ? 'border-red-500' : 'border-gray-700'
+              }`}
             aria-label="Email Address"
             required
           />
           {errors.email && (
             <p className="text-red-400 text-xs mt-1 ml-1">{errors.email}</p>
           )}
+        </div>
+
+        {/* Doctor Code Input */}
+        <div className="relative">
+          <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+            <Stethoscope className="text-gray-500" size={20} />
+          </div>
+          <input
+            type="text"
+            name="doctorCode"
+            value={formData.doctorCode}
+            onChange={handleInputChange}
+            placeholder="Doctor Code (e.g., DR1234)"
+            className={`w-full pl-12 pr-4 py-3 bg-[#21262D] text-white border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 placeholder-gray-500 ${errors.doctorCode ? 'border-red-500' : 'border-gray-700'
+              }`}
+            aria-label="Doctor Code"
+            required
+          />
+          {errors.doctorCode && (
+            <p className="text-red-400 text-xs mt-1 ml-1">{errors.doctorCode}</p>
+          )}
+          <p className="text-xs text-gray-500 mt-1 ml-1">
+            Enter the doctor code provided by your healthcare provider
+          </p>
         </div>
 
         {/* Password Input */}
@@ -158,9 +206,8 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onSwitchToLogin }) => {
             value={formData.password}
             onChange={handleInputChange}
             placeholder="Password"
-            className={`w-full pl-12 pr-12 py-3 bg-[#21262D] text-white border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 placeholder-gray-500 ${
-              errors.password ? 'border-red-500' : 'border-gray-700'
-            }`}
+            className={`w-full pl-12 pr-12 py-3 bg-[#21262D] text-white border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 placeholder-gray-500 ${errors.password ? 'border-red-500' : 'border-gray-700'
+              }`}
             aria-label="Password"
             required
           />
@@ -187,9 +234,8 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onSwitchToLogin }) => {
             value={formData.confirmPassword}
             onChange={handleInputChange}
             placeholder="Confirm Password"
-            className={`w-full pl-12 pr-12 py-3 bg-[#21262D] text-white border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 placeholder-gray-500 ${
-              errors.confirmPassword ? 'border-red-500' : 'border-gray-700'
-            }`}
+            className={`w-full pl-12 pr-12 py-3 bg-[#21262D] text-white border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 placeholder-gray-500 ${errors.confirmPassword ? 'border-red-500' : 'border-gray-700'
+              }`}
             aria-label="Confirm Password"
             required
           />

@@ -28,15 +28,16 @@ export const auth = {
       password,
       options: {
         data: userData
+        // Email confirmation enabled for patients (same as doctors)
       }
     })
-    
+
     if (error) {
       console.error('❌ Signup error:', error)
     } else {
       console.log('✅ Signup successful:', data.user?.email)
     }
-    
+
     return { data, error }
   },
 
@@ -47,13 +48,13 @@ export const auth = {
       email,
       password
     })
-    
+
     if (error) {
       console.error('❌ Signin error:', error)
     } else {
       console.log('✅ Signin successful:', data.user?.email)
     }
-    
+
     return { data, error }
   },
 
@@ -61,27 +62,44 @@ export const auth = {
   signOut: async () => {
     console.log('🔍 Auth Debug - Signing out user')
     const { error } = await supabase.auth.signOut()
-    
+
     if (error) {
       console.error('❌ Signout error:', error)
     } else {
       console.log('✅ Signout successful')
     }
-    
+
     return { error }
   },
 
   // Get current user
   getCurrentUser: async () => {
-    const { data: { user }, error } = await supabase.auth.getUser()
-    
-    if (error) {
-      console.error('❌ Get user error:', error)
-    } else {
-      console.log('🔍 Auth Debug - Current user:', user?.email)
+    try {
+      const { data: { user }, error } = await supabase.auth.getUser()
+
+      if (error) {
+        // Handle auth session missing gracefully
+        if (error.message && error.message.includes('Auth session missing')) {
+          console.log('ℹ️ No active session found (normal on first load)')
+          return { user: null, error: null }
+        } else {
+          console.error('❌ Get user error:', error)
+          return { user: null, error }
+        }
+      } else {
+        console.log('🔍 Auth Debug - Current user:', user?.email)
+        return { user, error: null }
+      }
+    } catch (err) {
+      // Handle any unexpected errors
+      if (err instanceof Error && err.message.includes('Auth session missing')) {
+        console.log('ℹ️ No active session found (normal on first load)')
+        return { user: null, error: null }
+      } else {
+        console.error('❌ Get user error:', err)
+        return { user: null, error: err }
+      }
     }
-    
-    return { user, error }
   },
 
   // Listen to auth changes
@@ -92,34 +110,84 @@ export const auth = {
 
 // Database helper functions
 export const db = {
-  // Get user profile
-  getUserProfile: async (userId: string) => {
+  // Get patient profile
+  getPatientProfile: async (authUserId: string) => {
+    console.log('🔍 DB Debug - Getting patient profile for:', authUserId)
     const { data, error } = await supabase
-      .from('user_profiles')
+      .from('patients')
       .select('*')
-      .eq('id', userId)
+      .eq('auth_user_id', authUserId)
       .single()
-    
+
+    if (error) {
+      console.error('❌ Get patient profile error:', error)
+    } else {
+      console.log('✅ Patient profile found:', data)
+    }
+
     return { data, error }
   },
 
-  // Update user profile
-  updateUserProfile: async (userId: string, updates: any) => {
-    const { data, error } = await supabase
-      .from('user_profiles')
-      .update(updates)
-      .eq('id', userId)
-    
-    return { data, error }
+  // Create patient profile
+  createPatientProfile: async (authUserId: string, fullName: string, email: string, doctorCode: string) => {
+    console.log('🔍 DB Debug - Creating patient profile:', { authUserId, fullName, email, doctorCode })
+
+    try {
+      const { data, error } = await supabase.rpc('create_patient_profile', {
+        auth_user_id: authUserId,
+        full_name: fullName,
+        email: email,
+        doctor_code_input: doctorCode
+      })
+
+      if (error) {
+        console.error('❌ Create patient profile error:', error)
+        return { data: null, error }
+      }
+
+      console.log('✅ Patient profile created:', data)
+      return { data, error: null }
+    } catch (err) {
+      console.error('❌ Create patient profile exception:', err)
+      return { data: null, error: err }
+    }
   },
 
   // Insert vital signs data
   insertVitalSigns: async (vitalSignsData: any) => {
+    // Get current user's patient profile to find assigned doctor
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      return { data: null, error: new Error('User not authenticated') }
+    }
+
+    // Get patient profile to find assigned doctor
+    const { data: patientProfile } = await supabase
+      .from('patients')
+      .select('id, assigned_doctor_id')
+      .eq('auth_user_id', user.id)
+      .single()
+
+    if (!patientProfile) {
+      return { data: null, error: new Error('Patient profile not found') }
+    }
+
+    // Add patient_id and doctor_id to vital signs data
+    const dataWithPatientAndDoctor = {
+      ...vitalSignsData,
+      patient_id: patientProfile.id,
+      doctor_id: patientProfile.assigned_doctor_id,
+      reading_timestamp: vitalSignsData.timestamp || new Date().toISOString()
+    }
+
+    // Remove the old timestamp field if it exists
+    delete dataWithPatientAndDoctor.timestamp
+
     const { data, error } = await supabase
       .from('vital_signs')
-      .insert(vitalSignsData)
+      .insert(dataWithPatientAndDoctor)
       .select()
-    
+
     return { data, error }
   },
 
@@ -131,7 +199,69 @@ export const db = {
       .eq('user_id', userId)
       .order('timestamp', { ascending: false })
       .limit(limit)
-    
+
+    return { data, error }
+  },
+
+  // Get vital signs for doctor's patients
+  getDoctorPatientsVitalSigns: async (doctorId: string, limit = 100) => {
+    const { data, error } = await supabase
+      .from('vital_signs')
+      .select(`
+        *,
+        user_profiles!user_id (
+          name,
+          role
+        )
+      `)
+      .eq('doctor_id', doctorId)
+      .order('timestamp', { ascending: false })
+      .limit(limit)
+
+    return { data, error }
+  },
+
+  // Assign doctor to patient
+  assignDoctorToPatient: async (patientId: string, doctorCode: string) => {
+    const { data, error } = await supabase.rpc('assign_doctor_to_patient', {
+      patient_id: patientId,
+      doctor_code_input: doctorCode
+    })
+
+    return { data, error }
+  },
+
+  // Generate doctor code for new doctors
+  generateDoctorCode: async () => {
+    const { data, error } = await supabase.rpc('generate_doctor_code')
+    return { data, error }
+  },
+
+  // Get doctor's patients
+  getDoctorPatients: async (doctorId: string) => {
+    const { data, error } = await supabase
+      .from('user_profiles')
+      .select('id, name, role, created_at')
+      .eq('doctor_id', doctorId)
+      .eq('role', 'user')
+
+    return { data, error }
+  },
+
+  // Get patient's assigned doctor
+  getPatientDoctor: async (patientId: string) => {
+    const { data, error } = await supabase
+      .from('user_profiles')
+      .select(`
+        doctor_id,
+        doctor:doctor_id (
+          name,
+          doctor_code
+        )
+      `)
+      .eq('id', patientId)
+      .single()
+
     return { data, error }
   }
 }

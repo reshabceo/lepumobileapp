@@ -238,13 +238,13 @@ export const LiveBPMonitorRevamped: React.FC = () => {
   };
 
   // 🚨 SAFETY: Get pressure safety indicator
-  const getPressureSafetyIndicator = (pressure: number): {icon: string, color: string, text: string} => {
-    if (pressure === 0) return {icon: '⭕', color: 'text-gray-400', text: 'Ready'};
-    if (pressure < 50) return {icon: '🟢', color: 'text-green-400', text: 'Safe'};
-    if (pressure < 100) return {icon: '🔵', color: 'text-blue-400', text: 'Normal'};
-    if (pressure < 150) return {icon: '🟡', color: 'text-yellow-400', text: 'Caution'};
-    if (pressure < 200) return {icon: '🟠', color: 'text-orange-400', text: 'High'};
-    return {icon: '🔴', color: 'text-red-400', text: 'Very High'};
+  const getPressureSafetyIndicator = (pressure: number): { icon: string, color: string, text: string } => {
+    if (pressure === 0) return { icon: '⭕', color: 'text-gray-400', text: 'Ready' };
+    if (pressure < 50) return { icon: '🟢', color: 'text-green-400', text: 'Safe' };
+    if (pressure < 100) return { icon: '🔵', color: 'text-blue-400', text: 'Normal' };
+    if (pressure < 150) return { icon: '🟡', color: 'text-yellow-400', text: 'Caution' };
+    if (pressure < 200) return { icon: '🟠', color: 'text-orange-400', text: 'High' };
+    return { icon: '🔴', color: 'text-red-400', text: 'Very High' };
   };
 
   // Waveform rendering
@@ -713,6 +713,36 @@ export const LiveBPMonitorRevamped: React.FC = () => {
         const updatedReports = [reportData, ...filteredReports.slice(0, 49)]; // Keep last 50
         localStorage.setItem('storedFilesInApp', JSON.stringify(updatedReports));
         console.log('💾 [BP] BP result saved to storedFilesInApp for reports, total reports:', updatedReports.length);
+
+        // 🆕 Save to Supabase database for doctor monitoring
+        try {
+          const { db } = await import('@/lib/supabase');
+          const vitalSignsData = {
+            device_id: connectedDevice?.id || 'unknown',
+            device_type: 'BP',
+            measurement_type: 'blood_pressure',
+            data: {
+              systolic: dataToSave.systolic,
+              diastolic: dataToSave.diastolic,
+              mean: dataToSave.mean,
+              pulseRate: dataToSave.pulseRate,
+              result: dataToSave.result,
+              deviceName: connectedDevice?.name || 'unknown',
+              measurementId: dataToSave.measurementId,
+              status: dataToSave.status
+            },
+            timestamp: dataToSave.timestamp
+          };
+
+          const { error: dbError } = await db.insertVitalSigns(vitalSignsData);
+          if (dbError) {
+            console.error('❌ [BP] Failed to save to database:', dbError);
+          } else {
+            console.log('✅ [BP] BP result saved to database for doctor monitoring');
+          }
+        } catch (dbError) {
+          console.error('❌ [BP] Database save error:', dbError);
+        }
       } catch (error) {
         console.error('❌ [BP] Failed to save BP result to storedFilesInApp:', error);
       }
@@ -810,8 +840,7 @@ export const LiveBPMonitorRevamped: React.FC = () => {
       bars.push(
         <div
           key={i}
-          className={`w-1 h-${i + 2} rounded-full ${
-            i < quality ? 'bg-green-400' : 'bg-gray-600'
+          className={`w-1 h-${i + 2} rounded-full ${i < quality ? 'bg-green-400' : 'bg-gray-600'
           }`}
         />
       );

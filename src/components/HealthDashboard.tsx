@@ -1,10 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Filesystem, Directory } from '@capacitor/filesystem';
-import { Video, Phone, MessageSquare, FileText, Siren, LayoutGrid, BarChart2, Droplets, Heart, Wind, User, LogOut, Loader2, Activity, Thermometer, Users, Bluetooth, Wifi, WifiOff, BarChart3, ChevronUp, ChevronDown } from 'lucide-react';
+import { Video, Phone, MessageSquare, FileText, Siren, LayoutGrid, BarChart2, Droplets, Heart, Wind, User, LogOut, Loader2, Activity, Thermometer, Users, Bluetooth, Wifi, WifiOff, BarChart3, ChevronUp, ChevronDown, Stethoscope } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
-import { useHealthData, HealthMetric } from '@/hooks/useHealthData';
+import { HealthMetric } from '@/hooks/useHealthData';
 import { useDevice } from '@/contexts/DeviceContext';
+import { useRealTimeVitals } from '@/hooks/useRealTimeVitals';
+import { DoctorInfoCard } from './DoctorInfoCard';
+import { EmergencyButton } from './EmergencyButton';
 
 // Icon mapping for different health metrics
 const getMetricIcon = (name: string) => {
@@ -98,16 +101,16 @@ const HealthMetricCard = ({ metric, onClick }: { metric: HealthMetric, onClick: 
 // Main Dashboard Component
 export const HealthDashboard = () => {
   const navigate = useNavigate();
-  
+
   // DEBUG: Add console log to verify this component is being rendered
   console.log('🔍 [DEBUG] HealthDashboard component is rendering - version with arrow button and no Live Health Overview');
-  
+
   const { toast } = useToast();
-  const { devices, metrics, loading, error } = useHealthData();
-  const { 
-    connectedDevice, 
-    bluetoothEnabled, 
-    isInitialized, 
+  const { vitals, patientProfile, loading: vitalsLoading, error: vitalsError, getLatestReadings, addVitalSign } = useRealTimeVitals();
+  const {
+    connectedDevice,
+    bluetoothEnabled,
+    isInitialized,
     error: deviceError,
     wellueSDK,
     startScan,
@@ -139,9 +142,55 @@ export const HealthDashboard = () => {
   const [isConnecting, setIsConnecting] = useState(false);
   const previewCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const [deviceStatusExpanded, setDeviceStatusExpanded] = useState(true);
-  
+
   // DEBUG: Log the current state after declaration
   console.log('🔍 [DEBUG] deviceStatusExpanded state:', deviceStatusExpanded);
+
+  // Helper functions for vital signs status
+  const getBPStatus = (bp: string): HealthMetric['status'] => {
+    const [systolic, diastolic] = bp.split('/').map(Number);
+    if (systolic >= 140 || diastolic >= 90) return 'High';
+    if (systolic < 90 || diastolic < 60) return 'Low';
+    return 'Normal';
+  };
+
+  const getBPColor = (bp: string): string => {
+    const status = getBPStatus(bp);
+    return status === 'High' ? '#F87171' : status === 'Low' ? '#FCD34D' : '#34D399';
+  };
+
+  const getHRStatus = (hr: number): HealthMetric['status'] => {
+    if (hr > 100) return 'High';
+    if (hr < 60) return 'Low';
+    return 'Normal';
+  };
+
+  const getHRColor = (hr: number): string => {
+    const status = getHRStatus(hr);
+    return status === 'High' ? '#F87171' : status === 'Low' ? '#FCD34D' : '#34D399';
+  };
+
+  const getSPO2Status = (spo2: number): HealthMetric['status'] => {
+    if (spo2 < 90) return 'Critical';
+    if (spo2 < 95) return 'Low';
+    return 'Normal';
+  };
+
+  const getSPO2Color = (spo2: number): string => {
+    const status = getSPO2Status(spo2);
+    return status === 'Critical' ? '#DC2626' : status === 'Low' ? '#F87171' : '#34D399';
+  };
+
+  const getGlucoseStatus = (glucose: number): HealthMetric['status'] => {
+    if (glucose > 180) return 'High';
+    if (glucose < 70) return 'Low';
+    return 'Normal';
+  };
+
+  const getGlucoseColor = (glucose: number): string => {
+    const status = getGlucoseStatus(glucose);
+    return status === 'High' ? '#F87171' : status === 'Low' ? '#FCD34D' : '#34D399';
+  };
 
   const fetchStoredECG = async () => {
     try {
@@ -177,9 +226,9 @@ export const HealthDashboard = () => {
           console.log('📖 Reading file:', entry.fileName);
           const res: any = await wellueSDK.readStoredFile(connectedDevice.id, entry.fileName);
           console.log('📦 Raw response for', entry.fileName, ':', res);
-          
+
           const fileTypeNum = typeof res?.fileType === 'number' ? res.fileType : Number(res?.fileType);
-          
+
           // Parse waveform data - convert base64 to array if needed
           let waveformCounts: number[] | undefined;
           if (res?.waveformCounts && Array.isArray(res.waveformCounts)) {
@@ -202,7 +251,7 @@ export const HealthDashboard = () => {
               console.warn('⚠️ Failed to parse base64 content for ECG:', e);
             }
           }
-          
+
           // Build payload with proper data extraction
           const payload: StoredItem = {
             fileName: entry.fileName,
@@ -255,29 +304,29 @@ export const HealthDashboard = () => {
     try {
       setIsLoadingSaved(true);
       console.log('📱 Loading saved files from phone Documents...');
-      
+
       // List all files in Documents directory
       const result = await Filesystem.readdir({
         path: '',
         directory: Directory.Documents
       });
-      
+
       console.log('📁 Documents folder contents:', result.files);
-      
+
       // Filter for our BP2/ECG JSON files
-      const jsonFiles = result.files.filter((file: any) => 
+      const jsonFiles = result.files.filter((file: any) =>
         file.name && (file.name.startsWith('bp2_ecg_') || file.name.includes('bp2') || file.name.includes('ecg'))
       );
-      
+
       console.log('📄 Found JSON files:', jsonFiles);
-      
+
       if (jsonFiles.length === 0) {
         toast({ title: 'No Saved Files', description: 'No BP2/ECG JSON files found in Documents folder.', variant: 'default' });
         return;
       }
-      
+
       const loadedFiles: StoredItem[] = [];
-      
+
       for (const file of jsonFiles) {
         try {
           console.log('📖 Reading saved file:', file.name);
@@ -285,10 +334,10 @@ export const HealthDashboard = () => {
             path: file.name,
             directory: Directory.Documents
           });
-          
+
           const parsedData = JSON.parse(fileContent.data as string);
           console.log('📊 Parsed saved file:', file.name, parsedData);
-          
+
           // Ensure the data has the right structure
           const storedItem: StoredItem = {
             fileName: parsedData.fileName || file.name,
@@ -301,32 +350,32 @@ export const HealthDashboard = () => {
             waveformCounts: parsedData.waveformCounts,
             base64: parsedData.base64,
           };
-          
+
           loadedFiles.push(storedItem);
         } catch (e) {
           console.warn('⚠️ Failed to read/parse saved file:', file.name, e);
         }
       }
-      
+
       setSavedFilesFromPhone(loadedFiles);
       setStoredFilesInApp(loadedFiles); // Replace the current stored files with loaded ones
       setSelectedIdx(loadedFiles.length > 0 ? 0 : null);
-      
+
       const ecgCount = loadedFiles.filter(f => f.fileType === 2).length;
       const bpCount = loadedFiles.filter(f => f.fileType === 1).length;
-      
-      toast({ 
-        title: 'Files Loaded from Phone', 
-        description: `Loaded ${ecgCount} ECG and ${bpCount} BP files from Documents folder.`, 
-        variant: 'default' 
+
+      toast({
+        title: 'Files Loaded from Phone',
+        description: `Loaded ${ecgCount} ECG and ${bpCount} BP files from Documents folder.`,
+        variant: 'default'
       });
-      
+
     } catch (err) {
       console.error('❌ Failed to load saved files from phone:', err);
-      toast({ 
-        title: 'Load Failed', 
-        description: 'Unable to load saved files from phone Documents folder.', 
-        variant: 'destructive' 
+      toast({
+        title: 'Load Failed',
+        description: 'Unable to load saved files from phone Documents folder.',
+        variant: 'destructive'
       });
     } finally {
       setIsLoadingSaved(false);
@@ -338,7 +387,7 @@ export const HealthDashboard = () => {
     if (selectedIdx == null) return;
     const file = storedFilesInApp[selectedIdx];
     if (!file) return;
-    
+
     const canvas = previewCanvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
@@ -429,17 +478,16 @@ export const HealthDashboard = () => {
   };
 
   const handleMetricClick = (metricName: string, deviceId?: string) => {
-    const device = devices.find(d => d.id === deviceId);
     toast({
-      title: "Device Information",
-      description: device
-        ? `${metricName} from ${device.name} (${device.model})`
+      title: "Vital Sign Information",
+      description: deviceId
+        ? `${metricName} from device ${deviceId}`
         : `${metricName} monitoring data`,
     });
   };
 
   // Show loading state
-  if (loading) {
+  if (vitalsLoading) {
     return (
       <div className="bg-[#101010] min-h-screen text-white flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
@@ -451,14 +499,14 @@ export const HealthDashboard = () => {
   }
 
   // Show error state
-  if (error) {
+  if (vitalsError) {
     return (
       <div className="bg-[#101010] min-h-screen text-white flex items-center justify-center p-4">
         <div className="max-w-sm mx-auto text-center">
           <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-6">
             <Siren className="h-12 w-12 text-red-500 mx-auto mb-4" />
             <h2 className="text-xl font-bold text-red-400 mb-2">Connection Error</h2>
-            <p className="text-gray-300 mb-4">{error}</p>
+            <p className="text-gray-300 mb-4">{vitalsError}</p>
             <p className="text-sm text-gray-400">
               Make sure the backend server is running on port 3000
             </p>
@@ -506,68 +554,67 @@ export const HealthDashboard = () => {
                 </span>
               </div>
             </div>
-            
+
             {/* Collapsible Device Status Content */}
-            <div className={`transition-all duration-300 overflow-hidden ${
-              deviceStatusExpanded ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
-            }`}>
+            <div className={`transition-all duration-300 overflow-hidden ${deviceStatusExpanded ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
+              }`}>
               {/* BP & ECG Device Status */}
-            {connectedDevice ? (
+              {connectedDevice ? (
                 <div className="mb-3 p-3 bg-green-500/10 border border-green-500/20 rounded-lg">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="bg-green-500 p-2 rounded-full">
-                    <Bluetooth className="h-5 w-5 text-white" />
-                  </div>
-                  <div>
-                    <p className="font-semibold text-white">{connectedDevice.name}</p>
-                    <p className="text-sm text-gray-400">{connectedDevice.model}</p>
-                    {connectedDevice.battery !== undefined && (
-                      <p className="text-xs text-gray-500">Battery: {connectedDevice.battery}%</p>
-                    )}
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-                  <span className="text-sm text-green-400">Connected</span>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="bg-green-500 p-2 rounded-full">
+                        <Bluetooth className="h-5 w-5 text-white" />
+                      </div>
+                      <div>
+                        <p className="font-semibold text-white">{connectedDevice.name}</p>
+                        <p className="text-sm text-gray-400">{connectedDevice.model}</p>
+                        {connectedDevice.battery !== undefined && (
+                          <p className="text-xs text-gray-500">Battery: {connectedDevice.battery}%</p>
+                        )}
+                      </div>
                     </div>
-                </div>
-              </div>
-            ) : (
-                <div className="mb-3 p-3 bg-gray-500/10 border border-gray-500/20 rounded-lg">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="bg-gray-500 p-2 rounded-full">
-                    <WifiOff className="h-5 w-5 text-white" />
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                      <span className="text-sm text-green-400">Connected</span>
+                    </div>
                   </div>
-                  <div>
+                </div>
+              ) : (
+                <div className="mb-3 p-3 bg-gray-500/10 border border-gray-500/20 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="bg-gray-500 p-2 rounded-full">
+                        <WifiOff className="h-5 w-5 text-white" />
+                      </div>
+                      <div>
                         <p className="font-semibold text-gray-400">BP & ECG Device</p>
                         <p className="text-sm text-gray-500">Not connected</p>
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                <button
-                    onClick={async () => {
-                      try {
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={async () => {
+                          try {
                             setIsConnecting(true);
-                        // Try to connect to last known device first
-                        const lastDeviceId = localStorage.getItem('lastConnectedDevice');
-                        if (lastDeviceId) {
-                          console.log('🔄 Attempting to connect to last known device:', lastDeviceId);
-                          await wellueSDK.connect(lastDeviceId);
-                        } else {
-                          // No last known device, start scanning
-                          console.log('🔍 Starting scan to find devices...');
-                          await startScan();
+                            // Try to connect to last known device first
+                            const lastDeviceId = localStorage.getItem('lastConnectedDevice');
+                            if (lastDeviceId) {
+                              console.log('🔄 Attempting to connect to last known device:', lastDeviceId);
+                              await wellueSDK.connect(lastDeviceId);
+                            } else {
+                              // No last known device, start scanning
+                              console.log('🔍 Starting scan to find devices...');
+                              await startScan();
                               // Wait longer for scan and connection
                               await new Promise(resolve => setTimeout(resolve, 5000));
-                            if (availableDevices.length > 0) {
-                              // Auto-connect to first available device
+                              if (availableDevices.length > 0) {
+                                // Auto-connect to first available device
                                 await connectToDevice(availableDevices[0]);
+                              }
                             }
-                        }
-                      } catch (error) {
-                        console.error('Failed to connect:', error);
+                          } catch (error) {
+                            console.error('Failed to connect:', error);
                             // Only reset connecting state on error
                             setIsConnecting(false);
                           }
@@ -584,7 +631,7 @@ export const HealthDashboard = () => {
                         ) : (
                           <span>Connect</span>
                         )}
-                </button>
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -635,7 +682,7 @@ export const HealthDashboard = () => {
                 )}
               </button>
             </div>
-            
+
             {/* Show device errors if any */}
             {deviceError && (
               <div className="mt-3 p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
@@ -700,59 +747,135 @@ export const HealthDashboard = () => {
 
 
 
-        {/* Health Metrics Grid */}
-        <div className="grid grid-cols-2 gap-4 mb-6">
-          {metrics.length > 0 ? (
-            metrics.map((metric) => (
-              <HealthMetricCard
-                key={metric.id}
-                metric={metric}
-                onClick={() => handleMetricClick(metric.name, metric.deviceId)}
-              />
-            ))
-          ) : (
-            <div className="col-span-2 grid grid-cols-3 gap-4">
-              {/* BP Monitor Button */}
-              <button
-                onClick={() => navigate('/live-bp-monitor')}
-                className="bg-gradient-to-br from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white p-6 rounded-2xl flex flex-col items-center justify-center gap-3 transition-all duration-300 hover:scale-105 active:scale-95 shadow-lg hover:shadow-xl border border-blue-400/20"
-              >
-                <Heart className="h-8 w-8 text-white" />
-                <div className="text-center">
-                  <h3 className="font-bold text-lg">BP Monitor</h3>
-                  <p className="text-xs text-blue-100 opacity-80">Blood Pressure</p>
-                </div>
-              </button>
-              
-              {/* ECG Monitor Button */}
-              <button
-                onClick={() => navigate('/ecg-monitor')}
-                className="bg-gradient-to-br from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white p-6 rounded-2xl flex flex-col items-center justify-center gap-3 transition-all duration-300 hover:scale-105 active:scale-95 shadow-lg hover:shadow-xl border border-purple-400/20"
-              >
-                <Activity className="h-8 w-8 text-white" />
-                <div className="text-center">
-                  <h3 className="font-bold text-lg">ECG Monitor</h3>
-                  <p className="text-xs text-purple-100 opacity-80">Heart Activity</p>
-                </div>
-              </button>
+        {/* Your Doctor */}
+        <div className="mb-6">
+          <h2 className="text-xl font-semibold mb-3 text-white">Your Doctor</h2>
+          <DoctorInfoCard />
+        </div>
 
-              {/* CGM Monitor Button */}
-              <button
-                onClick={() => navigate('/cgm-monitor')}
-                className="bg-gradient-to-br from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white p-6 rounded-2xl flex flex-col items-center justify-center gap-3 transition-all duration-300 hover:scale-105 active:scale-95 shadow-lg hover:shadow-xl border border-green-400/20"
-              >
-                <BarChart3 className="h-8 w-8 text-white" />
-                <div className="text-center">
-                  <h3 className="font-bold text-lg">CGM Monitor</h3>
-                  <p className="text-xs text-green-100 opacity-80">Glucose Levels</p>
-                </div>
-              </button>
-            </div>
-          )}
+        {/* Real-Time Vitals Display */}
+        <div className="grid grid-cols-2 gap-4 mb-6">
+          {(() => {
+            const latestReadings = getLatestReadings();
+            const realTimeMetrics: HealthMetric[] = [];
+
+            // Blood Pressure Card
+            if (latestReadings.bloodPressure) {
+              realTimeMetrics.push({
+                id: 'bp-realtime',
+                name: 'Blood Pressure',
+                value: latestReadings.bloodPressure,
+                unit: 'mmHg',
+                status: getBPStatus(latestReadings.bloodPressure),
+                color: getBPColor(latestReadings.bloodPressure),
+                chartData: [],
+                timestamp: latestReadings.lastUpdate || undefined
+              });
+            }
+
+            // Heart Rate Card
+            if (latestReadings.heartRate) {
+              realTimeMetrics.push({
+                id: 'hr-realtime',
+                name: 'Heart Rate',
+                value: latestReadings.heartRate.toString(),
+                unit: 'bpm',
+                status: getHRStatus(latestReadings.heartRate),
+                color: getHRColor(latestReadings.heartRate),
+                chartData: [],
+                timestamp: latestReadings.lastUpdate || undefined
+              });
+            }
+
+            // Oxygen Saturation Card
+            if (latestReadings.oxygenSaturation) {
+              realTimeMetrics.push({
+                id: 'spo2-realtime',
+                name: 'Oxygen Saturation',
+                value: latestReadings.oxygenSaturation.toString(),
+                unit: '%',
+                status: getSPO2Status(latestReadings.oxygenSaturation),
+                color: getSPO2Color(latestReadings.oxygenSaturation),
+                chartData: [],
+                timestamp: latestReadings.lastUpdate || undefined
+              });
+            }
+
+            // Blood Sugar Card
+            if (latestReadings.bloodSugar) {
+              realTimeMetrics.push({
+                id: 'glucose-realtime',
+                name: 'Blood Sugar',
+                value: latestReadings.bloodSugar.toString(),
+                unit: 'mg/dL',
+                status: getGlucoseStatus(latestReadings.bloodSugar),
+                color: getGlucoseColor(latestReadings.bloodSugar),
+                chartData: [],
+                timestamp: latestReadings.lastUpdate || undefined
+              });
+            }
+
+            return realTimeMetrics.length > 0 ? (
+              realTimeMetrics.slice(0, 4).map((metric, index) => (
+                <HealthMetricCard
+                  key={metric.id}
+                  metric={metric}
+                  onClick={() => handleMetricClick(metric.name, metric.deviceId)}
+                />
+              ))
+            ) : (
+              <div className="col-span-2 text-center py-8">
+                <Activity className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                <p className="text-gray-500">No recent vital signs data</p>
+                <p className="text-sm text-gray-400">Connect a device to start monitoring</p>
+              </div>
+            );
+          })()}
+        </div>
+
+        {/* Device Actions */}
+        <div className="grid grid-cols-2 gap-4 mb-6">
+          <div className="col-span-2 grid grid-cols-3 gap-4">
+            {/* BP Monitor Button */}
+            <button
+              onClick={() => navigate('/live-bp-monitor')}
+              className="bg-gradient-to-br from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white p-6 rounded-2xl flex flex-col items-center justify-center gap-3 transition-all duration-300 hover:scale-105 active:scale-95 shadow-lg hover:shadow-xl border border-blue-400/20"
+            >
+              <Heart className="h-8 w-8 text-white" />
+              <div className="text-center">
+                <h3 className="font-bold text-lg">BP Monitor</h3>
+                <p className="text-xs text-blue-100 opacity-80">Blood Pressure</p>
+              </div>
+            </button>
+
+            {/* ECG Monitor Button */}
+            <button
+              onClick={() => navigate('/ecg-monitor')}
+              className="bg-gradient-to-br from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white p-6 rounded-2xl flex flex-col items-center justify-center gap-3 transition-all duration-300 hover:scale-105 active:scale-95 shadow-lg hover:shadow-xl border border-purple-400/20"
+            >
+              <Activity className="h-8 w-8 text-white" />
+              <div className="text-center">
+                <h3 className="font-bold text-lg">ECG Monitor</h3>
+                <p className="text-xs text-purple-100 opacity-80">Heart Activity</p>
+              </div>
+            </button>
+
+            {/* CGM Monitor Button */}
+            <button
+              onClick={() => navigate('/cgm-monitor')}
+              className="bg-gradient-to-br from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white p-6 rounded-2xl flex flex-col items-center justify-center gap-3 transition-all duration-300 hover:scale-105 active:scale-95 shadow-lg hover:shadow-xl border border-green-400/20"
+            >
+              <BarChart3 className="h-8 w-8 text-white" />
+              <div className="text-center">
+                <h3 className="font-bold text-lg">CGM Monitor</h3>
+                <p className="text-xs text-green-100 opacity-80">Glucose Levels</p>
+              </div>
+            </button>
+          </div>
         </div>
 
         {/* Bottom Action Buttons */}
-        <div className="grid grid-cols-2 gap-4 pb-8">
+        <div className="grid grid-cols-2 gap-4 mb-4">
           <button
             onClick={handleViewReports}
             className="bg-[#4A37A8] hover:bg-[#5A47B8] text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2 transition-all duration-200 hover:scale-105 active:scale-95"
@@ -760,10 +883,19 @@ export const HealthDashboard = () => {
             <FileText size={20} />
             <span>View Reports</span>
           </button>
-          <button className="bg-[#D93B3B] hover:bg-[#E94B4B] text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2 transition-all duration-200 hover:scale-105 active:scale-95">
-            <Siren size={20} />
-            <span>Emergency SOS</span>
+          <button
+            onClick={() => navigate('/doctor-assignment')}
+            className="bg-[#0EA5E9] hover:bg-[#0284C7] text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2 transition-all duration-200 hover:scale-105 active:scale-95"
+          >
+            <Stethoscope size={20} />
+            <span>Doctor Setup</span>
           </button>
+        </div>
+        <div className="pb-8">
+          <EmergencyButton
+            size="lg"
+            className="w-full"
+          />
         </div>
       </div>
     </div>

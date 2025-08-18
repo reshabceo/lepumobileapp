@@ -48,18 +48,18 @@ const CGMMonitor: React.FC = () => {
       setTimeout(() => {
         setIsAuthenticated(true);
         startMonitoring();
-        toast({ 
-          title: 'Connected Successfully', 
-          description: 'Connected to Dexcom CGM device.', 
-          variant: 'default' 
+        toast({
+          title: 'Connected Successfully',
+          description: 'Connected to Dexcom CGM device.',
+          variant: 'default'
         });
       }, 1500);
     } catch (error) {
       console.error('Failed to connect:', error);
-      toast({ 
-        title: 'Connection Failed', 
-        description: 'Unable to connect to Dexcom CGM.', 
-        variant: 'destructive' 
+      toast({
+        title: 'Connection Failed',
+        description: 'Unable to connect to Dexcom CGM.',
+        variant: 'destructive'
       });
     } finally {
       setIsConnecting(false);
@@ -69,7 +69,7 @@ const CGMMonitor: React.FC = () => {
   const startMonitoring = async () => {
     try {
       setIsLoading(true);
-      
+
       // Use mock data for demonstration
       const mockData: GlucoseReading[] = [
         { systemTime: '2025-01-13T15:00:00Z', displayTime: '2025-01-13T15:00:00Z', value: 120, trend: 'Stable', unit: 'mg/dL' },
@@ -81,11 +81,11 @@ const CGMMonitor: React.FC = () => {
         { systemTime: '2025-01-13T16:30:00Z', displayTime: '2025-01-13T16:30:00Z', value: 142, trend: 'Rising', trendRate: 7, unit: 'mg/dL' },
         { systemTime: '2025-01-13T16:45:00Z', displayTime: '2025-01-13T16:45:00Z', value: 138, trend: 'Falling', trendRate: -4, unit: 'mg/dL' },
       ];
-      
+
       setGlucoseHistory(mockData);
       const lastReading = mockData[mockData.length - 1];
       const average = Math.round(mockData.reduce((sum, reading) => sum + reading.value, 0) / mockData.length);
-      
+
       setSession({
         isConnected: true,
         lastReading,
@@ -100,10 +100,10 @@ const CGMMonitor: React.FC = () => {
       startRealTimeUpdates();
     } catch (error) {
       console.error('Failed to start monitoring:', error);
-      toast({ 
-        title: 'Connection Failed', 
-        description: 'Unable to connect to Dexcom CGM. Please check your credentials.', 
-        variant: 'destructive' 
+      toast({
+        title: 'Connection Failed',
+        description: 'Unable to connect to Dexcom CGM. Please check your credentials.',
+        variant: 'destructive'
       });
     } finally {
       setIsLoading(false);
@@ -127,7 +127,7 @@ const CGMMonitor: React.FC = () => {
         setGlucoseHistory(prev => {
           const combined = [...prev, newReading];
           // Remove duplicates and keep last 100 readings
-          const unique = combined.filter((reading, index, arr) => 
+          const unique = combined.filter((reading, index, arr) =>
             arr.findIndex(r => r.systemTime === reading.systemTime) === index
           );
           return unique.slice(-100);
@@ -154,22 +154,22 @@ const CGMMonitor: React.FC = () => {
       lastUpdate: 'Never',
     });
     setGlucoseHistory([]);
-    
+
     if (intervalRef.current) {
       clearInterval(intervalRef.current);
       intervalRef.current = null;
     }
-    
-    toast({ 
-      title: 'Disconnected', 
-      description: 'Disconnected from Dexcom CGM.', 
-      variant: 'default' 
+
+    toast({
+      title: 'Disconnected',
+      description: 'Disconnected from Dexcom CGM.',
+      variant: 'default'
     });
   };
 
   const handleRefresh = async () => {
     if (!isAuthenticated) return;
-    
+
     setIsLoading(true);
     try {
       await startMonitoring();
@@ -249,7 +249,7 @@ const CGMMonitor: React.FC = () => {
                 <BarChart3 className="h-8 w-8 text-blue-400" />
                 <h2 className="text-2xl font-bold">Current Glucose</h2>
               </div>
-              
+
               <div className="mb-4">
                 <div className="text-6xl font-bold text-white mb-2">
                   {session.lastReading.value}
@@ -260,7 +260,7 @@ const CGMMonitor: React.FC = () => {
               <div className="flex items-center justify-center gap-4 mb-4">
                 {getTrendIcon(session.lastReading.trend)}
                 <span className="text-lg text-gray-300">
-                  {session.lastReading.trend} 
+                  {session.lastReading.trend}
                   {session.lastReading.trendRate && ` (${session.lastReading.trendRate} ${session.lastReading.unit}/min)`}
                 </span>
               </div>
@@ -290,7 +290,7 @@ const CGMMonitor: React.FC = () => {
                 <p className="font-semibold text-green-400">Connected</p>
               </div>
             </div>
-            
+
             <div className="flex items-center gap-3 p-3 bg-slate-700/50 rounded-lg">
               <Battery className="h-5 w-5 text-blue-400" />
               <div>
@@ -323,12 +323,12 @@ const CGMMonitor: React.FC = () => {
             <div className="text-2xl font-bold text-blue-400">{session.averageGlucose}</div>
             <div className="text-sm text-gray-400">Average</div>
           </div>
-          
+
           <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700 text-center">
             <div className="text-2xl font-bold text-green-400">{session.readingsCount}</div>
             <div className="text-sm text-gray-400">Readings</div>
           </div>
-          
+
           <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700 text-center">
             <div className="text-2xl font-bold text-purple-400">5</div>
             <div className="text-sm text-gray-400">Minutes</div>
@@ -343,11 +343,10 @@ const CGMMonitor: React.FC = () => {
               <button
                 key={range}
                 onClick={() => handleTimeRangeChange(range)}
-                className={`px-4 py-2 rounded-lg font-medium transition-all ${
-                  selectedTimeRange === range
+                className={`px-4 py-2 rounded-lg font-medium transition-all ${selectedTimeRange === range
                     ? 'bg-blue-500 text-white'
                     : 'bg-slate-700 text-gray-300 hover:bg-slate-600'
-                }`}
+                  }`}
               >
                 {range}
               </button>
@@ -362,11 +361,10 @@ const CGMMonitor: React.FC = () => {
             {glucoseHistory.slice(-8).reverse().map((reading, index) => (
               <div key={index} className="flex items-center justify-between p-3 bg-slate-700/50 rounded-lg">
                 <div className="flex items-center gap-3">
-                  <div className={`w-3 h-3 rounded-full ${
-                    getGlucoseStatus(reading.value).status === 'Normal' ? 'bg-green-500' :
-                    getGlucoseStatus(reading.value).status === 'Low' ? 'bg-red-500' :
-                    getGlucoseStatus(reading.value).status === 'High' ? 'bg-orange-500' : 'bg-yellow-500'
-                  }`} />
+                  <div className={`w-3 h-3 rounded-full ${getGlucoseStatus(reading.value).status === 'Normal' ? 'bg-green-500' :
+                      getGlucoseStatus(reading.value).status === 'Low' ? 'bg-red-500' :
+                        getGlucoseStatus(reading.value).status === 'High' ? 'bg-orange-500' : 'bg-yellow-500'
+                    }`} />
                   <div>
                     <div className="font-semibold text-white">{reading.value} {reading.unit}</div>
                     <div className="text-sm text-gray-400">
@@ -374,7 +372,7 @@ const CGMMonitor: React.FC = () => {
                     </div>
                   </div>
                 </div>
-                
+
                 <div className="flex items-center gap-2">
                   {getTrendIcon(reading.trend)}
                   <span className="text-sm text-gray-300">{reading.trend}</span>

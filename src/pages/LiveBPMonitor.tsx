@@ -1,20 +1,21 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { wellueSDK, BPMeasurement, BPStatus, BPProgress, RealTimeData } from '../lib/wellue-sdk-bridge';
 import { useDevice } from '../contexts/DeviceContext';
+import { useRealTimeVitals } from '../hooks/useRealTimeVitals';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
 import { Progress } from '../components/ui/progress';
 import { Alert, AlertDescription } from '../components/ui/alert';
 import { Separator } from '../components/ui/separator';
-import { 
-    Activity, 
-    Bluetooth, 
-    BluetoothOff, 
-    Heart, 
-    Play, 
-    Square, 
-    RefreshCw, 
+import {
+    Activity,
+    Bluetooth,
+    BluetoothOff,
+    Heart,
+    Play,
+    Square,
+    RefreshCw,
     Battery,
     AlertCircle,
     CheckCircle,
@@ -37,6 +38,8 @@ const LiveBPMonitor: React.FC = () => {
         stopMeasurement: stopMeasurementFromContext
     } = useDevice();
 
+    const { addVitalSign } = useRealTimeVitals();
+
     // BP measurement state
     const [bpState, setBpState] = useState<BPMeasurementState>({
         status: {
@@ -51,7 +54,7 @@ const LiveBPMonitor: React.FC = () => {
     });
 
     // Initialize BP-specific callbacks
-  useEffect(() => {
+    useEffect(() => {
         if (!connectedDevice) return;
 
         const initializeBPCallbacks = async () => {
@@ -67,23 +70,38 @@ const LiveBPMonitor: React.FC = () => {
             } catch (error) {
                 console.error('Failed to initialize BP callbacks:', error);
                 setBpState(prev => ({
-                ...prev,
+                    ...prev,
                     status: { ...prev.status, error: 'Failed to initialize BP callbacks' }
                 }));
-              }
+            }
         };
 
         initializeBPCallbacks();
     }, [connectedDevice]);
 
     // SDK Event Handlers
-    const handleBPMeasurement = useCallback((measurement: BPMeasurement) => {
+    const handleBPMeasurement = useCallback(async (measurement: BPMeasurement) => {
         setBpState(prev => ({
             ...prev,
             status: { ...prev.status, lastMeasurement: measurement },
             history: [measurement, ...prev.history].slice(0, 10) // Keep last 10 measurements
         }));
-    }, []);
+
+        // Save to database for real-time doctor monitoring
+        try {
+            await addVitalSign('BP', {
+                systolic: measurement.systolic,
+                diastolic: measurement.diastolic,
+                pulse: measurement.pulse,
+                unit: 'mmHg',
+                timestamp: new Date().toISOString()
+            }, connectedDevice?.id);
+
+            console.log('✅ BP measurement saved to database');
+        } catch (error) {
+            console.error('❌ Failed to save BP measurement to database:', error);
+        }
+    }, [addVitalSign, connectedDevice?.id]);
 
     const handleBPProgress = useCallback((progress: BPProgress) => {
         setBpState(prev => ({
@@ -240,13 +258,13 @@ const LiveBPMonitor: React.FC = () => {
                 <CardContent>
                     {/* Device Status */}
                     <div className="flex items-center justify-between mb-4">
-                                            <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-3">
                             <CheckCircle className="h-5 w-5 text-green-500" />
                             <div>
                                 <p className="font-medium">{connectedDevice.name}</p>
                                 <p className="text-sm text-gray-500">Connected</p>
                             </div>
-                                                </div>
+                        </div>
                         <div className="flex items-center gap-2">
                             <Badge variant="secondary" className="flex items-center gap-1">
                                 <Battery className="h-3 w-3" />
@@ -329,8 +347,8 @@ const LiveBPMonitor: React.FC = () => {
                             <Badge className={getStatusColor(bpState.status.status)}>
                                 {bpState.status.status.charAt(0).toUpperCase() + bpState.status.status.slice(1)}
                             </Badge>
-                                            </div>
-                                            
+                        </div>
+
                         {/* Pressure Progress */}
                         {bpState.status.isMeasuring && (
                             <div className="space-y-2">
@@ -340,12 +358,12 @@ const LiveBPMonitor: React.FC = () => {
                                         {formatPressure(bpState.status.currentPressure)}
                                     </span>
                                 </div>
-                                <Progress 
-                                    value={Math.min((bpState.status.currentPressure / 300) * 100, 100)} 
+                                <Progress
+                                    value={Math.min((bpState.status.currentPressure / 300) * 100, 100)}
                                     className="h-2"
                                 />
-                  </div>
-                )}
+                            </div>
+                        )}
 
                         {/* Real-time Data */}
                         {bpState.realTimeData && (
@@ -354,8 +372,8 @@ const LiveBPMonitor: React.FC = () => {
                                 <div className="grid grid-cols-2 gap-2 text-sm">
                                     <div>Heart Rate: {bpState.realTimeData.heartRate || 'N/A'} bpm</div>
                                     <div>Progress: {bpState.realTimeData.progress || 'N/A'}%</div>
-              </div>
-                                                </div>
+                                </div>
+                            </div>
                         )}
                     </div>
                 </CardContent>
@@ -374,31 +392,31 @@ const LiveBPMonitor: React.FC = () => {
                                 <p className="text-2xl font-bold text-red-600">
                                     {bpState.status.lastMeasurement.systolic} mmHg
                                 </p>
-            </div>
+                            </div>
                             <div>
                                 <p className="text-sm text-gray-500">Diastolic</p>
                                 <p className="text-2xl font-bold text-blue-600">
                                     {bpState.status.lastMeasurement.diastolic} mmHg
                                 </p>
-            </div>
+                            </div>
                             <div>
                                 <p className="text-sm text-gray-500">Pulse</p>
                                 <p className="text-xl font-semibold text-green-600">
                                     {bpState.status.lastMeasurement.pulseRate} bpm
                                 </p>
-            </div>
+                            </div>
                             <div>
                                 <p className="text-sm text-gray-500">Quality</p>
                                 <Badge variant="outline">
                                     {formatQuality(bpState.status.lastMeasurement.quality)}
                                 </Badge>
-            </div>
-            </div>
+                            </div>
+                        </div>
                         <Separator className="my-4" />
                         <div className="text-sm text-gray-500">
                             <p>Date: {new Date(bpState.status.lastMeasurement.timestamp).toLocaleString()}</p>
                             <p>Device: {connectedDevice.name}</p>
-            </div>
+                        </div>
                     </CardContent>
                 </Card>
             )}
@@ -420,17 +438,17 @@ const LiveBPMonitor: React.FC = () => {
                                         <p className="text-sm text-gray-500">
                                             Pulse: {measurement.pulseRate} bpm • {new Date(measurement.timestamp).toLocaleDateString()}
                                         </p>
-            </div>
+                                    </div>
                                     <Badge variant="outline">
                                         {formatQuality(measurement.quality)}
                                     </Badge>
-            </div>
+                                </div>
                             ))}
                         </div>
                     </CardContent>
                 </Card>
             )}
-            </div>
+        </div>
     );
 };
 

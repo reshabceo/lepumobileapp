@@ -6,8 +6,6 @@ import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Activity, Battery, Wifi, WifiOff } from 'lucide-react';
-import { useNavigate, useParams } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
 
 // Define interfaces locally since we're not using the old API service
@@ -240,7 +238,7 @@ const VitalCard = ({ device, measurements }: { device: Device; measurements: Mea
                         {(() => {
                             const systolic = latestMeasurement.systolic || 120;
                             const diastolic = latestMeasurement.diastolic || 80;
-                            
+
                             // More precise BP level calculation based on actual BP ranges
                             let bpLevel = 0;
                             if (systolic < 90) bpLevel = 0; // Low
@@ -248,12 +246,12 @@ const VitalCard = ({ device, measurements }: { device: Device; measurements: Mea
                             else if (systolic < 130) bpLevel = 2; // Normal
                             else if (systolic < 140) bpLevel = 3; // Normal-high
                             else bpLevel = 4; // High
-                            
+
                             // Calculate individual square intensity based on exact BP value
                             const getSquareIntensity = (index: number) => {
                                 if (index > bpLevel) return 0;
                                 if (index < bpLevel) return 1;
-                                
+
                                 // For the current level, calculate partial fill based on exact value
                                 const ranges = [90, 120, 130, 140, 180];
                                 const currentRange = ranges[index];
@@ -262,19 +260,18 @@ const VitalCard = ({ device, measurements }: { device: Device; measurements: Mea
                                 const valueInRange = systolic - prevRange;
                                 return Math.min(1, Math.max(0, valueInRange / rangeSize));
                             };
-                            
+
                             return Array.from({ length: 5 }, (_, index) => {
                                 const intensity = getSquareIntensity(index);
                                 const isActive = intensity > 0;
-                                
+
                                 return (
                                     <div
                                         key={index}
-                                        className={`flex-1 rounded-lg transition-all duration-300 ease-out ${
-                                            isActive 
-                                                ? 'bg-green-400 shadow-lg shadow-green-400/30' 
-                                                : 'bg-gray-700/60'
-                                        }`}
+                                        className={`flex-1 rounded-lg transition-all duration-300 ease-out ${isActive
+                                            ? 'bg-green-400 shadow-lg shadow-green-400/30'
+                                            : 'bg-gray-700/60'
+                                            }`}
                                         style={{
                                             opacity: isActive ? 0.3 + (intensity * 0.7) : 0.3,
                                             transform: isActive ? 'scaleY(1)' : 'scaleY(0.8)',

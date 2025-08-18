@@ -23,6 +23,7 @@ import BPReadingsHistory from "./pages/BPReadingsHistory";
 import ECGMonitor from "./pages/ECGMonitor";
 import CGMMonitor from "./pages/CGMMonitor";
 import BPResultScreen from "./pages/BPResult";
+import { DoctorAssignmentPage } from "./pages/DoctorAssignmentPage";
 
 const queryClient = new QueryClient();
 
@@ -41,7 +42,7 @@ const App = () => (
                   <LoginPage />
                 </ProtectedRoute>
               } />
-              
+
               {/* Protected routes */}
               <Route path="/dashboard" element={
                 <ProtectedRoute>
@@ -118,7 +119,12 @@ const App = () => (
                   <AddReports />
                 </ProtectedRoute>
               } />
-              
+              <Route path="/doctor-assignment" element={
+                <ProtectedRoute>
+                  <DoctorAssignmentPage />
+                </ProtectedRoute>
+              } />
+
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>

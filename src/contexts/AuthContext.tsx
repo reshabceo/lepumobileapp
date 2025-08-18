@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { auth, db } from '@/lib/supabase';
+import { auth, db, supabase } from '@/lib/supabase';
 import { User, Session } from '@supabase/supabase-js';
 
 interface AuthContextType {
@@ -8,7 +8,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<boolean>;
-  signup: (email: string, password: string, name: string) => Promise<boolean>;
+  signup: (email: string, password: string, name: string, doctorCode?: string) => Promise<boolean>;
   logout: () => void;
   updateUser: (userData: Partial<User>) => void;
 }
@@ -42,10 +42,24 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           setSession(session);
           console.log('🔍 Auth Debug - Initial user loaded:', user.email);
         } else if (error) {
-          console.error('❌ Auth initialization error:', error);
+          // Handle specific auth errors gracefully
+          if (error.message && error.message.includes('Auth session missing')) {
+            console.log('ℹ️ No active session found (normal on first load)');
+          } else {
+            console.error('❌ Auth initialization error:', error);
+          }
+          setUser(null);
+          setSession(null);
         }
       } catch (error) {
-        console.error('❌ Auth initialization failed:', error);
+        // Handle session missing errors gracefully
+        if (error instanceof Error && error.message.includes('Auth session missing')) {
+          console.log('ℹ️ No active session found (normal on first load)');
+        } else {
+          console.error('❌ Auth initialization failed:', error);
+        }
+        setUser(null);
+        setSession(null);
       } finally {
         setIsLoading(false);
       }
@@ -54,8 +68,41 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     initializeAuth();
 
     // Listen to auth changes
-    const { data: { subscription } } = auth.onAuthStateChange((event, session) => {
+    const { data: { subscription } } = auth.onAuthStateChange(async (event, session) => {
       console.log('🔍 Auth Debug - Auth state change:', event, session?.user?.email);
+
+      if (event === 'SIGNED_IN' && session?.user) {
+        // Check if this is after email confirmation
+        const pendingDoctorCode = localStorage.getItem('pending_doctor_code');
+        const pendingUserName = localStorage.getItem('pending_user_name');
+
+        if (pendingDoctorCode && pendingUserName && session.user.email_confirmed_at) {
+          console.log('📧 Email confirmed! Creating patient profile...');
+
+          try {
+            // Create patient profile now that email is confirmed
+            const { data: profileResult, error: profileError } = await db.createPatientProfile(
+              session.user.id,
+              pendingUserName,
+              session.user.email || '',
+              pendingDoctorCode
+            );
+
+            if (profileError || !profileResult || !profileResult.success) {
+              console.error('❌ Patient profile creation error after email confirmation:', profileError);
+            } else {
+              console.log('✅ Patient profile created after email confirmation:', profileResult);
+            }
+
+            // Clean up temporary storage
+            localStorage.removeItem('pending_doctor_code');
+            localStorage.removeItem('pending_user_name');
+          } catch (err) {
+            console.error('❌ Failed to create patient profile after email confirmation:', err);
+          }
+        }
+      }
+
       setSession(session);
       setUser(session?.user ?? null);
       setIsLoading(false);
@@ -68,14 +115,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       setIsLoading(true);
       console.log('🔍 Auth Debug - Attempting login with Supabase:', email);
-      
+
       const { data, error } = await auth.signIn(email, password);
-      
+
       if (error) {
         console.error('❌ Supabase login error:', error);
         throw error;
       }
-      
+
       if (data.user) {
         setUser(data.user);
         setSession(data.session);
@@ -91,40 +138,39 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-  const signup = async (email: string, password: string, name: string): Promise<boolean> => {
+  const signup = async (email: string, password: string, name: string, doctorCode?: string): Promise<boolean> => {
     try {
       setIsLoading(true);
       console.log('🔍 Auth Debug - Attempting signup with Supabase:', email, name);
-      
+
       const { data, error } = await auth.signUp(email, password, { name });
-      
+
       if (error) {
         console.error('❌ Supabase signup error:', error);
         throw error;
       }
-      
+
       if (data.user) {
-        setUser(data.user);
-        setSession(data.session);
-        
-        // Create user profile in user_profiles table
-        try {
-          const { error: profileError } = await db.updateUserProfile(data.user.id, {
-            name: name,
-            role: 'user'
-          });
-          
-          if (profileError) {
-            console.error('❌ Profile creation error:', profileError);
-          } else {
-            console.log('✅ User profile created successfully');
+        // For email confirmation flow, we don't set user/session immediately
+        // The user will need to confirm their email first
+
+        if (!data.user.email_confirmed_at) {
+          console.log('📧 Email confirmation required. Check your inbox.');
+
+          // Store doctor code temporarily for after email confirmation
+          if (doctorCode) {
+            localStorage.setItem('pending_doctor_code', doctorCode);
+            localStorage.setItem('pending_user_name', name);
           }
-        } catch (profileError) {
-          console.error('❌ Profile creation failed:', profileError);
+
+          return true; // Signup successful, but email confirmation needed
+        } else {
+          // Email already confirmed (shouldn't happen on new signup)
+          setUser(data.user);
+          setSession(data.session);
+          console.log('✅ Email already confirmed, user logged in');
+          return true;
         }
-        
-        console.log('✅ Supabase signup successful:', data.user.email);
-        return true;
       }
       return false;
     } catch (error) {
@@ -139,12 +185,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       console.log('🔍 Auth Debug - Attempting logout from Supabase');
       const { error } = await auth.signOut();
-      
+
       if (error) {
         console.error('❌ Supabase logout error:', error);
         throw error;
       }
-      
+
       setUser(null);
       setSession(null);
       console.log('✅ Supabase logout successful');
