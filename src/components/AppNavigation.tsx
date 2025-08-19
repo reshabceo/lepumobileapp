@@ -1,11 +1,11 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { 
-  Home, 
-  Activity, 
-  Users, 
-  BarChart3, 
-  MessageSquare, 
+import {
+  Home,
+  Activity,
+  Users,
+  BarChart3,
+  MessageSquare,
   FileText,
   Plus,
   Settings
@@ -15,10 +15,10 @@ const navigationItems = [
   { path: '/dashboard', label: 'Dashboard', icon: Home },
   { path: '/devices', label: 'Devices', icon: Activity },
   { path: '/patients', label: 'Patients', icon: Users },
-  { path: '/reports', label: 'Reports', icon: FileText },
+  { path: '/reports', label: 'My Reports', icon: FileText },
+  { path: '/measurement-reports', label: 'Measurements', icon: BarChart3 },
   { path: '/add-reports', label: 'Add Report', icon: Plus },
   { path: '/chat', label: 'Chat', icon: MessageSquare },
-  { path: '/live-bp-monitor', label: 'BP Monitor', icon: BarChart3 },
 ];
 
 export const AppNavigation: React.FC = () => {
@@ -30,16 +30,15 @@ export const AppNavigation: React.FC = () => {
         {navigationItems.map((item) => {
           const Icon = item.icon;
           const isActive = location.pathname === item.path;
-          
+
           return (
             <Link
               key={item.path}
               to={item.path}
-              className={`flex flex-col items-center space-y-1 p-2 rounded-lg transition-colors duration-200 ${
-                isActive
-                  ? 'text-green-500 bg-green-500/10'
-                  : 'text-gray-400 hover:text-white hover:bg-[#30363D]'
-              }`}
+              className={`flex flex-col items-center space-y-1 p-2 rounded-lg transition-colors duration-200 ${isActive
+                ? 'text-green-500 bg-green-500/10'
+                : 'text-gray-400 hover:text-white hover:bg-[#30363D]'
+                }`}
             >
               <Icon className="w-5 h-5" />
               <span className="text-xs font-medium">{item.label}</span>

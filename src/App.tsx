@@ -24,6 +24,7 @@ import ECGMonitor from "./pages/ECGMonitor";
 import CGMMonitor from "./pages/CGMMonitor";
 import BPResultScreen from "./pages/BPResult";
 import { DoctorAssignmentPage } from "./pages/DoctorAssignmentPage";
+import PatientReportsView from "./components/PatientReportsView";
 
 const queryClient = new QueryClient();
 
@@ -110,6 +111,11 @@ const App = () => (
                 </ProtectedRoute>
               } />
               <Route path="/reports" element={
+                <ProtectedRoute>
+                  <PatientReportsView />
+                </ProtectedRoute>
+              } />
+              <Route path="/measurement-reports" element={
                 <ProtectedRoute>
                   <ViewReports />
                 </ProtectedRoute>

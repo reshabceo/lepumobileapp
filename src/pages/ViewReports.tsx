@@ -94,9 +94,9 @@ const MeasurementResultItem = ({ result }: { result: MeasurementResult }) => {
   if ('systolic' in result) {
     const bpResult = result as BPResult;
     const status = getBPStatus(bpResult.systolic, bpResult.diastolic);
-    const statusColor = status === 'Normal' ? 'text-green-400' : 
-                       status === 'Elevated' ? 'text-yellow-400' : 
-                       status === 'Stage 1' ? 'text-orange-400' : 'text-red-400';
+    const statusColor = status === 'Normal' ? 'text-green-400' :
+      status === 'Elevated' ? 'text-yellow-400' :
+        status === 'Stage 1' ? 'text-orange-400' : 'text-red-400';
 
     return (
       <div className="bg-[#30363D] p-4 rounded-lg flex items-center space-x-4">
@@ -116,14 +116,14 @@ const MeasurementResultItem = ({ result }: { result: MeasurementResult }) => {
           </p>
         </div>
         <div className="flex items-center space-x-2">
-          <button 
+          <button
             onClick={handleView}
             className="p-2 text-gray-300 bg-[#3C444C] rounded-full hover:bg-gray-600 transition-colors"
             aria-label="View BP result"
           >
             <Eye size={18} />
           </button>
-          <button 
+          <button
             onClick={handleDownload}
             className="p-2 text-gray-300 bg-[#3C444C] rounded-full hover:bg-gray-600 transition-colors"
             aria-label="Download BP result"
@@ -156,14 +156,14 @@ const MeasurementResultItem = ({ result }: { result: MeasurementResult }) => {
         </p>
       </div>
       <div className="flex items-center space-x-2">
-        <button 
+        <button
           onClick={handleView}
           className="p-2 text-gray-300 bg-[#3C444C] rounded-full hover:bg-gray-600 transition-colors"
           aria-label="View ECG result"
         >
           <Eye size={18} />
         </button>
-        <button 
+        <button
           onClick={handleDownload}
           className="p-2 text-gray-300 bg-[#3C444C] rounded-full hover:bg-gray-600 transition-colors"
           aria-label="Download ECG result"
@@ -191,99 +191,99 @@ export default function ViewReports() {
 
   // Load measurement results from storage
   const loadResults = async () => {
-      try {
-        setLoading(true);
-        
-        const allResults: MeasurementResult[] = [];
-        
-        // Load BP results from localStorage
-        const savedBPResults = localStorage.getItem('bpResults');
-        if (savedBPResults) {
-          const bpResults = JSON.parse(savedBPResults);
-          allResults.push(...bpResults);
-          console.log('📊 Loaded BP results from localStorage:', bpResults.length);
-        }
-        
-        // Load ECG results from localStorage (from HealthDashboard)
-        const savedECGResults = localStorage.getItem('storedFilesInApp');
-        if (savedECGResults) {
-          const ecgResults = JSON.parse(savedECGResults);
-          console.log('📊 Raw storedFilesInApp data:', ecgResults);
-          
-          // Filter only ECG results
-          const filteredECGResults = ecgResults.filter((item: any) => item.type === 'ecg');
-          console.log('📊 Filtered ECG results:', filteredECGResults);
-          
-          allResults.push(...filteredECGResults);
-          console.log('📊 Loaded ECG results from localStorage:', filteredECGResults.length);
-        }
-        
-        // Also try to load from device storage
-        try {
-          const { Filesystem, Directory } = await import('@capacitor/filesystem');
-          const files = await Filesystem.readdir({
-            path: '',
-            directory: Directory.Documents
-          });
-          
-          // Load BP files
-          const bpFiles = files.files.filter((file: any) => 
-            file.name && file.name.startsWith('bp_result_') && file.name.endsWith('.json')
-          );
-          
-          for (const file of bpFiles) {
-            try {
-              const content = await Filesystem.readFile({
-                path: file.name,
-                directory: Directory.Documents
-              });
-              const result = JSON.parse(content.data as string);
-              allResults.push(result);
-            } catch (e) {
-              console.warn('⚠️ Failed to read BP file:', file.name, e);
-            }
-          }
-          
-          // Load ECG files
-          const ecgFiles = files.files.filter((file: any) => 
-            file.name && (file.name.startsWith('bp2_ecg_') || file.name.includes('ecg')) && file.name.endsWith('.json')
-          );
-          
-          for (const file of ecgFiles) {
-            try {
-              const content = await Filesystem.readFile({
-                path: file.name,
-                directory: Directory.Documents
-              });
-              const result = JSON.parse(content.data as string);
-              allResults.push(result);
-            } catch (e) {
-              console.warn('⚠️ Failed to read ECG file:', file.name, e);
-            }
-          }
-          
-          console.log('📊 Loaded results from device storage:', bpFiles.length + ecgFiles.length);
-          
-        } catch (error) {
-          console.log('⚠️ Could not load from device storage:', error);
-        }
-        
-        // Sort results by timestamp (newest first)
-        const sortedResults = allResults.sort((a, b) => {
-          const timestampA = 'timestamp' in a ? a.timestamp : '';
-          const timestampB = 'timestamp' in b ? b.timestamp : '';
-          return new Date(timestampB).getTime() - new Date(timestampA).getTime();
-        });
-        
-        setMeasurementResults(sortedResults);
-        console.log('📊 Total measurement results loaded:', sortedResults.length);
-        
-      } catch (error) {
-        console.error('❌ Failed to load measurement results:', error);
-      } finally {
-        setLoading(false);
+    try {
+      setLoading(true);
+
+      const allResults: MeasurementResult[] = [];
+
+      // Load BP results from localStorage
+      const savedBPResults = localStorage.getItem('bpResults');
+      if (savedBPResults) {
+        const bpResults = JSON.parse(savedBPResults);
+        allResults.push(...bpResults);
+        console.log('📊 Loaded BP results from localStorage:', bpResults.length);
       }
-    };
+
+      // Load ECG results from localStorage (from HealthDashboard)
+      const savedECGResults = localStorage.getItem('storedFilesInApp');
+      if (savedECGResults) {
+        const ecgResults = JSON.parse(savedECGResults);
+        console.log('📊 Raw storedFilesInApp data:', ecgResults);
+
+        // Filter only ECG results
+        const filteredECGResults = ecgResults.filter((item: any) => item.type === 'ecg');
+        console.log('📊 Filtered ECG results:', filteredECGResults);
+
+        allResults.push(...filteredECGResults);
+        console.log('📊 Loaded ECG results from localStorage:', filteredECGResults.length);
+      }
+
+      // Also try to load from device storage
+      try {
+        const { Filesystem, Directory } = await import('@capacitor/filesystem');
+        const files = await Filesystem.readdir({
+          path: '',
+          directory: Directory.Documents
+        });
+
+        // Load BP files
+        const bpFiles = files.files.filter((file: any) =>
+          file.name && file.name.startsWith('bp_result_') && file.name.endsWith('.json')
+        );
+
+        for (const file of bpFiles) {
+          try {
+            const content = await Filesystem.readFile({
+              path: file.name,
+              directory: Directory.Documents
+            });
+            const result = JSON.parse(content.data as string);
+            allResults.push(result);
+          } catch (e) {
+            console.warn('⚠️ Failed to read BP file:', file.name, e);
+          }
+        }
+
+        // Load ECG files
+        const ecgFiles = files.files.filter((file: any) =>
+          file.name && (file.name.startsWith('bp2_ecg_') || file.name.includes('ecg')) && file.name.endsWith('.json')
+        );
+
+        for (const file of ecgFiles) {
+          try {
+            const content = await Filesystem.readFile({
+              path: file.name,
+              directory: Directory.Documents
+            });
+            const result = JSON.parse(content.data as string);
+            allResults.push(result);
+          } catch (e) {
+            console.warn('⚠️ Failed to read ECG file:', file.name, e);
+          }
+        }
+
+        console.log('📊 Loaded results from device storage:', bpFiles.length + ecgFiles.length);
+
+      } catch (error) {
+        console.log('⚠️ Could not load from device storage:', error);
+      }
+
+      // Sort results by timestamp (newest first)
+      const sortedResults = allResults.sort((a, b) => {
+        const timestampA = 'timestamp' in a ? a.timestamp : '';
+        const timestampB = 'timestamp' in b ? b.timestamp : '';
+        return new Date(timestampB).getTime() - new Date(timestampA).getTime();
+      });
+
+      setMeasurementResults(sortedResults);
+      console.log('📊 Total measurement results loaded:', sortedResults.length);
+
+    } catch (error) {
+      console.error('❌ Failed to load measurement results:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     loadResults();
@@ -293,10 +293,10 @@ export default function ViewReports() {
     <MobileAppContainer>
       <div className="bg-[#161B22] min-h-screen text-white font-inter">
         <div className="max-w-sm mx-auto min-h-screen bg-[#1C2128] flex flex-col relative">
-          
+
           {/* Status Bar Spacing */}
           <div className="h-6"></div>
-          
+
           {/* Header */}
           <header className="flex items-center justify-between p-4 border-b border-gray-700 flex-shrink-0">
             <div className="flex items-center">
@@ -307,8 +307,8 @@ export default function ViewReports() {
               <h1 className="text-lg font-semibold text-white">View Reports</h1>
             </div>
             <div className="flex items-center gap-2">
-              <button 
-                onClick={loadResults} 
+              <button
+                onClick={loadResults}
                 className="text-gray-300 hover:text-white p-2 rounded-lg bg-gray-700/50"
                 title="Refresh Results"
               >
@@ -364,9 +364,9 @@ export default function ViewReports() {
               )}
             </div>
           </main>
-          
+
           {/* Floating Action Button */}
-          <button 
+          <button
             onClick={handleAddReport}
             className="absolute bottom-6 right-6 bg-teal-500 text-white rounded-full p-4 shadow-lg hover:bg-teal-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-[#1C2128] focus:ring-teal-500"
           >

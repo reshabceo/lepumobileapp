@@ -98,11 +98,24 @@ const HealthMetricCard = ({ metric, onClick }: { metric: HealthMetric, onClick: 
   );
 };
 
+// Utility function to calculate age from date of birth
+const calculateAge = (dateOfBirth: string | undefined): number | null => {
+  if (!dateOfBirth) return null;
+  const today = new Date();
+  const birthDate = new Date(dateOfBirth);
+  let age = today.getFullYear() - birthDate.getFullYear();
+  const monthDiff = today.getMonth() - birthDate.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+    age--;
+  }
+  return age;
+};
+
 // Main Dashboard Component
 export const HealthDashboard = () => {
   const navigate = useNavigate();
 
-  // DEBUG: Add console log to verify this component is being rendered
+  // DEBUG: Add console log to verify this component is rendering
   console.log('🔍 [DEBUG] HealthDashboard component is rendering - version with arrow button and no Live Health Overview');
 
   const { toast } = useToast();
@@ -700,8 +713,8 @@ export const HealthDashboard = () => {
         <div className="bg-[#1E1E1E] rounded-2xl mb-6 overflow-hidden transition-all duration-200 hover:bg-[#252525]">
           <div className="relative">
             <img
-              src="https://images.unsplash.com/photo-1559839734-2b71ea197ec2?q=80&w=2938&auto=format&fit=crop"
-              alt="Doctor in scrubs"
+              src={patientProfile?.profile_picture_url || "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?q=80&w=2938&auto=format&fit=crop"}
+              alt={patientProfile?.full_name || "Patient"}
               className="w-full h-44 object-cover object-center"
               onError={(e) => {
                 e.currentTarget.onerror = null;
@@ -718,13 +731,27 @@ export const HealthDashboard = () => {
             <div className="flex justify-between items-start">
               <div className="flex items-center gap-3">
                 <div className="bg-blue-500 p-3 rounded-full">
-                  <User className="h-6 w-6 text-white" />
+                  {patientProfile?.profile_picture_url ? (
+                    <img
+                      src={patientProfile.profile_picture_url}
+                      alt={patientProfile.full_name || 'Patient'}
+                      className="h-6 w-6 rounded-full object-cover"
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement;
+                        target.style.display = 'none';
+                        target.nextElementSibling?.classList.remove('hidden');
+                      }}
+                    />
+                  ) : null}
+                  <User className={`h-6 w-6 text-white ${patientProfile?.profile_picture_url ? 'hidden' : ''}`} />
                 </div>
                 <div>
-                  <h2 className="font-bold text-lg">Kunal Singh</h2>
-                  <p className="text-gray-400 text-xs">ID: #PT-7842 • Age: 42</p>
+                  <h2 className="font-bold text-lg">{patientProfile?.full_name || 'Loading...'}</h2>
+                  <p className="text-gray-400 text-xs">
+                    ID: #{patientProfile?.patient_code || 'N/A'} • Age: {calculateAge(patientProfile?.date_of_birth) || 'N/A'}
+                  </p>
                   <p className="text-gray-300 mt-2 text-sm">
-                    <span className="font-semibold">Condition:</span> Full body Paralysed
+                    <span className="font-semibold">Condition:</span> {patientProfile?.medical_conditions?.join(', ') || 'Not specified'}
                   </p>
                 </div>
               </div>

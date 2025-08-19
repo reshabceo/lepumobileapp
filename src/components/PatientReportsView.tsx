@@ -37,7 +37,7 @@ const PatientReportsView: React.FC = () => {
                 .from('patient_reports')
                 .select(`
           *,
-          doctors!inner(full_name)
+          doctors(full_name)
         `)
                 .eq('patient_id', patientProfile.id)
                 .order('created_at', { ascending: false });
@@ -47,7 +47,7 @@ const PatientReportsView: React.FC = () => {
             } else {
                 const formattedReports = data?.map(report => ({
                     ...report,
-                    doctor_name: report.doctors?.full_name
+                    doctor_name: report.doctors?.full_name || 'Unknown Doctor'
                 })) || [];
                 setReports(formattedReports);
             }
@@ -60,9 +60,20 @@ const PatientReportsView: React.FC = () => {
 
     const downloadReport = async (report: PatientReport) => {
         try {
-            // Create a temporary download link
+            // Generate signed URL for secure download from private bucket
+            const { data, error } = await supabase.storage
+                .from('patient-reports')
+                .createSignedUrl(report.file_url, 60); // 60 seconds expiry
+
+            if (error) {
+                console.error('Error creating signed URL:', error);
+                alert('Failed to generate download link: ' + error.message);
+                return;
+            }
+
+            // Create a temporary download link with signed URL
             const link = document.createElement('a');
-            link.href = report.file_url;
+            link.href = data.signedUrl;
             link.download = report.file_name;
             link.target = '_blank';
             document.body.appendChild(link);

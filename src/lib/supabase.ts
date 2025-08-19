@@ -113,31 +113,77 @@ export const db = {
   // Get patient profile
   getPatientProfile: async (authUserId: string) => {
     console.log('🔍 DB Debug - Getting patient profile for:', authUserId)
-    const { data, error } = await supabase
-      .from('patients')
-      .select('*')
-      .eq('auth_user_id', authUserId)
-      .single()
 
-    if (error) {
-      console.error('❌ Get patient profile error:', error)
-    } else {
-      console.log('✅ Patient profile found:', data)
+    try {
+      const { data, error } = await supabase
+        .from('patients')
+        .select('*')
+        .eq('auth_user_id', authUserId)
+        .limit(1)
+
+      if (error) {
+        console.error('❌ Get patient profile error:', error)
+        return { data: null, error }
+      }
+
+      // Handle case where no patient found or multiple patients found
+      if (!data || data.length === 0) {
+        console.log('ℹ️ No patient profile found for user:', authUserId)
+        return { data: null, error: null }
+      }
+
+      const patientProfile = data[0]
+      console.log('✅ Patient profile found:', patientProfile)
+      return { data: patientProfile, error: null }
+
+    } catch (err) {
+      console.error('❌ Exception getting patient profile:', err)
+      return {
+        data: null,
+        error: err instanceof Error ? err.message : 'Failed to get patient profile'
+      }
     }
-
-    return { data, error }
   },
 
   // Create patient profile
-  createPatientProfile: async (authUserId: string, fullName: string, email: string, doctorCode: string) => {
-    console.log('🔍 DB Debug - Creating patient profile:', { authUserId, fullName, email, doctorCode })
+  createPatientProfile: async (
+    authUserId: string,
+    fullName: string,
+    email: string,
+    doctorCode: string,
+    additionalData?: {
+      dateOfBirth: string;
+      gender: string;
+      bloodType: string;
+      address: string;
+      phoneNumber: string;
+      emergencyContactName: string;
+      emergencyContactPhone: string;
+      allergies?: string;
+      medicalConditions?: string;
+      currentMedications?: string;
+      profilePictureUrl?: string;
+    }
+  ) => {
+    console.log('🔍 DB Debug - Creating patient profile:', { authUserId, fullName, email, doctorCode, additionalData })
 
     try {
-      const { data, error } = await supabase.rpc('create_patient_profile', {
+      const { data, error } = await supabase.rpc('create_patient_profile_enhanced', {
         auth_user_id: authUserId,
         full_name: fullName,
         email: email,
-        doctor_code_input: doctorCode
+        doctor_code_input: doctorCode,
+        date_of_birth: additionalData?.dateOfBirth || null,
+        gender: additionalData?.gender || null,
+        blood_type: additionalData?.bloodType || null,
+        address: additionalData?.address || null,
+        phone_number: additionalData?.phoneNumber || null,
+        emergency_contact_name: additionalData?.emergencyContactName || null,
+        emergency_contact_phone: additionalData?.emergencyContactPhone || null,
+        profile_picture_url: additionalData?.profilePictureUrl || null,
+        allergies: additionalData?.allergies ? additionalData.allergies.split(',').map(s => s.trim()).filter(s => s) : null,
+        medical_conditions: additionalData?.medicalConditions ? additionalData.medicalConditions.split(',').map(s => s.trim()).filter(s => s) : null,
+        current_medications: additionalData?.currentMedications ? additionalData.currentMedications.split(',').map(s => s.trim()).filter(s => s) : null
       })
 
       if (error) {

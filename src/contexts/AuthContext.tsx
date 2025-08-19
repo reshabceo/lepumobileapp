@@ -8,7 +8,25 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<boolean>;
-  signup: (email: string, password: string, name: string, doctorCode?: string) => Promise<boolean>;
+  signup: (
+    email: string,
+    password: string,
+    name: string,
+    doctorCode?: string,
+    additionalData?: {
+      dateOfBirth: string;
+      gender: string;
+      bloodType: string;
+      address: string;
+      phoneNumber: string;
+      emergencyContactName: string;
+      emergencyContactPhone: string;
+      allergies?: string;
+      medicalConditions?: string;
+      currentMedications?: string;
+      profilePictureUrl?: string;
+    }
+  ) => Promise<boolean>;
   logout: () => void;
   updateUser: (userData: Partial<User>) => void;
 }
@@ -75,17 +93,28 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         // Check if this is after email confirmation
         const pendingDoctorCode = localStorage.getItem('pending_doctor_code');
         const pendingUserName = localStorage.getItem('pending_user_name');
+        const pendingPatientDataStr = localStorage.getItem('pending_patient_data');
 
         if (pendingDoctorCode && pendingUserName && session.user.email_confirmed_at) {
           console.log('📧 Email confirmed! Creating patient profile...');
 
           try {
+            let pendingPatientData = null;
+            if (pendingPatientDataStr) {
+              try {
+                pendingPatientData = JSON.parse(pendingPatientDataStr);
+              } catch (e) {
+                console.error('Error parsing pending patient data:', e);
+              }
+            }
+
             // Create patient profile now that email is confirmed
             const { data: profileResult, error: profileError } = await db.createPatientProfile(
               session.user.id,
               pendingUserName,
               session.user.email || '',
-              pendingDoctorCode
+              pendingDoctorCode,
+              pendingPatientData
             );
 
             if (profileError || !profileResult || !profileResult.success) {
@@ -97,6 +126,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             // Clean up temporary storage
             localStorage.removeItem('pending_doctor_code');
             localStorage.removeItem('pending_user_name');
+            localStorage.removeItem('pending_patient_data');
           } catch (err) {
             console.error('❌ Failed to create patient profile after email confirmation:', err);
           }
@@ -138,7 +168,25 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-  const signup = async (email: string, password: string, name: string, doctorCode?: string): Promise<boolean> => {
+  const signup = async (
+    email: string,
+    password: string,
+    name: string,
+    doctorCode?: string,
+    additionalData?: {
+      dateOfBirth: string;
+      gender: string;
+      bloodType: string;
+      address: string;
+      phoneNumber: string;
+      emergencyContactName: string;
+      emergencyContactPhone: string;
+      allergies?: string;
+      medicalConditions?: string;
+      currentMedications?: string;
+      profilePictureUrl?: string;
+    }
+  ): Promise<boolean> => {
     try {
       setIsLoading(true);
       console.log('🔍 Auth Debug - Attempting signup with Supabase:', email, name);
@@ -157,10 +205,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         if (!data.user.email_confirmed_at) {
           console.log('📧 Email confirmation required. Check your inbox.');
 
-          // Store doctor code temporarily for after email confirmation
+          // Store doctor code and additional data temporarily for after email confirmation
           if (doctorCode) {
             localStorage.setItem('pending_doctor_code', doctorCode);
             localStorage.setItem('pending_user_name', name);
+            if (additionalData) {
+              localStorage.setItem('pending_patient_data', JSON.stringify(additionalData));
+            }
           }
 
           return true; // Signup successful, but email confirmation needed

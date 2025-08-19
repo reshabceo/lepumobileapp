@@ -14,11 +14,19 @@ export interface PatientProfile {
     id: string;
     full_name: string;
     email: string;
-    phone_number: string;
+    phone_number?: string;
     assigned_doctor_id: string;
     date_of_birth?: string;
     gender?: string;
     medical_conditions?: string[];
+    profile_picture_url?: string;
+    patient_code?: string;
+    address?: string;
+    blood_type?: string;
+    allergies?: string[];
+    current_medications?: string[];
+    emergency_contact_name?: string;
+    emergency_contact_phone?: string;
 }
 
 export const useRealTimeVitals = () => {
