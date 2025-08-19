@@ -34,7 +34,7 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onSwitchToLogin }) => {
     currentMedications: '',
 
     // Profile picture
-    profilePicture: null as File | null
+    // profilePicture: null as File | null // DISABLED: Profile picture upload
   });
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -146,6 +146,8 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onSwitchToLogin }) => {
     }
   };
 
+  // DISABLED: Profile picture upload functionality
+  /*
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -170,6 +172,30 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onSwitchToLogin }) => {
       }
     }
   };
+  */
+
+  const validateDoctorCode = async (doctorCode: string): Promise<boolean> => {
+    try {
+      console.log('🔍 Validating doctor code:', doctorCode);
+
+      const { data: doctor, error } = await supabase
+        .from('doctors')
+        .select('id, full_name, doctor_code')
+        .eq('doctor_code', doctorCode)
+        .single();
+
+      if (error || !doctor) {
+        console.error('❌ Doctor validation error:', error);
+        return false;
+      }
+
+      console.log('✅ Doctor code validated:', doctor.full_name);
+      return true;
+    } catch (err) {
+      console.error('❌ Doctor validation exception:', err);
+      return false;
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -181,6 +207,28 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onSwitchToLogin }) => {
     setLoading(true);
 
     try {
+      // FIRST: Validate doctor code before creating account
+      console.log('🔍 Step 1: Validating doctor code before signup...');
+      const isDoctorValid = await validateDoctorCode(formData.doctorCode);
+
+      if (!isDoctorValid) {
+        setErrors(prev => ({
+          ...prev,
+          doctorCode: 'Invalid doctor code. Please check with your doctor for the correct code.'
+        }));
+        toast({
+          title: "Invalid Doctor Code",
+          description: "Please verify the doctor code with your healthcare provider.",
+          variant: "destructive",
+        });
+        setLoading(false);
+        return;
+      }
+
+      console.log('✅ Step 1: Doctor code validated successfully');
+      // DISABLED: Profile picture upload
+      const profilePictureUrl = '';
+      /*
       let profilePictureUrl = '';
 
       // Upload profile picture if provided
@@ -214,6 +262,7 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onSwitchToLogin }) => {
           console.log('🔗 Profile picture URL:', profilePictureUrl);
         }
       }
+      */
 
       const additionalData = {
         dateOfBirth: formData.dateOfBirth,
@@ -229,6 +278,7 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onSwitchToLogin }) => {
         profilePictureUrl: profilePictureUrl
       };
 
+      console.log('🔍 Step 2: Creating user account...');
       const success = await signup(formData.email, formData.password, formData.name, formData.doctorCode, additionalData);
 
       if (success) {
@@ -458,7 +508,7 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onSwitchToLogin }) => {
           )}
         </div>
 
-        {/* Profile Picture Upload */}
+        {/* DISABLED: Profile Picture Upload - causing RLS issues
         <div className="bg-[#1A1A1A] p-4 rounded-lg border border-gray-700">
           <h4 className="text-sm font-medium text-white mb-3">Profile Picture (Optional)</h4>
 
@@ -496,6 +546,7 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onSwitchToLogin }) => {
             )}
           </div>
         </div>
+        */}
 
         {/* Medical Conditions (Mandatory) */}
         <div className="bg-[#1A1A1A] p-4 rounded-lg border border-gray-700">
