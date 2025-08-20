@@ -5,7 +5,6 @@ import android.util.Log;
 import android.webkit.WebView;
 
 import com.getcapacitor.BridgeActivity;
-import com.priti.wellue.WelluePlugin;
 
 public class MainActivity extends BridgeActivity {
     
@@ -13,12 +12,9 @@ public class MainActivity extends BridgeActivity {
     
     @Override
     public void onCreate(Bundle savedInstanceState) {
-        // Register plugin BEFORE bridge initialization so the WebView can resolve it
-        registerPlugin(WelluePlugin.class);
-
         super.onCreate(savedInstanceState);
 
-        Log.d(TAG, "MainActivity onCreate called; WelluePlugin registered");
+        Log.d(TAG, "MainActivity onCreate called");
 
         // Enable WebView debugging
         WebView.setWebContentsDebuggingEnabled(true);
