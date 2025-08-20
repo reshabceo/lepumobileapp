@@ -38,14 +38,14 @@ subprojects {
         if (project.hasProperty('android')) {
             android {
                 compileOptions {
-                    sourceCompatibility JavaVersion.VERSION_17
-                    targetCompatibility JavaVersion.VERSION_17
+                    sourceCompatibility JavaVersion.VERSION_21
+                    targetCompatibility JavaVersion.VERSION_21
                 }
             }
         }
 
-        // Align Capacitor Filesystem plugin to Java/Kotlin 21 to avoid JVM target mismatch
-        if (project.name == 'capacitor-filesystem') {
+        // Align all plugins to Java 21 for consistency
+        if (project.name.contains('capacitor')) {
             try {
                 if (project.hasProperty('android')) {
                     android {

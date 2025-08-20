@@ -180,28 +180,14 @@ const DeviceList = () => {
                             >
                                 <ArrowLeft size={20} />
                             </button>
-                            <h1 className="text-2xl font-bold">Medical Devices</h1>
+                            <h1 className="text-2xl font-bold">Device Settings</h1>
                         </div>
                         <button className="bg-gray-700/80 hover:bg-gray-600 p-2 rounded-lg transition-all duration-200">
                             <Settings size={20} />
                         </button>
                     </header>
 
-                    {/* Stats */}
-                    <div className="grid grid-cols-3 gap-4 mb-6">
-                        <div className="bg-[#1E1E1E] rounded-xl p-4 text-center">
-                            <div className="text-2xl font-bold text-green-400">{devices.length}</div>
-                            <div className="text-xs text-gray-400">Total Devices</div>
-                        </div>
-                        <div className="bg-[#1E1E1E] rounded-xl p-4 text-center">
-                            <div className="text-2xl font-bold text-blue-400">{connectedDevices.length}</div>
-                            <div className="text-xs text-gray-400">Connected</div>
-                        </div>
-                        <div className="bg-[#1E1E1E] rounded-xl p-4 text-center">
-                            <div className="text-2xl font-bold text-gray-400">{disconnectedDevices.length}</div>
-                            <div className="text-xs text-gray-400">Offline</div>
-                        </div>
-                    </div>
+
 
                     {/* Wellue Scanner Section */}
                     <div className="mb-6">
@@ -227,78 +213,9 @@ const DeviceList = () => {
                         </div>
                     </div>
 
-                    {/* Live BP Monitor Section */}
-                    <div className="mb-6">
-                        <div className="bg-gradient-to-r from-red-500/20 to-pink-500/20 border border-red-500/30 rounded-2xl p-4">
-                            <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-3">
-                                    <div className="bg-red-500/20 p-3 rounded-full">
-                                        <Heart className="h-6 w-6 text-red-400" />
-                                    </div>
-                                    <div>
-                                        <h3 className="text-lg font-semibold text-white">Live BP Monitor</h3>
-                                        <p className="text-sm text-gray-400">Real-time blood pressure data</p>
-                                    </div>
-                                </div>
-                                <div className="flex gap-2">
-                                    <button
-                                        onClick={() => navigate('/live-bp-monitor-new')}
-                                        className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-4 py-2 rounded-lg transition-all duration-200 flex items-center gap-2 font-semibold shadow-lg"
-                                    >
-                                        <Heart className="h-4 w-4" />
-                                        New Monitor
-                                    </button>
-                                    <button
-                                        onClick={() => navigate('/live-bp-monitor')}
-                                        className="bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded-lg transition-all duration-200 flex items-center gap-2 text-sm"
-                                    >
-                                        <Heart className="h-4 w-4" />
-                                        Old
-                                    </button>
-                                    <button
-                                        onClick={() => navigate('/bp-readings')}
-                                        className="bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-lg transition-all duration-200 flex items-center gap-2 text-sm"
-                                    >
-                                        <BarChart3 className="h-4 w-4" />
-                                        History
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
 
-                    {/* Live ECG Monitor Section */}
-                    <div className="mb-6">
-                        <div className="bg-gradient-to-r from-green-500/20 to-emerald-500/20 border border-green-500/30 rounded-2xl p-4">
-                            <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-3">
-                                    <div className="bg-green-500/20 p-3 rounded-full">
-                                        <Activity className="h-6 w-6 text-green-400" />
-                                    </div>
-                                    <div>
-                                        <h3 className="text-lg font-semibold text-white">Live ECG Monitor</h3>
-                                        <p className="text-sm text-gray-400">Real-time ECG rhythm analysis</p>
-                                    </div>
-                                </div>
-                                <div className="flex gap-2">
-                                    <button
-                                        onClick={() => navigate('/ecg-monitor')}
-                                        className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-all duration-200 flex items-center gap-2"
-                                    >
-                                        <Activity className="h-4 w-4" />
-                                        Monitor
-                                    </button>
-                                    <button
-                                        onClick={() => navigate('/ecg-monitor')}
-                                        className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-all duration-200 flex items-center gap-2"
-                                    >
-                                        <BarChart3 className="h-4 w-4" />
-                                        History
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+
+
 
                     {/* Connected Devices */}
                     {connectedDevices.length > 0 && (
@@ -338,22 +255,7 @@ const DeviceList = () => {
                         </div>
                     )}
 
-                    {/* No Devices - Real State */}
-                    {devices.length === 0 && (
-                        <div className="bg-[#1E1E1E] rounded-2xl p-8 text-center">
-                            <Bluetooth className="h-16 w-16 text-gray-500 mx-auto mb-4" />
-                            <h3 className="text-xl font-semibold text-gray-400 mb-2">No Devices Connected</h3>
-                            <p className="text-sm text-gray-500 mb-4">
-                                Use the Wellue BP2 Scanner above to connect your real medical devices
-                            </p>
-                            <button 
-                                onClick={() => navigate('/wellue-scanner')}
-                                className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-2 rounded-lg transition-all duration-200"
-                            >
-                                Connect Device
-                            </button>
-                        </div>
-                    )}
+
 
                     <div className="pb-8"></div>
                 </div>

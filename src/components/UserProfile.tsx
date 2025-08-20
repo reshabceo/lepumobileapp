@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { User, LogOut, Settings, ChevronDown } from 'lucide-react';
+import { User, LogOut, Settings, ChevronDown, Bluetooth } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
@@ -81,6 +81,17 @@ export const UserProfile: React.FC = () => {
               >
                 <Settings className="w-4 h-4" />
                 <span>Profile Settings</span>
+              </button>
+              
+              <button
+                onClick={() => {
+                  setIsDropdownOpen(false);
+                  navigate('/devices');
+                }}
+                className="w-full flex items-center space-x-3 px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-[#30363D] rounded-md transition-colors duration-200"
+              >
+                <Bluetooth className="w-4 h-4" />
+                <span>Device Settings</span>
               </button>
               
               <button
