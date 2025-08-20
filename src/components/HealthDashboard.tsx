@@ -18,12 +18,14 @@ import {
   Thermometer,
   Users,
   Bluetooth,
+  BluetoothOff,
   Wifi,
   WifiOff,
   BarChart3,
   ChevronUp,
   ChevronDown,
   Stethoscope,
+  Settings,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
@@ -157,6 +159,7 @@ const calculateAge = (dateOfBirth: string | undefined): number | null => {
 // Main Dashboard Component
 export const HealthDashboard = () => {
   const navigate = useNavigate();
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
   // DEBUG: Add console log to verify this component is rendering
   console.log(
@@ -182,6 +185,7 @@ export const HealthDashboard = () => {
     stopScan,
     availableDevices,
     connectToDevice,
+    manualInitializeSDK,
   } = useDevice();
 
   // In-app stored file viewer state (supports both BP (1) and ECG (2))
@@ -207,11 +211,28 @@ export const HealthDashboard = () => {
   );
   const [isLoadingSaved, setIsLoadingSaved] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState("");
   const previewCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const [deviceStatusExpanded, setDeviceStatusExpanded] = useState(true);
 
   // DEBUG: Log the current state after declaration
   console.log("🔍 [DEBUG] deviceStatusExpanded state:", deviceStatusExpanded);
+
+  // Auto-collapse device status when both devices are connected
+  useEffect(() => {
+    // Check if both BP2 device and CGM are connected/available
+    const hasBP2Connected = connectedDevice?.name?.includes('BP2') || connectedDevice?.name?.includes('3049');
+    const hasCGMConnected = true; // CGM is always shown as connected in this demo
+    
+    if (hasBP2Connected && hasCGMConnected && deviceStatusExpanded) {
+      // Auto-collapse after a short delay to show the user both devices are connected
+      const timer = setTimeout(() => {
+        setDeviceStatusExpanded(false);
+      }, 2000); // 2 second delay
+      
+      return () => clearTimeout(timer);
+    }
+  }, [connectedDevice, deviceStatusExpanded]);
 
   // Helper functions for vital signs status
   const getBPStatus = (bp: string): HealthMetric["status"] => {
@@ -683,18 +704,67 @@ export const HealthDashboard = () => {
         {/* Status Bar Spacing */}
         <div className="h-6"></div>
 
-        {/* Header */}
+        {/* Dashboard Header with User Profile */}
         <header className="flex items-center justify-between mb-5">
           <div className="flex items-center gap-3">
-            <LayoutGrid size={24} className="text-gray-400" />
-            <h1 className="text-2xl font-bold">Dashboard</h1>
+            <img
+              src="/monitraq-logo.png"
+              alt="Monitraq Logo"
+              className="w-8 h-8 object-contain"
+            />
+            <h1 className="text-2xl font-bold">
+              <span className="text-green-400">Monitraq</span> Dashboard
+            </h1>
           </div>
-          <button
-            onClick={handleLogout}
-            className="bg-gray-700/80 hover:bg-gray-600 p-2 rounded-lg transition-all duration-200 hover:scale-105 active:scale-95"
-          >
-            <LogOut size={20} />
-          </button>
+          <div className="relative">
+            <button
+              onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+              className="bg-green-500 hover:bg-green-600 p-3 rounded-full transition-all duration-200 hover:scale-105 active:scale-95 flex items-center gap-2"
+            >
+              <User className="w-5 h-5 text-white" />
+              <ChevronDown className={`w-4 h-4 text-white transition-transform duration-200 ${isDropdownOpen ? 'rotate-180' : ''}`} />
+            </button>
+            
+            {/* User Dropdown Menu */}
+            {isDropdownOpen && (
+              <div className="absolute right-0 top-full mt-2 w-48 bg-[#21262D] border border-gray-700 rounded-lg shadow-lg z-50">
+                <div className="p-2">
+                  <button
+                    onClick={() => {
+                      setIsDropdownOpen(false);
+                      // Add profile settings navigation here
+                    }}
+                    className="w-full flex items-center space-x-3 px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-[#30363D] rounded-md transition-colors duration-200"
+                  >
+                    <Settings className="w-4 h-4" />
+                    <span>Profile Settings</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setIsDropdownOpen(false);
+                      navigate('/devices');
+                    }}
+                    className="w-full flex items-center space-x-3 px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-[#30363D] rounded-md transition-colors duration-200"
+                  >
+                    <Bluetooth className="w-4 h-4" />
+                    <span>Device Settings</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setIsDropdownOpen(false);
+                      // Add logout logic here
+                    }}
+                    className="w-full flex items-center space-x-3 px-3 py-2 text-sm text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-md transition-colors duration-200"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    <span>Sign Out</span>
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </header>
 
         {/* Device Connection Status */}
@@ -769,50 +839,130 @@ export const HealthDashboard = () => {
                     <div className="flex gap-2">
                       <button
                         onClick={async () => {
+                          // Check Bluetooth state first
+                          if (!bluetoothEnabled) {
+                            toast({
+                              title: "Bluetooth Required",
+                              description: "Please enable Bluetooth to connect to your device",
+                              variant: "destructive",
+                            });
+                            return;
+                          }
+
                           try {
                             setIsConnecting(true);
-                            // Try to connect to last known device first
-                            const lastDeviceId = localStorage.getItem(
-                              "lastConnectedDevice"
-                            );
-                            if (lastDeviceId) {
-                              console.log(
-                                "🔄 Attempting to connect to last known device:",
-                                lastDeviceId
-                              );
-                              await wellueSDK.connect(lastDeviceId);
-                            } else {
-                              // No last known device, start scanning
-                              console.log(
-                                "🔍 Starting scan to find devices..."
-                              );
+                            setConnectionStatus("Initializing...");
+                            
+                            // Step 1: Ensure SDK is initialized
+                            if (!isInitialized) {
+                              console.log("🚀 Initializing Wellue SDK...");
+                              await manualInitializeSDK();
+                              await new Promise(resolve => setTimeout(resolve, 1000));
+                            }
+                            
+                            // Step 2: Check if device is already connected
+                            if (connectedDevice) {
+                              console.log("✅ Device already connected:", connectedDevice.name);
+                              setIsConnecting(false);
+                              setConnectionStatus("");
+                              return;
+                            }
+                            
+                            // Step 3: Robust scanning with retry mechanism
+                            const maxRetries = 3;
+                            let retryCount = 0;
+                            let deviceFound = false;
+                            
+                            while (retryCount < maxRetries && !deviceFound) {
+                              if (retryCount > 0) {
+                                setConnectionStatus("Refreshing scan...");
+                                console.log(`🔄 Retry ${retryCount + 1}: Refreshing scan...`);
+                                await stopScan();
+                                await new Promise(resolve => setTimeout(resolve, 500));
+                              } else {
+                                setConnectionStatus("Scanning for devices...");
+                                console.log("🔍 Starting initial device scan...");
+                              }
+                              
+                              // Start fresh scan
                               await startScan();
-                              // Wait longer for scan and connection
-                              await new Promise((resolve) =>
-                                setTimeout(resolve, 5000)
-                              );
+                              
+                              // Wait for devices to be found with longer timeout
+                              let scanTime = 0;
+                              const scanTimeout = 4000; // 4 seconds per attempt
+                              
+                              while (scanTime < scanTimeout && availableDevices.length === 0) {
+                                await new Promise(resolve => setTimeout(resolve, 200));
+                                scanTime += 200;
+                              }
+                              
                               if (availableDevices.length > 0) {
-                                // Auto-connect to first available device
-                                await connectToDevice(availableDevices[0]);
+                                deviceFound = true;
+                                console.log(`✅ Found ${availableDevices.length} device(s) on attempt ${retryCount + 1}`);
+                              } else {
+                                retryCount++;
+                                console.log(`❌ No devices found on attempt ${retryCount}, retrying...`);
                               }
                             }
+                            
+                            // Step 4: Auto-connect to first BP2 device found
+                            if (deviceFound && availableDevices.length > 0) {
+                              const bp2Device = availableDevices.find(device => 
+                                device.name.toLowerCase().includes('bp2') || 
+                                device.name.toLowerCase().includes('3049')
+                              ) || availableDevices[0];
+                              
+                              setConnectionStatus(`Connecting to ${bp2Device.name}...`);
+                              console.log("🔗 Auto-connecting to device:", bp2Device.name);
+                              
+                              await connectToDevice(bp2Device);
+                              
+                              // Store last connected device
+                              localStorage.setItem("lastConnectedDevice", bp2Device.id);
+                              
+                              setConnectionStatus("");
+                              toast({
+                                title: "✅ Connected!",
+                                description: `Successfully connected to ${bp2Device.name}`,
+                              });
+                            } else {
+                              throw new Error("No BP2 devices found after multiple scan attempts. Please ensure your device is on and nearby.");
+                            }
+                            
                           } catch (error) {
-                            console.error("Failed to connect:", error);
-                            // Only reset connecting state on error
+                            console.error("❌ Smart Connect failed:", error);
                             setIsConnecting(false);
+                            setConnectionStatus("");
+                            
+                            toast({
+                              title: "Connection Failed",
+                              description: error instanceof Error ? error.message : "Failed to connect to device",
+                              variant: "destructive",
+                            });
                           }
-                          // Don't reset connecting state on success - let the device context handle it
                         }}
-                        disabled={isConnecting}
-                        className="bg-blue-500 hover:bg-blue-600 disabled:bg-blue-400 disabled:cursor-not-allowed text-white text-sm font-semibold py-2 px-4 rounded-lg transition-all duration-200 hover:scale-105 active:scale-95 flex items-center gap-2"
+                        disabled={isConnecting || !bluetoothEnabled}
+                        className={`${
+                          !bluetoothEnabled 
+                            ? "bg-gray-500 cursor-not-allowed" 
+                            : "bg-blue-500 hover:bg-blue-600"
+                        } disabled:bg-blue-400 disabled:cursor-not-allowed text-white text-sm font-semibold py-2 px-4 rounded-lg transition-all duration-200 hover:scale-105 active:scale-95 flex items-center gap-2`}
                       >
-                        {isConnecting ? (
+                        {!bluetoothEnabled ? (
                           <>
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                            <span>Connecting...</span>
+                            <BluetoothOff className="w-4 h-4" />
+                            Enable Bluetooth
+                          </>
+                        ) : isConnecting ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            {connectionStatus || "Connecting..."}
                           </>
                         ) : (
-                          <span>Connect</span>
+                          <>
+                            <Bluetooth className="w-4 h-4" />
+                            Connect
+                          </>
                         )}
                       </button>
                     </div>
@@ -953,7 +1103,7 @@ export const HealthDashboard = () => {
         </div> */}
 
         {/* Your Doctor */}
-        <div className="mb-6">
+        <div className="mb-4">
           <h2 className="text-xl font-semibold mb-3 text-white">Your Doctor</h2>
           <DoctorInfoCard />
         </div>
@@ -1032,15 +1182,7 @@ export const HealthDashboard = () => {
                     }
                   />
                 ))
-            ) : (
-              <div className="col-span-2 text-center py-8">
-                <Activity className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <p className="text-gray-500">No recent vital signs data</p>
-                <p className="text-sm text-gray-400">
-                  Connect a device to start monitoring
-                </p>
-              </div>
-            );
+            ) : null;
           })()}
         </div>
 
@@ -1092,7 +1234,7 @@ export const HealthDashboard = () => {
         </div>
 
         {/* Bottom Action Buttons */}
-        <div className="grid grid-cols-2 gap-4 mb-4">
+        <div className="grid grid-cols-2 gap-4 mb-6">
           <button
             onClick={handleViewReports}
             className="bg-[#4A37A8] hover:bg-[#5A47B8] text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2 transition-all duration-200 hover:scale-105 active:scale-95"
