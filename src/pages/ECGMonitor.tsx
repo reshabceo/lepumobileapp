@@ -5362,7 +5362,139 @@ const ECGMonitor: React.FC = () => {
 
 
 
-                    {/* ECG Results Saved to Reports section removed - no longer needed */}
+                    {/* NEW: Final ECG Result Display Section - Shows Completed Measurement Results */}
+                    {ecgResult && ecgResult.heartRate > 0 && (
+                        <div
+                            className="rounded-2xl p-4 mb-4"
+                            style={{
+                                background: 'rgba(17,24,39,0.6)',
+                                backdropFilter: 'blur(10px)',
+                                border: '1px solid rgba(55,65,81,0.3)',
+                                boxShadow: '0 0 20px rgba(0,0,0,0.3)'
+                            }}
+                        >
+                            <div className="flex items-center justify-between mb-4">
+                                <h2 className="text-base font-medium text-white flex items-center gap-2">
+                                    <ActivityIcon className="h-5 w-5" />
+                                    Final ECG Result
+                                </h2>
+                                <div className="flex items-center gap-2">
+                                    <div className="w-3 h-3 rounded-full bg-blue-400"></div>
+                                    <span className="text-sm text-blue-400 font-medium">Completed</span>
+                                </div>
+                            </div>
+
+                            {/* Final Result Display */}
+                            <div className="bg-slate-700/30 rounded-lg p-4">
+                                <div className="grid grid-cols-2 gap-4 text-center">
+                                    <div>
+                                        <div className="text-2xl font-bold text-blue-400">{ecgResult.heartRate}</div>
+                                        <div className="text-xs text-gray-400">Heart Rate (BPM)</div>
+                                        <div className="text-xs text-blue-400 mt-1">Final Result</div>
+                                    </div>
+                                    <div>
+                                        <div className="text-lg font-bold text-white capitalize">{ecgResult.rhythm}</div>
+                                        <div className="text-xs text-gray-400">Rhythm</div>
+                                        <div className="text-xs text-green-400 mt-1">Analyzed</div>
+                                    </div>
+                                </div>
+
+                                {/* Additional ECG Parameters */}
+                                <div className="grid grid-cols-3 gap-3 mt-4 pt-3 border-t border-gray-600">
+                                    <div className="text-center">
+                                        <div className="text-sm font-medium text-white">{ecgResult.qrsDuration}ms</div>
+                                        <div className="text-xs text-gray-400">QRS Duration</div>
+                                    </div>
+                                    <div className="text-center">
+                                        <div className="text-sm font-medium text-white">{ecgResult.qtInterval}ms</div>
+                                        <div className="text-xs text-gray-400">QT Interval</div>
+                                    </div>
+                                    <div className="text-center">
+                                        <div className="text-sm font-medium text-white">{ecgResult.prInterval}ms</div>
+                                        <div className="text-xs text-gray-400">PR Interval</div>
+                                    </div>
+                                </div>
+
+                                {/* Data Source Info */}
+                                <div className="text-center mt-3 pt-3 border-t border-gray-600">
+                                    <div className="text-xs text-gray-400">
+                                        Completed: {new Date(ecgResult.timestamp).toLocaleDateString()} at {new Date(ecgResult.timestamp).toLocaleTimeString()}
+                                    </div>
+                                    <div className="text-xs text-green-400 mt-1">
+                                        ✅ Measurement Complete • Auto-saved to Reports
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+
+
+                    {/* NEW: Current Rhythm Display Section - Shows Current Rhythm Analysis */}
+                    {currentRhythm && currentRhythm.heartRate > 0 && !ecgResult && (
+                        <div
+                            className="rounded-2xl p-4 mb-4"
+                            style={{
+                                background: 'rgba(17,24,39,0.6)',
+                                backdropFilter: 'blur(10px)',
+                                border: '1px solid rgba(55,65,81,0.3)',
+                                boxShadow: '0 0 20px rgba(0,0,0,0.3)'
+                            }}
+                        >
+                            <div className="flex items-center justify-between mb-4">
+                                <h2 className="text-base font-medium text-white flex items-center gap-2">
+                                    <ActivityIcon className="h-5 w-5" />
+                                    Current Rhythm Analysis
+                                </h2>
+                                <div className="flex items-center gap-2">
+                                    <div className="w-3 h-3 rounded-full bg-yellow-400 animate-pulse"></div>
+                                    <span className="text-sm text-yellow-400 font-medium">Processing</span>
+                                </div>
+                            </div>
+
+                            {/* Current Rhythm Display */}
+                            <div className="bg-slate-700/30 rounded-lg p-4">
+                                <div className="grid grid-cols-2 gap-4 text-center">
+                                    <div>
+                                        <div className="text-2xl font-bold text-yellow-400">{currentRhythm.heartRate}</div>
+                                        <div className="text-xs text-gray-400">Heart Rate (BPM)</div>
+                                        <div className="text-xs text-yellow-400 mt-1">Current</div>
+                                    </div>
+                                    <div>
+                                        <div className="text-lg font-bold text-white capitalize">{currentRhythm.rhythm}</div>
+                                        <div className="text-xs text-gray-400">Rhythm</div>
+                                        <div className="text-xs text-blue-400 mt-1">Analyzing</div>
+                                    </div>
+                                </div>
+
+                                {/* Additional ECG Parameters */}
+                                <div className="grid grid-cols-3 gap-3 mt-4 pt-3 border-t border-gray-600">
+                                    <div className="text-center">
+                                        <div className="text-sm font-medium text-white">{currentRhythm.qrsDuration}ms</div>
+                                        <div className="text-xs text-gray-400">QRS Duration</div>
+                                    </div>
+                                    <div className="text-center">
+                                        <div className="text-sm font-medium text-white">{currentRhythm.qtInterval}ms</div>
+                                        <div className="text-xs text-gray-400">QT Interval</div>
+                                    </div>
+                                    <div className="text-center">
+                                        <div className="text-sm font-medium text-white">{currentRhythm.prInterval}ms</div>
+                                        <div className="text-xs text-gray-400">PR Interval</div>
+                                    </div>
+                                </div>
+
+                                {/* Data Source Info */}
+                                <div className="text-center mt-3 pt-3 border-t border-gray-600">
+                                    <div className="text-xs text-gray-400">
+                                        Last Updated: {new Date(currentRhythm.timestamp).toLocaleDateString()} at {new Date(currentRhythm.timestamp).toLocaleTimeString()}
+                                    </div>
+                                    <div className="text-xs text-yellow-400 mt-1">
+                                        🔄 Rhythm analysis in progress...
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
 
 
 
