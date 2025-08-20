@@ -57,10 +57,10 @@ export const UserProfile: React.FC = () => {
           />
           
           {/* Dropdown Content */}
-          <div className="absolute right-0 mt-2 w-56 bg-[#21262D] border border-gray-700 rounded-lg shadow-lg z-20">
+          <div className="absolute right-0 mt-2 w-fit max-w-96 bg-[#21262D] border border-gray-700 rounded-lg shadow-lg z-20">
             <div className="p-4 border-b border-gray-700">
               <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 bg-green-600 rounded-full flex items-center justify-center">
+                <div className="w-10 h-10 min-w-10 bg-green-600 rounded-full flex items-center justify-center">
                   <User className="w-5 h-5 text-white" />
                 </div>
                 <div>

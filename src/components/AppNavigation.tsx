@@ -24,6 +24,8 @@ const navigationItems = [
 export const AppNavigation: React.FC = () => {
   const location = useLocation();
 
+  return null;
+
   return (
     <nav className="bg-[#21262D] border-t border-gray-700 px-4 py-2">
       <div className="flex items-center justify-around">

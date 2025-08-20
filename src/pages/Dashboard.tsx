@@ -15,7 +15,7 @@ const Dashboard = () => {
             <img
               src="/lovable-uploads/c10ef7ff-117f-45d3-adc9-bb398f6816c8.png"
               alt="Health Logo"
-              className="w-8 h-8"
+              className="w-8 h-8 object-contain"
             />
             <h1 className="text-xl font-semibold text-white">Vital Signs Monitor</h1>
           </div>
