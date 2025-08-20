@@ -24,14 +24,14 @@ export interface BPMeasurement {
 
 export interface BPProgress {
     pressure: number;
-    status: 'inflating' | 'holding' | 'deflating' | 'analyzing' | 'measuring';
+    status: 'ready' | 'inflating' | 'holding' | 'deflating' | 'analyzing' | 'measuring';
     timestamp: Date;
 }
 
 export interface BPStatus {
     isMeasuring: boolean;
     currentPressure: number;
-    status: 'idle' | 'starting' | 'inflating' | 'holding' | 'deflating' | 'analyzing' | 'measuring' | 'complete' | 'error';
+    status: 'idle' | 'ready' | 'starting' | 'inflating' | 'holding' | 'deflating' | 'analyzing' | 'measuring' | 'complete' | 'error';
     lastMeasurement?: BPMeasurement;
     error?: string;
 }
@@ -114,7 +114,7 @@ class BPMeasurementManager {
     private inflationStartPressure = 0;
     private peakPressure = 0;
     private deflationStartPressure = 0;
-    private measurementPhase: 'idle' | 'waiting' | 'inflating' | 'holding' | 'deflating' | 'analyzing' | 'complete' = 'idle';
+    private measurementPhase: 'idle' | 'ready' | 'waiting' | 'inflating' | 'holding' | 'deflating' | 'analyzing' | 'complete' = 'idle';
     
     // 🚨 SAFETY: Pressure throttling and safety controls
     private lastDisplayedPressure = 0;
@@ -128,6 +128,11 @@ class BPMeasurementManager {
     private minPressureJump = 2; // Minimum pressure increase per update (mmHg)
     private pressureStabilizationTime = 200; // Time to stabilize pressure (ms)
 
+    // 🚨 NEW: Pressure timeout detection for abrupt stops
+    private pressureTimeoutInterval?: NodeJS.Timeout;
+    private lastPressureUpdateTime = 0;
+    private pressureTimeoutThreshold = 4000; // 4 seconds without pressure updates = abrupt stop
+    
     constructor(callbacks: WellueSDKCallbacks) {
         this.callbacks = callbacks;
     }
@@ -173,6 +178,9 @@ class BPMeasurementManager {
         this.pressureUpdateQueue = [];
         this.isProcessingPressure = false;
         
+        // 🚨 NEW: Reset pressure timeout tracking
+        this.lastPressureUpdateTime = Date.now();
+        
         // Start progress monitoring
         this.progressInterval = setInterval(() => {
             if (this.isMeasuring && (this.status === 'inflating' || this.status === 'holding' || this.status === 'deflating' || this.status === 'analyzing')) {
@@ -185,12 +193,18 @@ class BPMeasurementManager {
             }
         }, 100); // Update every 100ms during measurement
         
+        // 🚨 NEW: Start pressure timeout monitoring
+        this.startPressureTimeoutMonitoring();
+        
         this.callbacks.onBPStatusChanged?.(this.getStatus());
     }
 
     updateProgress(pressure: number, status: BPProgress['status']) {
         const previousPressure = this.currentPressure;
         this.currentPressure = pressure;
+        
+        // 🚨 NEW: Reset pressure timeout timer on each update
+        this.lastPressureUpdateTime = Date.now();
         
         // 🚀 NEW: Enhanced pressure tracking and phase detection
         this.trackPressureAndDetectPhase(pressure, previousPressure);
@@ -368,6 +382,10 @@ class BPMeasurementManager {
     private determineActualStatus(pressure: number, inferredStatus: BPProgress['status']): BPProgress['status'] {
         // Use the detected phase instead of inferred status
         switch (this.measurementPhase) {
+            case 'idle':
+                return 'measuring'; // Use 'measuring' instead of 'idle' for progress
+            case 'ready':
+                return 'ready';
             case 'waiting':
                 return 'measuring'; // Use 'measuring' instead of 'idle' for progress
             case 'inflating':
@@ -429,31 +447,25 @@ class BPMeasurementManager {
     }
 
     reset() {
-        console.log('🔄 BP Measurement Manager: Resetting state');
+        console.log('🔄 BP Measurement Manager: Resetting');
         this.isMeasuring = false;
         this.status = 'idle';
         this.currentPressure = 0;
         this.error = undefined;
         this.measurementPhase = 'idle';
         
-        // 🚀 NEW: Reset measurement tracking
-        this.pressureHistory = [];
-        this.inflationStartPressure = 0;
-        this.peakPressure = 0;
-        this.deflationStartPressure = 0;
-        
-        // 🚨 SAFETY: Reset safety controls
-        this.lastDisplayedPressure = 0;
-        this.pressureUpdateQueue = [];
-        this.isProcessingPressure = false;
+        // 🚨 NEW: Clear pressure timeout monitoring
+        this.clearPressureTimeoutMonitoring();
         
         if (this.progressInterval) {
             clearInterval(this.progressInterval);
             this.progressInterval = undefined;
         }
         
-        // 🚨 FIX: After reset, be ready to detect new device-initiated measurements
-        this.measurementPhase = 'waiting';
+        // 🚨 SAFETY: Reset safety controls
+        this.lastDisplayedPressure = 0;
+        this.pressureUpdateQueue = [];
+        this.isProcessingPressure = false;
         
         this.callbacks.onBPStatusChanged?.(this.getStatus());
     }
@@ -463,6 +475,9 @@ class BPMeasurementManager {
         this.status = 'complete';
         this.isMeasuring = false;
         this.measurementPhase = 'complete';
+        
+        // 🚨 NEW: Clear pressure timeout monitoring
+        this.clearPressureTimeoutMonitoring();
         
         // 🚨 SAFETY: Reset safety controls
         this.lastDisplayedPressure = 0;
@@ -479,15 +494,86 @@ class BPMeasurementManager {
 
     setReady() {
         console.log('🟢 BP Measurement Manager: Device ready');
+        this.status = 'ready';
+        this.isMeasuring = false;
+        this.currentPressure = 0;
+        this.error = undefined;
+        this.measurementPhase = 'ready';
+        
+        // 🚨 NEW: Clear pressure timeout monitoring
+        this.clearPressureTimeoutMonitoring();
+        
+        if (this.progressInterval) {
+            clearInterval(this.progressInterval);
+            this.progressInterval = undefined;
+        }
+        
+        this.callbacks.onBPStatusChanged?.(this.getStatus());
+    }
+
+    // 🚨 NEW: Start pressure timeout monitoring for abrupt stop detection
+    private startPressureTimeoutMonitoring() {
+        // Clear any existing timeout interval
+        if (this.pressureTimeoutInterval) {
+            clearInterval(this.pressureTimeoutInterval);
+        }
+        
+        // Start monitoring for pressure updates
+        this.pressureTimeoutInterval = setInterval(() => {
+            if (!this.isMeasuring) {
+                // Measurement already stopped, clear timeout
+                this.clearPressureTimeoutMonitoring();
+                return;
+            }
+            
+            const now = Date.now();
+            const timeSinceLastUpdate = now - this.lastPressureUpdateTime;
+            
+            // If no pressure updates for threshold time, assume abrupt stop
+            if (timeSinceLastUpdate > this.pressureTimeoutThreshold) {
+                console.log('⏰ Pressure timeout detected - no updates for', this.pressureTimeoutThreshold, 'ms');
+                this.handleAbruptStop();
+            }
+        }, 1000); // Check every second
+    }
+    
+    // 🚨 NEW: Clear pressure timeout monitoring
+    private clearPressureTimeoutMonitoring() {
+        if (this.pressureTimeoutInterval) {
+            clearInterval(this.pressureTimeoutInterval);
+            this.pressureTimeoutInterval = undefined;
+        }
+    }
+    
+    // 🚨 NEW: Handle abrupt stop detection
+    private handleAbruptStop() {
+        console.log('🛑 Abrupt BP measurement stop detected');
+        
+        // Clear timeout monitoring
+        this.clearPressureTimeoutMonitoring();
+        
+        // Reset measurement state
+        this.isMeasuring = false;
         this.status = 'idle';
+        this.currentPressure = 0;
+        this.error = undefined; // Clear error for clean reset
         this.measurementPhase = 'idle';
         
-        // 🚨 SAFETY: Reset safety controls
+        // Clear progress interval
+        if (this.progressInterval) {
+            clearInterval(this.progressInterval);
+            this.progressInterval = undefined;
+        }
+        
+        // Reset safety controls
         this.lastDisplayedPressure = 0;
         this.pressureUpdateQueue = [];
         this.isProcessingPressure = false;
         
+        // Notify callbacks of abrupt stop
         this.callbacks.onBPStatusChanged?.(this.getStatus());
+        
+        console.log('🔄 BP Measurement Manager reset to idle state after abrupt stop');
     }
 }
 
