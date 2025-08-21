@@ -25,6 +25,7 @@ import CGMMonitor from "./pages/CGMMonitor";
 import BPResultScreen from "./pages/BPResult";
 import { DoctorAssignmentPage } from "./pages/DoctorAssignmentPage";
 import PatientReportsView from "./components/PatientReportsView";
+import { ResetPasswordPage } from "./components/ResetPasswordPage";
 
 const queryClient = new QueryClient();
 
@@ -128,6 +129,12 @@ const App = () => (
               <Route path="/doctor-assignment" element={
                 <ProtectedRoute>
                   <DoctorAssignmentPage />
+                </ProtectedRoute>
+              } />
+
+              <Route path="/reset-password" element={
+                <ProtectedRoute requireAuth={false}>
+                  <ResetPasswordPage />
                 </ProtectedRoute>
               } />
 

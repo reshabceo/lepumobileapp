@@ -422,9 +422,7 @@ const ECGMonitor: React.FC = () => {
 
 
 
-    // NEW: Result popup state
-
-    const [ecgResult, setEcgResult] = useState<ECGRhythm | null>(null);
+    // REMOVED: Old result state variables
 
 
 
@@ -1738,9 +1736,7 @@ const ECGMonitor: React.FC = () => {
 
 
 
-                        // Store the result directly (no popup)
-
-                        setEcgResult(finalResult);
+                        // REMOVED: Old result storage logic
 
 
 
@@ -2187,9 +2183,8 @@ const ECGMonitor: React.FC = () => {
             subs.push(Native.addListener('ecgLifecycle', (data: any) => {
 
                 const state = data?.state;
-                const finalHeartRate = data?.finalHeartRate; // 🚀 NEW: Get final HR from native
 
-                console.log('🔄 [NATIVE] ECG Lifecycle event received directly:', state, 'finalHeartRate:', finalHeartRate);
+                console.log('🔄 [NATIVE] ECG Lifecycle event received directly:', state);
 
 
 
@@ -2219,22 +2214,19 @@ const ECGMonitor: React.FC = () => {
 
                     setIsMonitoring(false); setMonitoringStatus('listening');
 
-                    // 🚀 CRITICAL FIX: Use finalHeartRate from native if available
-                    let immediateHeartRate = 0;
-                    
-                    if (finalHeartRate && finalHeartRate > 0) {
-                        immediateHeartRate = finalHeartRate;
-                        console.log('✅ [IMMEDIATE] Using final heart rate from native:', finalHeartRate, 'BPM');
-                        // Update deviceBpm with the final heart rate to ensure it's available for result calculation
-                        setDeviceBpm(finalHeartRate);
-                        setLastDeviceHeartRateTime(Date.now());
-                    } else {
-                        // Fallback to existing logic
-                        immediateHeartRate = deviceBpm > 0 ? deviceBpm :
+
+
+                    // CRITICAL FIX: Capture heart rate immediately when measurement stops
+
+                    // This prevents the race condition where state changes before final calculation
+
+                    const immediateHeartRate = deviceBpm > 0 ? deviceBpm :
+
                         (currentRhythm?.heartRate > 0 ? currentRhythm.heartRate :
+
                             (lastBpmRef.current > 0 ? lastBpmRef.current : 0));
-                        console.log('⚠️ [IMMEDIATE] No final HR from native, using fallback:', immediateHeartRate, 'BPM');
-                    }
+
+
 
                     console.log('🚨 [IMMEDIATE] Heart rate captured at stop:', immediateHeartRate, 'BPM');
 
@@ -2392,9 +2384,7 @@ const ECGMonitor: React.FC = () => {
 
 
 
-                        // Set the result and show popup
-
-                        setEcgResult(finalResult);
+                        // REMOVED: Old result storage logic
 
 
 
@@ -2624,109 +2614,7 @@ const ECGMonitor: React.FC = () => {
 
 
 
-            // Prepare the data to save with unified schema
-
-            const dataToSave = {
-
-                ...result,
-
-                timestamp: result.timestamp,
-
-                deviceId: result.deviceId || selectedDevice || 'unknown',
-
-                deviceName: 'ECG Monitor', // Default name for ECG device
-
-                measurementId: `ecg_${Date.now()}`,
-
-                status: 'completed',
-
-                type: 'ecg'
-
-            };
-
-            
-
-            // 1. Save to Supabase database FIRST (primary storage for doctor portal)
-
-            try {
-
-                const { db } = await import('@/lib/supabase');
-
-                const vitalSignsData = {
-
-                    device_type: 'ECG',
-
-                    measurement_type: 'electrocardiogram',
-
-                    data: {
-
-                        heart_rate: dataToSave.heartRate,
-
-                        rhythm: dataToSave.rhythm || 'normal',
-
-                        qrs_duration: dataToSave.qrsDuration || 80,
-
-                        qt_interval: dataToSave.qtInterval || 400,
-
-                        pr_interval: dataToSave.prInterval || 160,
-
-                        st_segment: dataToSave.stSegment || 'normal',
-
-                        t_wave: dataToSave.tWave || 'normal',
-
-                        p_wave: dataToSave.pWave || 'normal',
-
-                        status: 'completed',
-
-                        deviceName: dataToSave.deviceName,
-
-                        measurementId: dataToSave.measurementId
-
-                    },
-
-                    device_id: dataToSave.deviceId,
-
-                    reading_timestamp: dataToSave.timestamp
-
-                };
-
-
-
-                const { error: dbError } = await db.insertVitalSigns(vitalSignsData);
-
-                if (dbError) {
-
-                    console.error('❌ [ECG] Failed to save to database:', dbError);
-
-                    throw new Error(`Database save failed: ${dbError.message}`);
-
-                } else {
-
-                    console.log('✅ [ECG] ECG result saved to database for doctor monitoring');
-
-                }
-
-            } catch (dbError) {
-
-                console.error('❌ [ECG] Database save error:', dbError);
-
-                // Continue with local storage as fallback
-
-            }
-
-
-
-            // 2. Save to localStorage for app access (ECG-specific storage)
-
-            const existingECGResults = JSON.parse(localStorage.getItem('ecgResults') || '[]');
-
-            existingECGResults.unshift(dataToSave); // Add to beginning
-
-            localStorage.setItem('ecgResults', JSON.stringify(existingECGResults.slice(0, 50))); // Keep last 50
-
-
-
-            // 3. Save to storedFilesInApp for reports page (single source of truth)
+            // Save to storedFilesInApp for reports page (single source of truth)
 
             const existingReports = JSON.parse(localStorage.getItem('storedFilesInApp') || '[]');
 
@@ -2752,7 +2640,9 @@ const ECGMonitor: React.FC = () => {
 
             const reportData = {
 
-                ...dataToSave,
+                ...result,
+
+                type: 'ecg',
 
                 savedAt: new Date().toISOString()
 
@@ -2764,119 +2654,13 @@ const ECGMonitor: React.FC = () => {
 
             localStorage.setItem('storedFilesInApp', JSON.stringify(updatedReports));
 
-            console.log('💾 [ECG] ECG result auto-saved to all storage systems, total reports:', updatedReports.length);
-
-            
-
-            // 4. Update rhythms state from updated reports
-
-            const ecgReports = updatedReports.filter(r => r.type === 'ecg');
-
-            const sortedRhythms = ecgReports
-
-                .sort((a, b) => new Date(b.savedAt || b.timestamp).getTime() - new Date(a.savedAt || a.timestamp).getTime())
-
-                .slice(0, 10);
-
-            setRhythms(sortedRhythms);
-
-            console.log('🔄 [ECG] Updated rhythms state with latest results:', sortedRhythms.length, 'entries');
-
-            
-
-            // 5. Update previousECGReadings state for "Previous Reading" section
-
-            const latestECGResults = JSON.parse(localStorage.getItem('ecgResults') || '[]');
-
-            if (latestECGResults.length > 0) {
-
-                setPreviousECGReadings(latestECGResults);
-
-                console.log('🔄 [ECG] Updated previous ECG readings:', latestECGResults.length, 'entries');
-
-            }
+            console.log('💾 [ECG] ECG result auto-saved to storedFilesInApp for reports, total reports:', updatedReports.length);
 
 
 
         } catch (error) {
 
             console.error('❌ [ECG] Failed to auto-save ECG result:', error);
-
-            // Fallback: save to localStorage only
-
-            try {
-
-                const fallbackData = {
-
-                    ...result,
-
-                    timestamp: result.timestamp,
-
-                    deviceId: result.deviceId || selectedDevice || 'unknown',
-
-                    deviceName: 'ECG Monitor',
-
-                    measurementId: `ecg_${Date.now()}`,
-
-                    status: 'completed',
-
-                    type: 'ecg'
-
-                };
-
-                
-
-                const existingResults = JSON.parse(localStorage.getItem('ecgResults') || '[]');
-
-                existingResults.unshift(fallbackData);
-
-                localStorage.setItem('ecgResults', JSON.stringify(existingResults.slice(0, 50)));
-
-                
-
-                console.log('💾 [ECG] ECG result saved to localStorage as fallback');
-
-            } catch (fallbackError) {
-
-                console.error('❌ [ECG] Fallback save also failed:', fallbackError);
-
-            }
-
-        }
-
-    }, [selectedDevice]);
-
-    
-
-    // Load previous ECG readings from localStorage (like BP has)
-
-    const [previousECGReadings, setPreviousECGReadings] = useState<ECGRhythm[]>([]);
-
-
-
-    useEffect(() => {
-
-        try {
-
-            const savedResults = localStorage.getItem('ecgResults');
-
-            if (savedResults) {
-
-                const parsedResults = JSON.parse(savedResults);
-
-                if (Array.isArray(parsedResults) && parsedResults.length > 0) {
-
-                    console.log('📚 [ECG] Loading', parsedResults.length, 'previous ECG readings from localStorage');
-
-                    setPreviousECGReadings(parsedResults);
-
-                }
-
-            }
-
-        } catch (error) {
-
-            console.error('❌ [ECG] Failed to load previous ECG readings:', error);
 
         }
 
@@ -5704,84 +5488,6 @@ const ECGMonitor: React.FC = () => {
                                 </div>
                             </div>
                         </div>
-                    )}
-
-                    
-
-                    {/* Previous ECG Reading Section */}
-
-                    {previousECGReadings.length > 0 && (
-
-                        <div
-
-                            className="rounded-2xl p-4 mb-4"
-
-                            style={{
-
-                                background: 'rgba(17,24,39,0.6)',
-
-                                backdropFilter: 'blur(10px)',
-
-                                border: '1px solid rgba(55,65,81,0.3)'
-
-                            }}
-
-                        >
-
-                            <div className="flex items-center justify-between mb-3">
-
-                                <h3 className="text-gray-200 font-medium">Previous Reading</h3>
-
-                                <div className="text-sm text-gray-400">Latest</div>
-
-                            </div>
-
-                            <div
-
-                                className="p-3 rounded-lg"
-
-                                style={{
-
-                                    background: 'rgba(55,65,81,0.3)'
-
-                                }}
-
-                            >
-
-                                <div className="grid grid-cols-2 gap-3 text-center">
-
-                                    <div>
-
-                                        <div className="text-lg font-bold text-white">{previousECGReadings[0].heartRate}</div>
-
-                                        <div className="text-xs text-gray-400">Heart Rate (bpm)</div>
-
-                                    </div>
-
-                                    <div>
-
-                                        <div className="text-lg font-bold text-white capitalize">{previousECGReadings[0].rhythm || 'normal'}</div>
-
-                                        <div className="text-xs text-gray-400">Rhythm</div>
-
-                                    </div>
-
-                                </div>
-
-                                <div className="text-center mt-2">
-
-                                    <div className="text-xs text-gray-400">
-
-                                        {new Date(previousECGReadings[0].timestamp).toLocaleDateString()} at {new Date(previousECGReadings[0].timestamp).toLocaleTimeString()}
-
-                                    </div>
-
-                                </div>
-
-                            </div>
-
-                        </div>
-
                     )}
 
 

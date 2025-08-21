@@ -324,11 +324,11 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onSwitchToLogin }) => {
         <p className="text-gray-400 text-sm">Join us to monitor vital signs</p>
       </div>
 
-      <form className="space-y-5" onSubmit={handleSubmit}>
+      <form className="space-y-6" onSubmit={handleSubmit}>
         {/* Name Input */}
-        <div className="relative">
+        <div className="relative group">
           <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-            <User className="text-gray-500" size={20} />
+            <User className="text-gray-400 group-focus-within:text-blue-400 transition-colors duration-300" size={20} />
           </div>
           <input
             type="text"
@@ -336,20 +336,20 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onSwitchToLogin }) => {
             value={formData.name}
             onChange={handleInputChange}
             placeholder="Full Name"
-            className={`w-full pl-12 pr-4 py-3 bg-[#21262D] text-white border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 placeholder-gray-500 ${errors.name ? 'border-red-500' : 'border-gray-700'
+            className={`w-full pl-12 pr-4 py-4 bg-black/30 backdrop-blur-sm text-white border border-white/20 rounded-2xl focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 placeholder-gray-400 transition-all duration-300 ${errors.name ? 'border-red-500/50 focus:ring-red-500/50 focus:border-red-500/50' : ''
               }`}
             aria-label="Full Name"
             required
           />
           {errors.name && (
-            <p className="text-red-400 text-xs mt-1 ml-1">{errors.name}</p>
+            <p className="text-red-300 text-xs mt-2 ml-1">{errors.name}</p>
           )}
         </div>
 
         {/* Email Input */}
-        <div className="relative">
+        <div className="relative group">
           <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-            <Mail className="text-gray-500" size={20} />
+            <Mail className="text-gray-400 group-focus-within:text-blue-400 transition-colors duration-300" size={20} />
           </div>
           <input
             type="email"
@@ -357,20 +357,20 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onSwitchToLogin }) => {
             value={formData.email}
             onChange={handleInputChange}
             placeholder="Email Address"
-            className={`w-full pl-12 pr-4 py-3 bg-[#21262D] text-white border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 placeholder-gray-500 ${errors.email ? 'border-red-500' : 'border-gray-700'
+            className={`w-full pl-12 pr-4 py-4 bg-black/30 backdrop-blur-sm text-white border border-white/20 rounded-2xl focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 placeholder-gray-400 transition-all duration-300 ${errors.email ? 'border-red-500/50 focus:ring-red-500/50 focus:border-red-500/50' : ''
               }`}
             aria-label="Email Address"
             required
           />
           {errors.email && (
-            <p className="text-red-400 text-xs mt-1 ml-1">{errors.email}</p>
+            <p className="text-red-300 text-xs mt-2 ml-1">{errors.email}</p>
           )}
         </div>
 
         {/* Doctor Code Input */}
-        <div className="relative">
+        <div className="relative group">
           <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-            <Stethoscope className="text-gray-500" size={20} />
+            <Stethoscope className="text-gray-400 group-focus-within:text-blue-400 transition-colors duration-300" size={20} />
           </div>
           <input
             type="text"
@@ -378,13 +378,13 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onSwitchToLogin }) => {
             value={formData.doctorCode}
             onChange={handleInputChange}
             placeholder="Doctor Code (e.g., DR1234)"
-            className={`w-full pl-12 pr-4 py-3 bg-[#21262D] text-white border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 placeholder-gray-500 ${errors.doctorCode ? 'border-red-500' : 'border-gray-700'
+            className={`w-full pl-12 pr-4 py-4 bg-black/30 backdrop-blur-sm text-white border border-white/20 rounded-2xl focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 placeholder-gray-400 transition-all duration-300 ${errors.doctorCode ? 'border-red-500/50 focus:ring-red-500/50 focus:border-red-500/50' : ''
               }`}
             aria-label="Doctor Code"
             required
           />
           {errors.doctorCode && (
-            <p className="text-red-400 text-xs mt-1 ml-1">{errors.doctorCode}</p>
+            <p className="text-red-300 text-xs mt-2 ml-1">{errors.doctorCode}</p>
           )}
           <p className="text-xs text-gray-500 mt-1 ml-1">
             Enter the doctor code provided by your healthcare provider
@@ -392,36 +392,36 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onSwitchToLogin }) => {
         </div>
 
         {/* Date of Birth Input */}
-        <div className="relative">
+        <div className="relative group">
           <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-            <Calendar className="text-gray-500" size={20} />
+            <Calendar className="text-gray-400 group-focus-within:text-blue-400 transition-colors duration-300" size={20} />
           </div>
           <input
             type="date"
             name="dateOfBirth"
             value={formData.dateOfBirth}
             onChange={handleInputChange}
-            className={`w-full pl-12 pr-4 py-3 bg-[#21262D] text-white border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 placeholder-gray-500 ${errors.dateOfBirth ? 'border-red-500' : 'border-gray-700'
+            className={`w-full pl-12 pr-4 py-4 bg-black/30 backdrop-blur-sm text-white border border-white/20 rounded-2xl focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 placeholder-gray-400 transition-all duration-300 ${errors.dateOfBirth ? 'border-red-500/50 focus:ring-red-500/50 focus:border-red-500/50' : ''
               }`}
             aria-label="Date of Birth"
             required
           />
           {errors.dateOfBirth && (
-            <p className="text-red-400 text-xs mt-1 ml-1">{errors.dateOfBirth}</p>
+            <p className="text-red-300 text-xs mt-2 ml-1">{errors.dateOfBirth}</p>
           )}
         </div>
 
         {/* Gender and Blood Type Row */}
         <div className="grid grid-cols-2 gap-4">
-          <div className="relative">
+          <div className="relative group">
             <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-              <UserCheck className="text-gray-500" size={20} />
+              <UserCheck className="text-gray-400 group-focus-within:text-blue-400 transition-colors duration-300" size={20} />
             </div>
             <select
               name="gender"
               value={formData.gender}
               onChange={handleInputChange}
-              className={`w-full pl-12 pr-4 py-3 bg-[#21262D] text-white border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 ${errors.gender ? 'border-red-500' : 'border-gray-700'
+              className={`w-full pl-12 pr-4 py-4 bg-black/30 backdrop-blur-sm text-white border border-white/20 rounded-2xl focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all duration-300 ${errors.gender ? 'border-red-500/50 focus:ring-red-500/50 focus:border-red-500/50' : ''
                 }`}
               aria-label="Gender"
               required
@@ -433,19 +433,19 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onSwitchToLogin }) => {
               <option value="prefer_not_to_say">Prefer not to say</option>
             </select>
             {errors.gender && (
-              <p className="text-red-400 text-xs mt-1 ml-1">{errors.gender}</p>
+              <p className="text-red-300 text-xs mt-2 ml-1">{errors.gender}</p>
             )}
           </div>
 
-          <div className="relative">
+          <div className="relative group">
             <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-              <Heart className="text-gray-500" size={20} />
+              <Heart className="text-gray-400 group-focus-within:text-blue-400 transition-colors duration-300" size={20} />
             </div>
             <select
               name="bloodType"
               value={formData.bloodType}
               onChange={handleInputChange}
-              className={`w-full pl-12 pr-4 py-3 bg-[#21262D] text-white border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 ${errors.bloodType ? 'border-red-500' : 'border-gray-700'
+              className={`w-full pl-12 pr-4 py-4 bg-black/30 backdrop-blur-sm text-white border border-white/20 rounded-2xl focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all duration-300 ${errors.bloodType ? 'border-red-500/50 focus:ring-red-500/50 focus:border-blue-500/50' : ''
                 }`}
               aria-label="Blood Type"
               required
@@ -461,15 +461,15 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onSwitchToLogin }) => {
               <option value="O-">O-</option>
             </select>
             {errors.bloodType && (
-              <p className="text-red-400 text-xs mt-1 ml-1">{errors.bloodType}</p>
+              <p className="text-red-300 text-xs mt-2 ml-1">{errors.bloodType}</p>
             )}
           </div>
         </div>
 
         {/* Phone Number Input */}
-        <div className="relative">
+        <div className="relative group">
           <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-            <Phone className="text-gray-500" size={20} />
+            <Phone className="text-gray-400 group-focus-within:text-blue-400 transition-colors duration-300" size={20} />
           </div>
           <input
             type="tel"
@@ -477,20 +477,20 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onSwitchToLogin }) => {
             value={formData.phoneNumber}
             onChange={handleInputChange}
             placeholder="Phone Number"
-            className={`w-full pl-12 pr-4 py-3 bg-[#21262D] text-white border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 placeholder-gray-500 ${errors.phoneNumber ? 'border-red-500' : 'border-gray-700'
+            className={`w-full pl-12 pr-4 py-4 bg-black/30 backdrop-blur-sm text-white border border-white/20 rounded-2xl focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 placeholder-gray-400 transition-all duration-300 ${errors.phoneNumber ? 'border-red-500/50 focus:ring-red-500/50 focus:border-red-500/50' : ''
               }`}
             aria-label="Phone Number"
             required
           />
           {errors.phoneNumber && (
-            <p className="text-red-400 text-xs mt-1 ml-1">{errors.phoneNumber}</p>
+            <p className="text-red-300 text-xs mt-2 ml-1">{errors.phoneNumber}</p>
           )}
         </div>
 
         {/* Address Input */}
-        <div className="relative">
+        <div className="relative group">
           <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-            <MapPin className="text-gray-500" size={20} />
+            <MapPin className="text-gray-400 group-focus-within:text-blue-400 transition-colors duration-300" size={20} />
           </div>
           <input
             type="text"
@@ -498,13 +498,13 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onSwitchToLogin }) => {
             value={formData.address}
             onChange={handleInputChange}
             placeholder="Home Address"
-            className={`w-full pl-12 pr-4 py-3 bg-[#21262D] text-white border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 placeholder-gray-500 ${errors.address ? 'border-red-500' : 'border-gray-700'
+            className={`w-full pl-12 pr-4 py-4 bg-black/30 backdrop-blur-sm text-white border border-white/20 rounded-2xl focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 placeholder-gray-400 transition-all duration-300 ${errors.address ? 'border-red-500/50 focus:ring-red-500/50 focus:border-red-500/50' : ''
               }`}
             aria-label="Address"
             required
           />
           {errors.address && (
-            <p className="text-red-400 text-xs mt-1 ml-1">{errors.address}</p>
+            <p className="text-red-300 text-xs mt-2 ml-1">{errors.address}</p>
           )}
         </div>
 
@@ -549,7 +549,7 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onSwitchToLogin }) => {
         */}
 
         {/* Medical Conditions (Mandatory) */}
-        <div className="bg-[#1A1A1A] p-4 rounded-lg border border-gray-700">
+        <div className="bg-black/20 backdrop-blur-sm p-4 rounded-2xl border border-white/10">
           <h4 className="text-sm font-medium text-white mb-3">Medical Information *</h4>
 
           <div className="space-y-4">
@@ -561,12 +561,12 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onSwitchToLogin }) => {
                 onChange={handleInputChange}
                 placeholder="Please describe your current medical conditions (e.g., Hypertension, Diabetes, etc.)"
                 rows={3}
-                className={`w-full px-4 py-3 bg-[#21262D] text-white border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 placeholder-gray-500 resize-none ${errors.medicalConditions ? 'border-red-500' : 'border-gray-700'}`}
+                className={`w-full px-4 py-4 bg-black/30 backdrop-blur-sm text-white border border-white/20 rounded-2xl focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 placeholder-gray-400 resize-none transition-all duration-300 ${errors.medicalConditions ? 'border-red-500/50 focus:ring-red-500/50 focus:border-red-500/50' : ''}`}
                 aria-label="Medical Conditions"
                 required
               />
               {errors.medicalConditions && (
-                <p className="text-red-400 text-xs mt-1">{errors.medicalConditions}</p>
+                <p className="text-red-300 text-xs mt-2">{errors.medicalConditions}</p>
               )}
             </div>
 
@@ -578,7 +578,7 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onSwitchToLogin }) => {
                 value={formData.allergies}
                 onChange={handleInputChange}
                 placeholder="Known allergies (comma separated)"
-                className="w-full px-4 py-3 bg-[#21262D] text-white border border-gray-700 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 placeholder-gray-500"
+                className="w-full px-4 py-4 bg-black/30 backdrop-blur-sm text-white border border-white/20 rounded-2xl focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 placeholder-gray-400 transition-all duration-300"
                 aria-label="Allergies"
               />
             </div>
@@ -591,7 +591,7 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onSwitchToLogin }) => {
                 value={formData.currentMedications}
                 onChange={handleInputChange}
                 placeholder="Current medications (comma separated)"
-                className="w-full px-4 py-3 bg-[#21262D] text-white border border-gray-700 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 placeholder-gray-500"
+                className="w-full px-4 py-4 bg-black/30 backdrop-blur-sm text-white border border-white/20 rounded-2xl focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 placeholder-gray-400 transition-all duration-300"
                 aria-label="Current Medications"
               />
             </div>
@@ -599,13 +599,13 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onSwitchToLogin }) => {
         </div>
 
         {/* Emergency Contact Section */}
-        <div className="bg-[#1A1A1A] p-4 rounded-lg border border-gray-700">
+        <div className="bg-black/20 backdrop-blur-sm p-4 rounded-2xl border border-white/10">
           <h4 className="text-sm font-medium text-white mb-3">Emergency Contact</h4>
 
           <div className="space-y-4">
-            <div className="relative">
+            <div className="relative group">
               <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                <User className="text-gray-500" size={20} />
+                <User className="text-gray-400 group-focus-within:text-blue-400 transition-colors duration-300" size={20} />
               </div>
               <input
                 type="text"
@@ -613,19 +613,19 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onSwitchToLogin }) => {
                 value={formData.emergencyContactName}
                 onChange={handleInputChange}
                 placeholder="Emergency Contact Name"
-                className={`w-full pl-12 pr-4 py-3 bg-[#21262D] text-white border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 placeholder-gray-500 ${errors.emergencyContactName ? 'border-red-500' : 'border-gray-700'
+                className={`w-full pl-12 pr-4 py-4 bg-black/30 backdrop-blur-sm text-white border border-white/20 rounded-2xl focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 placeholder-gray-400 transition-all duration-300 ${errors.emergencyContactName ? 'border-red-500/50 focus:ring-red-500/50 focus:border-red-500/50' : ''
                   }`}
                 aria-label="Emergency Contact Name"
                 required
               />
               {errors.emergencyContactName && (
-                <p className="text-red-400 text-xs mt-1 ml-1">{errors.emergencyContactName}</p>
+                <p className="text-red-300 text-xs mt-2 ml-1">{errors.emergencyContactName}</p>
               )}
             </div>
 
-            <div className="relative">
+            <div className="relative group">
               <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                <Phone className="text-gray-500" size={20} />
+                <Phone className="text-gray-400 group-focus-within:text-blue-400 transition-colors duration-300" size={20} />
               </div>
               <input
                 type="tel"
@@ -633,22 +633,22 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onSwitchToLogin }) => {
                 value={formData.emergencyContactPhone}
                 onChange={handleInputChange}
                 placeholder="Emergency Contact Phone"
-                className={`w-full pl-12 pr-4 py-3 bg-[#21262D] text-white border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 placeholder-gray-500 ${errors.emergencyContactPhone ? 'border-red-500' : 'border-gray-700'
+                className={`w-full pl-12 pr-4 py-4 bg-black/30 backdrop-blur-sm text-white border border-white/20 rounded-2xl focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 placeholder-gray-400 transition-all duration-300 ${errors.emergencyContactPhone ? 'border-red-500/50 focus:ring-red-500/50 focus:border-red-500/50' : ''
                   }`}
                 aria-label="Emergency Contact Phone"
                 required
               />
               {errors.emergencyContactPhone && (
-                <p className="text-red-400 text-xs mt-1 ml-1">{errors.emergencyContactPhone}</p>
+                <p className="text-red-300 text-xs mt-2 ml-1">{errors.emergencyContactPhone}</p>
               )}
             </div>
           </div>
         </div>
 
         {/* Password Input */}
-        <div className="relative">
+        <div className="relative group">
           <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-            <Lock className="text-gray-500" size={20} />
+            <Lock className="text-gray-400 group-focus-within:text-blue-400 transition-colors duration-300" size={20} />
           </div>
           <input
             type={showPassword ? 'text' : 'password'}
@@ -656,7 +656,7 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onSwitchToLogin }) => {
             value={formData.password}
             onChange={handleInputChange}
             placeholder="Password"
-            className={`w-full pl-12 pr-12 py-3 bg-[#21262D] text-white border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 placeholder-gray-500 ${errors.password ? 'border-red-500' : 'border-gray-700'
+            className={`w-full pl-12 pr-12 py-4 bg-black/30 backdrop-blur-sm text-white border border-white/20 rounded-2xl focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 placeholder-gray-400 transition-all duration-300 ${errors.password ? 'border-red-500/50 focus:ring-red-500/50 focus:border-red-500/50' : ''
               }`}
             aria-label="Password"
             required
@@ -664,19 +664,19 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onSwitchToLogin }) => {
           <button
             type="button"
             onClick={() => setShowPassword(!showPassword)}
-            className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-500 hover:text-gray-300"
+            className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-400 hover:text-gray-300 transition-colors duration-200"
           >
             {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
           </button>
           {errors.password && (
-            <p className="text-red-400 text-xs mt-1 ml-1">{errors.password}</p>
+            <p className="text-red-300 text-xs mt-2 ml-1">{errors.password}</p>
           )}
         </div>
 
         {/* Confirm Password Input */}
-        <div className="relative">
+        <div className="relative group">
           <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-            <Lock className="text-gray-500" size={20} />
+            <Lock className="text-gray-400 group-focus-within:text-blue-400 transition-colors duration-300" size={20} />
           </div>
           <input
             type={showConfirmPassword ? 'text' : 'password'}
@@ -684,7 +684,7 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onSwitchToLogin }) => {
             value={formData.confirmPassword}
             onChange={handleInputChange}
             placeholder="Confirm Password"
-            className={`w-full pl-12 pr-12 py-3 bg-[#21262D] text-white border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 placeholder-gray-500 ${errors.confirmPassword ? 'border-red-500' : 'border-gray-700'
+            className={`w-full pl-12 pr-12 py-4 bg-black/30 backdrop-blur-sm text-white border border-white/20 rounded-2xl focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 placeholder-gray-400 transition-all duration-300 ${errors.confirmPassword ? 'border-red-500/50 focus:ring-red-500/50 focus:border-red-500/50' : ''
               }`}
             aria-label="Confirm Password"
             required
@@ -692,12 +692,12 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onSwitchToLogin }) => {
           <button
             type="button"
             onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-            className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-500 hover:text-gray-300"
+            className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-400 hover:text-gray-300 transition-colors duration-200"
           >
             {showConfirmPassword ? <EyeOff size={20} /> : <Eye size={20} />}
           </button>
           {errors.confirmPassword && (
-            <p className="text-red-400 text-xs mt-1 ml-1">{errors.confirmPassword}</p>
+            <p className="text-red-300 text-xs mt-2 ml-1">{errors.confirmPassword}</p>
           )}
         </div>
 
@@ -705,7 +705,7 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onSwitchToLogin }) => {
         <button
           type="submit"
           disabled={loading}
-          className="w-full bg-[#238636] text-white font-semibold py-3 rounded-lg hover:bg-[#2EA043] transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-[#161B22] focus:ring-green-500 mt-2 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          className="w-full bg-gradient-to-r from-blue-600 to-blue-700 text-white font-semibold py-4 rounded-2xl hover:from-blue-700 hover:to-blue-800 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-transparent focus:ring-blue-500 mt-4 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3 shadow-lg hover:shadow-xl transform hover:scale-[1.02] active:scale-[0.98]"
         >
           {loading ? (
             <>
@@ -719,12 +719,12 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onSwitchToLogin }) => {
       </form>
 
       {/* Switch to Login */}
-      <div className="text-center mt-6">
-        <p className="text-sm text-gray-500">
+      <div className="text-center mt-8">
+        <p className="text-sm text-gray-300">
           Already have an account?{' '}
           <button
             onClick={onSwitchToLogin}
-            className="font-medium text-[#58A6FF] hover:underline focus:outline-none"
+            className="font-medium text-blue-400 hover:text-blue-300 hover:underline focus:outline-none transition-colors duration-200"
           >
             Sign in here
           </button>

@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Wifi, WifiOff, Battery, Activity, Heart, Droplets, Wind, Settings, Info, Loader2, Bluetooth, Plus, BarChart3 } from 'lucide-react';
+import { ArrowLeft, Wifi, WifiOff, Battery, Activity, Heart, Droplets, Wind, Settings, Info, Loader2, Bluetooth, Plus, BarChart3, Video, Camera, Shield } from 'lucide-react';
 import { MobileAppContainer } from '@/components/MobileAppContainer';
 import { useHealthData } from '@/hooks/useHealthData';
 import { Device } from '@/lib/api';
@@ -114,6 +114,10 @@ const DeviceList = () => {
     const navigate = useNavigate();
     const { toast } = useToast();
     const { devices, loading, error } = useHealthData();
+    
+    // Camera settings state
+    const [cameraSerialNumber, setCameraSerialNumber] = useState('');
+    const [cameraPermissionEnabled, setCameraPermissionEnabled] = useState(false);
 
     const handleBack = () => {
         navigate('/dashboard');
@@ -209,6 +213,75 @@ const DeviceList = () => {
                                     <Bluetooth className="h-4 w-4" />
                                     Connect BP2
                                 </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Camera Settings Section */}
+                    <div className="mb-6">
+                        <div className="bg-gradient-to-r from-purple-500/20 to-pink-500/20 border border-purple-500/30 rounded-2xl p-4">
+                            <div className="mb-4">
+                                <div className="flex items-center gap-3 mb-4">
+                                    <div className="bg-purple-500/20 p-3 rounded-full">
+                                        <Video className="h-6 w-6 text-purple-400" />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-lg font-semibold text-white">Camera Settings</h3>
+                                        <p className="text-sm text-gray-400">Configure camera device and permissions</p>
+                                    </div>
+                                </div>
+                                
+                                {/* Serial Number Input */}
+                                <div className="mb-4">
+                                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                                        Camera Serial Number
+                                    </label>
+                                    <div className="relative">
+                                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                            <Camera className="h-4 w-4 text-gray-400" />
+                                        </div>
+                                        <input
+                                            type="text"
+                                            value={cameraSerialNumber}
+                                            onChange={(e) => setCameraSerialNumber(e.target.value)}
+                                            placeholder="Enter camera serial number"
+                                            className="w-full pl-10 pr-4 py-2.5 bg-black/30 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all duration-200"
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* Camera Permission Toggle */}
+                                <div className="flex items-center justify-between p-3 bg-black/20 rounded-lg border border-gray-600">
+                                    <div className="flex items-center gap-3">
+                                        <div className="bg-purple-500/20 p-2 rounded-full">
+                                            <Shield className="h-4 w-4 text-purple-400" />
+                                        </div>
+                                        <div>
+                                            <p className="text-sm font-medium text-white">Phone Camera Permission</p>
+                                            <p className="text-xs text-gray-400">Allow access to device camera</p>
+                                        </div>
+                                    </div>
+                                    <button
+                                        onClick={() => {
+                                            setCameraPermissionEnabled(!cameraPermissionEnabled);
+                                            toast({
+                                                title: cameraPermissionEnabled ? "Camera Permission Disabled" : "Camera Permission Enabled",
+                                                description: cameraPermissionEnabled 
+                                                    ? "Camera access has been revoked" 
+                                                    : "Camera access has been granted",
+                                            });
+                                        }}
+                                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 ${
+                                            cameraPermissionEnabled ? 'bg-purple-600' : 'bg-gray-600'
+                                        }`}
+                                    >
+                                        <span
+                                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-200 ${
+                                                cameraPermissionEnabled ? 'translate-x-6' : 'translate-x-1'
+                                            }`}
+                                        />
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
