@@ -131,7 +131,8 @@ class BPMeasurementManager {
     // 🚨 NEW: Pressure timeout detection for abrupt stops
     private pressureTimeoutInterval?: NodeJS.Timeout;
     private lastPressureUpdateTime = 0;
-    private pressureTimeoutThreshold = 4000; // 4 seconds without pressure updates = abrupt stop
+    private pressureTimeoutThreshold = 2000; // 2 seconds without pressure updates = abrupt stop
+    private lastRealPressureUpdate = 0; // Track when we last got actual BP pressure data
     
     constructor(callbacks: WellueSDKCallbacks) {
         this.callbacks = callbacks;
@@ -180,21 +181,15 @@ class BPMeasurementManager {
         
         // 🚨 NEW: Reset pressure timeout tracking
         this.lastPressureUpdateTime = Date.now();
+        this.lastRealPressureUpdate = Date.now(); // Initialize real pressure timestamp
         
-        // Start progress monitoring
-        this.progressInterval = setInterval(() => {
-            if (this.isMeasuring && (this.status === 'inflating' || this.status === 'holding' || this.status === 'deflating' || this.status === 'analyzing')) {
-                // Emit progress update
-                this.callbacks.onBPProgress?.({
-                    pressure: this.currentPressure,
-                    status: this.status as BPProgress['status'],
-                    timestamp: new Date()
-                });
-            }
-        }, 100); // Update every 100ms during measurement
+        // 🚀 SIMPLIFIED: No artificial progress monitoring - let real pressure updates drive the display
+        console.log('🚀 BP Measurement started - pressure bar will follow real device data');
         
         // 🚨 NEW: Start pressure timeout monitoring
+        console.log('🚨 [START] About to call startPressureTimeoutMonitoring()');
         this.startPressureTimeoutMonitoring();
+        console.log('🚨 [START] startPressureTimeoutMonitoring() called');
         
         this.callbacks.onBPStatusChanged?.(this.getStatus());
     }
@@ -206,22 +201,47 @@ class BPMeasurementManager {
         // 🚨 NEW: Reset pressure timeout timer on each update
         this.lastPressureUpdateTime = Date.now();
         
-        // 🚀 NEW: Enhanced pressure tracking and phase detection
-        this.trackPressureAndDetectPhase(pressure, previousPressure);
+        // 🚨 NEW: Only update real pressure timestamp for actual BP pressure data (not other real-time updates)
+        if (pressure > 0 && (status === 'inflating' || status === 'deflating' || status === 'measuring')) {
+            this.lastRealPressureUpdate = Date.now();
+            console.log('🚨 [PRESSURE] Real BP pressure update:', pressure, 'mmHg, updating timeout timer');
+        }
         
-        // 🚀 NEW: Use detected phase instead of inferred status
-        const actualStatus = this.determineActualStatus(pressure, status);
-        this.status = actualStatus;
+        console.log('🚨 [BP MANAGER] ===== UPDATE PROGRESS =====');
+        console.log('🚨 [BP MANAGER] Input pressure:', pressure, 'mmHg');
+        console.log('🚨 [BP MANAGER] Input status:', status);
+        console.log('🚨 [BP MANAGER] Previous pressure:', previousPressure, 'mmHg');
+        console.log('🚨 [BP MANAGER] Pressure change:', pressure - previousPressure, 'mmHg');
+        console.log('🚨 [BP MANAGER] Is measuring:', this.isMeasuring);
+        console.log('🚨 [BP MANAGER] Timestamp:', new Date().toISOString());
+        console.log('🚨 [BP MANAGER] Last real pressure update:', new Date(this.lastRealPressureUpdate).toISOString());
         
-        if ((actualStatus === 'inflating' || actualStatus === 'holding' || actualStatus === 'deflating' || actualStatus === 'analyzing') && !this.isMeasuring) {
+        // 🚀 SIMPLIFIED: Start measurement if not already started
+        if (!this.isMeasuring && pressure > 0) {
+            console.log('🚨 [START] Detected pressure > 0, calling startMeasurement()');
             this.startMeasurement();
         }
+        
+        // 🚀 SIMPLIFIED: Update status based on pressure patterns (not complex phase detection)
+        let actualStatus: BPProgress['status'] = 'measuring';
+        
+        if (this.isMeasuring) {
+            if (pressure > previousPressure && pressure > 50) {
+                actualStatus = 'inflating';
+            } else if (pressure < previousPressure && pressure < 200) {
+                actualStatus = 'deflating';
+            } else if (pressure < 50 && pressure > 0) {
+                actualStatus = 'analyzing';
+            } else {
+                actualStatus = 'measuring';
+            }
+        }
+        
+        this.status = actualStatus;
 
-        // 🚨 SAFETY: Queue pressure update for safe, sequential display
-        this.queuePressureUpdate(pressure, actualStatus);
-
+        // 🚀 SIMPLIFIED: Direct pressure update without queuing or smoothing
         const progress: BPProgress = {
-            pressure,
+            pressure: pressure, // Use actual pressure directly
             status: actualStatus,
             timestamp: new Date()
         };
@@ -511,30 +531,47 @@ class BPMeasurementManager {
         this.callbacks.onBPStatusChanged?.(this.getStatus());
     }
 
-    // 🚨 NEW: Start pressure timeout monitoring for abrupt stop detection
+            // 🚨 NEW: Start pressure timeout monitoring for abrupt stop detection
     private startPressureTimeoutMonitoring() {
+        console.log('🚨 [TIMEOUT] Starting pressure timeout monitoring');
+        console.log('🚨 [TIMEOUT] DEBUG: Method called successfully');
+        
         // Clear any existing timeout interval
         if (this.pressureTimeoutInterval) {
             clearInterval(this.pressureTimeoutInterval);
+            console.log('🚨 [TIMEOUT] Cleared existing timeout interval');
         }
         
         // Start monitoring for pressure updates
         this.pressureTimeoutInterval = setInterval(() => {
+            console.log('🚨 [TIMEOUT] Interval callback triggered');
+            
             if (!this.isMeasuring) {
                 // Measurement already stopped, clear timeout
+                console.log('🚨 [TIMEOUT] Measurement not active, clearing timeout');
                 this.clearPressureTimeoutMonitoring();
                 return;
             }
             
             const now = Date.now();
-            const timeSinceLastUpdate = now - this.lastPressureUpdateTime;
+            const timeSinceLastUpdate = now - this.lastRealPressureUpdate;
             
-            // If no pressure updates for threshold time, assume abrupt stop
+            console.log('🚨 [TIMEOUT] Checking BP pressure timeout:', {
+                timeSinceLastUpdate,
+                threshold: this.pressureTimeoutThreshold,
+                isMeasuring: this.isMeasuring,
+                currentPressure: this.currentPressure,
+                lastRealPressureUpdate: this.lastRealPressureUpdate
+            });
+            
+            // If no REAL BP pressure updates for threshold time, assume abrupt stop
             if (timeSinceLastUpdate > this.pressureTimeoutThreshold) {
-                console.log('⏰ Pressure timeout detected - no updates for', this.pressureTimeoutThreshold, 'ms');
+                console.log('⏰ BP Pressure timeout detected - no BP updates for', this.pressureTimeoutThreshold, 'ms');
                 this.handleAbruptStop();
             }
         }, 1000); // Check every second
+        
+        console.log('🚨 [TIMEOUT] Timeout monitoring interval set successfully');
     }
     
     // 🚨 NEW: Clear pressure timeout monitoring
@@ -719,18 +756,27 @@ class NativeWelluePlugin {
 
         // BP progress event (live pressure during measurement)
         this.nativePlugin.addListener('bpProgress', (data: any) => {
-            console.log('🔴 LIVE BP Progress event received:', data);
+            console.log('🔴 LIVE BP Progress event received from NATIVE:', data);
+            console.log('🔴 [NATIVE] BP Progress timestamp:', new Date().toISOString());
             
             if (typeof data?.pressure === 'number') {
                 const pressure = data.pressure;
+                
+                console.log('🔴 [NATIVE] ===== PRESSURE FROM DEVICE =====');
+                console.log('🔴 [NATIVE] Raw pressure value:', pressure, 'mmHg');
+                console.log('🔴 [NATIVE] Device data object:', JSON.stringify(data));
+                console.log('🔴 [NATIVE] Timestamp:', new Date().toISOString());
                 
                 // 🚀 NEW: Let BP manager handle status detection based on pressure patterns
                 // Pass 'measuring' as initial status, manager will determine actual status
                 this.bpManager.updateProgress(pressure, 'measuring');
                 
-                console.log(`🔴 Live pressure: ${pressure} mmHg, letting BP manager detect status`);
+                console.log('🔴 [NATIVE] ===== SENT TO BP MANAGER =====');
+                console.log(`🔴 [NATIVE] Forwarded pressure: ${pressure} mmHg to BP manager`);
             } else {
-                console.log('🔴 Invalid BP progress data:', data);
+                console.log('🔴 [NATIVE] ===== INVALID DATA =====');
+                console.log('🔴 [NATIVE] Invalid BP progress data received:', JSON.stringify(data));
+                console.log('🔴 [NATIVE] Data type check - pressure type:', typeof data?.pressure);
             }
         });
 

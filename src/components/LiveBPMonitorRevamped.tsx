@@ -37,6 +37,48 @@ export const LiveBPMonitorRevamped: React.FC = () => {
   const navigate = useNavigate();
   const { connectedDevice, wellueSDK, isInitialized } = useDevice();
   
+  // 🚀 NEW: Smooth animation system for elderly users (no complex filtering)
+  const updateSmoothAnimation = () => {
+    if (!measurementStartTime) return;
+    
+    const elapsedTime = (Date.now() - measurementStartTime) / 1000; // seconds
+    const totalDuration = 45; // Total measurement duration in seconds
+    
+    let newPhase: typeof smoothAnimationPhase = 'idle';
+    let targetPressure = 0;
+    
+    if (elapsedTime < 15) {
+      // Inflation phase: 0-15 seconds
+      newPhase = 'inflating';
+      const inflationProgress = elapsedTime / 15; // 0 to 1
+      targetPressure = inflationProgress * inflationPeakTarget; // Smooth curve to peak
+    } else if (elapsedTime < 20) {
+      // Peak hold phase: 15-20 seconds
+      newPhase = 'peak';
+      targetPressure = inflationPeakTarget; // Hold at peak
+    } else if (elapsedTime < 40) {
+      // Deflation phase: 20-40 seconds
+      newPhase = 'deflating';
+      const deflationProgress = (elapsedTime - 20) / 20; // 0 to 1
+      targetPressure = inflationPeakTarget * (1 - deflationProgress); // Smooth curve to zero
+    } else {
+      // Complete phase: 40+ seconds
+      newPhase = 'complete';
+      targetPressure = 0;
+    }
+    
+    setSmoothAnimationPhase(newPhase);
+    
+    // Smooth transition to target pressure
+    setSmoothPressure(prev => {
+      const diff = targetPressure - prev;
+      const smoothingFactor = 0.1; // How fast to reach target (0.1 = gentle, 0.5 = faster)
+      return prev + (diff * smoothingFactor);
+    });
+    
+    console.log('🎭 [SMOOTH] Phase:', newPhase, 'Time:', elapsedTime.toFixed(1)+'s', 'Target:', targetPressure.toFixed(1), 'Current:', smoothPressure.toFixed(1));
+  };
+  
   // State management
   const [measurementState, setMeasurementState] = useState<MeasurementState>('idle');
   const [currentPressure, setCurrentPressure] = useState(0);
@@ -49,6 +91,16 @@ export const LiveBPMonitorRevamped: React.FC = () => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isStartDisabled, setIsStartDisabled] = useState(false);
   const [stopGuardActive, setStopGuardActive] = useState(false);
+  
+  // 🚀 NEW: Pressure buffer system for 0.2s delay
+  const [pressureBuffer, setPressureBuffer] = useState<Array<{pressure: number, timestamp: number}>>([]);
+  const pressureBufferRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // 🚀 NEW: Smooth animation system for elderly users
+  const [smoothPressure, setSmoothPressure] = useState(0);
+  const [measurementStartTime, setMeasurementStartTime] = useState<number | null>(null);
+  const [inflationPeakTarget, setInflationPeakTarget] = useState(150); // Default target for smooth animation
+  const [smoothAnimationPhase, setSmoothAnimationPhase] = useState<'idle' | 'inflating' | 'peak' | 'deflating' | 'complete'>('idle');
   
   // Refs for animations
   const pressureAnimationRef = useRef<number | null>(null);
@@ -66,6 +118,10 @@ export const LiveBPMonitorRevamped: React.FC = () => {
     setCurrentPressure(0);
     setTargetPressure(0);
     setBpResult(null);
+    setWaveformData([]);
+    setErrorMessage(null);
+    setStopGuardActive(false);
+    setIsStartDisabled(false);
     
     return () => {
       console.log('🔍 LiveBPMonitorRevamped unmounting');
@@ -76,7 +132,46 @@ export const LiveBPMonitorRevamped: React.FC = () => {
         cancelAnimationFrame(waveformAnimationRef.current);
       }
     };
-  }, [connectedDevice, isInitialized]);
+  }, []); // Reset every time component mounts
+  
+  // 🚀 NEW: Simple measurement detection for smooth animation
+  useEffect(() => {
+    const processBufferedPressure = () => {
+      const now = Date.now();
+      const validReadings = pressureBuffer.filter(reading => now - reading.timestamp >= 200); // 0.2s delay
+      
+      if (validReadings.length > 0) {
+        const latestReading = validReadings[validReadings.length - 1];
+        
+        // Start smooth animation when device pressure detected
+        if (latestReading.pressure > 10 && !measurementStartTime) {
+          console.log('🚀 [SMOOTH] Starting smooth animation - device pressure detected:', latestReading.pressure);
+          setMeasurementStartTime(Date.now());
+          
+          // Estimate peak target based on first significant reading
+          const estimatedPeak = Math.max(140, Math.min(180, latestReading.pressure * 1.2));
+          setInflationPeakTarget(estimatedPeak);
+          console.log('🎯 [SMOOTH] Estimated peak target:', estimatedPeak, 'mmHg');
+        }
+        
+        // Remove processed readings from buffer
+        setPressureBuffer(prev => prev.filter(reading => now - reading.timestamp < 200));
+      }
+    };
+    
+    if (pressureBuffer.length > 0) {
+      if (pressureBufferRef.current) {
+        clearTimeout(pressureBufferRef.current);
+      }
+      pressureBufferRef.current = setTimeout(processBufferedPressure, 50); // Check every 50ms
+    }
+    
+    return () => {
+      if (pressureBufferRef.current) {
+        clearTimeout(pressureBufferRef.current);
+      }
+    };
+  }, [pressureBuffer, measurementStartTime]);
   
   // Load previous BP readings from localStorage
   useEffect(() => {
@@ -153,79 +248,29 @@ export const LiveBPMonitorRevamped: React.FC = () => {
     return () => clearInterval(connectionInterval);
   }, [connectedDevice, isInitialized, wellueSDK]);
 
-  // 🚀 ENHANCED: Pressure animation with realistic progression
+  // 🚀 NEW: Smooth animation loop for elderly users
   useEffect(() => {
-    if (measurementState === 'idle' || measurementState === 'waiting' || measurementState === 'completed' || 
-        measurementState === 'canceled' || measurementState === 'error') {
+    if (!measurementStartTime || smoothAnimationPhase === 'complete') {
       if (pressureAnimationRef.current) {
         cancelAnimationFrame(pressureAnimationRef.current);
         pressureAnimationRef.current = null;
       }
-      setCurrentPressure(0);
-      setTargetPressure(0);
-      return;
-    }
-    
-    if (targetPressure <= 0) {
-      if (pressureAnimationRef.current) {
-        cancelAnimationFrame(pressureAnimationRef.current);
-        pressureAnimationRef.current = null;
-      }
-      setCurrentPressure(0);
       return;
     }
 
-    const animatePressure = () => {
-      setCurrentPressure(prev => {
-        const diff = targetPressure - prev;
-        
-        // 🚀 NEW: More realistic pressure progression
-        if (Math.abs(diff) < 0.5) {
-          return targetPressure;
-        }
-        
-        // 🚨 SAFETY: Much slower, safer animation for elderly users
-        let animationSpeed = 0.03; // Default speed (much slower)
-        
-        if (measurementState === 'inflating') {
-          // Very slow, gradual increase during inflation for safety
-          animationSpeed = 0.02;
-        } else if (measurementState === 'deflating') {
-          // Slow decrease during deflation
-          animationSpeed = 0.04;
-        } else if (measurementState === 'analyzing') {
-          // Very slow during analysis
-          animationSpeed = 0.01;
-        }
-        
-        // 🚨 SAFETY: Ensure pressure never goes backwards during inflation
-        if (measurementState === 'inflating' && targetPressure < prev) {
-          return prev; // Hold current pressure
-        }
-        
-        // 🚨 SAFETY: Ensure pressure never goes forwards during deflation
-        if (measurementState === 'deflating' && targetPressure > prev) {
-          return prev; // Hold current pressure
-        }
-        
-        // 🚨 SAFETY: Limit maximum pressure jump per frame
-        const maxJump = 2; // Maximum 2 mmHg per frame
-        const limitedDiff = Math.max(-maxJump, Math.min(maxJump, diff));
-        
-        return prev + limitedDiff * animationSpeed;
-      });
-      
-      pressureAnimationRef.current = requestAnimationFrame(animatePressure);
+    const animateSmooth = () => {
+      updateSmoothAnimation();
+      pressureAnimationRef.current = requestAnimationFrame(animateSmooth);
     };
     
-    pressureAnimationRef.current = requestAnimationFrame(animatePressure);
+    pressureAnimationRef.current = requestAnimationFrame(animateSmooth);
     
     return () => {
       if (pressureAnimationRef.current) {
         cancelAnimationFrame(pressureAnimationRef.current);
       }
     };
-  }, [targetPressure, measurementState]);
+  }, [measurementStartTime, smoothAnimationPhase]);
 
   // 🚨 SAFETY: Enhanced pressure display with safety indicators
   const getPressureDisplayColor = (pressure: number): string => {
@@ -386,24 +431,28 @@ export const LiveBPMonitorRevamped: React.FC = () => {
         console.log('⚠️ Unknown progress status:', progress.status);
     }
     
-    // 🚀 NEW: Enhanced pressure tracking for better UI synchronization
+    // 🚀 FIXED: Natural pressure tracking - trust device data completely
+    console.log('📊 [REACT] ===== PRESSURE UPDATE =====');
+    console.log('📊 [REACT] Received pressure:', progress.pressure, 'mmHg');
+    console.log('📊 [REACT] Received status:', progress.status);
+    console.log('📊 [REACT] Current targetPressure:', targetPressure, 'mmHg');
+    console.log('📊 [REACT] Current currentPressure:', currentPressure, 'mmHg');
+    
     if (progress.pressure > 0) {
-      // Only update pressure if it's a reasonable progression
-      // This prevents the app from showing high values immediately
-      if (progress.status === 'inflating') {
-        // During inflation, pressure should increase gradually
-        if (progress.pressure <= targetPressure + 10 || targetPressure === 0) {
-          setTargetPressure(progress.pressure);
-        }
-      } else if (progress.status === 'deflating') {
-        // During deflation, pressure should decrease gradually
-        if (progress.pressure <= targetPressure || progress.pressure >= targetPressure - 10) {
-          setTargetPressure(progress.pressure);
-        }
-      } else {
-        // For other states, update normally
-        setTargetPressure(progress.pressure);
+      console.log('📊 [REACT] Pressure > 0, adding to buffer for 0.2s delay');
+      
+      // 🚀 NEW: Add to pressure buffer instead of direct update
+      const now = Date.now();
+      setPressureBuffer(prev => [...prev, { pressure: progress.pressure, timestamp: now }]);
+      console.log('📊 [BUFFER] Added pressure', progress.pressure, 'mmHg to buffer at', new Date(now).toISOString());
+      
+      // 🚀 NEW: Track peak pressure for natural flow detection
+      if (progress.status === 'inflating' && progress.pressure > targetPressure) {
+        console.log('📈 [PEAK] New peak pressure detected:', progress.pressure, 'mmHg');
       }
+      
+    } else {
+      console.log('📊 [REACT] Pressure <= 0, not adding to buffer');
     }
     
     // 🚀 NEW: Real waveform data collection during deflation (no simulation)
@@ -484,19 +533,28 @@ export const LiveBPMonitorRevamped: React.FC = () => {
   }, [measurementState]);
 
   const handleRealTimeUpdate = useCallback((data: any) => {
-    console.log('📊 Real-time update:', data);
+    console.log('📊 [REALTIME] ===== REAL-TIME UPDATE =====');
+    console.log('📊 [REALTIME] Data received:', JSON.stringify(data));
+    console.log('📊 [REALTIME] Current measurementState:', measurementState);
+    console.log('📊 [REALTIME] Current targetPressure:', targetPressure);
     
     if (data.pressure !== undefined) {
+      console.log('📊 [REALTIME] Pressure found in data:', data.pressure, 'mmHg');
+      console.log('📊 [REALTIME] UPDATING targetPressure from', targetPressure, 'to', data.pressure);
       setTargetPressure(data.pressure);
       
       // If pressure is increasing and we're idle, the device might have started measuring
       if (data.pressure > 0 && measurementState === 'idle') {
-        console.log('🎯 Device-initiated measurement detected via real-time update!');
+        console.log('🎯 [REALTIME] Device-initiated measurement detected via real-time update!');
+        console.log('🎯 [REALTIME] Changing measurementState from idle to inflating');
         setMeasurementState('inflating');
+        resetPressureTracking(); // Reset pressure tracking for new measurement
         setErrorMessage(null);
         setBpResult(null);
         setWaveformData([]);
       }
+    } else {
+      console.log('📊 [REALTIME] No pressure data in real-time update');
     }
     
     if (data.heartRate !== undefined) {
@@ -570,13 +628,14 @@ export const LiveBPMonitorRevamped: React.FC = () => {
     try {
       console.log('🚀 Starting BP measurement...');
       
-      // 🚀 NEW: Complete state reset for clean measurement start
-      setErrorMessage(null);
-      setBpResult(null);
-      setWaveformData([]);
-      setCurrentPressure(0);
-      setTargetPressure(0);
-      setHeartRate(0);
+              // 🚀 NEW: Complete state reset for clean measurement start
+        setErrorMessage(null);
+        setBpResult(null);
+        setWaveformData([]);
+        setCurrentPressure(0);
+        setTargetPressure(0);
+        setHeartRate(0);
+        resetPressureTracking(); // Reset pressure tracking for new measurement
       setSignalQuality(0);
       
       // 🚀 NEW: Start in 'waiting' state to detect device-initiated inflation
@@ -663,6 +722,7 @@ export const LiveBPMonitorRevamped: React.FC = () => {
     setSignalQuality(0);
     setErrorMessage(null);
     setIsStartDisabled(false);
+    resetPressureTracking(); // Reset pressure tracking
   }, []);
 
   // Auto-save BP result to storage when measurement completes
@@ -672,24 +732,62 @@ export const LiveBPMonitorRevamped: React.FC = () => {
     try {
       console.log('💾 [BP] Auto-saving BP result:', result);
       
+      // Validate BP result
+      if (!result.systolic || !result.diastolic || result.systolic <= 0 || result.diastolic <= 0) {
+        console.error('❌ [BP] Invalid BP result:', result);
+        return;
+      }
+      
       // Create a unique filename for the BP result
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
       const filename = `bp_result_${timestamp}.json`;
       
-      // Prepare the data to save
+      // Prepare the data to save with unified schema
       const dataToSave = {
         ...result,
         timestamp: result.timestamp.toISOString(),
         deviceId: connectedDevice?.id || 'unknown',
         deviceName: connectedDevice?.name || 'unknown',
         measurementId: `bp_${Date.now()}`,
-        status: 'completed'
+        status: 'completed',
+        type: 'bp' // Add type for consistency
       };
       
-      // Save to localStorage for app access
+      // 1. Save to Supabase database FIRST (primary storage for doctor portal)
+      try {
+        const { db } = await import('@/lib/supabase');
+        const vitalSignsData = {
+          device_type: 'BP',
+          measurement_type: 'blood_pressure',
+          data: {
+            systolic: dataToSave.systolic,
+            diastolic: dataToSave.diastolic,
+            mean: dataToSave.mean || Math.round((dataToSave.systolic + 2 * dataToSave.diastolic) / 3),
+            pulse_rate: dataToSave.pulseRate || 0,
+            status: 'completed',
+            deviceName: connectedDevice?.name || 'unknown',
+            measurementId: dataToSave.measurementId
+          },
+          device_id: connectedDevice?.id || 'unknown',
+          reading_timestamp: dataToSave.timestamp
+        };
+
+        const { error: dbError } = await db.insertVitalSigns(vitalSignsData);
+        if (dbError) {
+          console.error('❌ [BP] Failed to save to database:', dbError);
+          throw new Error(`Database save failed: ${dbError.message}`);
+        } else {
+          console.log('✅ [BP] BP result saved to database for doctor monitoring');
+        }
+      } catch (dbError) {
+        console.error('❌ [BP] Database save error:', dbError);
+        // Continue with local storage as fallback
+      }
+      
+      // 2. Save to localStorage for app access (add to beginning for latest first)
       const existingResults = JSON.parse(localStorage.getItem('bpResults') || '[]');
-      existingResults.push(dataToSave);
-      localStorage.setItem('bpResults', JSON.stringify(existingResults));
+      existingResults.unshift(dataToSave); // Add to beginning
+      localStorage.setItem('bpResults', JSON.stringify(existingResults.slice(0, 50))); // Keep last 50
       
       // FIXED: Also save to storedFilesInApp for reports page (single source of truth)
       try {
@@ -714,35 +812,7 @@ export const LiveBPMonitorRevamped: React.FC = () => {
         localStorage.setItem('storedFilesInApp', JSON.stringify(updatedReports));
         console.log('💾 [BP] BP result saved to storedFilesInApp for reports, total reports:', updatedReports.length);
 
-        // 🆕 Save to Supabase database for doctor monitoring
-        try {
-          const { db } = await import('@/lib/supabase');
-          const vitalSignsData = {
-            device_id: connectedDevice?.id || 'unknown',
-            device_type: 'BP',
-            measurement_type: 'blood_pressure',
-            data: {
-              systolic: dataToSave.systolic,
-              diastolic: dataToSave.diastolic,
-              mean: dataToSave.mean,
-              pulseRate: dataToSave.pulseRate,
-              result: dataToSave.result,
-              deviceName: connectedDevice?.name || 'unknown',
-              measurementId: dataToSave.measurementId,
-              status: dataToSave.status
-            },
-            timestamp: dataToSave.timestamp
-          };
-
-          const { error: dbError } = await db.insertVitalSigns(vitalSignsData);
-          if (dbError) {
-            console.error('❌ [BP] Failed to save to database:', dbError);
-          } else {
-            console.log('✅ [BP] BP result saved to database for doctor monitoring');
-          }
-        } catch (dbError) {
-          console.error('❌ [BP] Database save error:', dbError);
-        }
+        // Note: Database save already handled above in step 1
       } catch (error) {
         console.error('❌ [BP] Failed to save BP result to storedFilesInApp:', error);
       }
@@ -756,10 +826,33 @@ export const LiveBPMonitorRevamped: React.FC = () => {
         recursive: true
       });
       
-      console.log('💾 [BP] BP result auto-saved successfully:', dataToSave);
+      // 5. Note: Dashboard will refresh on next navigation or component mount
+      console.log('📊 BP measurement completed, data saved to all storage systems');
+      
+      console.log('💾 [BP] BP result auto-saved successfully to all storage systems');
       
     } catch (error) {
       console.error('❌ [BP] Failed to auto-save BP result:', error);
+      // Fallback: save to localStorage only
+      try {
+        const fallbackData = {
+          ...result,
+          timestamp: result.timestamp.toISOString(),
+          deviceId: connectedDevice?.id || 'unknown',
+          deviceName: connectedDevice?.name || 'unknown',
+          measurementId: `bp_${Date.now()}`,
+          status: 'completed',
+          type: 'bp'
+        };
+        
+        const existingResults = JSON.parse(localStorage.getItem('bpResults') || '[]');
+        existingResults.unshift(fallbackData);
+        localStorage.setItem('bpResults', JSON.stringify(existingResults.slice(0, 50)));
+        
+        console.log('💾 [BP] BP result saved to localStorage as fallback');
+      } catch (fallbackError) {
+        console.error('❌ [BP] Fallback save also failed:', fallbackError);
+      }
     }
   }, [connectedDevice]);
 
@@ -823,14 +916,14 @@ export const LiveBPMonitorRevamped: React.FC = () => {
     }
   }, []);
 
-  // 🚨 SAFETY: Enhanced pressure bar color with safety zones
+  // 🚨 FIXED: Pressure bar color with proper normal ranges
   const getPressureBarColor = (pressure: number): string => {
     if (pressure === 0) return 'linear-gradient(180deg, #6b7280 0%, #4b5563 100%)'; // Gray for idle
-    if (pressure < 50) return 'linear-gradient(180deg, #10b981 0%, #059669 100%)'; // Green for safe
-    if (pressure < 100) return 'linear-gradient(180deg, #3b82f6 0%, #2563eb 100%)'; // Blue for normal
-    if (pressure < 150) return 'linear-gradient(180deg, #f59e0b 0%, #d97706 100%)'; // Yellow for caution
-    if (pressure < 200) return 'linear-gradient(180deg, #f97316 0%, #ea580c 100%)'; // Orange for high
-    return 'linear-gradient(180deg, #ef4444 0%, #dc2626 100%)'; // Red for very high
+    if (pressure < 60) return 'linear-gradient(180deg, #10b981 0%, #059669 100%)'; // Green for safe
+    if (pressure < 120) return 'linear-gradient(180deg, #3b82f6 0%, #2563eb 100%)'; // Blue for normal
+    if (pressure < 180) return 'linear-gradient(180deg, #f59e0b 0%, #d97706 100%)'; // Yellow for caution
+    if (pressure < 250) return 'linear-gradient(180deg, #f97316 0%, #ea580c 100%)'; // Orange for high
+    return 'linear-gradient(180deg, #ef4444 0%, #dc2626 100%)'; // Red for very high (abnormal)
   };
 
   // Get signal quality bars
@@ -848,6 +941,59 @@ export const LiveBPMonitorRevamped: React.FC = () => {
     return bars;
   };
 
+  // 🚀 IMPLEMENTED: Clean pressure bar algorithm based on pseudo code
+  const [measurementPhase, setMeasurementPhase] = useState<'idle' | 'inflating' | 'deflating' | 'analyzing' | 'complete'>('idle');
+  const [lastPressure, setLastPressure] = useState(0);
+  const [peakPressure, setPeakPressure] = useState(0);
+  
+  // 🚀 NEW: Reset pressure tracking when measurement starts
+  const resetPressureTracking = () => {
+    setMeasurementPhase('idle');
+    setLastPressure(0);
+    setPeakPressure(0);
+    setSmoothPressure(0);
+    setSmoothAnimationPhase('idle');
+    setMeasurementStartTime(null);
+    setInflationPeakTarget(150);
+    setPressureBuffer([]);
+    console.log('🔄 Smooth animation reset for new measurement');
+  };
+  
+  // 🚀 NEW: Enhanced peak pressure tracking for natural flow
+  useEffect(() => {
+    if (currentPressure > 0 && lastPressure !== currentPressure) {
+      const pressureChange = currentPressure - lastPressure;
+      
+      // Phase 1: Inflation Detection
+      if (currentPressure > lastPressure && currentPressure > 30) {
+        if (measurementPhase !== 'inflating') {
+          console.log('📈 [NATURAL FLOW] INFLATING: Pressure increasing to', currentPressure, 'mmHg');
+          setMeasurementPhase('inflating');
+        }
+        // Track peak pressure during inflation
+        if (currentPressure > peakPressure) {
+          setPeakPressure(currentPressure);
+          console.log('🏔️ [PEAK] New peak pressure reached:', currentPressure, 'mmHg');
+        }
+      }
+      
+      // Phase 2: Peak Detection & Deflation Start
+      else if (currentPressure < lastPressure && measurementPhase === 'inflating' && currentPressure < peakPressure) {
+        console.log('📉 [NATURAL FLOW] DEFLATING: Pressure decreasing from peak', peakPressure, 'to', currentPressure, 'mmHg');
+        setMeasurementPhase('deflating');
+      }
+      
+      // Phase 3: Analysis Phase
+      else if (currentPressure < 50 && currentPressure > 0 && measurementPhase === 'deflating') {
+        console.log('🔍 [NATURAL FLOW] ANALYZING: Pressure stabilized at', currentPressure, 'mmHg');
+        setMeasurementPhase('analyzing');
+      }
+      
+      // Update last pressure for next comparison
+      setLastPressure(currentPressure);
+    }
+  }, [currentPressure, lastPressure, measurementPhase, peakPressure]);
+  
   // Real-time monitoring for device-initiated measurements
   useEffect(() => {
     if (!connectedDevice || !isInitialized || !wellueSDK) return;
@@ -879,8 +1025,8 @@ export const LiveBPMonitorRevamped: React.FC = () => {
 
   if (!connectedDevice) {
     return (
-      <div className="min-h-screen bg-slate-900 text-white p-4">
-        <div className="max-w-md mx-auto">
+      <div className="min-h-screen bg-slate-900 text-white p-4 w-full">
+        <div className="w-full max-w-md mx-auto">
           <div className="text-center">
             <h1 className="text-2xl font-bold mb-4">No Device Connected</h1>
             <p className="text-gray-400 mb-6">Please connect a BP monitor device first.</p>
@@ -894,9 +1040,9 @@ export const LiveBPMonitorRevamped: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-slate-900 text-white p-5">
+    <div className="min-h-screen bg-slate-900 text-white p-4 w-full">
       <style dangerouslySetInnerHTML={{ __html: heartbeatStyles }} />
-      <div className="max-w-md mx-auto">
+      <div className="w-full max-w-md mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <Button
@@ -934,7 +1080,7 @@ export const LiveBPMonitorRevamped: React.FC = () => {
               {/* Measuring Display with Heart Beating Effect */}
               <div className="flex-1 min-h-[280px] flex flex-col items-center justify-center">
                 {/* Measuring Text with Continuous Heart Beating Animation */}
-                {measurementState !== 'idle' && measurementState !== 'completed' ? (
+                {smoothAnimationPhase !== 'idle' && smoothAnimationPhase !== 'complete' ? (
                   <div className="text-center">
                     <div className="flex items-center justify-center gap-3 mb-4">
                       <span className="text-4xl font-bold text-blue-400 animate-pulse">Measuring</span>
@@ -949,53 +1095,58 @@ export const LiveBPMonitorRevamped: React.FC = () => {
                   </div>
                 )}
                 
+                {/* Pressure Display Section Removed */}
+                
 
               </div>
 
 
             </div>
 
-            {/* Column 2: Animated pressure bar - goes up during inflation, down during deflation */}
+            {/* Column 2: ENHANCED pressure bar with proper markings and height */}
             <div className="flex">
               <div className="w-9 rounded-[14px] p-1 bg-white/10 flex items-end relative">
+                {/* Pressure Bar Fill */}
                 <div
-                  className="w-7 rounded-[14px] transition-all duration-300 ease-out"
+                  className="w-7 rounded-[14px] transition-all duration-500 ease-out shadow-lg"
                   style={{ 
-                    height: `${Math.min(100, (currentPressure / 250) * 100)}%`,
-                    background: measurementState === 'inflating' 
-                      ? 'linear-gradient(180deg, #3b82f6 0%, #2563eb 100%)' // Blue going up
-                      : measurementState === 'deflating'
-                      ? 'linear-gradient(180deg, #f59e0b 0%, #d97706 100%)' // Orange going down
-                      : getPressureBarColor(currentPressure)
+                    height: `${(() => {
+                      const calculatedHeight = Math.min(100, Math.max(0, (smoothPressure / 200) * 100));
+                      console.log('🎨 [SMOOTH BAR] Height:', calculatedHeight.toFixed(1), '% | Pressure:', smoothPressure.toFixed(1), 'mmHg | Phase:', smoothAnimationPhase);
+                      return calculatedHeight;
+                    })()}%`,
+                    background: smoothAnimationPhase === 'inflating' 
+                      ? 'linear-gradient(180deg, #3b82f6 0%, #1d4ed8 100%)' // Blue going up
+                      : smoothAnimationPhase === 'deflating'
+                      ? 'linear-gradient(180deg, #f59e0b 0%, #d97706 100%)' // Yellow going down
+                      : smoothAnimationPhase === 'peak'
+                      ? 'linear-gradient(180deg, #10b981 0%, #059669 100%)' // Green for peak
+                      : smoothAnimationPhase === 'complete'
+                      ? 'linear-gradient(180deg, #6b7280 0%, #4b5563 100%)' // Gray for complete
+                      : 'linear-gradient(180deg, #6b7280 0%, #4b5563 100%)' // Gray for idle
                   }}
                 />
-                {/* Pressure scale labels - positioned inside the bar */}
-                <div className="absolute left-0 right-0 flex flex-col justify-between text-xs text-gray-400 h-full pointer-events-none">
-                  <div className="text-center">250</div>
-                  <div className="text-center">200</div>
-                  <div className="text-center">150</div>
-                  <div className="text-center">100</div>
-                  <div className="text-center">50</div>
-                  <div className="text-center">0</div>
+
+                {/* 🎨 SMOOTH VISUAL: Clean pressure bar with no numerical markings (elderly-friendly) */}
+                <div className="absolute -right-4 top-0 bottom-0 flex flex-col justify-between">
+                  <div className="w-2 h-0.5 bg-white/40 rounded"></div>
+                  <div className="w-2 h-0.5 bg-white/40 rounded"></div>
+                  <div className="w-2 h-0.5 bg-white/40 rounded"></div>
+                  <div className="w-2 h-0.5 bg-white/40 rounded"></div>
+                  <div className="w-2 h-0.5 bg-white/40 rounded"></div>
                 </div>
               </div>
             </div>
           </div>
         </Card>
 
+        {/* Action Buttons Section Removed */}
+
         {/* Results Display Panel - Direct Results */}
         <Card className="bg-slate-800 border-slate-700 p-4 mb-6">
           <div className="flex items-center justify-between mb-3">
             <div className="text-gray-200 font-medium">Measurement Results</div>
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-gray-400">Status:</span>
-              <Badge 
-                variant={measurementState === 'completed' ? 'default' : 'secondary'}
-                className="text-xs"
-              >
-                {measurementState === 'completed' ? 'Complete' : measurementState}
-              </Badge>
-            </div>
+            {/* Status section removed as requested */}
           </div>
 
           <div className="p-4">

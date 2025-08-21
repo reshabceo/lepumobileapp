@@ -149,9 +149,9 @@ export const EmergencyButton: React.FC<EmergencyButtonProps> = ({
         <button
             onClick={handleEmergencyClick}
             className={`
-        bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl 
+        bg-red-600/90 backdrop-blur-sm hover:bg-red-700/90 text-white font-bold rounded-xl 
         flex items-center justify-center gap-2 transition-all duration-200 
-        hover:scale-105 active:scale-95 shadow-lg hover:shadow-xl
+        hover:scale-105 active:scale-95 border border-red-500/30 hover:border-red-500/50
         ${sizeClasses[size]} ${className}
       `}
         >

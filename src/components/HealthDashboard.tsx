@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 import { HealthMetric } from "@/hooks/useHealthData";
 import { useDevice } from "@/contexts/DeviceContext";
 import { useRealTimeVitals } from "@/hooks/useRealTimeVitals";
@@ -160,6 +161,7 @@ const calculateAge = (dateOfBirth: string | undefined): number | null => {
 export const HealthDashboard = () => {
   const navigate = useNavigate();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const { logout } = useAuth();
 
   // DEBUG: Add console log to verify this component is rendering
   console.log(
@@ -214,87 +216,38 @@ export const HealthDashboard = () => {
   const [connectionStatus, setConnectionStatus] = useState("");
   const previewCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const [deviceStatusExpanded, setDeviceStatusExpanded] = useState(true);
+  const [cameraConnected, setCameraConnected] = useState(false);
+  const [cgmConnected, setCgmConnected] = useState(false);
 
   // DEBUG: Log the current state after declaration
   console.log("🔍 [DEBUG] deviceStatusExpanded state:", deviceStatusExpanded);
 
-  // Auto-collapse device status when both devices are connected
+  // Auto-collapse device status when all three devices are connected
   useEffect(() => {
-    // Check if both BP2 device and CGM are connected/available
+    // Check if all devices are connected/available
     const hasBP2Connected = connectedDevice?.name?.includes('BP2') || connectedDevice?.name?.includes('3049');
-    const hasCGMConnected = true; // CGM is always shown as connected in this demo
+    const hasCGMConnected = cgmConnected;
+    const hasCameraConnected = cameraConnected;
     
-    if (hasBP2Connected && hasCGMConnected && deviceStatusExpanded) {
-      // Auto-collapse after a short delay to show the user both devices are connected
+    if (hasBP2Connected && hasCGMConnected && hasCameraConnected && deviceStatusExpanded) {
+      // Auto-collapse after a short delay to show the user all devices are connected
       const timer = setTimeout(() => {
         setDeviceStatusExpanded(false);
       }, 2000); // 2 second delay
       
       return () => clearTimeout(timer);
     }
-  }, [connectedDevice, deviceStatusExpanded]);
+  }, [connectedDevice, cgmConnected, cameraConnected, deviceStatusExpanded]);
 
-  // Helper functions for vital signs status
-  const getBPStatus = (bp: string): HealthMetric["status"] => {
-    const [systolic, diastolic] = bp.split("/").map(Number);
-    if (systolic >= 140 || diastolic >= 90) return "High";
-    if (systolic < 90 || diastolic < 60) return "Low";
-    return "Normal";
-  };
 
-  const getBPColor = (bp: string): string => {
-    const status = getBPStatus(bp);
-    return status === "High"
-      ? "#F87171"
-      : status === "Low"
-      ? "#FCD34D"
-      : "#34D399";
-  };
 
-  const getHRStatus = (hr: number): HealthMetric["status"] => {
-    if (hr > 100) return "High";
-    if (hr < 60) return "Low";
-    return "Normal";
-  };
 
-  const getHRColor = (hr: number): string => {
-    const status = getHRStatus(hr);
-    return status === "High"
-      ? "#F87171"
-      : status === "Low"
-      ? "#FCD34D"
-      : "#34D399";
-  };
 
-  const getSPO2Status = (spo2: number): HealthMetric["status"] => {
-    if (spo2 < 90) return "Critical";
-    if (spo2 < 95) return "Low";
-    return "Normal";
-  };
 
-  const getSPO2Color = (spo2: number): string => {
-    const status = getSPO2Status(spo2);
-    return status === "Critical"
-      ? "#DC2626"
-      : status === "Low"
-      ? "#F87171"
-      : "#34D399";
-  };
 
-  const getGlucoseStatus = (glucose: number): HealthMetric["status"] => {
-    if (glucose > 180) return "High";
-    if (glucose < 70) return "Low";
-    return "Normal";
-  };
 
-  const getGlucoseColor = (glucose: number): string => {
-    const status = getGlucoseStatus(glucose);
-    return status === "High"
-      ? "#F87171"
-      : status === "Low"
-      ? "#FCD34D"
-      : "#34D399";
-  };
+
+
 
   const fetchStoredECG = async () => {
     try {
@@ -638,8 +591,14 @@ export const HealthDashboard = () => {
     ctx.stroke();
   }, [selectedIdx, storedFilesInApp]);
 
-  const handleLogout = () => {
-    navigate("/");
+  const handleLogout = async () => {
+    try {
+      await logout();
+    } catch (e) {
+      console.error("Logout failed", e);
+    } finally {
+      navigate("/");
+    }
   };
 
   const handleChatClick = () => {
@@ -698,6 +657,11 @@ export const HealthDashboard = () => {
     );
   }
 
+  // Note: BP data will refresh automatically through existing mechanisms:
+  // 1. Real-time Supabase subscription in useRealTimeVitals
+  // 2. localStorage fallback in getLatestReadings
+  // 3. Component re-renders when navigating back to dashboard
+
   return (
     <div className="bg-[#101010] min-h-screen text-white p-4 font-inter">
       <div className="max-w-sm mx-auto">
@@ -732,7 +696,8 @@ export const HealthDashboard = () => {
                   <button
                     onClick={() => {
                       setIsDropdownOpen(false);
-                      // Add profile settings navigation here
+                      // Temporary routing for profile settings until a dedicated page exists
+                      navigate('/doctor-assignment');
                     }}
                     className="w-full flex items-center space-x-3 px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-[#30363D] rounded-md transition-colors duration-200"
                   >
@@ -754,7 +719,7 @@ export const HealthDashboard = () => {
                   <button
                     onClick={() => {
                       setIsDropdownOpen(false);
-                      // Add logout logic here
+                      handleLogout();
                     }}
                     className="w-full flex items-center space-x-3 px-3 py-2 text-sm text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-md transition-colors duration-200"
                   >
@@ -796,44 +761,39 @@ export const HealthDashboard = () => {
             >
               {/* BP & ECG Device Status */}
               {connectedDevice ? (
-                <div className="mb-3 p-3 bg-green-500/10 border border-green-500/20 rounded-lg">
+                <div className="mb-2 p-2 bg-green-500/10 border border-green-500/20 rounded-lg">
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="bg-green-500 p-2 rounded-full">
-                        <Bluetooth className="h-5 w-5 text-white" />
+                    <div className="flex items-center gap-2">
+                      <div className="bg-green-500 p-1.5 rounded-full">
+                        <Bluetooth className="h-4 w-4 text-white" />
                       </div>
                       <div>
-                        <p className="font-semibold text-white">
+                        <p className="text-sm font-semibold text-white">
                           {connectedDevice.name}
                         </p>
-                        <p className="text-sm text-gray-400">
+                        <p className="text-xs text-gray-400">
                           {connectedDevice.model}
                         </p>
-                        {connectedDevice.battery !== undefined && (
-                          <p className="text-xs text-gray-500">
-                            Battery: {connectedDevice.battery}%
-                          </p>
-                        )}
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1">
                       <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-                      <span className="text-sm text-green-400">Connected</span>
+                      <span className="text-xs text-green-400">Connected</span>
                     </div>
                   </div>
                 </div>
               ) : (
-                <div className="mb-3 p-3 bg-gray-500/10 border border-gray-500/20 rounded-lg">
+                <div className="mb-2 p-2 bg-gray-500/10 border border-gray-500/20 rounded-lg">
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="bg-gray-500 p-2 rounded-full">
-                        <WifiOff className="h-5 w-5 text-white" />
+                    <div className="flex items-center gap-2">
+                      <div className="bg-gray-500 p-1.5 rounded-full">
+                        <WifiOff className="h-4 w-4 text-white" />
                       </div>
                       <div>
-                        <p className="font-semibold text-gray-400">
+                        <p className="text-sm font-semibold text-gray-400">
                           BP & ECG Device
                         </p>
-                        <p className="text-sm text-gray-500">Not connected</p>
+                        <p className="text-xs text-gray-500">Not connected</p>
                       </div>
                     </div>
                     <div className="flex gap-2">
@@ -946,21 +906,21 @@ export const HealthDashboard = () => {
                           !bluetoothEnabled 
                             ? "bg-gray-500 cursor-not-allowed" 
                             : "bg-blue-500 hover:bg-blue-600"
-                        } disabled:bg-blue-400 disabled:cursor-not-allowed text-white text-sm font-semibold py-2 px-4 rounded-lg transition-all duration-200 hover:scale-105 active:scale-95 flex items-center gap-2`}
+                        } disabled:bg-blue-400 disabled:cursor-not-allowed text-white text-xs font-medium px-3 py-1.5 rounded-lg transition-all duration-200 flex items-center gap-1`}
                       >
                         {!bluetoothEnabled ? (
                           <>
-                            <BluetoothOff className="w-4 h-4" />
+                            <BluetoothOff className="w-3 h-3" />
                             Enable Bluetooth
                           </>
                         ) : isConnecting ? (
                           <>
-                            <Loader2 className="w-4 h-4 animate-spin" />
+                            <Loader2 className="w-3 h-3 animate-spin" />
                             {connectionStatus || "Connecting..."}
                           </>
                         ) : (
                           <>
-                            <Bluetooth className="w-4 h-4" />
+                            <Bluetooth className="w-3 h-3" />
                             Connect
                           </>
                         )}
@@ -971,32 +931,106 @@ export const HealthDashboard = () => {
               )}
 
               {/* CGM Device Status */}
-              <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="bg-blue-500 p-2 rounded-full">
-                      <Activity className="h-5 w-5 text-white" />
+              {cgmConnected ? (
+                <div className="mb-2 p-2 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="bg-blue-500 p-1.5 rounded-full">
+                        <Activity className="h-4 w-4 text-white" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-white">Dexcom CGM</p>
+                        <p className="text-xs text-gray-400">Continuous Glucose Monitor</p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="font-semibold text-white">Dexcom CGM</p>
-                      <p className="text-sm text-gray-400">
-                        Continuous Glucose Monitor
-                      </p>
-                      <p className="text-xs text-gray-500">API Connected</p>
+                    <div className="flex items-center gap-1">
+                      <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
+                      <span className="text-xs text-blue-400">Connected</span>
                     </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
-                    <span className="text-sm text-blue-400">Connected</span>
                   </div>
                 </div>
-              </div>
+              ) : (
+                <div className="mb-2 p-2 bg-gray-500/10 border border-gray-500/20 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="bg-gray-500 p-1.5 rounded-full">
+                        <Activity className="h-4 w-4 text-white" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-gray-400">Dexcom CGM</p>
+                        <p className="text-xs text-gray-500">Not connected</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => {
+                        toast({
+                          title: "CGM Not Found",
+                          description: "No Dexcom CGM device detected. Please check your device.",
+                          variant: "destructive",
+                        });
+                      }}
+                      className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium px-3 py-1.5 rounded-lg transition-all duration-200 flex items-center gap-1"
+                    >
+                      <Activity className="h-3 w-3" />
+                      Connect
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Camera Device Status */}
+              {cameraConnected ? (
+                <div className="p-2 bg-purple-500/10 border border-purple-500/20 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="bg-purple-500 p-1.5 rounded-full">
+                        <Video className="h-4 w-4 text-white" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-white">Camera</p>
+                        <p className="text-xs text-gray-400">Video Monitoring</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <div className="w-2 h-2 bg-purple-500 rounded-full animate-pulse" />
+                      <span className="text-xs text-purple-400">Connected</span>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-2 bg-gray-500/10 border border-gray-500/20 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="bg-gray-500 p-1.5 rounded-full">
+                        <Video className="h-4 w-4 text-white" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-gray-400">Camera</p>
+                        <p className="text-xs text-gray-500">Not connected</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => {
+                        toast({
+                          title: "Camera Not Found",
+                          description: "No camera device detected. Please check your device connection.",
+                          variant: "destructive",
+                        });
+                      }}
+                      className="bg-purple-600 hover:bg-purple-700 text-white text-xs font-medium px-3 py-1.5 rounded-lg transition-all duration-200 flex items-center gap-1"
+                    >
+                      <Video className="h-3 w-3" />
+                      Connect
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Compact Status Summary (Always Visible) */}
             <div className="flex items-center justify-between pt-2 border-t border-slate-600">
-              <div className="flex items-center gap-4 text-sm">
-                <div className="flex items-center gap-2">
+              <div className="flex items-center gap-3 text-xs">
+                <div className="flex items-center gap-1">
                   <div
                     className={`w-2 h-2 rounded-full ${
                       connectedDevice ? "bg-green-500" : "bg-gray-500"
@@ -1004,9 +1038,13 @@ export const HealthDashboard = () => {
                   />
                   <span className="text-gray-400">BP/ECG</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-blue-500" />
+                <div className="flex items-center gap-1">
+                  <div className={`w-2 h-2 rounded-full ${cgmConnected ? "bg-blue-500" : "bg-gray-500"}`} />
                   <span className="text-gray-400">CGM</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <div className={`w-2 h-2 rounded-full ${cameraConnected ? "bg-purple-500" : "bg-gray-500"}`} />
+                  <span className="text-gray-400">Camera</span>
                 </div>
               </div>
               <button
@@ -1108,83 +1146,7 @@ export const HealthDashboard = () => {
           <DoctorInfoCard />
         </div>
 
-        {/* Real-Time Vitals Display */}
-        <div className="grid grid-cols-2 gap-4 mb-6">
-          {(() => {
-            const latestReadings = getLatestReadings();
-            const realTimeMetrics: HealthMetric[] = [];
 
-            // Blood Pressure Card
-            if (latestReadings.bloodPressure) {
-              realTimeMetrics.push({
-                id: "bp-realtime",
-                name: "Blood Pressure",
-                value: latestReadings.bloodPressure,
-                unit: "mmHg",
-                status: getBPStatus(latestReadings.bloodPressure),
-                color: getBPColor(latestReadings.bloodPressure),
-                chartData: [],
-                timestamp: latestReadings.lastUpdate || undefined,
-              });
-            }
-
-            // Heart Rate Card
-            if (latestReadings.heartRate) {
-              realTimeMetrics.push({
-                id: "hr-realtime",
-                name: "Heart Rate",
-                value: latestReadings.heartRate.toString(),
-                unit: "bpm",
-                status: getHRStatus(latestReadings.heartRate),
-                color: getHRColor(latestReadings.heartRate),
-                chartData: [],
-                timestamp: latestReadings.lastUpdate || undefined,
-              });
-            }
-
-            // Oxygen Saturation Card
-            if (latestReadings.oxygenSaturation) {
-              realTimeMetrics.push({
-                id: "spo2-realtime",
-                name: "Oxygen Saturation",
-                value: latestReadings.oxygenSaturation.toString(),
-                unit: "%",
-                status: getSPO2Status(latestReadings.oxygenSaturation),
-                color: getSPO2Color(latestReadings.oxygenSaturation),
-                chartData: [],
-                timestamp: latestReadings.lastUpdate || undefined,
-              });
-            }
-
-            // Blood Sugar Card
-            if (latestReadings.bloodSugar) {
-              realTimeMetrics.push({
-                id: "glucose-realtime",
-                name: "Blood Sugar",
-                value: latestReadings.bloodSugar.toString(),
-                unit: "mg/dL",
-                status: getGlucoseStatus(latestReadings.bloodSugar),
-                color: getGlucoseColor(latestReadings.bloodSugar),
-                chartData: [],
-                timestamp: latestReadings.lastUpdate || undefined,
-              });
-            }
-
-            return realTimeMetrics.length > 0 ? (
-              realTimeMetrics
-                .slice(0, 4)
-                .map((metric, index) => (
-                  <HealthMetricCard
-                    key={metric.id}
-                    metric={metric}
-                    onClick={() =>
-                      handleMetricClick(metric.name, metric.deviceId)
-                    }
-                  />
-                ))
-            ) : null;
-          })()}
-        </div>
 
         {/* Device Actions */}
         <div className="grid grid-cols-2 gap-4 mb-6">
@@ -1192,12 +1154,12 @@ export const HealthDashboard = () => {
             {/* BP Monitor Button */}
             <button
               onClick={() => navigate("/live-bp-monitor")}
-              className="bg-gradient-to-br from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white p-6 rounded-2xl flex flex-col items-center justify-center gap-3 transition-all duration-300 hover:scale-105 active:scale-95 shadow-lg hover:shadow-xl border border-blue-400/20"
+              className="bg-blue-900/60 backdrop-blur-sm hover:bg-blue-800/70 text-white p-6 rounded-2xl flex flex-col items-center justify-center gap-3 transition-all duration-300 hover:scale-105 active:scale-95 border border-blue-400/40 hover:border-blue-400/60"
             >
-              <Heart className="h-8 w-8 text-white" />
+              <Heart className="h-8 w-8 text-blue-400" />
               <div className="text-center">
-                <h3 className="font-bold text-lg">BP Monitor</h3>
-                <p className="text-xs text-blue-100 opacity-80">
+                <h3 className="font-bold text-lg text-white">BP Monitor</h3>
+                <p className="text-xs text-gray-400">
                   Blood Pressure
                 </p>
               </div>
@@ -1206,12 +1168,12 @@ export const HealthDashboard = () => {
             {/* ECG Monitor Button */}
             <button
               onClick={() => navigate("/ecg-monitor")}
-              className="bg-gradient-to-br from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white p-6 rounded-2xl flex flex-col items-center justify-center gap-3 transition-all duration-300 hover:scale-105 active:scale-95 shadow-lg hover:shadow-xl border border-purple-400/20"
+              className="bg-purple-900/60 backdrop-blur-sm hover:bg-purple-800/70 text-white p-6 rounded-2xl flex flex-col items-center justify-center gap-3 transition-all duration-300 hover:scale-105 active:scale-95 border border-purple-400/40 hover:border-purple-400/60"
             >
-              <Activity className="h-8 w-8 text-white" />
+              <Activity className="h-8 w-8 text-purple-400" />
               <div className="text-center">
-                <h3 className="font-bold text-lg">ECG Monitor</h3>
-                <p className="text-xs text-purple-100 opacity-80">
+                <h3 className="font-bold text-lg text-white">ECG Monitor</h3>
+                <p className="text-xs text-gray-400">
                   Heart Activity
                 </p>
               </div>
@@ -1220,12 +1182,12 @@ export const HealthDashboard = () => {
             {/* CGM Monitor Button */}
             <button
               onClick={() => navigate("/cgm-monitor")}
-              className="bg-gradient-to-br from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white p-6 rounded-2xl flex flex-col items-center justify-center gap-3 transition-all duration-300 hover:scale-105 active:scale-95 shadow-lg hover:shadow-xl border border-green-400/20"
+              className="bg-green-900/60 backdrop-blur-sm hover:bg-green-800/70 text-white p-6 rounded-2xl flex flex-col items-center justify-center gap-3 transition-all duration-300 hover:scale-105 active:scale-95 border border-green-400/40 hover:border-green-400/60"
             >
-              <BarChart3 className="h-8 w-8 text-white" />
+              <BarChart3 className="h-8 w-8 text-green-400" />
               <div className="text-center">
-                <h3 className="font-bold text-lg">CGM Monitor</h3>
-                <p className="text-xs text-green-100 opacity-80">
+                <h3 className="font-bold text-lg text-white">CGM Monitor</h3>
+                <p className="text-xs text-gray-400">
                   Glucose Levels
                 </p>
               </div>
@@ -1237,16 +1199,16 @@ export const HealthDashboard = () => {
         <div className="grid grid-cols-2 gap-4 mb-6">
           <button
             onClick={handleViewReports}
-            className="bg-[#4A37A8] hover:bg-[#5A47B8] text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2 transition-all duration-200 hover:scale-105 active:scale-95"
+            className="bg-purple-900/60 backdrop-blur-sm hover:bg-purple-800/70 text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2 transition-all duration-200 hover:scale-105 active:scale-95 border border-purple-400/40 hover:border-purple-400/60"
           >
-            <FileText size={20} />
+            <FileText size={20} className="text-purple-400" />
             <span>View Reports</span>
           </button>
           <button
             onClick={() => navigate("/doctor-assignment")}
-            className="bg-[#0EA5E9] hover:bg-[#0284C7] text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2 transition-all duration-200 hover:scale-105 active:scale-95"
+            className="bg-blue-900/60 backdrop-blur-sm hover:bg-blue-800/70 text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2 transition-all duration-200 hover:scale-105 active:scale-95 border border-blue-400/40 hover:border-blue-400/60"
           >
-            <Stethoscope size={20} />
+            <Stethoscope size={20} className="text-blue-400" />
             <span>Doctor Setup</span>
           </button>
         </div>

@@ -98,6 +98,7 @@ export const useRealTimeVitals = () => {
                     console.log('📊 Real-time vital signs update:', payload);
 
                     if (payload.eventType === 'INSERT') {
+                        // Simple insert without complex filtering
                         setVitals(prev => [payload.new as VitalSign, ...prev.slice(0, 49)]);
                     } else if (payload.eventType === 'UPDATE') {
                         setVitals(prev => prev.map(vital =>
@@ -147,15 +148,36 @@ export const useRealTimeVitals = () => {
         return vitals.filter(vital => vital.type === type);
     };
 
-    // Get latest readings for dashboard
+    // Get latest readings for dashboard with hybrid strategy
     const getLatestReadings = () => {
+        // 1. Try Supabase first (most recent)
         const latestBP = getLatestVital('BP');
         const latestECG = getLatestVital('ECG');
         const latestOximeter = getLatestVital('OXIMETER');
         const latestGlucose = getLatestVital('GLUCOSE');
 
+        // 2. Fallback to localStorage if Supabase is empty for BP
+        let bloodPressure = null;
+        if (latestBP) {
+            bloodPressure = `${latestBP.data.systolic}/${latestBP.data.diastolic}`;
+        } else {
+            // Try localStorage as fallback
+            try {
+                const localBPResults = JSON.parse(localStorage.getItem('bpResults') || '[]');
+                if (localBPResults.length > 0) {
+                    const latestLocal = localBPResults[0];
+                    if (latestLocal.systolic && latestLocal.diastolic) {
+                        bloodPressure = `${latestLocal.systolic}/${latestLocal.diastolic}`;
+                        console.log('📊 [Fallback] Using BP from localStorage:', bloodPressure);
+                    }
+                }
+            } catch (error) {
+                console.warn('⚠️ Failed to read BP from localStorage fallback:', error);
+            }
+        }
+
         return {
-            bloodPressure: latestBP ? `${latestBP.data.systolic}/${latestBP.data.diastolic}` : null,
+            bloodPressure,
             heartRate: latestECG?.data?.heartRate || null,
             oxygenSaturation: latestOximeter?.data?.oxygenSaturation || null,
             bloodSugar: latestGlucose?.data?.glucose || null,
