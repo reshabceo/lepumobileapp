@@ -26,6 +26,7 @@ import {
   ChevronDown,
   Stethoscope,
   Settings,
+  Monitor,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
@@ -238,14 +239,6 @@ export const HealthDashboard = () => {
       return () => clearTimeout(timer);
     }
   }, [connectedDevice, cgmConnected, cameraConnected, deviceStatusExpanded]);
-
-
-
-
-
-
-
-
 
 
 
@@ -1079,74 +1072,11 @@ export const HealthDashboard = () => {
           </div>
         </div>
 
-        {/* Patient Card */}
-        {/* <div className="bg-[#1E1E1E] rounded-2xl mb-6 overflow-hidden transition-all duration-200 hover:bg-[#252525]">
-          <div className="relative">
-            <img
-              src={patientProfile?.profile_picture_url || "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?q=80&w=2938&auto=format&fit=crop"}
-              alt={patientProfile?.full_name || "Patient"}
-              className="w-full h-44 object-cover object-center"
-              onError={(e) => {
-                e.currentTarget.onerror = null;
-                e.currentTarget.src = 'https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?q=80&w=2940&auto=format&fit=crop';
-              }}
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
-            <button className="absolute top-4 right-4 bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-3 rounded-lg flex items-center gap-2 text-sm transition-all duration-200 hover:scale-105 active:scale-95">
-              <Video size={16} />
-              <span>Connect</span>
-            </button>
-          </div>
-          <div className="p-4">
-            <div className="flex justify-between items-start">
-              <div className="flex items-center gap-3">
-                <div className="bg-blue-500 p-3 rounded-full">
-                  {patientProfile?.profile_picture_url ? (
-                    <img
-                      src={patientProfile.profile_picture_url}
-                      alt={patientProfile.full_name || 'Patient'}
-                      className="h-6 w-6 rounded-full object-cover"
-                      onError={(e) => {
-                        const target = e.target as HTMLImageElement;
-                        target.style.display = 'none';
-                        target.nextElementSibling?.classList.remove('hidden');
-                      }}
-                    />
-                  ) : null}
-                  <User className={`h-6 w-6 text-white ${patientProfile?.profile_picture_url ? 'hidden' : ''}`} />
-                </div>
-                <div>
-                  <h2 className="font-bold text-lg">{patientProfile?.full_name || 'Loading...'}</h2>
-                  <p className="text-gray-400 text-xs">
-                    ID: #{patientProfile?.patient_code || 'N/A'} • Age: {calculateAge(patientProfile?.date_of_birth) || 'N/A'}
-                  </p>
-                  <p className="text-gray-300 mt-2 text-sm">
-                    <span className="font-semibold">Condition:</span> {patientProfile?.medical_conditions?.join(', ') || 'Not specified'}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2 mt-1">
-                <button className="bg-gray-700/80 hover:bg-gray-600 p-3 rounded-lg transition-all duration-200 hover:scale-105 active:scale-95">
-                  <Phone size={20} />
-                </button>
-                <button
-                  onClick={handleChatClick}
-                  className="bg-gray-700/80 hover:bg-gray-600 p-3 rounded-lg transition-all duration-200 hover:scale-105 active:scale-95"
-                >
-                  <MessageSquare size={20} />
-                </button>
-              </div>
-            </div>
-          </div>
-        </div> */}
-
         {/* Your Doctor */}
         <div className="mb-4">
           <h2 className="text-xl font-semibold mb-3 text-white">Your Doctor</h2>
           <DoctorInfoCard />
         </div>
-
-
 
         {/* Device Actions */}
         <div className="grid grid-cols-2 gap-4 mb-6">
@@ -1196,20 +1126,28 @@ export const HealthDashboard = () => {
         </div>
 
         {/* Bottom Action Buttons */}
-        <div className="grid grid-cols-2 gap-4 mb-6">
+        <div className="grid grid-cols-3 gap-4 mb-6">
           <button
             onClick={handleViewReports}
             className="bg-purple-900/60 backdrop-blur-sm hover:bg-purple-800/70 text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2 transition-all duration-200 hover:scale-105 active:scale-95 border border-purple-400/40 hover:border-purple-400/60"
           >
             <FileText size={20} className="text-purple-400" />
-            <span>View Reports</span>
+            <span>Reports</span>
           </button>
           <button
             onClick={() => navigate("/doctor-assignment")}
             className="bg-blue-900/60 backdrop-blur-sm hover:bg-blue-800/70 text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2 transition-all duration-200 hover:scale-105 active:scale-95 border border-blue-400/40 hover:border-blue-400/60"
           >
             <Stethoscope size={20} className="text-blue-400" />
-            <span>Doctor Setup</span>
+            <span>Doctor</span>
+          </button>
+          {/* ECG Test Button */}
+          <button
+            onClick={() => navigate("/ecg-results")}
+            className="bg-orange-900/60 backdrop-blur-sm hover:bg-orange-800/70 text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2 transition-all duration-200 hover:scale-105 active:scale-95 border border-orange-400/40 hover:border-orange-400/60"
+          >
+            <Monitor size={20} className="text-orange-400" />
+            <span>ECG Test</span>
           </button>
         </div>
         <div className="pb-8">

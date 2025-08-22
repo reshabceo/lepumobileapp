@@ -26,6 +26,7 @@ import BPResultScreen from "./pages/BPResult";
 import { DoctorAssignmentPage } from "./pages/DoctorAssignmentPage";
 import PatientReportsView from "./components/PatientReportsView";
 import { ResetPasswordPage } from "./components/ResetPasswordPage";
+import EcgDemo from "./pages/EcgDemo";
 
 const queryClient = new QueryClient();
 
@@ -84,6 +85,11 @@ const App = () => (
               <Route path="/ecg-monitor" element={
                 <ProtectedRoute>
                   <ECGMonitor />
+                </ProtectedRoute>
+              } />
+              <Route path="/ecg-results" element={
+                <ProtectedRoute>
+                  <EcgDemo />
                 </ProtectedRoute>
               } />
               <Route path="/cgm-monitor" element={
