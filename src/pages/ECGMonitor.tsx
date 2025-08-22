@@ -8,15 +8,18 @@ import { registerPlugin } from '@capacitor/core';
 
 import { useNavigate } from 'react-router-dom';
 
-import { ArrowLeft, Activity, Heart, Power, Play, Pause, Zap, TrendingUp, Wifi, Battery, Activity as ActivityIcon, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Activity, Heart, Power, Play, Pause, Zap, TrendingUp, Wifi, Battery, Activity as ActivityIcon, RefreshCw, XCircle, CheckCircle, AlertCircle, Bluetooth, BluetoothOff } from 'lucide-react';
 
 import { MobileAppContainer } from '@/components/MobileAppContainer';
+import EcgChartWithControls from '@/components/EcgChartWithControls';
 
 // Removed backend API usage for this page; monitor is purely native/RT
 
 import { useToast } from '@/hooks/use-toast';
 
 import { wellueSDK, WellueDevice, ECGData, RealTimeData } from '@/lib/wellue-sdk-bridge';
+import { Bp2, getEcgDataInMv } from '@/plugins/bp2';
+
 
 import { Capacitor } from '@capacitor/core';
 
@@ -444,6 +447,118 @@ const ECGMonitor: React.FC = () => {
     // NEW: Fallback measurement end detection
 
     const [lastEcgDataTime, setLastEcgDataTime] = useState<number>(0);
+    
+    // Duplicated ECG data state - exact same as EcgResultScreen
+    const [ecgData, setEcgData] = useState<{
+        s: Float32Array;
+        sr: number;
+        scale: number;
+    } | null>(null);
+    
+    // Loading state for ECG chart
+    const [isLoadingEcgChart, setIsLoadingEcgChart] = useState(false);
+    
+    // Flag to prevent re-loading once chart is displayed
+    const [hasEcgChartLoaded, setHasEcgChartLoaded] = useState(false);
+    
+    // Permanent storage for ECG data once loaded
+    const [permanentEcgData, setPermanentEcgData] = useState<{
+        s: Float32Array;
+        sr: number;
+        scale: number;
+    } | null>(null);
+    
+
+    
+    // Background ECG processing - exact same logic as EcgResultScreen
+    const processEcgInBackground = async () => {
+        // If chart is already loaded, don't process again
+        if (hasEcgChartLoaded) {
+            console.log('ℹ️ [ECG] Chart already loaded, skipping background processing');
+            return;
+        }
+        
+        // 🛑 EXTRA SAFETY: If we're already processing, don't start another
+        if (isLoadingEcgChart) {
+            console.log('ℹ️ [ECG] Already processing, skipping duplicate call');
+            return;
+        }
+        
+        try {
+            console.log('🚀 [ECG] Background processing: Fetching latest ECG file...');
+            
+            // Show loading state
+            setIsLoadingEcgChart(true);
+            
+            // Get list of ECG records (same as EcgResultScreen)
+            const result = await Bp2.listEcgRecords();
+            const allRecords = result.records || [];
+            
+            if (allRecords.length === 0) {
+                console.log('⚠️ [ECG] No ECG records found');
+                setIsLoadingEcgChart(false);
+                return;
+            }
+            
+            // Sort IDs descending (they're timestamps like yyyyMMddHHmmss)
+            const sortedRecords = allRecords.sort((a, b) => b.localeCompare(a));
+            const newestRecord = sortedRecords[0];
+            
+            console.log('🎯 [ECG] Auto-selecting newest ECG record:', newestRecord);
+            
+            // Fetch the ECG data (same as EcgResultScreen)
+            const result2 = await Bp2.getEcgRecord({ recordId: newestRecord });
+            
+            // Convert to mV format using our helper (EXACTLY like EcgResultScreen)
+            const ecgData = getEcgDataInMv(result2);
+            
+            // Set the ECG data (EXACTLY like EcgResultScreen)
+            const finalEcgData = { 
+                s: ecgData.samples, 
+                sr: ecgData.sampleRate, 
+                scale: 1.0 // Already in mV, no scaling needed
+            };
+            
+            // Set current ECG data
+            setEcgData(finalEcgData);
+            
+            // Store permanently so chart never disappears
+            setPermanentEcgData(finalEcgData);
+            
+            // Mark chart as loaded - this prevents future re-loading
+            setHasEcgChartLoaded(true);
+            
+            // 🛑 STOP ALL BACKGROUND PROCESSES - Chart is loaded, no more device communication needed
+            console.log('🛑 [ECG] Chart loaded successfully - stopping all background processes');
+            
+            // Stop device communication
+            if (selectedDevice) {
+                try {
+                    await wellueSDK.stopLive(selectedDevice);
+                    console.log('🛑 [ECG] Stopped device live communication');
+                } catch (e) {
+                    console.log('⚠️ [ECG] Error stopping device communication:', e);
+                }
+            }
+            
+            console.log('✅ [ECG] Background ECG chart loaded successfully:', ecgData.samples.length, 'samples');
+            
+        } catch (err) {
+            console.error('❌ [ECG] Failed to process ECG in background:', err);
+            
+            // Handle "Not an ECG file" error gracefully
+            if (err.toString().includes('Not an ECG file')) {
+                console.log('ℹ️ [ECG] Latest file is not an ECG file (may be BP reading)');
+            }
+        } finally {
+            // Hide loading state
+            setIsLoadingEcgChart(false);
+        }
+    };
+    
+
+    
+
 
 
 
@@ -502,6 +617,8 @@ const ECGMonitor: React.FC = () => {
         return out;
 
     };
+
+
 
     // Live capture (raw counts) for A/B against stored record
 
@@ -925,106 +1042,9 @@ const ECGMonitor: React.FC = () => {
 
     };
 
-    // 🚀 NEW: Process and store ECG result (rebuilt from scratch)
-    const processECGResult = async (result: ECGRhythm) => {
-        if (!result || result.heartRate === 0) {
-            console.log('⚠️ [ECG] Skipping ECG result processing - invalid result:', result);
-            return;
-        }
 
-        // 🚀 CRITICAL: Prevent processing duplicate results from device
-        if (hasResultBeenProcessed) {
-            console.log('⚠️ [ECG] ECG result already processed, skipping duplicate:', result.heartRate);
-            return;
-        }
 
-        console.log('💾 [ECG] Processing ECG result:', result);
 
-        try {
-            // 1. Set the current ECG result for immediate display
-            setEcgResult(result);
-
-            // 2. Save to Supabase database (primary storage for doctor portal)
-            try {
-                const { db } = await import('@/lib/supabase');
-                
-                // 🚀 CRITICAL: Check for duplicate ECG measurements before saving
-                const { supabase } = await import('@/lib/supabase');
-                
-                // 🚀 CRITICAL: Check for duplicate ECG measurements before saving
-                try {
-                    const { data: existingECG } = await supabase
-                        .from('vital_signs')
-                        .select('id, data, reading_timestamp')
-                        .eq('device_type', 'ECG')
-                        .eq('device_id', result.deviceId)
-                        .eq('data->heart_rate', result.heartRate) // Check heart rate in JSONB
-                        .gte('reading_timestamp', new Date(Date.now() - 10 * 60 * 1000).toISOString()) // Last 10 minutes
-                        .order('reading_timestamp', { ascending: false })
-                        .limit(1);
-
-                    // Check if we have a recent ECG with same heart rate (duplicate prevention)
-                    if (existingECG && existingECG.length > 0) {
-                        const timeDiff = Math.round((Date.now() - new Date(existingECG[0].reading_timestamp).getTime()) / 1000);
-                        console.log('⚠️ [ECG] Duplicate ECG measurement detected, skipping save:', {
-                            existing: existingECG[0].data?.heart_rate,
-                            new: result.heartRate,
-                            timeDiff: timeDiff + 's ago'
-                        });
-                        return; // Skip saving duplicate
-                    }
-                } catch (error) {
-                    console.log('⚠️ [ECG] Duplicate check failed, proceeding with save:', error);
-                }
-                
-                console.log('💾 [ECG] Saving ECG result to database (duplicate prevention active)');
-
-                const vitalSignsData = {
-                    device_type: 'ECG',
-                    measurement_type: 'electrocardiogram', 
-                    data: {
-                        heart_rate: result.heartRate,
-                        rhythm: result.rhythm || 'normal',
-                        qrs_duration: result.qrsDuration || 80,
-                        qt_interval: result.qtInterval || 400,
-                        pr_interval: result.prInterval || 160,
-                        st_segment: result.stSegment || 'normal',
-                        t_wave: result.tWave || 'normal',
-                        p_wave: result.pWave || 'normal',
-                        status: 'completed',
-                        deviceName: 'ECG Monitor',
-                        measurementId: result.id
-                    },
-                    device_id: result.deviceId,
-                    reading_timestamp: result.timestamp
-                };
-
-                const { error: dbError } = await db.insertVitalSigns(vitalSignsData);
-                if (dbError) {
-                    console.error('❌ [ECG] Failed to save to database:', dbError);
-                } else {
-                    console.log('✅ [ECG] ECG result saved to database for doctor monitoring (duplicate prevented)');
-                }
-            } catch (dbError) {
-                console.error('❌ [ECG] Database save error:', dbError);
-            }
-
-            // 3. Save to localStorage for app access (ECG-specific storage)
-            const existingECGResults = JSON.parse(localStorage.getItem('ecgResults') || '[]');
-            existingECGResults.unshift(result); // Add to beginning
-            localStorage.setItem('ecgResults', JSON.stringify(existingECGResults.slice(0, 50))); // Keep last 50
-
-            // 4. Update previousECGReadings state for "Previous Reading" section
-            setPreviousECGReadings(existingECGResults);
-
-            // 🚀 CRITICAL: Mark result as processed to prevent duplicates
-        setHasResultBeenProcessed(true);
-        console.log('💾 [ECG] ECG result processed and saved successfully (duplicate prevention active)');
-
-        } catch (error) {
-            console.error('❌ [ECG] Failed to process ECG result:', error);
-        }
-    };
 
     // Load ECG rhythm history
 
@@ -2520,22 +2540,28 @@ const ECGMonitor: React.FC = () => {
                             rhythm: data?.ecgRhythm || finalResult.rhythm
                         };
                         
-                        // 🚀 CRITICAL: Mark measurement as completed to allow history updates
+                        // Mark measurement as completed
                         setIsMeasurementCompleted(true);
                         setMeasurementCompletionTime(new Date().toISOString());
-                        processECGResult(enhancedResult);
+                        
+                        // Trigger background ECG processing (duplicated from EcgResultScreen)
+                        // Only process if chart hasn't been loaded yet
+                        if (!hasEcgChartLoaded) {
+                            processEcgInBackground();
+                        } else {
+                            console.log('ℹ️ [ECG] Chart already loaded, skipping background processing call');
+                        }
+                        
+
 
                         // Force UI update to show final heart rate
-
                         setCurrentRhythm(prev => prev ? {
-
                             ...prev,
-
                             heartRate: finalResult.heartRate,
-
                             timestamp: new Date().toISOString()
-
                         } : prev);
+
+
 
                     }, 1000); // Increased from 500ms to 1000ms to ensure state updates complete
 
@@ -2585,6 +2611,10 @@ const ECGMonitor: React.FC = () => {
 
                 console.log('🚀 [ECGMonitor] Auto-starting ECG measurement for device:', selectedDevice);
 
+                // Reset ECG chart state for new measurement
+                setHasEcgChartLoaded(false);
+                setEcgData(null);
+
                 await wellueSDK.startECGMeasurement(selectedDevice);
 
                 console.log('✅ [ECGMonitor] ECG measurement auto-started successfully');
@@ -2614,6 +2644,8 @@ const ECGMonitor: React.FC = () => {
         }
 
     }, [selectedDevice]);
+
+
 
 
 
@@ -3261,21 +3293,7 @@ const ECGMonitor: React.FC = () => {
 
     }, []);
 
-    // 🚀 NEW: Load previous ECG readings on component mount (rebuilt from scratch)
-    useEffect(() => {
-        try {
-            const savedResults = localStorage.getItem('ecgResults');
-            if (savedResults) {
-                const parsedResults = JSON.parse(savedResults);
-                if (Array.isArray(parsedResults) && parsedResults.length > 0) {
-                    console.log('📚 [ECG] Loading', parsedResults.length, 'previous ECG readings from localStorage');
-                    setPreviousECGReadings(parsedResults);
-                }
-            }
-        } catch (error) {
-            console.error('❌ [ECG] Failed to load previous ECG readings:', error);
-        }
-    }, []);
+
 
     // Handle window resize for responsive canvas
 
@@ -4823,6 +4841,10 @@ const ECGMonitor: React.FC = () => {
 
                     try {
 
+                        // Reset ECG chart state for new measurement
+                        setHasEcgChartLoaded(false);
+                        setEcgData(null);
+
                         await wellueSDK.startECGMeasurement(device.id);
 
                         console.log('✅ [ECG] ECG measurement started successfully');
@@ -5051,6 +5073,8 @@ const ECGMonitor: React.FC = () => {
 
                 {/* Header */}
 
+
+
                 <div className="bg-[#1E1E1E] p-4 border-b border-gray-800">
 
                     <div className="flex items-center justify-between">
@@ -5082,6 +5106,8 @@ const ECGMonitor: React.FC = () => {
                 {/* Content */}
 
                 <div className="p-4">
+
+                    
 
 
 
@@ -5347,56 +5373,40 @@ const ECGMonitor: React.FC = () => {
 
 
 
-                    {/* 🚀 CONSOLIDATED: Live ECG Data Display - Shows Real-Time Device Data */}
-                    {deviceBpm > 0 && (
-                        <div
-                            className="rounded-2xl p-4 mb-4"
-                            style={{
-                                background: 'rgba(17,24,39,0.6)',
-                                backdropFilter: 'blur(10px)',
-                                border: '1px solid rgba(55,65,81,0.3)',
-                                boxShadow: '0 0 20px rgba(0,0,0,0.3)'
-                            }}
-                        >
-                            <div className="flex items-center justify-between mb-4">
-                                <h2 className="text-base font-medium text-white flex items-center gap-2">
-                                    <ActivityIcon className="h-5 w-5" />
-                                    Live ECG Data
-                                </h2>
-                                <div className="flex items-center gap-2">
-                                    <div className="w-3 h-3 rounded-full bg-green-400 animate-pulse"></div>
-                                    <span className="text-sm text-green-400 font-medium">Live</span>
-                                </div>
-                            </div>
 
-                            {/* Live Data Display */}
-                            <div className="bg-slate-700/30 rounded-lg p-4">
-                                <div className="grid grid-cols-2 gap-4 text-center">
-                                    <div>
-                                        <div className="text-2xl font-bold text-green-400">{deviceBpm}</div>
-                                        <div className="text-xs text-gray-400">Heart Rate (BPM)</div>
-                                        <div className="text-xs text-green-400 mt-1">From Device</div>
-                                    </div>
-                                    <div>
-                                        <div className="text-lg font-bold text-white">Normal</div>
-                                        <div className="text-xs text-gray-400">Rhythm</div>
-                                        <div className="text-xs text-blue-400 mt-1">Real-Time</div>
+
+
+
+                    {/* Loading State for ECG Chart - Only show if not already loaded */}
+                    {isLoadingEcgChart && !hasEcgChartLoaded && (
+                        <div className="backdrop-blur-md bg-green-900/10 border border-green-500/30 rounded-lg shadow-2xl p-8 text-center">
+                            <div className="flex flex-col items-center justify-center space-y-4">
+                                {/* Spinning ECG Icon */}
+                                <div className="relative">
+                                    <div className="w-16 h-16 border-4 border-green-500/30 border-t-green-500 rounded-full animate-spin"></div>
+                                    <div className="absolute inset-0 flex items-center justify-center">
+                                        <svg className="w-8 h-8 text-green-500" fill="currentColor" viewBox="0 0 24 24">
+                                            <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+                                        </svg>
                                     </div>
                                 </div>
-
-                                {/* Data Source Info */}
-                                <div className="text-center mt-3 pt-3 border-t border-gray-600">
-                                    <div className="text-xs text-gray-400">
-                                        Measurement Time: {measurementCompletionTime ? new Date(measurementCompletionTime).toLocaleTimeString() : 'Not recorded'}
-                                    </div>
+                                
+                                {/* Loading Text */}
+                                <div className="text-center">
+                                    <h3 className="text-lg font-semibold text-white mb-2">Loading ECG Chart Result</h3>
+                                    <p className="text-green-400 text-sm">Processing your ECG data...</p>
                                 </div>
                             </div>
                         </div>
                     )}
 
-
-
-                    {/* 🚀 REMOVED: Final ECG Result section - keeping only Live ECG Data */}
+                    {/* Shared Chart Component with Controls - Same as ECG Test Page */}
+                    {/* Show chart if we have data OR if chart was previously loaded */}
+                    {(ecgData || permanentEcgData) && !isLoadingEcgChart && (
+                        <EcgChartWithControls 
+                            ecgData={ecgData || permanentEcgData}
+                        />
+                    )}
 
                     {/* 🚀 REMOVED: Redundant Current Rhythm Analysis section - consolidated into Live ECG Data */}
 

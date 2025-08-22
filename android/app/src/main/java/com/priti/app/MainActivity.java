@@ -13,6 +13,7 @@ import androidx.core.content.ContextCompat;
 import com.getcapacitor.BridgeActivity;
 import com.getcapacitor.Plugin;
 import com.priti.wellue.WelluePlugin;
+import com.priti.app.plugins.Bp2Plugin;
 import java.util.ArrayList;
 
 public class MainActivity extends BridgeActivity {
@@ -22,6 +23,7 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(WelluePlugin.class);
+        registerPlugin(Bp2Plugin.class);
         super.onCreate(savedInstanceState);
 
         Log.d(TAG, "MainActivity onCreate called");
