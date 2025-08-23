@@ -18,6 +18,38 @@ console.log('🔍 Supabase Debug - Anon Key:', supabaseAnonKey.substring(0, 20) 
 // Create Supabase client
 export const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
+// ECG Data Storage Functions
+export async function storeEcgRecording(ecgData: {
+    patient_id: string;
+    device_id?: string;
+    recorded_at: string;
+    sample_rate: number;
+    scale_uv_per_lsb: number;
+    duration_seconds: number;
+    raw_data_base64?: string;
+    mv_data_json?: number[];
+    heart_rate?: number;
+    quality_score?: number;
+    notes?: string;
+}) {
+    try {
+        const { data, error } = await supabase
+            .from('ecg_recordings')
+            .insert(ecgData);
+
+        if (error) {
+            console.error('❌ Failed to store ECG recording:', error);
+            throw error;
+        }
+
+        console.log('✅ ECG recording stored successfully:', data);
+        return data;
+    } catch (error) {
+        console.error('❌ Error storing ECG recording:', error);
+        throw error;
+    }
+}
+
 // Auth helper functions
 export const auth = {
   // Sign up
