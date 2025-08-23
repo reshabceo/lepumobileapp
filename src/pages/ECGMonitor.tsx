@@ -19,6 +19,7 @@ import { useToast } from '@/hooks/use-toast';
 
 import { wellueSDK, WellueDevice, ECGData, RealTimeData } from '@/lib/wellue-sdk-bridge';
 import { Bp2, getEcgDataInMv } from '@/plugins/bp2';
+import { supabase, storeEcgRecording } from '@/lib/supabase';
 
 
 import { Capacitor } from '@capacitor/core';
@@ -468,6 +469,9 @@ const ECGMonitor: React.FC = () => {
         scale: number;
     } | null>(null);
     
+    // Permanent storage for timestamp to prevent continuous updates
+    const [permanentTimestamp, setPermanentTimestamp] = useState<string>('');
+    
 
     
     // Background ECG processing - exact same logic as EcgResultScreen
@@ -527,6 +531,48 @@ const ECGMonitor: React.FC = () => {
             
             // Mark chart as loaded - this prevents future re-loading
             setHasEcgChartLoaded(true);
+            
+            // Store timestamp permanently when chart loads
+            if (!permanentTimestamp) {
+                setPermanentTimestamp(new Date().toISOString());
+            }
+            
+            // 🚀 STORE ECG DATA IN SUPABASE FOR DOCTOR PORTAL
+            try {
+                // Get current patient ID from auth context
+                const { data: { user } } = await supabase.auth.getUser();
+                if (user) {
+                    // Get patient profile
+                    const { data: patientProfile } = await supabase
+                        .from('patients')
+                        .select('id')
+                        .eq('auth_user_id', user.id)
+                        .single();
+                    
+                    if (patientProfile) {
+                        // Prepare ECG data for Supabase
+                        const ecgRecord = {
+                            patient_id: patientProfile.id,
+                            device_id: selectedDevice || 'BP2_Device',
+                            recorded_at: new Date().toISOString(),
+                            sample_rate: 125, // Fixed for BP2
+                            scale_uv_per_lsb: 3.098, // Fixed for BP2
+                            duration_seconds: ecgData.samples.length / 125,
+                            mv_data_json: Array.from(ecgData.samples), // Send processed mV data
+                            heart_rate: deviceBpm || currentRhythm?.heartRate || 0,
+                            quality_score: 0.95, // Default quality score
+                            notes: 'ECG recording from BP2 device'
+                        };
+                        
+                        // Store in Supabase
+                        await storeEcgRecording(ecgRecord);
+                        console.log('✅ [ECG] ECG data stored in Supabase for doctor portal');
+                    }
+                }
+            } catch (error) {
+                console.error('❌ [ECG] Failed to store ECG data in Supabase:', error);
+                // Don't fail the main ECG process if Supabase storage fails
+            }
             
             // 🛑 STOP ALL BACKGROUND PROCESSES - Chart is loaded, no more device communication needed
             console.log('🛑 [ECG] Chart loaded successfully - stopping all background processes');
@@ -2542,7 +2588,11 @@ const ECGMonitor: React.FC = () => {
                         
                         // Mark measurement as completed
                         setIsMeasurementCompleted(true);
-                        setMeasurementCompletionTime(new Date().toISOString());
+                        const completionTime = new Date().toISOString();
+                        setMeasurementCompletionTime(completionTime);
+                        
+                        // Store timestamp permanently to prevent continuous updates
+                        setPermanentTimestamp(completionTime);
                         
                         // Trigger background ECG processing (duplicated from EcgResultScreen)
                         // Only process if chart hasn't been loaded yet
@@ -2614,6 +2664,9 @@ const ECGMonitor: React.FC = () => {
                 // Reset ECG chart state for new measurement
                 setHasEcgChartLoaded(false);
                 setEcgData(null);
+                
+                // Reset timestamp for new measurement
+                setPermanentTimestamp('');
 
                 await wellueSDK.startECGMeasurement(selectedDevice);
 
@@ -4844,6 +4897,9 @@ const ECGMonitor: React.FC = () => {
                         // Reset ECG chart state for new measurement
                         setHasEcgChartLoaded(false);
                         setEcgData(null);
+                        
+                        // Reset timestamp for new measurement
+                        setPermanentTimestamp('');
 
                         await wellueSDK.startECGMeasurement(device.id);
 
@@ -5412,181 +5468,7 @@ const ECGMonitor: React.FC = () => {
 
                     
 
-                    {/* Previous ECG Reading Section */}
 
-                    {/* 🚀 REMOVED: Duplicate ECG History section - keeping the comprehensive existing one */}
-
-                    {/* ECG History Section - Show Previous Readings */}
-
-                    {rhythms.length > 0 && (
-
-                        <div
-
-                            className="rounded-2xl p-4 mb-4"
-
-                            style={{
-
-                                background: 'rgba(17,24,39,0.6)',
-
-                                backdropFilter: 'blur(10px)',
-
-                                border: '1px solid rgba(55,65,81,0.3)'
-
-                            }}
-
-                        >
-
-                            <div className="flex items-center justify-between mb-4">
-
-                                <h2 className="text-base font-medium text-white flex items-center gap-2">
-
-                                    <TrendingUp className="h-5 w-5" />
-
-                                    ECG History
-
-                                </h2>
-
-                                <div className="text-sm text-gray-400">
-
-                                    1 reading
-
-                                </div>
-
-                            </div>
-
-
-
-                            <div className="space-y-3">
-
-                                {rhythms.slice(0, 1).map((rhythm, index) => {
-
-                                    const rhythmStatus = getRhythmStatus(rhythm.rhythm);
-
-                                    const isLatest = index === 0;
-
-                                    return (
-
-                                        <div
-
-                                            key={rhythm.id}
-
-                                            className={`rounded-lg p-3 border transition-all ${isLatest ? 'ring-2 ring-green-500/50' : ''
-
-                                                }`}
-
-                                            style={{
-
-                                                background: isLatest
-
-                                                    ? 'rgba(34,197,94,0.1)'
-
-                                                    : 'rgba(31,41,55,0.8)',
-
-                                                borderRadius: '8px',
-
-                                                borderColor: isLatest
-
-                                                    ? 'rgba(34,197,94,0.3)'
-
-                                                    : 'rgba(55,65,81,0.3)'
-
-                                            }}
-
-                                        >
-
-                                            <div className="flex items-center justify-between">
-
-                                                <div className="flex items-center gap-3">
-
-                                                    <div className={`p-2 rounded-full ${rhythmStatus.bg}`}>
-
-                                                        <Heart className={`h-5 w-5 ${rhythmStatus.color}`} />
-
-                                                    </div>
-
-                                                    <div>
-
-                                                        <div className="flex items-center gap-2">
-
-                                                            <h3 className="text-lg font-bold text-white">
-
-                                                                {rhythm.heartRate} BPM
-
-                                                            </h3>
-
-                                                            {isLatest && (
-
-                                                                <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-500/20 text-green-400 border border-green-500/30">
-
-                                                                    Latest
-
-                                                                </span>
-
-                                                            )}
-
-                                                        </div>
-
-                                                        <p className="text-sm text-gray-400">{rhythmStatus.label}</p>
-
-                                                        <p className="text-xs text-gray-500 mt-1">
-
-                                                            {new Date(rhythm.timestamp).toLocaleDateString()} at {new Date(rhythm.timestamp).toLocaleTimeString()}
-
-                                                        </p>
-
-                                                    </div>
-
-                                                </div>
-
-                                                <div className="text-right">
-
-                                                    <div className={`px-2 py-1 rounded-full text-xs font-medium ${rhythmStatus.bg}`}>
-
-                                                        <span className={rhythmStatus.color}>
-
-                                                            {rhythmStatus.label}
-
-                                                        </span>
-
-                                                    </div>
-
-                                                    <p className="text-xs text-gray-400 mt-1">
-
-                                                        {formatTime(rhythm.timestamp)}
-
-                                                    </p>
-
-                                                </div>
-
-                                            </div>
-
-                                        </div>
-
-                                    );
-
-                                })}
-
-                            </div>
-
-
-
-                            {rhythms.length > 5 && (
-
-                                <div className="text-center mt-3">
-
-                                    <p className="text-sm text-gray-400">
-
-                                        +{rhythms.length - 5} more reading{rhythms.length - 5 !== 1 ? 's' : ''}
-
-                                    </p>
-
-                                </div>
-
-                            )}
-
-                        </div>
-
-                    )}
 
                 </div>
 
