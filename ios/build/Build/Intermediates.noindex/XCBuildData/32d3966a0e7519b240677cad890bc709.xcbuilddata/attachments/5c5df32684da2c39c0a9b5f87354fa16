@@ -1,0 +1,28 @@
+{
+  "" : {
+    "diagnostics" : "/Users/reshab/Desktop/lepumobileapp/ios/build/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/CapacitorScreenOrientation.build/Objects-normal/arm64/CapacitorScreenOrientation-master.dia",
+    "emit-module-dependencies" : "/Users/reshab/Desktop/lepumobileapp/ios/build/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/CapacitorScreenOrientation.build/Objects-normal/arm64/CapacitorScreenOrientation-master-emit-module.d",
+    "emit-module-diagnostics" : "/Users/reshab/Desktop/lepumobileapp/ios/build/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/CapacitorScreenOrientation.build/Objects-normal/arm64/CapacitorScreenOrientation-master-emit-module.dia",
+    "swift-dependencies" : "/Users/reshab/Desktop/lepumobileapp/ios/build/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/CapacitorScreenOrientation.build/Objects-normal/arm64/CapacitorScreenOrientation-master.swiftdeps"
+  },
+  "/Users/reshab/Desktop/lepumobileapp/node_modules/@capacitor/screen-orientation/ios/Sources/ScreenOrientationPlugin/ScreenOrientation.swift" : {
+    "const-values" : "/Users/reshab/Desktop/lepumobileapp/ios/build/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/CapacitorScreenOrientation.build/Objects-normal/arm64/ScreenOrientation.swiftconstvalues",
+    "dependencies" : "/Users/reshab/Desktop/lepumobileapp/ios/build/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/CapacitorScreenOrientation.build/Objects-normal/arm64/ScreenOrientation.d",
+    "diagnostics" : "/Users/reshab/Desktop/lepumobileapp/ios/build/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/CapacitorScreenOrientation.build/Objects-normal/arm64/ScreenOrientation.dia",
+    "index-unit-output-path" : "/Pods.build/Debug-iphonesimulator/CapacitorScreenOrientation.build/Objects-normal/arm64/ScreenOrientation.o",
+    "llvm-bc" : "/Users/reshab/Desktop/lepumobileapp/ios/build/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/CapacitorScreenOrientation.build/Objects-normal/arm64/ScreenOrientation.bc",
+    "object" : "/Users/reshab/Desktop/lepumobileapp/ios/build/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/CapacitorScreenOrientation.build/Objects-normal/arm64/ScreenOrientation.o",
+    "swift-dependencies" : "/Users/reshab/Desktop/lepumobileapp/ios/build/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/CapacitorScreenOrientation.build/Objects-normal/arm64/ScreenOrientation.swiftdeps",
+    "swiftmodule" : "/Users/reshab/Desktop/lepumobileapp/ios/build/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/CapacitorScreenOrientation.build/Objects-normal/arm64/ScreenOrientation~partial.swiftmodule"
+  },
+  "/Users/reshab/Desktop/lepumobileapp/node_modules/@capacitor/screen-orientation/ios/Sources/ScreenOrientationPlugin/ScreenOrientationPlugin.swift" : {
+    "const-values" : "/Users/reshab/Desktop/lepumobileapp/ios/build/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/CapacitorScreenOrientation.build/Objects-normal/arm64/ScreenOrientationPlugin.swiftconstvalues",
+    "dependencies" : "/Users/reshab/Desktop/lepumobileapp/ios/build/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/CapacitorScreenOrientation.build/Objects-normal/arm64/ScreenOrientationPlugin.d",
+    "diagnostics" : "/Users/reshab/Desktop/lepumobileapp/ios/build/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/CapacitorScreenOrientation.build/Objects-normal/arm64/ScreenOrientationPlugin.dia",
+    "index-unit-output-path" : "/Pods.build/Debug-iphonesimulator/CapacitorScreenOrientation.build/Objects-normal/arm64/ScreenOrientationPlugin.o",
+    "llvm-bc" : "/Users/reshab/Desktop/lepumobileapp/ios/build/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/CapacitorScreenOrientation.build/Objects-normal/arm64/ScreenOrientationPlugin.bc",
+    "object" : "/Users/reshab/Desktop/lepumobileapp/ios/build/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/CapacitorScreenOrientation.build/Objects-normal/arm64/ScreenOrientationPlugin.o",
+    "swift-dependencies" : "/Users/reshab/Desktop/lepumobileapp/ios/build/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/CapacitorScreenOrientation.build/Objects-normal/arm64/ScreenOrientationPlugin.swiftdeps",
+    "swiftmodule" : "/Users/reshab/Desktop/lepumobileapp/ios/build/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/CapacitorScreenOrientation.build/Objects-normal/arm64/ScreenOrientationPlugin~partial.swiftmodule"
+  }
+}

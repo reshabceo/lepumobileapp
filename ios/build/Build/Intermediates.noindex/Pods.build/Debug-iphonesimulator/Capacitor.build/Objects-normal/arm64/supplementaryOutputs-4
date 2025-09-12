@@ -1,0 +1,36 @@
+"/Users/reshab/Desktop/lepumobileapp/node_modules/@capacitor/ios/Capacitor/Capacitor/Plugins/Console.swift":
+  object: "/Users/reshab/Desktop/lepumobileapp/ios/build/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/Capacitor.build/Objects-normal/arm64/Console.o"
+  const-values: "/Users/reshab/Desktop/lepumobileapp/ios/build/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/Capacitor.build/Objects-normal/arm64/Console.swiftconstvalues"
+  swift-dependencies: "/Users/reshab/Desktop/lepumobileapp/ios/build/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/Capacitor.build/Objects-normal/arm64/Console.swiftdeps"
+  diagnostics: "/Users/reshab/Desktop/lepumobileapp/ios/build/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/Capacitor.build/Objects-normal/arm64/Console.dia"
+  dependencies: "/Users/reshab/Desktop/lepumobileapp/ios/build/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/Capacitor.build/Objects-normal/arm64/Console.d"
+"/Users/reshab/Desktop/lepumobileapp/node_modules/@capacitor/ios/Capacitor/Capacitor/CAPPluginCall.swift":
+  diagnostics: "/Users/reshab/Desktop/lepumobileapp/ios/build/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/Capacitor.build/Objects-normal/arm64/CAPPluginCall-c410158055b6379c530bc5531bc4c3ae.dia"
+  dependencies: "/Users/reshab/Desktop/lepumobileapp/ios/build/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/Capacitor.build/Objects-normal/arm64/CAPPluginCall-c410158055b6379c530bc5531bc4c3ae.d"
+  const-values: "/Users/reshab/Desktop/lepumobileapp/ios/build/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/Capacitor.build/Objects-normal/arm64/CAPPluginCall-c410158055b6379c530bc5531bc4c3ae.swiftconstvalues"
+  object: "/Users/reshab/Desktop/lepumobileapp/ios/build/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/Capacitor.build/Objects-normal/arm64/CAPPluginCall-c410158055b6379c530bc5531bc4c3ae.o"
+  swift-dependencies: "/Users/reshab/Desktop/lepumobileapp/ios/build/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/Capacitor.build/Objects-normal/arm64/CAPPluginCall-c410158055b6379c530bc5531bc4c3ae.swiftdeps"
+"/Users/reshab/Desktop/lepumobileapp/node_modules/@capacitor/ios/Capacitor/Capacitor/CAPNotifications.swift":
+  dependencies: "/Users/reshab/Desktop/lepumobileapp/ios/build/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/Capacitor.build/Objects-normal/arm64/CAPNotifications.d"
+  const-values: "/Users/reshab/Desktop/lepumobileapp/ios/build/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/Capacitor.build/Objects-normal/arm64/CAPNotifications.swiftconstvalues"
+  swift-dependencies: "/Users/reshab/Desktop/lepumobileapp/ios/build/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/Capacitor.build/Objects-normal/arm64/CAPNotifications.swiftdeps"
+  object: "/Users/reshab/Desktop/lepumobileapp/ios/build/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/Capacitor.build/Objects-normal/arm64/CAPNotifications.o"
+  diagnostics: "/Users/reshab/Desktop/lepumobileapp/ios/build/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/Capacitor.build/Objects-normal/arm64/CAPNotifications.dia"
+"/Users/reshab/Desktop/lepumobileapp/node_modules/@capacitor/ios/Capacitor/Capacitor/CAPLog.swift":
+  object: "/Users/reshab/Desktop/lepumobileapp/ios/build/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/Capacitor.build/Objects-normal/arm64/CAPLog.o"
+  const-values: "/Users/reshab/Desktop/lepumobileapp/ios/build/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/Capacitor.build/Objects-normal/arm64/CAPLog.swiftconstvalues"
+  swift-dependencies: "/Users/reshab/Desktop/lepumobileapp/ios/build/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/Capacitor.build/Objects-normal/arm64/CAPLog.swiftdeps"
+  diagnostics: "/Users/reshab/Desktop/lepumobileapp/ios/build/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/Capacitor.build/Objects-normal/arm64/CAPLog.dia"
+  dependencies: "/Users/reshab/Desktop/lepumobileapp/ios/build/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/Capacitor.build/Objects-normal/arm64/CAPLog.d"
+"/Users/reshab/Desktop/lepumobileapp/node_modules/@capacitor/ios/Capacitor/Capacitor/CAPPluginMethod.swift":
+  swift-dependencies: "/Users/reshab/Desktop/lepumobileapp/ios/build/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/Capacitor.build/Objects-normal/arm64/CAPPluginMethod-b31fde5f0db1c4469eb0cf3e3c82ad53.swiftdeps"
+  diagnostics: "/Users/reshab/Desktop/lepumobileapp/ios/build/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/Capacitor.build/Objects-normal/arm64/CAPPluginMethod-b31fde5f0db1c4469eb0cf3e3c82ad53.dia"
+  object: "/Users/reshab/Desktop/lepumobileapp/ios/build/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/Capacitor.build/Objects-normal/arm64/CAPPluginMethod-b31fde5f0db1c4469eb0cf3e3c82ad53.o"
+  dependencies: "/Users/reshab/Desktop/lepumobileapp/ios/build/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/Capacitor.build/Objects-normal/arm64/CAPPluginMethod-b31fde5f0db1c4469eb0cf3e3c82ad53.d"
+  const-values: "/Users/reshab/Desktop/lepumobileapp/ios/build/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/Capacitor.build/Objects-normal/arm64/CAPPluginMethod-b31fde5f0db1c4469eb0cf3e3c82ad53.swiftconstvalues"
+"/Users/reshab/Desktop/lepumobileapp/node_modules/@capacitor/ios/Capacitor/Capacitor/CAPPlugin+LoadInstance.swift":
+  swift-dependencies: "/Users/reshab/Desktop/lepumobileapp/ios/build/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/Capacitor.build/Objects-normal/arm64/CAPPlugin+LoadInstance.swiftdeps"
+  dependencies: "/Users/reshab/Desktop/lepumobileapp/ios/build/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/Capacitor.build/Objects-normal/arm64/CAPPlugin+LoadInstance.d"
+  object: "/Users/reshab/Desktop/lepumobileapp/ios/build/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/Capacitor.build/Objects-normal/arm64/CAPPlugin+LoadInstance.o"
+  diagnostics: "/Users/reshab/Desktop/lepumobileapp/ios/build/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/Capacitor.build/Objects-normal/arm64/CAPPlugin+LoadInstance.dia"
+  const-values: "/Users/reshab/Desktop/lepumobileapp/ios/build/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/Capacitor.build/Objects-normal/arm64/CAPPlugin+LoadInstance.swiftconstvalues"

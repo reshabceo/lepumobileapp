@@ -1,0 +1,18 @@
+{
+  "" : {
+    "diagnostics" : "/Users/reshab/Desktop/lepumobileapp/ios/build/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/CapacitorShare.build/Objects-normal/arm64/CapacitorShare-master.dia",
+    "emit-module-dependencies" : "/Users/reshab/Desktop/lepumobileapp/ios/build/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/CapacitorShare.build/Objects-normal/arm64/CapacitorShare-master-emit-module.d",
+    "emit-module-diagnostics" : "/Users/reshab/Desktop/lepumobileapp/ios/build/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/CapacitorShare.build/Objects-normal/arm64/CapacitorShare-master-emit-module.dia",
+    "swift-dependencies" : "/Users/reshab/Desktop/lepumobileapp/ios/build/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/CapacitorShare.build/Objects-normal/arm64/CapacitorShare-master.swiftdeps"
+  },
+  "/Users/reshab/Desktop/lepumobileapp/node_modules/@capacitor/share/ios/Sources/SharePlugin/SharePlugin.swift" : {
+    "const-values" : "/Users/reshab/Desktop/lepumobileapp/ios/build/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/CapacitorShare.build/Objects-normal/arm64/SharePlugin.swiftconstvalues",
+    "dependencies" : "/Users/reshab/Desktop/lepumobileapp/ios/build/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/CapacitorShare.build/Objects-normal/arm64/SharePlugin.d",
+    "diagnostics" : "/Users/reshab/Desktop/lepumobileapp/ios/build/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/CapacitorShare.build/Objects-normal/arm64/SharePlugin.dia",
+    "index-unit-output-path" : "/Pods.build/Debug-iphonesimulator/CapacitorShare.build/Objects-normal/arm64/SharePlugin.o",
+    "llvm-bc" : "/Users/reshab/Desktop/lepumobileapp/ios/build/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/CapacitorShare.build/Objects-normal/arm64/SharePlugin.bc",
+    "object" : "/Users/reshab/Desktop/lepumobileapp/ios/build/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/CapacitorShare.build/Objects-normal/arm64/SharePlugin.o",
+    "swift-dependencies" : "/Users/reshab/Desktop/lepumobileapp/ios/build/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/CapacitorShare.build/Objects-normal/arm64/SharePlugin.swiftdeps",
+    "swiftmodule" : "/Users/reshab/Desktop/lepumobileapp/ios/build/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/CapacitorShare.build/Objects-normal/arm64/SharePlugin~partial.swiftmodule"
+  }
+}

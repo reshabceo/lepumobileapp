@@ -31,9 +31,11 @@ const CGMMonitor: React.FC = () => {
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    // Auto-connect to Dexcom for demo purposes
-    // In production, this would check for existing tokens
-    handleAutoConnect();
+    // Respect demo flag; default to off so we do not auto-connect
+    const demoEnabled = String(import.meta.env.VITE_ENABLE_DEXCOM_DEMO || 'false') === 'true';
+    if (demoEnabled) {
+      handleAutoConnect();
+    }
     return () => {
       if (intervalRef.current) {
         clearInterval(intervalRef.current);

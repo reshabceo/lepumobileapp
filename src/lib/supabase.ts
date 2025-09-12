@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
+import { Capacitor, CapacitorHttp } from '@capacitor/core'
 
 // Get environment variables
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
@@ -15,7 +16,57 @@ if (!supabaseUrl || !supabaseAnonKey) {
 console.log('🔍 Supabase Debug - URL:', supabaseUrl)
 console.log('🔍 Supabase Debug - Anon Key:', supabaseAnonKey.substring(0, 20) + '...')
 
-// Create Supabase client
+// On some iOS simulator environments, WKWebView fetch can intermittently fail
+// with "TypeError: Load failed". To make auth/network calls robust, route
+// Supabase requests through Capacitor's native HTTP on native platforms.
+const isNative = Capacitor?.isNativePlatform?.() === true
+
+const nativeFetch: typeof fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+  const isReqObj = typeof input !== 'string' && !(input instanceof URL)
+  const req = isReqObj ? (input as Request) : undefined
+  const url = isReqObj ? req!.url : String(input)
+  const method = (init?.method || req?.method || 'GET').toUpperCase()
+
+  // Normalize headers to a plain object
+  const headerEntries = new Headers(init?.headers || req?.headers)
+  const headers: Record<string, string> = {}
+  headerEntries.forEach((value, key) => { headers[key] = value })
+
+  // Parse JSON body when provided as string; CapacitorHttp expects an object for JSON
+  let data: any
+  if (init?.body) {
+    try {
+      data = typeof init.body === 'string' ? JSON.parse(init.body) : init.body
+    } catch {
+      // Fallback to raw string if not JSON
+      data = init.body
+    }
+  }
+
+  const response = await CapacitorHttp.request({ url, method, headers, data })
+
+  // Construct a fetch-compatible Response
+  const body = typeof response.data === 'string' ? response.data : JSON.stringify(response.data)
+  const respHeaders = new Headers()
+  // Copy known headers if available
+  if (response.headers) {
+    Object.entries(response.headers).forEach(([k, v]) => {
+      try { if (typeof v === 'string') respHeaders.set(k, v) } catch { /* no-op */ }
+    })
+  }
+  // Ensure JSON content-type when body is JSON
+  if (body && !respHeaders.has('content-type') && typeof response.data !== 'string') {
+    respHeaders.set('content-type', 'application/json')
+  }
+
+  return new Response(body, { status: response.status, headers: respHeaders })
+}
+
+console.log('🔍 Supabase Debug - Using native fetch:', isNative)
+
+// Default: use browser fetch (works in Simulator). If a TypeError Load failed
+// occurs during runtime, app code can switch to nativeFetch by calling
+// supabase.functions.setFetcher(nativeFetch). For now keep default for stability.
 export const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
 // ECG Data Storage Functions
@@ -299,14 +350,30 @@ export const db = {
     return { data, error }
   },
 
-  // Assign doctor to patient
-  assignDoctorToPatient: async (patientId: string, doctorCode: string) => {
-    const { data, error } = await supabase.rpc('assign_doctor_to_patient', {
-      patient_id: patientId,
-      doctor_code_input: doctorCode
-    })
+  // Assign doctor to patient (current schema uses doctors/patients tables)
+  assignDoctorToPatient: async (authUserId: string, doctorCode: string) => {
+    // 1) lookup doctor by code
+    const { data: doctor, error: docErr } = await supabase
+      .from('doctors')
+      .select('id, doctor_code')
+      .eq('doctor_code', doctorCode)
+      .single()
 
-    return { data, error }
+    if (docErr || !doctor) {
+      return { data: false, error: docErr || new Error('Doctor not found') }
+    }
+
+    // 2) update patient's assigned_doctor_id by auth user id
+    const { error: updErr } = await supabase
+      .from('patients')
+      .update({ assigned_doctor_id: doctor.id })
+      .eq('auth_user_id', authUserId)
+
+    if (updErr) {
+      return { data: false, error: updErr }
+    }
+
+    return { data: true, error: null }
   },
 
   // Generate doctor code for new doctors
@@ -326,20 +393,34 @@ export const db = {
     return { data, error }
   },
 
-  // Get patient's assigned doctor
-  getPatientDoctor: async (patientId: string) => {
-    const { data, error } = await supabase
-      .from('user_profiles')
-      .select(`
-        doctor_id,
-        doctor:doctor_id (
-          name,
-          doctor_code
-        )
-      `)
-      .eq('id', patientId)
+  // Get patient's assigned doctor (current schema: patients -> assigned_doctor_id -> doctors)
+  getPatientDoctor: async (authUserId: string) => {
+    // 1) fetch patient's assigned_doctor_id
+    const { data: patientRow, error: patientErr } = await supabase
+      .from('patients')
+      .select('assigned_doctor_id')
+      .eq('auth_user_id', authUserId)
       .single()
 
-    return { data, error }
+    if (patientErr) {
+      return { data: null as any, error: patientErr }
+    }
+
+    if (!patientRow?.assigned_doctor_id) {
+      return { data: { doctor: null }, error: null }
+    }
+
+    // 2) fetch doctor info
+    const { data: doctorRow, error: doctorErr } = await supabase
+      .from('doctors')
+      .select('id, full_name, doctor_code')
+      .eq('id', patientRow.assigned_doctor_id)
+      .single()
+
+    if (doctorErr) {
+      return { data: null as any, error: doctorErr }
+    }
+
+    return { data: { doctor: doctorRow }, error: null }
   }
 }
