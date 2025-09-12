@@ -622,15 +622,21 @@ class NativeWelluePlugin {
     private connectedDevices: Map<string, WellueDevice> = new Map();
     private bpManager: BPMeasurementManager;
     private activeDeviceId?: string;
+    private pluginAvailable: boolean = true;
 
     constructor() {
         this.nativePlugin = WellueSDK;
+        // Detect plugin availability on this platform to avoid noisy errors
+        try {
+            const anyCap = Capacitor as any;
+            this.pluginAvailable = typeof anyCap.isPluginAvailable === 'function' ? anyCap.isPluginAvailable('WellueSDK') : true;
+        } catch { this.pluginAvailable = true }
         this.bpManager = new BPMeasurementManager(this.callbacks);
         this.setupBluetoothMonitoring();
     }
 
     private setupBluetoothMonitoring() {
-        if (Capacitor.isNativePlatform()) {
+        if (Capacitor.isNativePlatform() && this.pluginAvailable) {
             this.monitorBluetoothState();
         }
     }
@@ -649,7 +655,7 @@ class NativeWelluePlugin {
     }
 
     private async checkBluetoothEnabled(): Promise<boolean> {
-        if (!Capacitor.isNativePlatform()) {
+        if (!Capacitor.isNativePlatform() || !this.pluginAvailable) {
             return false;
         }
 
@@ -657,7 +663,11 @@ class NativeWelluePlugin {
             const result = await this.nativePlugin.isBluetoothEnabled();
             return result.enabled;
         } catch (error) {
-            console.error('Error checking Bluetooth status:', error);
+            // Suppress noisy unimplemented errors; report once
+            const msg = String(error);
+            if (!/not implemented/i.test(msg)) {
+                console.error('Error checking Bluetooth status:', error);
+            }
             return false;
         }
     }
@@ -672,8 +682,10 @@ class NativeWelluePlugin {
     }
 
     async initialize(): Promise<void> {
-        if (!Capacitor.isNativePlatform()) {
-            throw new Error('Native Wellue SDK only works on mobile devices');
+        if (!Capacitor.isNativePlatform() || !this.pluginAvailable) {
+            console.warn('WellueSDK plugin not available on this platform; skipping initialization');
+            this.isInitialized = false;
+            return;
         }
 
         try {

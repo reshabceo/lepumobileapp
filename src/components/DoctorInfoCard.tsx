@@ -15,6 +15,8 @@ import {
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
+import { usePatientVideoCall } from '@/hooks/usePatientVideoCall';
+// duplicate import removed
 
 interface Doctor {
   id: string;
@@ -34,6 +36,7 @@ export const DoctorInfoCard: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { currentCall, initiateCall } = usePatientVideoCall(user?.id)
 
   useEffect(() => {
     const fetchDoctorInfo = async () => {
@@ -96,9 +99,39 @@ export const DoctorInfoCard: React.FC = () => {
     navigate("/chat");
   };
 
-  const handleVideoCall = () => {
-    // Placeholder for video call functionality
-    console.log("Video call requested with doctor:", doctor?.full_name);
+  const handleVideoCall = async () => {
+    console.log('[CALL] VideoCall button pressed. currentCall=', currentCall)
+    // If we already have an active/pending call from the subscription, go straight in
+    if (currentCall?.channel_name) {
+      console.log('[CALL] Navigating to existing channel', currentCall.channel_name)
+      navigate(`/call/${currentCall.channel_name}`)
+      return
+    }
+
+    // Fallback: query Supabase for latest pending/accepted call for this patient
+    if (!user) { return }
+    console.log('[CALL] Querying for existing pending/accepted call')
+    const { data: patient, error: pErr } = await supabase
+      .from('patients')
+      .select('id')
+      .eq('auth_user_id', user.id)
+      .single()
+    if (pErr || !patient?.id) return
+
+    const { data: calls } = await supabase
+      .from('video_calls')
+      .select('id, channel_name, status, call_type')
+      .eq('patient_id', patient.id)
+      .in('status', ['pending','accepted'])
+      .order('initiated_at', { ascending: false })
+      .limit(1)
+    const call = calls?.[0]
+    if (call?.channel_name) { console.log('[CALL] Found pending/accepted call, navigating to', call.channel_name); navigate(`/call/${call.channel_name}`); return }
+
+    // No active call yet: start one and go to waiting screen
+    console.log('[CALL] No active call. Initiating new one…')
+    await initiateCall('video')
+    navigate('/call/wait')
   };
 
   if (loading) {

@@ -1,0 +1,23 @@
+{
+  "version": 0,
+  "use-external-names": false,
+  "case-sensitive": false,
+  "roots": [{
+    "type": "directory",
+    "name": "/Users/reshab/Desktop/lepumobileapp/ios/build/Build/Products/Debug-iphonesimulator/CapacitorScreenOrientation/CapacitorScreenOrientation.framework/Modules",
+    "contents": [{
+      "type": "file",
+      "name": "module.modulemap",
+      "external-contents": "/Users/reshab/Desktop/lepumobileapp/ios/build/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/CapacitorScreenOrientation.build/unextended-module.modulemap",
+    }]
+    },
+    {
+    "type": "directory",
+    "name": "/Users/reshab/Desktop/lepumobileapp/ios/build/Build/Products/Debug-iphonesimulator/CapacitorScreenOrientation/CapacitorScreenOrientation.framework/Headers",
+    "contents": [{
+      "type": "file",
+      "name": "CapacitorScreenOrientation-Swift.h",
+      "external-contents": "/Users/reshab/Desktop/lepumobileapp/ios/build/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/CapacitorScreenOrientation.build/unextended-interface-header.h",
+    }]
+  }]
+}

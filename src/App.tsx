@@ -27,6 +27,8 @@ import { DoctorAssignmentPage } from "./pages/DoctorAssignmentPage";
 import PatientReportsView from "./components/PatientReportsView";
 import { ResetPasswordPage } from "./components/ResetPasswordPage";
 import EcgDemo from "./pages/EcgDemo";
+import VideoCallPage from "./pages/VideoCall";
+import WaitingForDoctor from "./pages/WaitingForDoctor";
 
 const queryClient = new QueryClient();
 
@@ -135,6 +137,18 @@ const App = () => (
               <Route path="/doctor-assignment" element={
                 <ProtectedRoute>
                   <DoctorAssignmentPage />
+                </ProtectedRoute>
+              } />
+
+              <Route path="/call/:channel" element={
+                <ProtectedRoute>
+                  <VideoCallPage />
+                </ProtectedRoute>
+              } />
+
+              <Route path="/call/wait" element={
+                <ProtectedRoute>
+                  <WaitingForDoctor />
                 </ProtectedRoute>
               } />
 

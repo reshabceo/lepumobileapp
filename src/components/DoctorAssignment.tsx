@@ -7,6 +7,8 @@ import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/lib/supabase';
 import { UserPlus, Stethoscope, Users, CheckCircle, AlertCircle } from 'lucide-react';
+import { usePatientVideoCall } from '@/hooks/usePatientVideoCall';
+import { useNavigate } from 'react-router-dom';
 
 interface DoctorAssignmentProps {
     onAssignmentComplete?: () => void;
@@ -20,7 +22,21 @@ export const DoctorAssignment: React.FC<DoctorAssignmentProps> = ({ onAssignment
     const [statusMessage, setStatusMessage] = useState('');
     const [currentDoctor, setCurrentDoctor] = useState<any>(null);
     const [userProfile, setUserProfile] = useState<any>(null);
+    const [editing, setEditing] = useState(false);
+    const navigate = useNavigate();
+    const { currentCall, acceptCall, declineCall } = usePatientVideoCall(user?.id);
 
+    useEffect(() => {
+        if (currentCall?.status === 'pending') {
+            // simple inline prompt for now
+            const go = window.confirm(`Incoming ${currentCall.call_type} call. Accept?`)
+            if (go) {
+                acceptCall(currentCall.id).then(ok => { if (ok) navigate(`/call/${currentCall.channel_name}`) })
+            } else {
+                declineCall(currentCall.id)
+            }
+        }
+    }, [currentCall, acceptCall, declineCall, navigate])
     // Load user profile and current doctor assignment
     useEffect(() => {
         const loadUserInfo = async () => {
@@ -35,6 +51,7 @@ export const DoctorAssignment: React.FC<DoctorAssignmentProps> = ({ onAssignment
                 const { data: doctorInfo } = await db.getPatientDoctor(user.id);
                 if (doctorInfo?.doctor) {
                     setCurrentDoctor(doctorInfo.doctor);
+                    setEditing(false);
                 }
             } catch (error) {
                 console.error('Failed to load user info:', error);
@@ -51,6 +68,15 @@ export const DoctorAssignment: React.FC<DoctorAssignmentProps> = ({ onAssignment
         setAssignmentStatus('idle');
 
         try {
+            // No-op if same as current doctor
+            if (currentDoctor && doctorCode.trim().toUpperCase() === String(currentDoctor.doctor_code).toUpperCase()) {
+                setAssignmentStatus('success');
+                setStatusMessage('Already assigned to this doctor.');
+                setDoctorCode('');
+                setIsAssigning(false);
+                setEditing(false);
+                return;
+            }
             const { data: success, error } = await db.assignDoctorToPatient(user.id, doctorCode.trim());
 
             if (error || !success) {
@@ -65,6 +91,7 @@ export const DoctorAssignment: React.FC<DoctorAssignmentProps> = ({ onAssignment
                 const { data: doctorInfo } = await db.getPatientDoctor(user.id);
                 if (doctorInfo?.doctor) {
                     setCurrentDoctor(doctorInfo.doctor);
+                    setEditing(false);
                 }
 
                 onAssignmentComplete?.();
@@ -122,7 +149,7 @@ export const DoctorAssignment: React.FC<DoctorAssignmentProps> = ({ onAssignment
                     <Alert className="border-green-200 bg-green-50">
                         <CheckCircle className="h-4 w-4 text-green-600" />
                         <AlertDescription className="text-green-800">
-                            <strong>Assigned Doctor:</strong> {currentDoctor.name}
+                            <strong>Assigned Doctor:</strong> {currentDoctor.full_name || currentDoctor.name}
                             <br />
                             <span className="text-sm">Code: {currentDoctor.doctor_code}</span>
                         </AlertDescription>
@@ -137,29 +164,40 @@ export const DoctorAssignment: React.FC<DoctorAssignmentProps> = ({ onAssignment
                 )}
 
                 {/* Doctor code input */}
-                <div className="space-y-2">
-                    <label htmlFor="doctor-code" className="text-sm font-medium text-gray-700">
-                        Doctor Code
-                    </label>
-                    <Input
-                        id="doctor-code"
-                        type="text"
-                        placeholder="Enter doctor code (e.g., DR1234)"
-                        value={doctorCode}
-                        onChange={(e) => setDoctorCode(e.target.value.toUpperCase())}
-                        className="text-center font-mono"
-                        disabled={isAssigning}
-                    />
-                </div>
+                {(!currentDoctor || editing) && (
+                    <>
+                        <div className="space-y-2">
+                            <label htmlFor="doctor-code" className="text-sm font-medium text-gray-700">
+                                Doctor Code
+                            </label>
+                            <Input
+                                id="doctor-code"
+                                type="text"
+                                placeholder="Enter doctor code (e.g., DR1234)"
+                                value={doctorCode}
+                                onChange={(e) => setDoctorCode(e.target.value.toUpperCase())}
+                                className="text-center font-mono"
+                                disabled={isAssigning}
+                            />
+                        </div>
 
-                {/* Assignment button */}
-                <Button
-                    onClick={handleAssignDoctor}
-                    disabled={!doctorCode.trim() || isAssigning}
-                    className="w-full"
-                >
-                    {isAssigning ? 'Assigning...' : 'Assign Doctor'}
-                </Button>
+                        {/* Assignment button */}
+                        <Button
+                            onClick={handleAssignDoctor}
+                            disabled={!doctorCode.trim() || isAssigning}
+                            className="w-full"
+                        >
+                            {isAssigning ? 'Assigning...' : 'Assign Doctor'}
+                        </Button>
+                    </>
+                )}
+
+                {/* Change doctor CTA when already assigned */}
+                {currentDoctor && !editing && (
+                    <Button variant="outline" className="w-full" onClick={() => setEditing(true)}>
+                        Change doctor
+                    </Button>
+                )}
 
                 {/* Status messages */}
                 {assignmentStatus === 'success' && (

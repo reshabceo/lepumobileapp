@@ -1,0 +1,10 @@
+{
+	"appId": "com.priti.app",
+	"appName": "pritimedicalapp",
+	"webDir": "dist",
+	"packageClassList": [
+		"FilesystemPlugin",
+		"ScreenOrientationPlugin",
+		"SharePlugin"
+	]
+}

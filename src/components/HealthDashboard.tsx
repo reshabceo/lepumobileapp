@@ -603,6 +603,24 @@ export const HealthDashboard = () => {
     navigate("/reports");
   };
 
+  const handleEmergencyCall = () => {
+    const phone = patientProfile?.emergency_contact_phone || patientProfile?.phone_number
+    if (!phone) {
+      toast({
+        title: 'No phone on file',
+        description: 'Add an emergency contact number in Profile Settings.',
+        variant: 'destructive'
+      })
+      return
+    }
+    try {
+      window.location.href = `tel:${phone}`
+    } catch (e) {
+      console.error('Failed to open dialer', e)
+      toast({ title: 'Unable to open dialer', variant: 'destructive' })
+    }
+  }
+
   const handleMetricClick = (metricName: string, deviceId?: string) => {
     toast({
       title: "Vital Sign Information",
@@ -1142,8 +1160,15 @@ export const HealthDashboard = () => {
             <span>Doctor</span>
           </button>
         </div>
-        <div className="pb-8">
+        <div className="pb-8 space-y-3">
           <EmergencyButton size="lg" className="w-full" />
+          <button
+            onClick={handleEmergencyCall}
+            className="w-full bg-green-600/90 hover:bg-green-700/90 text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2 transition-all duration-200 hover:scale-105 active:scale-95 border border-green-500/30 hover:border-green-500/50"
+          >
+            <Phone size={20} className="text-white" />
+            <span>Call Now</span>
+          </button>
         </div>
       </div>
     </div>
