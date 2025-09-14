@@ -168,3 +168,20 @@ All colors MUST be HSL.
     }
   }
 }
+
+/* Safe area padding for iPhone notch */
+.pt-safe-top {
+  padding-top: max(1rem, env(safe-area-inset-top));
+}
+
+.pb-safe-bottom {
+  padding-bottom: max(1rem, env(safe-area-inset-bottom));
+}
+
+.pl-safe-left {
+  padding-left: max(1rem, env(safe-area-inset-left));
+}
+
+.pr-safe-right {
+  padding-right: max(1rem, env(safe-area-inset-right));
+}

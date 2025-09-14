@@ -5,6 +5,7 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useDevice } from '@/contexts/DeviceContext';
 import { WellueSDKBridge } from '@/lib/wellue-sdk-bridge';
+import { ArrowLeft } from 'lucide-react';
 
 type MeasurementState = 'idle' | 'waiting' | 'inflating' | 'deflating' | 'analyzing' | 'completed' | 'canceled' | 'error';
 
@@ -1025,14 +1026,33 @@ export const LiveBPMonitorRevamped: React.FC = () => {
 
   if (!connectedDevice) {
     return (
-      <div className="min-h-screen bg-slate-900 text-white p-4 w-full">
-        <div className="w-full max-w-md mx-auto">
-          <div className="text-center">
-            <h1 className="text-2xl font-bold mb-4">No Device Connected</h1>
-            <p className="text-gray-400 mb-6">Please connect a BP monitor device first.</p>
-            <Button onClick={() => navigate('/wellue-scanner')} className="w-full">
-              Connect Device
-            </Button>
+      <div className="min-h-screen bg-slate-900 text-white w-full">
+        {/* Header */}
+        <div className="bg-slate-800/50 backdrop-blur-sm border-b border-slate-700" style={{ paddingTop: 'max(1rem, env(safe-area-inset-top))' }}>
+          <div className="relative flex items-center justify-between p-4">
+            <button
+              onClick={() => navigate(-1)}
+              className="flex items-center gap-2 px-3 py-2 text-white bg-blue-600 hover:bg-blue-700 transition-colors touch-manipulation rounded-lg"
+              style={{ minHeight: '40px', minWidth: '70px' }}
+            >
+              <ArrowLeft className="h-4 w-4" />
+              <span className="text-sm">Back</span>
+            </button>
+            <h1 className="absolute left-1/2 transform -translate-x-1/2 text-xl font-semibold">BP Monitor</h1>
+            <div className="w-16" />
+          </div>
+        </div>
+        
+        {/* Content */}
+        <div className="p-4">
+          <div className="w-full max-w-md mx-auto">
+            <div className="text-center">
+              <h1 className="text-2xl font-bold mb-4">No Device Connected</h1>
+              <p className="text-gray-400 mb-6">Please connect a BP monitor device first.</p>
+              <Button onClick={() => navigate('/wellue-scanner')} className="w-full">
+                Connect Device
+              </Button>
+            </div>
           </div>
         </div>
       </div>
@@ -1040,21 +1060,28 @@ export const LiveBPMonitorRevamped: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-slate-900 text-white p-4 w-full">
+    <div className="min-h-screen bg-slate-900 text-white w-full">
       <style dangerouslySetInnerHTML={{ __html: heartbeatStyles }} />
-      <div className="w-full max-w-md mx-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <Button
-            variant="ghost"
+      
+      {/* Header */}
+      <div className="bg-slate-800/50 backdrop-blur-sm border-b border-slate-700" style={{ paddingTop: 'max(1rem, env(safe-area-inset-top))' }}>
+        <div className="relative flex items-center justify-between p-4">
+          <button
             onClick={() => navigate(-1)}
-            className="text-gray-400 hover:text-white"
+            className="flex items-center gap-2 px-3 py-2 text-white bg-blue-600 hover:bg-blue-700 transition-colors touch-manipulation rounded-lg"
+            style={{ minHeight: '40px', minWidth: '70px' }}
           >
-            ← Back
-          </Button>
-          <h1 className="text-xl font-semibold">Blood Pressure Monitor</h1>
-          <div className="w-10" />
+            <ArrowLeft className="h-4 w-4" />
+            <span className="text-sm">Back</span>
+          </button>
+          <h1 className="absolute left-1/2 transform -translate-x-1/2 text-xl font-semibold">BP Monitor</h1>
+          <div className="w-16" />
         </div>
+      </div>
+      
+      {/* Content */}
+      <div className="p-4">
+        <div className="w-full max-w-md mx-auto">
 
         {/* Device Info */}
         <Card className="bg-slate-800 border-slate-700 p-4 mb-6">
@@ -1268,6 +1295,7 @@ export const LiveBPMonitorRevamped: React.FC = () => {
 
 
 
+        </div>
       </div>
     </div>
   );

@@ -19,6 +19,7 @@ interface DeviceContextType {
     refreshBattery: () => Promise<void>;
     manualInitializeSDK: () => Promise<void>;
     requestPermissions: () => Promise<void>;
+    forceBluetoothStatusCheck: () => Promise<boolean>;
     
     // SDK methods
     startBPMeasurement: () => Promise<void>;
@@ -657,6 +658,18 @@ export const DeviceProvider: React.FC<DeviceProviderProps> = ({ children }) => {
         }
     };
 
+    const forceBluetoothStatusCheck = async (): Promise<boolean> => {
+        try {
+            console.log('🔵 Manual Bluetooth status check requested');
+            const enabled = await wellueSDK.forceBluetoothStatusCheck();
+            console.log('🔵 Manual Bluetooth status check result:', enabled);
+            return enabled;
+        } catch (error) {
+            console.error('Failed to check Bluetooth status:', error);
+            return false;
+        }
+    };
+
     const value: DeviceContextType = {
         connectedDevice,
         availableDevices,
@@ -672,6 +685,7 @@ export const DeviceProvider: React.FC<DeviceProviderProps> = ({ children }) => {
         refreshBattery,
         manualInitializeSDK,
         requestPermissions,
+        forceBluetoothStatusCheck,
         startBPMeasurement,
         startECGMeasurement,
         stopMeasurement,

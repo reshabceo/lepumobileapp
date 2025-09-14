@@ -691,7 +691,10 @@ class NativeWelluePlugin {
         try {
             await this.nativePlugin.initialize();
             this.setupEventListeners();
+            
+            // Check initial Bluetooth status and notify
             const bluetoothEnabled = await this.checkBluetoothEnabled();
+            console.log('🔵 Initial Bluetooth status check:', bluetoothEnabled);
             this.callbacks.onBluetoothStatusChanged?.(bluetoothEnabled);
 
             this.isInitialized = true;
@@ -853,6 +856,12 @@ class NativeWelluePlugin {
         // Battery update event
         this.nativePlugin.addListener('batteryUpdate', (data: any) => {
             this.callbacks.onBatteryUpdate?.(data.deviceId, data.battery);
+        });
+
+        // Bluetooth status changed event
+        this.nativePlugin.addListener('bluetoothStatusChanged', (data: any) => {
+            console.log('🔵 Web layer received Bluetooth status change:', data);
+            this.callbacks.onBluetoothStatusChanged?.(data.enabled);
         });
 
         // Error event
@@ -1124,6 +1133,24 @@ class NativeWelluePlugin {
     forceBPStatusUpdate() {
         this.callbacks.onBPStatusChanged?.(this.bpManager.getStatus());
     }
+
+    // Force Bluetooth status check
+    async forceBluetoothStatusCheck() {
+        if (!this.isInitialized) {
+            console.warn('SDK not initialized, cannot check Bluetooth status');
+            return false;
+        }
+        
+        try {
+            const bluetoothEnabled = await this.checkBluetoothEnabled();
+            console.log('🔵 Manual Bluetooth status check:', bluetoothEnabled);
+            this.callbacks.onBluetoothStatusChanged?.(bluetoothEnabled);
+            return bluetoothEnabled;
+        } catch (error) {
+            console.error('Failed to check Bluetooth status:', error);
+            return false;
+        }
+    }
 }
 
 // Main SDK Bridge
@@ -1261,6 +1288,10 @@ export class WellueSDKBridge {
 
     forceBPStatusUpdate() {
         this.plugin.forceBPStatusUpdate();
+    }
+
+    async forceBluetoothStatusCheck() {
+        return this.plugin.forceBluetoothStatusCheck();
     }
 }
 

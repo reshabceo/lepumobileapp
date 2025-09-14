@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Activity, BarChart3, TrendingUp, TrendingDown, AlertTriangle, CheckCircle, Clock, Battery, Signal, RefreshCw, Loader2, LogIn, LogOut } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { dexcomApi, GlucoseReading } from '@/services/dexcomApi';
+import { useDevice } from '@/contexts/DeviceContext';
+import { Button } from '@/components/ui/button';
 
 interface CGMSession {
   isConnected: boolean;
@@ -17,6 +19,7 @@ interface CGMSession {
 const CGMMonitor: React.FC = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { connectedDevice } = useDevice();
   const [session, setSession] = useState<CGMSession>({
     isConnected: false,
     averageGlucose: 0,
@@ -211,19 +214,56 @@ const CGMMonitor: React.FC = () => {
     }
   };
 
+  // Check if no device is connected
+  if (!connectedDevice) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white">
+        {/* Header */}
+        <div className="bg-slate-800/50 backdrop-blur-sm border-b border-slate-700">
+        <div className="relative flex items-center justify-between p-4" style={{ paddingTop: 'max(1rem, env(safe-area-inset-top))' }}>
+          <button
+            onClick={() => navigate(-1)}
+            className="flex items-center gap-2 px-3 py-2 text-white bg-blue-600 hover:bg-blue-700 transition-colors touch-manipulation rounded-lg"
+            style={{ minHeight: '40px', minWidth: '70px' }}
+          >
+            <ArrowLeft className="h-4 w-4" />
+            <span className="text-sm">Back</span>
+          </button>
+          <h1 className="absolute left-1/2 transform -translate-x-1/2 text-xl font-semibold">CGM Monitor</h1>
+          <div className="w-16" />
+        </div>
+        </div>
+        
+        {/* Content */}
+        <div className="p-4">
+          <div className="w-full max-w-md mx-auto">
+            <div className="text-center">
+              <h1 className="text-2xl font-bold mb-4">No Device Connected</h1>
+              <p className="text-gray-400 mb-6">Please connect a Dexcom CGM device first.</p>
+              <Button onClick={() => navigate('/wellue-scanner')} className="w-full">
+                Connect Device
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white">
       {/* Header */}
       <div className="bg-slate-800/50 backdrop-blur-sm border-b border-slate-700">
-        <div className="flex items-center justify-between p-4">
+        <div className="relative flex items-center justify-between p-4" style={{ paddingTop: 'max(1rem, env(safe-area-inset-top))' }}>
           <button
             onClick={() => navigate(-1)}
-            className="flex items-center gap-2 text-gray-300 hover:text-white transition-colors"
+            className="flex items-center gap-2 px-3 py-2 text-white bg-blue-600 hover:bg-blue-700 transition-colors touch-manipulation rounded-lg"
+            style={{ minHeight: '40px', minWidth: '70px' }}
           >
-            <ArrowLeft className="h-5 w-5" />
-            <span>Back</span>
+            <ArrowLeft className="h-4 w-4" />
+            <span className="text-sm">Back</span>
           </button>
-          <h1 className="text-xl font-semibold">CGM Monitor</h1>
+          <h1 className="absolute left-1/2 transform -translate-x-1/2 text-xl font-semibold">CGM Monitor</h1>
           <div className="flex items-center gap-2">
             <button
               onClick={handleRefresh}
