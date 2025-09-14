@@ -5131,22 +5131,17 @@ const ECGMonitor: React.FC = () => {
 
 
 
-                <div className="bg-[#1E1E1E] p-4 border-b border-gray-800">
+                <div className="bg-[#1E1E1E] p-4 border-b border-gray-800" style={{ paddingTop: 'max(1rem, env(safe-area-inset-top))' }}>
 
                     <div className="flex items-center justify-between">
 
                         <button
-
                             onClick={handleBack}
-
-                            className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors"
-
+                            className="flex items-center gap-2 px-3 py-2 text-white bg-blue-600 hover:bg-blue-700 transition-colors touch-manipulation rounded-lg"
+                            style={{ minHeight: '40px', minWidth: '70px' }}
                         >
-
-                            <ArrowLeft className="h-5 w-5" />
-
-                            Back
-
+                            <ArrowLeft className="h-4 w-4" />
+                            <span className="text-sm">Back</span>
                         </button>
 
                         <h1 className="text-xl font-semibold">ECG Monitoring</h1>

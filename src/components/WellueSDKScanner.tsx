@@ -39,7 +39,8 @@ export const WellueSDKScanner: React.FC = () => {
     connectToDevice,
     disconnectDevice,
     refreshBattery,
-    manualInitializeSDK
+    manualInitializeSDK,
+    forceBluetoothStatusCheck
   } = useDevice();
 
   useEffect(() => {
@@ -247,6 +248,35 @@ export const WellueSDKScanner: React.FC = () => {
           >
             <Bluetooth className="h-4 w-4 mr-2" />
             Check Devices
+          </Button>
+          
+          <Button
+            onClick={async () => {
+              try {
+                toast({
+                  title: "Checking Bluetooth...",
+                  description: "Verifying Bluetooth status",
+                });
+                const enabled = await forceBluetoothStatusCheck();
+                toast({
+                  title: "Bluetooth Status",
+                  description: `Bluetooth is ${enabled ? 'enabled' : 'disabled'}`,
+                  variant: enabled ? "default" : "destructive",
+                });
+              } catch (error) {
+                toast({
+                  title: "Error",
+                  description: "Failed to check Bluetooth status",
+                  variant: "destructive",
+                });
+              }
+            }}
+            variant="outline"
+            size="sm"
+            className="flex-1"
+          >
+            <Bluetooth className="h-4 w-4 mr-2" />
+            Check BT Status
           </Button>
           
           <Button
