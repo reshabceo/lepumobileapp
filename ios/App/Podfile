@@ -19,7 +19,7 @@ end
 target 'App' do
   capacitor_pods
   # Add your Pods here
-  # pod 'VTMProductLib'  # Temporarily disabled due to framework issues
+  pod 'VTProductLib'  # Official Wellue SDK for BP2 device
 end
 
 post_install do |installer|
