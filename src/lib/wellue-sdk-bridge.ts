@@ -1,4 +1,6 @@
 import { Capacitor } from '@capacitor/core';
+// BLE fallback (static import so it exists on device builds)
+import { BleClient } from '@capacitor-community/bluetooth-le';
 import { registerPlugin } from '@capacitor/core';
 
 // Core device interfaces
@@ -625,48 +627,105 @@ class NativeWelluePlugin {
     private pluginAvailable: boolean = true;
 
     constructor() {
+        console.log('🚀 [NATIVE WELLUE PLUGIN] Constructor called');
+        console.log('🚀 [NATIVE WELLUE PLUGIN] WellueSDK plugin object:', WellueSDK);
+        console.log('🚀 [NATIVE WELLUE PLUGIN] WellueSDK type:', typeof WellueSDK);
+        
         this.nativePlugin = WellueSDK;
+        console.log('🚀 [NATIVE WELLUE PLUGIN] Native plugin assigned:', !!this.nativePlugin);
+        
         // Detect plugin availability on this platform to avoid noisy errors
         try {
             const anyCap = Capacitor as any;
-            this.pluginAvailable = typeof anyCap.isPluginAvailable === 'function' ? anyCap.isPluginAvailable('WellueSDK') : true;
-        } catch { this.pluginAvailable = true }
+            const capSays = typeof anyCap.isPluginAvailable === 'function' ? anyCap.isPluginAvailable('WellueSDK') : undefined;
+            const hasMethods = this.nativePlugin && typeof (this.nativePlugin as any).initialize === 'function';
+            this.pluginAvailable = (capSays === true) || (!!hasMethods && Capacitor.isNativePlatform());
+            console.log('🚀 [NATIVE WELLUE PLUGIN] Plugin available check result:', this.pluginAvailable);
+        } catch (error) {
+            console.log('⚠️ [NATIVE WELLUE PLUGIN] Plugin availability check failed, defaulting to true:', error);
+            this.pluginAvailable = true;
+        }
+        
+        console.log('🚀 [NATIVE WELLUE PLUGIN] Creating BP measurement manager...');
         this.bpManager = new BPMeasurementManager(this.callbacks);
+        console.log('🚀 [NATIVE WELLUE PLUGIN] Setting up Bluetooth monitoring...');
         this.setupBluetoothMonitoring();
+        console.log('✅ [NATIVE WELLUE PLUGIN] Constructor completed');
     }
 
     private setupBluetoothMonitoring() {
-        if (Capacitor.isNativePlatform() && this.pluginAvailable) {
+        console.log('🔵 [BLUETOOTH MONITORING] Setting up Bluetooth monitoring...');
+        console.log('🔵 [BLUETOOTH MONITORING] Is native platform:', Capacitor.isNativePlatform());
+        console.log('🔵 [BLUETOOTH MONITORING] Plugin available:', this.pluginAvailable);
+        
+        if (Capacitor.isNativePlatform()) {
+            console.log('🔵 [BLUETOOTH MONITORING] Starting Bluetooth state monitoring...');
             this.monitorBluetoothState();
+        } else {
+            console.log('⚠️ [BLUETOOTH MONITORING] Skipping Bluetooth monitoring - not native platform or plugin not available');
         }
     }
 
     private async monitorBluetoothState() {
+        console.log('🔵 [BLUETOOTH MONITORING] Starting Bluetooth state monitoring...');
         try {
+            console.log('🔵 [BLUETOOTH MONITORING] Checking initial Bluetooth state...');
             const isEnabled = await this.checkBluetoothEnabled();
+            console.log('🔵 [BLUETOOTH MONITORING] Initial Bluetooth state:', isEnabled);
             this.callbacks.onBluetoothStatusChanged?.(isEnabled);
+            
+            console.log('🔵 [BLUETOOTH MONITORING] Setting up periodic Bluetooth state checks...');
             setInterval(async () => {
+                console.log('🔵 [BLUETOOTH MONITORING] Periodic Bluetooth state check...');
                 const enabled = await this.checkBluetoothEnabled();
+                console.log('🔵 [BLUETOOTH MONITORING] Periodic check result:', enabled);
                 this.callbacks.onBluetoothStatusChanged?.(enabled);
             }, 5000);
+            console.log('✅ [BLUETOOTH MONITORING] Bluetooth state monitoring set up successfully');
         } catch (error) {
-            console.error('Failed to monitor Bluetooth state:', error);
+            console.error('❌ [BLUETOOTH MONITORING] Failed to monitor Bluetooth state:', error);
         }
     }
 
     private async checkBluetoothEnabled(): Promise<boolean> {
-        if (!Capacitor.isNativePlatform() || !this.pluginAvailable) {
+        console.log('🔵 [BLUETOOTH CHECK] Starting Bluetooth status check...');
+        console.log('🔵 [BLUETOOTH CHECK] Is native platform:', Capacitor.isNativePlatform());
+        console.log('🔵 [BLUETOOTH CHECK] Plugin available:', this.pluginAvailable);
+        
+        if (!Capacitor.isNativePlatform()) {
+            console.log('⚠️ [BLUETOOTH CHECK] Not on native platform');
             return false;
         }
 
         try {
+            console.log('🔵 [BLUETOOTH CHECK] Calling native plugin isBluetoothEnabled()...');
             const result = await this.nativePlugin.isBluetoothEnabled();
+            console.log('🔵 [BLUETOOTH CHECK] Native plugin result:', result);
+            console.log('🔵 [BLUETOOTH CHECK] Bluetooth enabled:', result.enabled);
             return result.enabled;
         } catch (error) {
             // Suppress noisy unimplemented errors; report once
             const msg = String(error);
+            console.log('❌ [BLUETOOTH CHECK] Error occurred:', error);
+            console.log('❌ [BLUETOOTH CHECK] Error message:', msg);
+            // Fallback to community BLE if available
+            if (BleClient) {
+                try {
+                    console.log('🔵 [BLUETOOTH CHECK][FALLBACK] Initializing BleClient...');
+                    if (typeof BleClient.initialize === 'function') {
+                        await BleClient.initialize();
+                    }
+                    if (typeof BleClient.isEnabled === 'function') {
+                        const enabled = await BleClient.isEnabled();
+                        console.log('🔵 [BLUETOOTH CHECK][FALLBACK] isEnabled:', enabled);
+                        return !!enabled;
+                    }
+                } catch (e) {
+                    console.error('❌ [BLUETOOTH CHECK][FALLBACK] Failed:', e);
+                }
+            }
             if (!/not implemented/i.test(msg)) {
-                console.error('Error checking Bluetooth status:', error);
+                console.error('❌ [BLUETOOTH CHECK] Error checking Bluetooth status:', error);
             }
             return false;
         }
@@ -682,34 +741,53 @@ class NativeWelluePlugin {
     }
 
     async initialize(): Promise<void> {
-        if (!Capacitor.isNativePlatform() || !this.pluginAvailable) {
-            console.warn('WellueSDK plugin not available on this platform; skipping initialization');
+        console.log('🚀 [WELLUE SDK] Starting initialization...');
+        console.log('🚀 [WELLUE SDK] Is native platform:', Capacitor.isNativePlatform());
+        console.log('🚀 [WELLUE SDK] Plugin available:', this.pluginAvailable);
+        console.log('🚀 [WELLUE SDK] Native plugin exists:', !!this.nativePlugin);
+        
+        if (!Capacitor.isNativePlatform()) {
+            console.warn('⚠️ [WELLUE SDK] Not a native platform; skipping initialization');
             this.isInitialized = false;
             return;
         }
 
         try {
+            console.log('🔵 [WELLUE SDK] Calling native plugin initialize()...');
             await this.nativePlugin.initialize();
+            console.log('✅ [WELLUE SDK] Native plugin initialize() completed');
+            
+            console.log('🔵 [WELLUE SDK] Setting up event listeners...');
             this.setupEventListeners();
+            console.log('✅ [WELLUE SDK] Event listeners set up');
             
             // Check initial Bluetooth status and notify
+            console.log('🔵 [WELLUE SDK] Checking initial Bluetooth status...');
             const bluetoothEnabled = await this.checkBluetoothEnabled();
-            console.log('🔵 Initial Bluetooth status check:', bluetoothEnabled);
+            console.log('🔵 [WELLUE SDK] Initial Bluetooth status check result:', bluetoothEnabled);
             this.callbacks.onBluetoothStatusChanged?.(bluetoothEnabled);
 
             this.isInitialized = true;
-            console.log('Wellue SDK initialized successfully');
+            console.log('✅ [WELLUE SDK] Initialization completed successfully');
         } catch (error) {
-            console.error('Failed to initialize Wellue SDK:', error);
+            console.error('❌ [WELLUE SDK] Failed to initialize:', error);
             throw error;
         }
     }
 
     private setupEventListeners() {
-        if (!this.nativePlugin) return;
+        console.log('🔵 [EVENT LISTENERS] Setting up event listeners...');
+        console.log('🔵 [EVENT LISTENERS] Native plugin exists:', !!this.nativePlugin);
+        
+        if (!this.nativePlugin) {
+            console.log('❌ [EVENT LISTENERS] No native plugin available, skipping event listener setup');
+            return;
+        }
 
         // Device found event
+        console.log('🔵 [EVENT LISTENERS] Adding deviceFound listener...');
         this.nativePlugin.addListener('deviceFound', (data: any) => {
+            console.log('🔍 [EVENT LISTENERS] Device found event received:', data);
             const device: WellueDevice = {
                 id: data.deviceId,
                 name: data.deviceName,
@@ -718,6 +796,7 @@ class NativeWelluePlugin {
                 isConnected: false,
                 address: data.address
             };
+            console.log('🔍 [EVENT LISTENERS] Processed device object:', device);
             this.callbacks.onDeviceFound?.(device);
         });
 
@@ -859,8 +938,10 @@ class NativeWelluePlugin {
         });
 
         // Bluetooth status changed event
+        console.log('🔵 [EVENT LISTENERS] Adding bluetoothStatusChanged listener...');
         this.nativePlugin.addListener('bluetoothStatusChanged', (data: any) => {
-            console.log('🔵 Web layer received Bluetooth status change:', data);
+            console.log('🔵 [EVENT LISTENERS] Bluetooth status changed event received:', data);
+            console.log('🔵 [EVENT LISTENERS] Bluetooth enabled:', data.enabled);
             this.callbacks.onBluetoothStatusChanged?.(data.enabled);
         });
 
@@ -894,30 +975,49 @@ class NativeWelluePlugin {
     // Now using enhanced phase detection in BPMeasurementManager
 
     async startScan(): Promise<void> {
+        console.log('🔍 [START SCAN] Starting device scan...');
+        console.log('🔍 [START SCAN] SDK initialized:', this.isInitialized);
+        
         if (!this.isInitialized) {
-            throw new Error('Wellue SDK not initialized');
+            console.log('🔄 [START SCAN] SDK not initialized, auto-initializing now...');
+            try {
+                await this.initialize();
+                console.log('✅ [START SCAN] Auto-initialize completed');
+            } catch (e) {
+                console.error('❌ [START SCAN] Auto-initialize failed:', e);
+                throw new Error('Wellue SDK not initialized');
+            }
         }
 
+        console.log('🔍 [START SCAN] Checking Bluetooth status...');
         const bluetoothEnabled = await this.checkBluetoothEnabled();
+        console.log('🔍 [START SCAN] Bluetooth enabled:', bluetoothEnabled);
+        
         if (!bluetoothEnabled) {
+            console.log('❌ [START SCAN] Bluetooth disabled, throwing error');
             throw new Error('Bluetooth is disabled. Please enable Bluetooth in device settings.');
         }
 
         try {
+            console.log('🔍 [START SCAN] Calling native plugin startScan()...');
             await this.nativePlugin.startScan();
+            console.log('✅ [START SCAN] Native plugin startScan() completed');
         } catch (error) {
-            console.error('Failed to start scan:', error);
+            console.error('❌ [START SCAN] Failed to start scan:', error);
             throw error;
         }
     }
 
     async stopScan(): Promise<void> {
+        if (!this.isInitialized) {
+            try { await this.initialize(); } catch {}
+        }
         await this.nativePlugin.stopScan();
     }
 
     async connect(deviceId: string): Promise<WellueDevice> {
         if (!this.isInitialized) {
-            throw new Error('Wellue SDK not initialized');
+            try { await this.initialize(); } catch { throw new Error('Wellue SDK not initialized'); }
         }
 
         try {
@@ -999,7 +1099,7 @@ class NativeWelluePlugin {
 
     async startECGMeasurement(deviceId: string): Promise<void> {
         if (!this.isInitialized) {
-            throw new Error('Wellue SDK not initialized');
+            try { await this.initialize(); } catch { throw new Error('Wellue SDK not initialized'); }
         }
 
         const device = this.connectedDevices.get(deviceId);
@@ -1017,7 +1117,7 @@ class NativeWelluePlugin {
 
     async startRtTaskForConnectedDevice(): Promise<void> {
         if (!this.isInitialized) {
-            throw new Error('Wellue SDK not initialized');
+            try { await this.initialize(); } catch { throw new Error('Wellue SDK not initialized'); }
         }
         try {
             await this.nativePlugin.startRtTaskForConnectedDevice?.();
@@ -1039,7 +1139,7 @@ class NativeWelluePlugin {
 
     async getBatteryLevel(deviceId: string): Promise<number> {
         if (!this.isInitialized) {
-            throw new Error('Wellue SDK not initialized');
+            try { await this.initialize(); } catch { throw new Error('Wellue SDK not initialized'); }
         }
 
         const device = this.connectedDevices.get(deviceId);
@@ -1160,14 +1260,25 @@ export class WellueSDKBridge {
     private isInitialized = false;
 
     constructor() {
+        console.log('🚀 [WELLUE SDK BRIDGE] Constructor called');
+        console.log('🚀 [WELLUE SDK BRIDGE] Creating NativeWelluePlugin instance...');
         this.plugin = new NativeWelluePlugin();
+        console.log('✅ [WELLUE SDK BRIDGE] Constructor completed');
     }
 
     async initialize(callbacks: WellueSDKCallbacks): Promise<void> {
+        console.log('🚀 [WELLUE SDK BRIDGE] Initialize called');
+        console.log('🚀 [WELLUE SDK BRIDGE] Callbacks provided:', !!callbacks);
+        
         this.callbacks = callbacks;
+        console.log('🚀 [WELLUE SDK BRIDGE] Setting callbacks on plugin...');
         this.plugin.setCallbacks(callbacks);
+        
+        console.log('🚀 [WELLUE SDK BRIDGE] Calling plugin initialize...');
         await this.plugin.initialize();
+        
         this.isInitialized = true;
+        console.log('✅ [WELLUE SDK BRIDGE] Initialize completed');
     }
 
     async startScan(): Promise<void> {

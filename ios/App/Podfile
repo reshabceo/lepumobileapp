@@ -11,6 +11,7 @@ install! 'cocoapods', :disable_input_output_paths => true
 def capacitor_pods
   pod 'Capacitor', :path => '../../node_modules/@capacitor/ios'
   pod 'CapacitorCordova', :path => '../../node_modules/@capacitor/ios'
+  pod 'CapacitorCommunityBluetoothLe', :path => '../../node_modules/@capacitor-community/bluetooth-le'
   pod 'CapacitorFilesystem', :path => '../../node_modules/@capacitor/filesystem'
   pod 'CapacitorScreenOrientation', :path => '../../node_modules/@capacitor/screen-orientation'
   pod 'CapacitorShare', :path => '../../node_modules/@capacitor/share'
@@ -19,7 +20,9 @@ end
 target 'App' do
   capacitor_pods
   # Add your Pods here
-  pod 'VTProductLib'  # Official Wellue SDK for BP2 device
+  
+  # Viatom VTProductLib SDK for Wellue devices (Local Repository)
+  pod 'VTMProductLib', :path => '../../VTProductLib_Pods'
 end
 
 post_install do |installer|

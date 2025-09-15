@@ -19,6 +19,7 @@
     "info": "node start.js"
   },
   "dependencies": {
+    "@capacitor-community/bluetooth-le": "^7.2.0",
     "@capacitor/android": "^7.4.2",
     "@capacitor/cli": "^7.4.2",
     "@capacitor/core": "^7.4.2",
