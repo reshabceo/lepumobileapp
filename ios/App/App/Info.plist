@@ -30,7 +30,11 @@
 		<true/>
 	</dict>
 	<key>NSBluetoothAlwaysUsageDescription</key>
-	<string>This app uses Bluetooth to connect to and monitor health devices.</string>
+	<string>This app uses Bluetooth to connect to and monitor Wellue BP2 health devices.</string>
+	<key>NSBluetoothPeripheralUsageDescription</key>
+	<string>This app uses Bluetooth to connect to and monitor Wellue BP2 health devices.</string>
+	<key>NSBluetoothUsageDescription</key>
+	<string>This app uses Bluetooth to connect to and monitor Wellue BP2 health devices.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Camera access is required for video calls with your doctor.</string>
 	<key>NSMicrophoneUsageDescription</key>

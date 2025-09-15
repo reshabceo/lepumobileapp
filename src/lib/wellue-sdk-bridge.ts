@@ -921,7 +921,7 @@ class NativeWelluePlugin {
         }
 
         try {
-            const deviceData = await this.nativePlugin.connect({ address: deviceId });
+            const deviceData = await this.nativePlugin.connect({ address: deviceId, deviceId: deviceId });
             
             const device: WellueDevice = {
                 id: deviceId,
@@ -945,7 +945,7 @@ class NativeWelluePlugin {
 
     async disconnect(deviceId: string): Promise<void> {
         try {
-            await this.nativePlugin.disconnect?.({ address: deviceId });
+            await this.nativePlugin.disconnect?.({ address: deviceId, deviceId: deviceId });
             this.connectedDevices.delete(deviceId);
             if (this.activeDeviceId === deviceId) {
                 this.activeDeviceId = undefined;
@@ -1048,7 +1048,7 @@ class NativeWelluePlugin {
         }
 
         try {
-            const batteryLevel = await this.nativePlugin.getBatteryLevel?.({ address: deviceId });
+            const batteryLevel = await this.nativePlugin.getBatteryLevel?.({ address: deviceId, deviceId: deviceId });
             
             device.battery = batteryLevel;
             this.connectedDevices.set(deviceId, device);
@@ -1064,7 +1064,7 @@ class NativeWelluePlugin {
 
     async isConnected(deviceId: string): Promise<boolean> {
         try {
-            const native = await this.nativePlugin.isDeviceConnected?.({ address: deviceId });
+            const native = await this.nativePlugin.isDeviceConnected?.({ address: deviceId, deviceId: deviceId });
             if (native && typeof native.connected === 'boolean') return native.connected;
         } catch {}
         const device = this.connectedDevices.get(deviceId);
@@ -1104,7 +1104,7 @@ class NativeWelluePlugin {
     async getStoredFiles(deviceId: string): Promise<any[]> {
         try {
             console.log('🔍 NativeWelluePlugin: Attempting to get stored files for device:', deviceId);
-            const result = await this.nativePlugin.getBp2FileList?.({ address: deviceId });
+            const result = await this.nativePlugin.getBp2FileList?.({ address: deviceId, deviceId: deviceId });
             console.log('📁 NativeWelluePlugin: Raw result from getBp2FileList:', result);
             return result?.files || [];
         } catch (error) {
@@ -1116,7 +1116,7 @@ class NativeWelluePlugin {
     async readStoredFile(deviceId: string, fileName: string): Promise<any> {
         try {
             console.log('📖 NativeWelluePlugin: Attempting to read stored file:', fileName, 'from device:', deviceId);
-            const result = await this.nativePlugin.bp2ReadFile?.({ address: deviceId, fileName });
+            const result = await this.nativePlugin.bp2ReadFile?.({ address: deviceId, deviceId: deviceId, fileName });
             console.log('📄 NativeWelluePlugin: Raw result from bp2ReadFile:', result);
             return result || {};
         } catch (error) {
