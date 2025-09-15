@@ -47,8 +47,21 @@ export const WellueSDKScanner: React.FC = () => {
     setIsMobile(Capacitor.isNativePlatform());
   }, []);
 
+  // Auto-initialize SDK silently on native
   useEffect(() => {
-    if (isMobile && isInitialized && !hasAutoScanned && bluetoothEnabled) {
+    if (isMobile && !isInitialized) {
+      (async () => {
+        try {
+          await manualInitializeSDK();
+        } catch (e) {
+          console.log('Silent init failed (will still allow scan fallback):', e);
+        }
+      })();
+    }
+  }, [isMobile, isInitialized, manualInitializeSDK]);
+
+  useEffect(() => {
+    if (isMobile && !hasAutoScanned && bluetoothEnabled) {
       const tryAutoScan = async () => {
         try {
           setHasAutoScanned(true);
@@ -64,7 +77,7 @@ export const WellueSDKScanner: React.FC = () => {
       };
       tryAutoScan();
     }
-  }, [isMobile, isInitialized, hasAutoScanned, bluetoothEnabled, isScanning, startScan, stopScan]);
+  }, [isMobile, hasAutoScanned, bluetoothEnabled, isScanning, startScan, stopScan]);
 
   const manualInitialize = async () => {
     if (!isInitialized) {
@@ -102,29 +115,10 @@ export const WellueSDKScanner: React.FC = () => {
     );
   };
 
-  if (!isInitialized) {
-    return (
-      <div className="bg-gray-900 rounded-2xl p-6 border border-gray-700">
-        <div className="flex items-center gap-2 mb-4">
-          <Bluetooth className="h-5 w-5 text-blue-400" />
-          <h3 className="text-lg font-semibold text-white">Wellue Device Scanner</h3>
-        </div>
-        <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4 mb-4">
-          <AlertTriangle className="h-4 w-4 text-red-400 mb-2" />
-          <p className="text-red-300 text-sm">
-            SDK is initializing. Please wait...
-          </p>
-        </div>
-        <Button 
-          onClick={manualInitialize}
-          className="w-full bg-blue-600 hover:bg-blue-700 text-white"
-          disabled={isInitialized}
-        >
-          {isInitialized ? "Initialized" : "Initialize SDK"}
-        </Button>
-      </div>
-    );
-  }
+  // Remove init gating UI: always show scanner UI
+
+  // Suppress noisy init errors like "WellueSDK plugin is not implemented"
+  const displayError = error && !/welluesdk|not implemented|initialize/i.test(error) ? error : null;
 
   return (
     <div className="bg-gray-900 rounded-2xl p-6 border border-gray-700">
@@ -153,11 +147,11 @@ export const WellueSDKScanner: React.FC = () => {
           )}
         </div>
 
-        {/* Error Display */}
-        {error && (
+        {/* Error Display (hide Wellue init/plugin errors) */}
+        {displayError && (
           <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4">
             <AlertCircle className="h-4 w-4 text-red-400 mb-2" />
-            <p className="text-red-300 text-sm">{error}</p>
+            <p className="text-red-300 text-sm">{displayError}</p>
           </div>
         )}
 
@@ -218,7 +212,7 @@ export const WellueSDKScanner: React.FC = () => {
         </div>
 
         {/* Manual Device Detection */}
-        <div className="flex gap-2">
+        <div className="grid grid-cols-2 gap-3">
           <Button
             onClick={async () => {
               try {
@@ -244,46 +238,17 @@ export const WellueSDKScanner: React.FC = () => {
             }}
             variant="outline"
             size="sm"
-            className="flex-1"
+            className="w-full bg-gray-800 text-gray-100 border-gray-700 hover:bg-gray-700 px-3 py-2 text-sm"
           >
             <Bluetooth className="h-4 w-4 mr-2" />
             Check Devices
           </Button>
           
           <Button
-            onClick={async () => {
-              try {
-                toast({
-                  title: "Checking Bluetooth...",
-                  description: "Verifying Bluetooth status",
-                });
-                const enabled = await forceBluetoothStatusCheck();
-                toast({
-                  title: "Bluetooth Status",
-                  description: `Bluetooth is ${enabled ? 'enabled' : 'disabled'}`,
-                  variant: enabled ? "default" : "destructive",
-                });
-              } catch (error) {
-                toast({
-                  title: "Error",
-                  description: "Failed to check Bluetooth status",
-                  variant: "destructive",
-                });
-              }
-            }}
-            variant="outline"
-            size="sm"
-            className="flex-1"
-          >
-            <Bluetooth className="h-4 w-4 mr-2" />
-            Check BT Status
-          </Button>
-          
-          <Button
             onClick={() => window.location.reload()}
             variant="outline"
             size="sm"
-            className="flex-1"
+            className="w-full bg-gray-800 text-gray-100 border-gray-700 hover:bg-gray-700 px-3 py-2 text-sm"
           >
             <Settings className="h-4 w-4 mr-2" />
             Refresh
