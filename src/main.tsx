@@ -1,4 +1,5 @@
 import { createRoot } from 'react-dom/client'
+import { Capacitor } from '@capacitor/core'
 import App from './App.tsx'
 import './index.css'
 import { Component, ErrorInfo, ReactNode } from 'react'
@@ -74,17 +75,31 @@ window.addEventListener('unhandledrejection', (event) => {
   console.error('Unhandled promise rejection:', event.reason)
 })
 
-// Register service worker for PWA (only in browser)
+// Service worker handling
 if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js')
-      .then((registration) => {
-        console.log('SW registered: ', registration);
+  const isNative = typeof Capacitor !== 'undefined' && Capacitor.isNativePlatform?.()
+  if (isNative) {
+    // Unregister any service workers on native to avoid stale caching
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.getRegistrations().then(registrations => {
+        registrations.forEach(reg => reg.unregister())
       })
-      .catch((registrationError) => {
-        console.log('SW registration failed: ', registrationError);
-      });
-  });
+      if ('caches' in window) {
+        caches.keys().then(keys => keys.forEach(k => caches.delete(k)))
+      }
+    })
+  } else {
+    // Register SW for web/PWA only
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js')
+        .then((registration) => {
+          console.log('SW registered: ', registration)
+        })
+        .catch((registrationError) => {
+          console.log('SW registration failed: ', registrationError)
+        })
+    })
+  }
 }
 
 // Render the app with error boundary

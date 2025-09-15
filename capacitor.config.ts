@@ -8,6 +8,9 @@ const config: CapacitorConfig = {
     WellueSDK: {
       // Plugin configuration if needed
     }
+  },
+  ios: {
+    scheme: "App"
   }
 };
 
