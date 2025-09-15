@@ -1003,8 +1003,23 @@ class NativeWelluePlugin {
             await this.nativePlugin.startScan();
             console.log('✅ [START SCAN] Native plugin startScan() completed');
         } catch (error) {
-            console.error('❌ [START SCAN] Failed to start scan:', error);
-            throw error;
+            console.log('⚠️ [START SCAN] Native plugin failed, trying BLE fallback...');
+            // Fallback to BLE scanning
+            try {
+                if (BleClient) {
+                    await BleClient.initialize();
+                    const devices = await BleClient.requestLEScan({
+                        services: ['0000180D-0000-1000-8000-00805F9B34FB'], // Heart Rate service
+                        allowDuplicates: false
+                    });
+                    console.log('🔍 [START SCAN][FALLBACK] BLE scan started, found devices:', devices);
+                } else {
+                    throw new Error('No BLE fallback available');
+                }
+            } catch (fallbackError) {
+                console.error('❌ [START SCAN] Both native and BLE fallback failed:', fallbackError);
+                throw error; // Throw original error
+            }
         }
     }
 

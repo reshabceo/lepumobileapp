@@ -126,20 +126,23 @@ const PatientReportsView: React.FC = () => {
     }
 
     return (
-        <div className="bg-[#101010] min-h-screen text-white">
-            <div className="max-w-md mx-auto p-4">
-                {/* Header */}
-                <div className="flex items-center mb-6">
+        <div className="bg-[#101010] min-h-screen text-white p-4">
+            <div className="max-w-sm mx-auto">
+                {/* Status Bar Spacing (match scanner) */}
+                <div className="h-6"></div>
+
+                {/* Header (match scanner style) */}
+                <div className="flex items-center gap-4 mb-6">
                     <button
                         onClick={() => navigate('/dashboard')}
-                        className="mr-4 p-2 hover:bg-gray-800 rounded-lg transition-colors"
+                        className="bg-gray-700/80 hover:bg-gray-600 p-2 rounded-lg transition-all duration-200"
                     >
-                        <ArrowLeft className="h-6 w-6" />
+                        <ArrowLeft className="h-5 w-5" />
                     </button>
                     <div className="flex items-center">
-                        <FileText className="h-6 w-6 text-blue-500 mr-3" />
+                        <FileText className="h-5 w-5 text-blue-500 mr-3" />
                         <div>
-                            <h1 className="text-xl font-bold">My Reports</h1>
+                            <h1 className="text-2xl font-bold text-white">My Reports</h1>
                             <p className="text-sm text-gray-400">Medical reports from your doctor</p>
                         </div>
                     </div>

@@ -191,6 +191,9 @@ export const HealthDashboard = () => {
     manualInitializeSDK,
   } = useDevice();
 
+  // Ensure the banner doesn't show a stale Bluetooth error when Bluetooth is ON
+  const bannerError = bluetoothEnabled && deviceError === 'Bluetooth is disabled' ? null : deviceError;
+
   // In-app stored file viewer state (supports both BP (1) and ECG (2))
   type StoredItem = {
     fileName: string;
@@ -1075,8 +1078,8 @@ export const HealthDashboard = () => {
               </button>
             </div>
 
-            {/* Show device errors if any */}
-            {deviceError && (
+            {/* Hide device error banner as requested */}
+            {false && (
               <div className="mt-3 p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
                 <div className="flex items-center gap-2">
                   <Siren className="w-4 h-4 text-red-400" />
@@ -1084,7 +1087,7 @@ export const HealthDashboard = () => {
                     Device Error
                   </span>
                 </div>
-                <p className="text-sm text-red-300 mt-1">{deviceError}</p>
+                <p className="text-sm text-red-300 mt-1">{bannerError}</p>
               </div>
             )}
           </div>

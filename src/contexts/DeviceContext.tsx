@@ -129,6 +129,9 @@ export const DeviceProvider: React.FC<DeviceProviderProps> = ({ children }) => {
                                 setConnectedDevice(null);
                                 // Clear available devices when Bluetooth is disabled
                                 setAvailableDevices([]);
+                            } else {
+                                // Clear stale error banner when Bluetooth becomes available again
+                                setError(null);
                             }
                         },
                         onError: (error: string, details?: any) => {
@@ -573,6 +576,8 @@ export const DeviceProvider: React.FC<DeviceProviderProps> = ({ children }) => {
                         setError('Bluetooth is disabled');
                         setConnectedDevice(null);
                         setAvailableDevices([]);
+                    } else {
+                        setError(null);
                     }
                 },
                 onError: (error: string, details?: any) => {
@@ -636,6 +641,8 @@ export const DeviceProvider: React.FC<DeviceProviderProps> = ({ children }) => {
                         setError('Bluetooth is disabled');
                         setConnectedDevice(null);
                         setAvailableDevices([]);
+                    } else {
+                        setError(null);
                     }
                 },
                 onError: (error: string, details?: any) => {
