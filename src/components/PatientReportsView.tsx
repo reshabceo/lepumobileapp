@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FileText, Download, Calendar, User, ArrowLeft } from 'lucide-react';
+import { FileText, Download, Calendar, User, ArrowLeft, Upload, Stethoscope } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 import { useRealTimeVitals } from '@/hooks/useRealTimeVitals';
@@ -14,6 +14,7 @@ interface PatientReport {
     file_size: number;
     created_at: string;
     doctor_name: string;
+    uploaded_by_patient: boolean;
 }
 
 const PatientReportsView: React.FC = () => {
@@ -21,6 +22,7 @@ const PatientReportsView: React.FC = () => {
     const { patientProfile } = useRealTimeVitals();
     const [reports, setReports] = useState<PatientReport[]>([]);
     const [loading, setLoading] = useState(true);
+    const [activeTab, setActiveTab] = useState<'from-doctor' | 'my-uploads'>('from-doctor');
 
     useEffect(() => {
         if (patientProfile) {
@@ -57,6 +59,15 @@ const PatientReportsView: React.FC = () => {
             setLoading(false);
         }
     };
+
+    // Filter reports based on active tab
+    const filteredReports = reports.filter(report => {
+        if (activeTab === 'from-doctor') {
+            return !report.uploaded_by_patient; // Reports uploaded by doctor
+        } else {
+            return report.uploaded_by_patient; // Reports uploaded by patient
+        }
+    });
 
     const downloadReport = async (report: PatientReport) => {
         try {
@@ -143,9 +154,35 @@ const PatientReportsView: React.FC = () => {
                         <FileText className="h-5 w-5 text-blue-500 mr-3" />
                         <div>
                             <h1 className="text-2xl font-bold text-white">My Reports</h1>
-                            <p className="text-sm text-gray-400">Medical reports from your doctor</p>
+                            <p className="text-sm text-gray-400">Medical reports and uploads</p>
                         </div>
                     </div>
+                </div>
+
+                {/* Tabs */}
+                <div className="flex bg-gray-800/50 rounded-lg p-1 mb-6">
+                    <button
+                        onClick={() => setActiveTab('from-doctor')}
+                        className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-md transition-all duration-200 ${
+                            activeTab === 'from-doctor'
+                                ? 'bg-blue-600 text-white shadow-lg'
+                                : 'text-gray-400 hover:text-white hover:bg-gray-700/50'
+                        }`}
+                    >
+                        <Stethoscope className="h-4 w-4" />
+                        <span className="font-medium">From Doctor</span>
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('my-uploads')}
+                        className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-md transition-all duration-200 ${
+                            activeTab === 'my-uploads'
+                                ? 'bg-blue-600 text-white shadow-lg'
+                                : 'text-gray-400 hover:text-white hover:bg-gray-700/50'
+                        }`}
+                    >
+                        <Upload className="h-4 w-4" />
+                        <span className="font-medium">My Uploads</span>
+                    </button>
                 </div>
 
                 {/* Loading State */}
@@ -157,18 +194,33 @@ const PatientReportsView: React.FC = () => {
                 )}
 
                 {/* No Reports */}
-                {!loading && reports.length === 0 && (
+                {!loading && filteredReports.length === 0 && (
                     <div className="text-center py-12">
                         <FileText className="h-16 w-16 text-gray-600 mx-auto mb-4" />
-                        <h3 className="text-lg font-semibold text-gray-300 mb-2">No Reports Yet</h3>
-                        <p className="text-gray-500">Your doctor hasn't uploaded any reports yet.</p>
+                        <h3 className="text-lg font-semibold text-gray-300 mb-2">
+                            {activeTab === 'from-doctor' ? 'No Reports from Doctor' : 'No Uploads Yet'}
+                        </h3>
+                        <p className="text-gray-500">
+                            {activeTab === 'from-doctor' 
+                                ? 'Your doctor hasn\'t uploaded any reports yet.' 
+                                : 'You haven\'t uploaded any reports yet.'
+                            }
+                        </p>
+                        {activeTab === 'my-uploads' && (
+                            <button
+                                onClick={() => navigate('/add-reports')}
+                                className="mt-4 bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                            >
+                                Upload Report
+                            </button>
+                        )}
                     </div>
                 )}
 
                 {/* Reports List */}
-                {!loading && reports.length > 0 && (
+                {!loading && filteredReports.length > 0 && (
                     <div className="space-y-4">
-                        {reports.map((report) => (
+                        {filteredReports.map((report) => (
                             <div
                                 key={report.id}
                                 className="bg-[#1A1A1A] border border-gray-800 rounded-xl p-4 hover:border-gray-700 transition-all"
@@ -176,8 +228,17 @@ const PatientReportsView: React.FC = () => {
                                 <div className="flex items-start justify-between mb-3">
                                     <div className="flex-1">
                                         <div className="flex items-center gap-2 mb-2">
-                                            <FileText className="h-5 w-5 text-blue-500" />
+                                            {report.uploaded_by_patient ? (
+                                                <Upload className="h-5 w-5 text-green-500" />
+                                            ) : (
+                                                <Stethoscope className="h-5 w-5 text-blue-500" />
+                                            )}
                                             <h3 className="font-semibold text-white">{report.title}</h3>
+                                            {report.uploaded_by_patient && (
+                                                <span className="text-xs bg-green-500/20 text-green-400 px-2 py-1 rounded-full">
+                                                    My Upload
+                                                </span>
+                                            )}
                                         </div>
 
                                         <span className={`inline-block px-2 py-1 text-xs rounded-full ${getReportTypeColor(report.report_type)}`}>
