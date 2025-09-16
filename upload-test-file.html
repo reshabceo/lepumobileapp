@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Upload Test File to Supabase</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+    <h1>Upload Test File to Supabase Storage</h1>
+    <input type="file" id="fileInput" accept=".pdf,.jpg,.png,.doc,.docx">
+    <button onclick="uploadFile()">Upload File</button>
+    <div id="result"></div>
+
+    <script>
+        // Replace with your Supabase URL and anon key
+        const supabaseUrl = 'YOUR_SUPABASE_URL';
+        const supabaseKey = 'YOUR_SUPABASE_ANON_KEY';
+        const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+
+        async function uploadFile() {
+            const fileInput = document.getElementById('fileInput');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                alert('Please select a file');
+                return;
+            }
+
+            try {
+                // Upload to storage
+                const fileName = `doctor-reports/${Date.now()}-${file.name}`;
+                const { data, error } = await supabase.storage
+                    .from('patient-reports')
+                    .upload(fileName, file);
+
+                if (error) {
+                    console.error('Upload error:', error);
+                    document.getElementById('result').innerHTML = `Error: ${error.message}`;
+                    return;
+                }
+
+                console.log('Upload successful:', data);
+                document.getElementById('result').innerHTML = `
+                    <h3>Upload Successful!</h3>
+                    <p>File path: ${data.path}</p>
+                    <p>Now run this SQL to add it to the database:</p>
+                    <textarea style="width: 100%; height: 100px;">
+INSERT INTO patient_uploads (
+    patient_id,
+    title,
+    description,
+    file_url,
+    file_name,
+    file_size,
+    mime_type,
+    upload_status,
+    upload_source,
+    patient_notes,
+    created_at
+) VALUES (
+    (SELECT id FROM patients LIMIT 1),
+    '${file.name.split('.')[0]}',
+    'Test file uploaded via web interface',
+    '${data.path}',
+    '${file.name}',
+    ${file.size},
+    '${file.type}',
+    'uploaded',
+    'doctor',
+    'Uploaded via web interface',
+    NOW()
+);
+                    </textarea>
+                `;
+            } catch (err) {
+                console.error('Error:', err);
+                document.getElementById('result').innerHTML = `Error: ${err.message}`;
+            }
+        }
+    </script>
+</body>
+</html>
