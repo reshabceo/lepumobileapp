@@ -1,0 +1,17 @@
+{
+	"appId": "com.priti.app",
+	"appName": "Monitraq",
+	"webDir": "dist",
+	"plugins": {
+		"WellueSDK": {}
+	},
+	"ios": {
+		"scheme": "App"
+	},
+	"packageClassList": [
+		"BluetoothLe",
+		"FilesystemPlugin",
+		"ScreenOrientationPlugin",
+		"SharePlugin"
+	]
+}
