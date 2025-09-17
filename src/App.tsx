@@ -29,6 +29,7 @@ import { ResetPasswordPage } from "./components/ResetPasswordPage";
 import EcgDemo from "./pages/EcgDemo";
 import VideoCallPage from "./pages/VideoCall";
 import WaitingForDoctor from "./pages/WaitingForDoctor";
+import { GlobalVideoCallNotification } from "./components/GlobalVideoCallNotification";
 
 const queryClient = new QueryClient();
 
@@ -40,6 +41,7 @@ const App = () => (
           <Toaster />
           <Sonner />
           <BrowserRouter>
+            <GlobalVideoCallNotification />
             <Routes>
               {/* Public routes */}
               <Route path="/" element={

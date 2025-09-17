@@ -51,13 +51,20 @@ export const useRealTimeVitals = () => {
                     throw new Error(typeof profileData.error === 'string' ? profileData.error : profileData.error.message);
                 }
 
+                // If no profile exists, stop loading and keep dashboard minimal
+                if (!profileData.data) {
+                    console.log('ℹ️ No patient profile found; skipping vitals fetch');
+                    setPatientProfile(null);
+                    return;
+                }
+
                 setPatientProfile(profileData.data);
 
                 // Get vital signs for this patient
                 const { data: vitalsData, error: vitalsError } = await supabase
                     .from('vital_signs')
                     .select('*')
-                    .eq('patient_id', profileData.data?.id)
+                    .eq('patient_id', profileData.data.id)
                     .order('reading_timestamp', { ascending: false })
                     .limit(50);
 
