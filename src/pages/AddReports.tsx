@@ -4,11 +4,14 @@ import { ArrowLeft, FilePlus2, Search, Upload, Camera, ChevronDown } from 'lucid
 import { useNavigate } from 'react-router-dom';
 import { MobileAppContainer } from '../components/MobileAppContainer';
 import { useToast } from '../hooks/use-toast';
+import { supabase } from '@/lib/supabase';
+import { useRealTimeVitals } from '@/hooks/useRealTimeVitals';
 
 // Main Add Report Component
 export default function AddReports() {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { patientProfile } = useRealTimeVitals();
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   // State for form inputs
@@ -16,6 +19,7 @@ export default function AddReports() {
   const [reportName, setReportName] = useState('');
   const [doctorName, setDoctorName] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
 
   const handleBack = () => {
     navigate('/reports');
@@ -67,26 +71,105 @@ export default function AddReports() {
     }
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     // Validate required fields
-    if (!reportType || !reportName || !doctorName) {
+    if (!reportType || !reportName || !doctorName || !selectedFile) {
       toast({
         title: "Missing Information",
-        description: "Please fill in all required fields",
+        description: "Please fill in all required fields and select a file",
         variant: "destructive",
       });
       return;
     }
 
-    // Handle save logic here
-    console.log('Saving report:', { reportType, reportName, doctorName, file: selectedFile });
-    
-    toast({
-      title: "Report Saved",
-      description: "Your medical report has been saved successfully",
-    });
-    
-    navigate('/reports');
+    if (!patientProfile) {
+      toast({
+        title: "Error",
+        description: "Patient profile not found. Please try again.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!patientProfile.assigned_doctor_id) {
+      toast({
+        title: "No Assigned Doctor",
+        description: "You don't have an assigned doctor. Please contact support.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setUploading(true);
+
+    try {
+      // Upload file to Supabase Storage
+      const fileExt = selectedFile.name.split('.').pop();
+      const fileName = `${patientProfile.id}/${Date.now()}.${fileExt}`;
+
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('patient-reports')
+        .upload(fileName, selectedFile);
+
+      if (uploadError) {
+        console.error('File upload error:', uploadError);
+        toast({
+          title: "Upload Failed",
+          description: "Failed to upload file: " + uploadError.message,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Use the patient's assigned doctor instead of looking up by name
+      console.log('🔍 Debug - reportType value:', reportType);
+      console.log('🔍 Debug - reportType type:', typeof reportType);
+      
+      const insertData = {
+        patient_id: patientProfile.id,
+        doctor_id: patientProfile.assigned_doctor_id, // Use assigned doctor
+        title: `${reportName} (by Dr. ${doctorName})`,
+        description: `Uploaded by patient. Consulted with: ${doctorName}`,
+        report_type: reportType,
+        file_url: fileName,
+        file_name: selectedFile.name,
+        file_size: selectedFile.size,
+        mime_type: selectedFile.type,
+        uploaded_by_patient: true
+      };
+      
+      console.log('🔍 Debug - Full insert data:', insertData);
+      
+      const { error: insertError } = await supabase
+        .from('patient_reports')
+        .insert(insertData);
+
+      if (insertError) {
+        console.error('Database insert error:', insertError);
+        toast({
+          title: "Save Failed",
+          description: "Failed to save report: " + insertError.message,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      toast({
+        title: "Report Saved",
+        description: "Your medical report has been saved successfully",
+      });
+      
+      navigate('/reports');
+    } catch (error) {
+      console.error('Upload error:', error);
+      toast({
+        title: "Upload Failed",
+        description: "An unexpected error occurred. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setUploading(false);
+    }
   };
 
   return (
@@ -158,15 +241,20 @@ export default function AddReports() {
                 <label className="text-sm font-medium text-gray-400 mb-2 block">Report Type *</label>
                 <div className="relative">
                   <select
+                    key="report-type-select"
                     value={reportType}
-                    onChange={(e) => setReportType(e.target.value)}
+                    onChange={(e) => {
+                      console.log('🔍 Form change - selected value:', e.target.value);
+                      setReportType(e.target.value);
+                    }}
                     className="w-full appearance-none bg-[#2D333B] text-white border border-gray-600 rounded-lg py-3 px-4 focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
                   >
                     <option value="" disabled>Select report type</option>
-                    <option value="blood_test">Blood Test</option>
-                    <option value="xray">X-Ray</option>
-                    <option value="mri">MRI Scan</option>
-                    <option value="consultation">Consultation Notes</option>
+                    <option value="medical_report">Medical Report</option>
+                    <option value="test_results">Test Results</option>
+                    <option value="prescription">Prescription</option>
+                    <option value="consultation_notes">Consultation Notes</option>
+                    <option value="discharge_summary">Discharge Summary</option>
                   </select>
                   <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={20} />
                 </div>
@@ -189,9 +277,10 @@ export default function AddReports() {
                   type="text"
                   value={doctorName}
                   onChange={(e) => setDoctorName(e.target.value)}
-                  placeholder="Enter doctor name"
+                  placeholder="Enter the doctor who provided this report"
                   className="w-full bg-[#2D333B] text-white border border-gray-600 rounded-lg py-3 px-4 focus:ring-2 focus:ring-teal-500 focus:border-teal-500 placeholder-gray-500"
                 />
+                <p className="text-xs text-gray-500 mt-1">Name of the doctor who provided this report (will be visible to your assigned doctor)</p>
               </div>
             </form>
           </main>
@@ -200,9 +289,17 @@ export default function AddReports() {
           <footer className="p-4 flex-shrink-0">
             <button 
               onClick={handleSave}
-              className="w-full bg-teal-500 text-white font-bold py-3 rounded-lg hover:bg-teal-600 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-[#1C2128] focus:ring-teal-500"
+              disabled={uploading}
+              className="w-full bg-teal-500 text-white font-bold py-3 rounded-lg hover:bg-teal-600 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-[#1C2128] focus:ring-teal-500 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Save Report
+              {uploading ? (
+                <div className="flex items-center justify-center">
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2"></div>
+                  Uploading...
+                </div>
+              ) : (
+                'Save Report'
+              )}
             </button>
           </footer>
         </div>
