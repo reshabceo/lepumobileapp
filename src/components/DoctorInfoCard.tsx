@@ -202,7 +202,7 @@ export const DoctorInfoCard: React.FC = () => {
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
 
-        {/* Video Call Button */}
+        {/* Video Call Button (disabled per requirements)
         <button
           onClick={handleVideoCall}
           className="absolute top-4 right-4 bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-3 rounded-lg flex items-center gap-2 text-sm transition-all duration-200 hover:scale-105 active:scale-95"
@@ -210,6 +210,7 @@ export const DoctorInfoCard: React.FC = () => {
           <Video size={16} />
           <span>Video Call</span>
         </button>
+        */}
       </div>
 
       <div className="p-4">

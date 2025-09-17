@@ -56,22 +56,81 @@ export function usePatientVideoCall(authUserId?: string | null): UsePatientVideo
     return () => { cancelled = true }
   }, [authUserId])
 
+  const loadLatestCall = useCallback(async (): Promise<PatientVideoCall | null> => {
+    try {
+      if (!patientId) return null
+      const { data, error } = await supabase
+        .from('video_calls')
+        .select('id, doctor_id, patient_id, channel_name, call_type, status, initiated_at, accepted_at, ended_at, doctor_token, patient_token')
+        .eq('patient_id', patientId)
+        .in('status', ['pending','accepted'])
+        .order('initiated_at', { ascending: false })
+        .limit(1)
+      const row = data?.[0]
+      if (error || !row) return null
+      const call: PatientVideoCall = {
+        id: row.id,
+        doctor_id: row.doctor_id,
+        patient_id: row.patient_id,
+        channel_name: row.channel_name,
+        call_type: row.call_type,
+        status: row.status,
+        initiated_at: row.initiated_at,
+        accepted_at: row.accepted_at,
+        ended_at: row.ended_at,
+        doctor_token: row.doctor_token,
+        patient_token: row.patient_token
+      }
+      setCurrentCall(call)
+      return call
+    } catch { return null }
+  }, [patientId])
+
   // Subscribe to video_calls changes for this patient
   useEffect(() => {
     if (!patientId) return
     const pid = patientId
+    console.log('[CALL] Setting up video_calls subscription for patient:', pid)
+
     const channel = supabase
       .channel(`patient_video_calls_${pid}`)
+      // New calls inserted for this patient
       .on('postgres_changes', {
-        event: '*',
+        event: 'INSERT',
         schema: 'public',
         table: 'video_calls',
         filter: `patient_id=eq.${pid}`
       }, payload => {
-        console.log('[CALL] video_calls change', payload.eventType, payload.new)
         const row = payload.new as any
         if (!row) return
-        if (['pending', 'accepted'].includes(row.status)) {
+        if (row.status === 'pending' || row.status === 'accepted') {
+          console.log('[CALL] INSERT detected for patient:', row.id)
+          setCurrentCall({
+            id: row.id,
+            doctor_id: row.doctor_id,
+            patient_id: row.patient_id,
+            channel_name: row.channel_name,
+            call_type: row.call_type,
+            status: row.status,
+            initiated_at: row.initiated_at,
+            accepted_at: row.accepted_at,
+            ended_at: row.ended_at,
+            doctor_token: row.doctor_token ?? null,
+            patient_token: row.patient_token ?? null
+          })
+        }
+      })
+      // Status changes (accepted/ended/declined)
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'video_calls',
+        filter: `patient_id=eq.${pid}`
+      }, payload => {
+        const row = payload.new as any
+        if (!row) return
+        if (row.status === 'pending' || row.status === 'accepted') {
+          console.log('[CALL] UPDATE to active status detected:', row.id, row.status)
           setCurrentCall({
             id: row.id,
             doctor_id: row.doctor_id,
@@ -86,14 +145,23 @@ export function usePatientVideoCall(authUserId?: string | null): UsePatientVideo
             patient_token: row.patient_token ?? null
           })
         } else if (row.status === 'ended' || row.status === 'declined') {
-          console.log('[CALL] Clearing current call; status', row.status)
+          console.log('[CALL] UPDATE to ended/declined detected:', row.id)
           setCurrentCall(null)
         }
       })
-      .subscribe()
+      .subscribe((status) => {
+        console.log('[CALL] Realtime subscription status:', status)
+        if (status === 'SUBSCRIBED') {
+          // Fetch immediately when socket is ready
+          loadLatestCall().catch(() => {})
+        }
+      })
 
-    return () => { supabase.removeChannel(channel) }
-  }, [patientId])
+    return () => { 
+      console.log('[CALL] Unsubscribing video_calls for patient:', pid)
+      supabase.removeChannel(channel) 
+    }
+  }, [patientId, loadLatestCall])
 
   const acceptCall = useCallback(async (callId: string) => {
     try {
@@ -110,78 +178,11 @@ export function usePatientVideoCall(authUserId?: string | null): UsePatientVideo
     }
   }, [])
 
-  const initiateCall = useCallback(async (callType: 'video' | 'audio' = 'video'): Promise<PatientVideoCall | null> => {
-    try {
-      setLoading(true)
-      setError(null)
-      let pid = patientId
-      // If patient id not yet resolved, fetch it on demand
-      if (!pid) {
-        if (!authUserId) { setError('Patient not found'); return null }
-        const { data: p, error: perr } = await supabase
-          .from('patients')
-          .select('id')
-          .eq('auth_user_id', authUserId)
-          .single()
-        if (perr || !p?.id) { setError('Patient not found'); return null }
-        pid = p.id
-        setPatientId(pid)
-      }
-
-      // Get assigned doctor id
-      const { data: patientRow, error: pErr } = await supabase
-        .from('patients')
-        .select('assigned_doctor_id')
-        .eq('id', pid)
-        .single()
-      if (pErr || !patientRow?.assigned_doctor_id) {
-        console.error('[CALL] No assigned doctor', pErr)
-        setError('No assigned doctor');
-        return null
-      }
-
-      // Use server RPC to create call
-      console.log('[CALL] initiate_video_call', { doctor: patientRow.assigned_doctor_id, patient: pid, callType })
-      const { data: callResult, error: rpcErr } = await supabase
-        .rpc('initiate_video_call', {
-          p_doctor_id: patientRow.assigned_doctor_id,
-          p_patient_id: pid,
-          p_call_type: callType
-        })
-      if (rpcErr || !callResult?.success) {
-        console.error('[CALL] initiate_video_call failed', rpcErr || callResult)
-        setError(rpcErr?.message || callResult?.error || 'Failed to initiate call')
-        return null
-      }
-
-      // Fetch created call with channel name
-      console.log('[CALL] created call id', callResult.call_id)
-      const { data: fullCall, error: fetchErr } = await supabase
-        .from('video_calls')
-        .select('id, doctor_id, patient_id, channel_name, call_type, status, initiated_at, accepted_at, ended_at, doctor_token, patient_token')
-        .eq('id', callResult.call_id)
-        .single()
-      if (fetchErr || !fullCall) { console.error('[CALL] fetch created call failed', fetchErr); setError('Call created but not found'); return null }
-
-      const newCall: PatientVideoCall = {
-        id: fullCall.id,
-        doctor_id: fullCall.doctor_id,
-        patient_id: fullCall.patient_id,
-        channel_name: fullCall.channel_name,
-        call_type: fullCall.call_type,
-        status: fullCall.status,
-        initiated_at: fullCall.initiated_at,
-        accepted_at: fullCall.accepted_at,
-        ended_at: fullCall.ended_at,
-        doctor_token: fullCall.doctor_token,
-        patient_token: fullCall.patient_token
-      }
-      console.log('[CALL] newCall', newCall)
-      setCurrentCall(newCall)
-      return newCall
-    } finally {
-      setLoading(false)
-    }
+  const initiateCall = useCallback(async (_callType: 'video' | 'audio' = 'video'): Promise<PatientVideoCall | null> => {
+    // Patients are not allowed to initiate calls in production
+    console.warn('[CALL] Patient-initiated calls are disabled');
+    setError('Patients cannot initiate calls');
+    return null;
   }, [])
 
   const declineCall = useCallback(async (callId: string) => {
@@ -242,7 +243,7 @@ export function usePatientVideoCall(authUserId?: string | null): UsePatientVideo
       const { data, error } = await supabase
         .rpc('generate_agora_token', {
           channel_name: callRow.channel_name,
-          uid_param: 0
+          uid_param: 1002
         })
       if (error) { console.error('[CALL] generate_agora_token failed', error); return null }
       return (data as any)?.token ?? null
@@ -250,36 +251,6 @@ export function usePatientVideoCall(authUserId?: string | null): UsePatientVideo
       return null
     }
   }, [])
-
-  const loadLatestCall = useCallback(async (): Promise<PatientVideoCall | null> => {
-    try {
-      if (!patientId) return null
-      const { data, error } = await supabase
-        .from('video_calls')
-        .select('id, doctor_id, patient_id, channel_name, call_type, status, initiated_at, accepted_at, ended_at, doctor_token, patient_token')
-        .eq('patient_id', patientId)
-        .in('status', ['pending','accepted'])
-        .order('initiated_at', { ascending: false })
-        .limit(1)
-      const row = data?.[0]
-      if (error || !row) return null
-      const call: PatientVideoCall = {
-        id: row.id,
-        doctor_id: row.doctor_id,
-        patient_id: row.patient_id,
-        channel_name: row.channel_name,
-        call_type: row.call_type,
-        status: row.status,
-        initiated_at: row.initiated_at,
-        accepted_at: row.accepted_at,
-        ended_at: row.ended_at,
-        doctor_token: row.doctor_token,
-        patient_token: row.patient_token
-      }
-      setCurrentCall(call)
-      return call
-    } catch { return null }
-  }, [patientId])
 
   return { currentCall, loading, error, initiateCall, acceptCall, declineCall, endCall, loadLatestCall, refreshToken }
 }

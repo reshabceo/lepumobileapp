@@ -24,19 +24,7 @@ export const DoctorAssignment: React.FC<DoctorAssignmentProps> = ({ onAssignment
     const [userProfile, setUserProfile] = useState<any>(null);
     const [editing, setEditing] = useState(false);
     const navigate = useNavigate();
-    const { currentCall, acceptCall, declineCall } = usePatientVideoCall(user?.id);
-
-    useEffect(() => {
-        if (currentCall?.status === 'pending') {
-            // simple inline prompt for now
-            const go = window.confirm(`Incoming ${currentCall.call_type} call. Accept?`)
-            if (go) {
-                acceptCall(currentCall.id).then(ok => { if (ok) navigate(`/call/${currentCall.channel_name}`) })
-            } else {
-                declineCall(currentCall.id)
-            }
-        }
-    }, [currentCall, acceptCall, declineCall, navigate])
+    // Video call notifications are now handled globally by GlobalVideoCallNotification component
     // Load user profile and current doctor assignment
     useEffect(() => {
         const loadUserInfo = async () => {
