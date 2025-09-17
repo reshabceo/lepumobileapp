@@ -1,0 +1,272 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Monitraq.ipa</key>
+	<array>
+		<dict>
+			<key>architectures</key>
+			<array>
+				<string>arm64</string>
+			</array>
+			<key>buildNumber</key>
+			<string>9</string>
+			<key>certificate</key>
+			<dict>
+				<key>SHA1</key>
+				<string>0FFA141783CA26E6E419CC0188F484278CD0181A</string>
+				<key>dateExpires</key>
+				<string>20/06/1948 Saka</string>
+				<key>type</key>
+				<string>Cloud Managed Apple Distribution</string>
+			</dict>
+			<key>embeddedBinaries</key>
+			<array>
+				<dict>
+					<key>architectures</key>
+					<array>
+						<string>arm64</string>
+					</array>
+					<key>buildNumber</key>
+					<string>1</string>
+					<key>certificate</key>
+					<dict>
+						<key>SHA1</key>
+						<string>0FFA141783CA26E6E419CC0188F484278CD0181A</string>
+						<key>dateExpires</key>
+						<string>20/06/1948 Saka</string>
+						<key>type</key>
+						<string>Cloud Managed Apple Distribution</string>
+					</dict>
+					<key>name</key>
+					<string>Capacitor.framework</string>
+					<key>symbols</key>
+					<true/>
+					<key>team</key>
+					<dict>
+						<key>id</key>
+						<string>55A3C29ND7</string>
+						<key>name</key>
+						<string>Supreeth Girish</string>
+					</dict>
+					<key>versionNumber</key>
+					<string>7.4.3</string>
+				</dict>
+				<dict>
+					<key>architectures</key>
+					<array>
+						<string>arm64</string>
+					</array>
+					<key>buildNumber</key>
+					<string>1</string>
+					<key>certificate</key>
+					<dict>
+						<key>SHA1</key>
+						<string>0FFA141783CA26E6E419CC0188F484278CD0181A</string>
+						<key>dateExpires</key>
+						<string>20/06/1948 Saka</string>
+						<key>type</key>
+						<string>Cloud Managed Apple Distribution</string>
+					</dict>
+					<key>name</key>
+					<string>CapacitorCommunityBluetoothLe.framework</string>
+					<key>symbols</key>
+					<true/>
+					<key>team</key>
+					<dict>
+						<key>id</key>
+						<string>55A3C29ND7</string>
+						<key>name</key>
+						<string>Supreeth Girish</string>
+					</dict>
+					<key>versionNumber</key>
+					<string>7.2.0</string>
+				</dict>
+				<dict>
+					<key>architectures</key>
+					<array>
+						<string>arm64</string>
+					</array>
+					<key>buildNumber</key>
+					<string>1</string>
+					<key>certificate</key>
+					<dict>
+						<key>SHA1</key>
+						<string>0FFA141783CA26E6E419CC0188F484278CD0181A</string>
+						<key>dateExpires</key>
+						<string>20/06/1948 Saka</string>
+						<key>type</key>
+						<string>Cloud Managed Apple Distribution</string>
+					</dict>
+					<key>name</key>
+					<string>CapacitorFilesystem.framework</string>
+					<key>symbols</key>
+					<true/>
+					<key>team</key>
+					<dict>
+						<key>id</key>
+						<string>55A3C29ND7</string>
+						<key>name</key>
+						<string>Supreeth Girish</string>
+					</dict>
+					<key>versionNumber</key>
+					<string>7.1.4</string>
+				</dict>
+				<dict>
+					<key>architectures</key>
+					<array>
+						<string>arm64</string>
+					</array>
+					<key>buildNumber</key>
+					<string>1</string>
+					<key>certificate</key>
+					<dict>
+						<key>SHA1</key>
+						<string>0FFA141783CA26E6E419CC0188F484278CD0181A</string>
+						<key>dateExpires</key>
+						<string>20/06/1948 Saka</string>
+						<key>type</key>
+						<string>Cloud Managed Apple Distribution</string>
+					</dict>
+					<key>name</key>
+					<string>CapacitorScreenOrientation.framework</string>
+					<key>symbols</key>
+					<true/>
+					<key>team</key>
+					<dict>
+						<key>id</key>
+						<string>55A3C29ND7</string>
+						<key>name</key>
+						<string>Supreeth Girish</string>
+					</dict>
+					<key>versionNumber</key>
+					<string>7.0.2</string>
+				</dict>
+				<dict>
+					<key>architectures</key>
+					<array>
+						<string>arm64</string>
+					</array>
+					<key>buildNumber</key>
+					<string>1</string>
+					<key>certificate</key>
+					<dict>
+						<key>SHA1</key>
+						<string>0FFA141783CA26E6E419CC0188F484278CD0181A</string>
+						<key>dateExpires</key>
+						<string>20/06/1948 Saka</string>
+						<key>type</key>
+						<string>Cloud Managed Apple Distribution</string>
+					</dict>
+					<key>name</key>
+					<string>CapacitorShare.framework</string>
+					<key>symbols</key>
+					<true/>
+					<key>team</key>
+					<dict>
+						<key>id</key>
+						<string>55A3C29ND7</string>
+						<key>name</key>
+						<string>Supreeth Girish</string>
+					</dict>
+					<key>versionNumber</key>
+					<string>7.0.2</string>
+				</dict>
+				<dict>
+					<key>architectures</key>
+					<array>
+						<string>arm64</string>
+					</array>
+					<key>buildNumber</key>
+					<string>1</string>
+					<key>certificate</key>
+					<dict>
+						<key>SHA1</key>
+						<string>0FFA141783CA26E6E419CC0188F484278CD0181A</string>
+						<key>dateExpires</key>
+						<string>20/06/1948 Saka</string>
+						<key>type</key>
+						<string>Cloud Managed Apple Distribution</string>
+					</dict>
+					<key>name</key>
+					<string>Cordova.framework</string>
+					<key>symbols</key>
+					<true/>
+					<key>team</key>
+					<dict>
+						<key>id</key>
+						<string>55A3C29ND7</string>
+						<key>name</key>
+						<string>Supreeth Girish</string>
+					</dict>
+					<key>versionNumber</key>
+					<string>7.4.3</string>
+				</dict>
+				<dict>
+					<key>architectures</key>
+					<array>
+						<string>arm64</string>
+					</array>
+					<key>buildNumber</key>
+					<string>3</string>
+					<key>certificate</key>
+					<dict>
+						<key>SHA1</key>
+						<string>0FFA141783CA26E6E419CC0188F484278CD0181A</string>
+						<key>dateExpires</key>
+						<string>20/06/1948 Saka</string>
+						<key>type</key>
+						<string>Cloud Managed Apple Distribution</string>
+					</dict>
+					<key>name</key>
+					<string>IONFilesystemLib.framework</string>
+					<key>symbols</key>
+					<true/>
+					<key>team</key>
+					<dict>
+						<key>id</key>
+						<string>55A3C29ND7</string>
+						<key>name</key>
+						<string>Supreeth Girish</string>
+					</dict>
+					<key>versionNumber</key>
+					<string>1.0.1</string>
+				</dict>
+			</array>
+			<key>entitlements</key>
+			<dict>
+				<key>application-identifier</key>
+				<string>55A3C29ND7.com.priti.app</string>
+				<key>beta-reports-active</key>
+				<true/>
+				<key>com.apple.developer.team-identifier</key>
+				<string>55A3C29ND7</string>
+				<key>get-task-allow</key>
+				<false/>
+			</dict>
+			<key>name</key>
+			<string>Monitraq.app</string>
+			<key>profile</key>
+			<dict>
+				<key>UUID</key>
+				<string>fa5c085b-5f59-47dc-b06e-4d2f880efd89</string>
+				<key>dateExpires</key>
+				<string>23/06/1948 Saka</string>
+				<key>name</key>
+				<string>iOS Team Store Provisioning Profile: com.priti.app</string>
+			</dict>
+			<key>symbols</key>
+			<true/>
+			<key>team</key>
+			<dict>
+				<key>id</key>
+				<string>55A3C29ND7</string>
+				<key>name</key>
+				<string>Supreeth Girish</string>
+			</dict>
+			<key>versionNumber</key>
+			<string>1.0</string>
+		</dict>
+	</array>
+</dict>
+</plist>
