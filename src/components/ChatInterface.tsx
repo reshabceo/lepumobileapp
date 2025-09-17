@@ -203,15 +203,18 @@ export const ChatInterface = () => {
   const doctorAvatar = currentConversation?.doctor_avatar;
 
   return (
-    <div className="bg-[#101010] h-full text-white font-inter flex flex-col">
-      {/* Header */}
-      <header className="bg-[#1A1A1A] px-4 py-3 flex items-center justify-between border-b border-gray-800">
+        <div className="bg-gradient-to-br from-gray-900 via-black to-gray-900 h-screen text-white font-inter flex flex-col">
+            {/* Status Bar Spacing */}
+            <div className="h-12 flex-shrink-0"></div>
+            
+            {/* Header */}
+            <header className="bg-white/10 backdrop-blur-md border-b border-white/20 px-4 py-4 flex items-center justify-between flex-shrink-0">
         <div className="flex items-center">
           <button
             onClick={handleBack}
-            className="mr-4 p-1 hover:bg-gray-700 rounded-full transition-colors"
+            className="mr-4 p-2 bg-white/10 backdrop-blur-sm border border-white/20 hover:bg-white/20 rounded-xl transition-all duration-200"
           >
-            <ArrowLeft className="w-6 h-6" />
+            <ArrowLeft className="w-5 h-5" />
           </button>
 
           <div className="flex items-center">
@@ -241,20 +244,20 @@ export const ChatInterface = () => {
         </div>
 
         <div className="flex items-center space-x-2">
-          <button className="p-2 hover:bg-gray-700 rounded-full transition-colors">
+          <button className="p-2 bg-white/10 backdrop-blur-sm border border-white/20 hover:bg-white/20 rounded-xl transition-all duration-200">
             <Phone className="w-5 h-5 text-gray-300" />
           </button>
-          <button className="p-2 hover:bg-gray-700 rounded-full transition-colors">
+          <button className="p-2 bg-white/10 backdrop-blur-sm border border-white/20 hover:bg-white/20 rounded-xl transition-all duration-200">
             <Video className="w-5 h-5 text-gray-300" />
           </button>
-          <button className="p-2 hover:bg-gray-700 rounded-full transition-colors">
+          <button className="p-2 bg-white/10 backdrop-blur-sm border border-white/20 hover:bg-white/20 rounded-xl transition-all duration-200">
             <MoreVertical className="w-5 h-5 text-gray-300" />
           </button>
         </div>
       </header>
 
       {/* Chat Body */}
-      <main className="flex-grow px-4 overflow-y-auto pb-4 pt-4">
+      <main className="flex-1 px-4 overflow-y-auto py-4 min-h-0">
         {loading ? (
           <div className="flex items-center justify-center h-full">
             <div className="text-center">
@@ -273,7 +276,7 @@ export const ChatInterface = () => {
             </div>
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-4 h-full">
             {messages.map((message) => (
               <div
                 key={message.id}
@@ -374,14 +377,14 @@ export const ChatInterface = () => {
       </main>
 
       {/* Message Input Footer */}
-      <footer className="p-4 flex-shrink-0 border-t border-gray-800">
+      <footer className="p-4 flex-shrink-0 bg-white/5 backdrop-blur-md border-t border-white/20">
         <form onSubmit={handleSendMessage} className="flex items-center space-x-3">
           <button
             type="button"
             onClick={handleAttachFile}
-            className="p-2 hover:bg-gray-700 rounded-full transition-colors"
+            className="p-2 bg-white/10 backdrop-blur-sm border border-white/20 hover:bg-white/20 rounded-xl transition-all duration-200"
           >
-            <Paperclip className="w-5 h-5 text-gray-400" />
+            <Paperclip className="w-5 h-5 text-gray-300" />
           </button>
 
           <div className="flex-1 relative">
@@ -390,7 +393,7 @@ export const ChatInterface = () => {
               value={newMessage}
               onChange={handleInputChange}
               placeholder="Type a message..."
-              className="w-full px-4 py-3 bg-[#1E1E1E] border border-gray-700 rounded-full text-white placeholder-gray-400 focus:outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500"
+              className="w-full px-4 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl text-white placeholder-gray-300 focus:outline-none focus:border-green-400 focus:ring-1 focus:ring-green-400 transition-all duration-200"
               disabled={sending}
             />
           </div>
@@ -398,9 +401,9 @@ export const ChatInterface = () => {
           <button
             type="submit"
             disabled={!newMessage.trim() || sending || !conversationId}
-            className={`p-3 rounded-full transition-all duration-200 ${newMessage.trim() && !sending && conversationId
-              ? 'bg-green-500 hover:bg-green-600 text-white'
-              : 'bg-gray-700 text-gray-400 cursor-not-allowed'
+            className={`p-3 rounded-xl transition-all duration-200 ${newMessage.trim() && !sending && conversationId
+              ? 'bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white shadow-lg'
+              : 'bg-white/10 backdrop-blur-sm border border-white/20 text-gray-400 cursor-not-allowed'
               }`}
           >
             {sending ? (
