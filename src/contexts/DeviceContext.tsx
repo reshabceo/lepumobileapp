@@ -356,6 +356,32 @@ export const DeviceProvider: React.FC<DeviceProviderProps> = ({ children }) => {
                 }
             }
             
+            // 🚨 FIX: ALWAYS set callbacks before scanning, even if already initialized
+            // This ensures the onDeviceFound callback is active
+            console.log('🔧 Setting scan callbacks before starting scan...');
+            wellueSDK.setCallbacks({
+                onDeviceFound: (device: WellueDevice) => {
+                    console.log('🔍 [SCAN CALLBACK] Device found:', device.name, device.id);
+                    setAvailableDevices(prev => {
+                        const exists = prev.some(d => d.id === device.id);
+                        if (!exists) {
+                            console.log('➕ [SCAN CALLBACK] Adding new device to list');
+                            return [...prev, device];
+                        }
+                        return prev;
+                    });
+                },
+                onDeviceConnected: (device: WellueDevice) => {
+                    console.log('✅ [SCAN CALLBACK] Device connected:', device.name);
+                    setConnectedDevice(device);
+                    setError(null);
+                    setIsConnecting(false);
+                },
+                // Keep other existing callbacks from initialization
+                ...wellueSDK.getCallbacks()
+            });
+            console.log('✅ Scan callbacks set, starting scan...');
+            
             await wellueSDK.startScan();
         } catch (error) {
             console.error('Failed to start scan:', error);

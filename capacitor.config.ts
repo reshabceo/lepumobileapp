@@ -11,7 +11,15 @@ const config: CapacitorConfig = {
   },
   ios: {
     scheme: "App"
-  }
+  },
+  // Explicitly register WellueSDK plugin to prevent 'npx cap sync' from removing it
+  packageClassList: [
+    'WellueSDK',
+    'BluetoothLe',
+    'FilesystemPlugin',
+    'ScreenOrientationPlugin',
+    'SharePlugin'
+  ] as any
 };
 
 export default config;

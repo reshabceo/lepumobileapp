@@ -17,11 +17,11 @@ def capacitor_pods
   pod 'CapacitorShare', :path => '../../node_modules/@capacitor/share'
 end
 
-target 'App' do
+target 'Monitraq' do
   capacitor_pods
   # Add your Pods here
   
-  # Viatom VTProductLib SDK for Wellue devices (Local Repository)
+  # Viatom VTMProductLib SDK for Wellue devices (Local)
   pod 'VTMProductLib', :path => '../../VTProductLib_Pods'
 end
 
