@@ -13,6 +13,7 @@ CAP_PLUGIN(WellueSDK, "WellueSDK",
            CAP_PLUGIN_METHOD(startBPMeasurement, CAPPluginReturnPromise);
            CAP_PLUGIN_METHOD(startECGMeasurement, CAPPluginReturnPromise);
            CAP_PLUGIN_METHOD(stopMeasurement, CAPPluginReturnPromise);
+           CAP_PLUGIN_METHOD(startRtTaskForConnectedDevice, CAPPluginReturnPromise);
            CAP_PLUGIN_METHOD(getBatteryLevel, CAPPluginReturnPromise);
            CAP_PLUGIN_METHOD(getBondedDevices, CAPPluginReturnPromise);
            CAP_PLUGIN_METHOD(getConnectedDevices, CAPPluginReturnPromise);

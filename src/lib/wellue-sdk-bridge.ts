@@ -40,10 +40,15 @@ export interface BPStatus {
 
 // Real-time data interfaces
 export interface RealTimeData {
+    pressure?: number;          // Real-time pressure in mmHg (raw value / 100)
     heartRate?: number;
+    pulse?: number;             // Alternative to heartRate
     progress?: number;
     deviceStatus?: number;
     batteryStatus?: number;
+    batteryPercent?: number;    // Alternative to batteryStatus
+    status?: number;            // Alternative to deviceStatus
+    isDeflating?: boolean;      // Deflation phase indicator
     timestamp: Date;
 }
 
@@ -740,6 +745,11 @@ class NativeWelluePlugin {
         }
     }
 
+    // 🚨 FIX: Add method to get current callbacks
+    getCallbacks(): WellueSDKCallbacks {
+        return this.callbacks;
+    }
+
     async initialize(): Promise<void> {
         console.log('🚀 [WELLUE SDK] Starting initialization...');
         console.log('🚀 [WELLUE SDK] Is native platform:', Capacitor.isNativePlatform());
@@ -835,9 +845,9 @@ class NativeWelluePlugin {
             const measurement: BPMeasurement = {
                 systolic: data.systolic,
                 diastolic: data.diastolic,
-                pulseRate: data.pulseRate,
+                pulseRate: data.pulseRate || data.pulse,  // iOS sends 'pulse', map to 'pulseRate'
                 timestamp: new Date(),
-                quality: this.getQualityFromResult(data.result),
+                quality: this.getQualityFromResult(data.result || data.state),
                 meanArterialPressure: data.map
             };
             
@@ -903,14 +913,45 @@ class NativeWelluePlugin {
 
         // Real-time update event
         this.nativePlugin.addListener('bp2Rt', (data: any) => {
+            console.log('📊 [BP2RT BRIDGE] Raw native data:', JSON.stringify(data));
+            console.log('📊 [BP2RT BRIDGE] Callbacks object exists:', !!this.callbacks);
+            console.log('📊 [BP2RT BRIDGE] onRealTimeUpdate exists:', !!this.callbacks?.onRealTimeUpdate);
+            
+            // Map both iOS and Android field names
             const rtData: RealTimeData = {
-                heartRate: data?.hr,
+                // Pressure (iOS: pressure, Android: might be different)
+                pressure: data?.pressure !== undefined ? Math.round(data.pressure / 100) : undefined,
+                
+                // Heart rate / Pulse (iOS: pulse, Android: hr)
+                heartRate: data?.pulse || data?.hr,
+                pulse: data?.pulse || data?.hr,
+                
+                // Progress/percentage
                 progress: data?.percent,
-                deviceStatus: data?.deviceStatus,
-                batteryStatus: data?.batteryStatus,
+                
+                // Device status (iOS: status, Android: deviceStatus)
+                deviceStatus: data?.deviceStatus || data?.status,
+                status: data?.status || data?.deviceStatus,
+                
+                // Battery (iOS: batteryPercent, Android: batteryStatus)
+                batteryStatus: data?.batteryStatus || data?.batteryPercent,
+                batteryPercent: data?.batteryPercent || data?.batteryStatus,
+                
+                // Deflating indicator
+                isDeflating: data?.isDeflating,
+                
                 timestamp: new Date()
             };
-            this.callbacks.onRealTimeUpdate?.(rtData);
+            
+            console.log('📊 [BP2RT BRIDGE] Mapped rtData:', JSON.stringify(rtData));
+            console.log('📊 [BP2RT BRIDGE] About to call onRealTimeUpdate...');
+            
+            if (this.callbacks?.onRealTimeUpdate) {
+                this.callbacks.onRealTimeUpdate(rtData);
+                console.log('📊 [BP2RT BRIDGE] ✅ onRealTimeUpdate called successfully');
+            } else {
+                console.log('📊 [BP2RT BRIDGE] ❌ onRealTimeUpdate callback not set!');
+            }
         });
 
         // ECG data event
@@ -1283,17 +1324,24 @@ export class WellueSDKBridge {
 
     async initialize(callbacks: WellueSDKCallbacks): Promise<void> {
         console.log('🚀 [WELLUE SDK BRIDGE] Initialize called');
-        console.log('🚀 [WELLUE SDK BRIDGE] Callbacks provided:', !!callbacks);
+        console.log('🔍 [WELLUE SDK BRIDGE] Already initialized:', this.isInitialized);
         
+        // Update callbacks regardless of initialization state
         this.callbacks = callbacks;
         console.log('🚀 [WELLUE SDK BRIDGE] Setting callbacks on plugin...');
         this.plugin.setCallbacks(callbacks);
         
-        console.log('🚀 [WELLUE SDK BRIDGE] Calling plugin initialize...');
+        // Only initialize native plugin once
+        if (this.isInitialized) {
+            console.log('✅ [WELLUE SDK BRIDGE] Already initialized - only updated callbacks');
+            return;
+        }
+        
+        console.log('🚀 [WELLUE SDK BRIDGE] First initialization - calling native plugin initialize...');
         await this.plugin.initialize();
         
         this.isInitialized = true;
-        console.log('✅ [WELLUE SDK BRIDGE] Initialize completed');
+        console.log('✅ [WELLUE SDK BRIDGE] Native initialization completed (will never re-initialize)');
     }
 
     async startScan(): Promise<void> {
@@ -1397,6 +1445,11 @@ export class WellueSDKBridge {
     setCallbacks(callbacks: WellueSDKCallbacks) {
         this.callbacks = callbacks;
         this.plugin.setCallbacks(callbacks);
+    }
+
+    // 🚨 FIX: Add method to get current callbacks (for merging)
+    getCallbacks(): WellueSDKCallbacks {
+        return this.callbacks;
     }
 
     async stopLive(deviceId?: string): Promise<void> {
