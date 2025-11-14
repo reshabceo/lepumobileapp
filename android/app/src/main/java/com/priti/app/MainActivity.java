@@ -22,11 +22,30 @@ public class MainActivity extends BridgeActivity {
     
     @Override
     public void onCreate(Bundle savedInstanceState) {
-        registerPlugin(WelluePlugin.class);
-        registerPlugin(Bp2Plugin.class);
+        // CRITICAL: Register plugins BEFORE super.onCreate()
+        // BridgeActivity creates the bridge in super.onCreate(), so plugins must be added to initialPlugins first
+        Log.d(TAG, "MainActivity onCreate - Registering Lepu SDK plugins BEFORE bridge creation");
+        Log.d(TAG, "Using Lepu SDK from: https://github.com/viatom-develop/LepuDemo.git");
+        Log.d(TAG, "AAR Version: lepu-blepro-1.0.8.aar (supports BP2 device)");
+        
+        try {
+            initialPlugins.add(WelluePlugin.class);
+            Log.d(TAG, "✅ WelluePlugin (LepuSDK) added to initialPlugins");
+        } catch (Exception e) {
+            Log.e(TAG, "❌ Failed to add WelluePlugin: " + e.getMessage(), e);
+        }
+        
+        try {
+            initialPlugins.add(Bp2Plugin.class);
+            Log.d(TAG, "✅ Bp2Plugin added to initialPlugins");
+        } catch (Exception e) {
+            Log.e(TAG, "❌ Failed to add Bp2Plugin: " + e.getMessage(), e);
+        }
+        
+        // NOW call super.onCreate() - bridge will be created with our plugins included
         super.onCreate(savedInstanceState);
 
-        Log.d(TAG, "MainActivity onCreate called");
+        Log.d(TAG, "MainActivity onCreate completed - Bridge created with Lepu SDK plugins");
 
         // Enable WebView debugging
         WebView.setWebContentsDebuggingEnabled(true);
