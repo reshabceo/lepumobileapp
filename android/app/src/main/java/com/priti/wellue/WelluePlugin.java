@@ -44,7 +44,7 @@ import com.lepu.blepro.objs.Bluetooth;
 import java.util.Arrays;
 
 @CapacitorPlugin(
-    name = "WellueSDK",
+    name = "LepuSDK",
     permissions = {
         @Permission(strings = { Manifest.permission.ACCESS_FINE_LOCATION }, alias = "location"),
         @Permission(strings = { Manifest.permission.BLUETOOTH_SCAN }, alias = "bl_scan"),
@@ -1411,12 +1411,31 @@ public class WelluePlugin extends Plugin {
                                     if (!seenAddresses.add(address)) return; // dedup
                                     String name = result.getDevice().getName();
                                     int rssi = result.getRssi();
-                                    Log.d(TAG, "🛰️ sysScan device: name=" + name + ", addr=" + address + ", rssi=" + rssi);
+                                    
+                                    // Enhanced logging to help identify BP2 device
+                                    Log.d(TAG, "🛰️ ===== BLUETOOTH DEVICE FOUND =====");
+                                    Log.d(TAG, "🛰️ Device Name: " + (name != null ? name : "Unknown"));
+                                    Log.d(TAG, "🛰️ MAC Address: " + address);
+                                    Log.d(TAG, "🛰️ Signal Strength (RSSI): " + rssi + " dBm");
+                                    Log.d(TAG, "🛰️ Callback Type: " + callbackType);
+                                    
+                                    // Check if this looks like a BP2 device
+                                    boolean likelyBP2 = false;
+                                    if (name != null) {
+                                        String nameLower = name.toLowerCase();
+                                        if (nameLower.contains("bp2") || nameLower.contains("3049") || 
+                                            nameLower.contains("lepu") || nameLower.contains("viatom")) {
+                                            likelyBP2 = true;
+                                            Log.d(TAG, "🩺 ⭐ POSSIBLE BP2 DEVICE DETECTED! ⭐");
+                                        }
+                                    }
+                                    Log.d(TAG, "🛰️ =====================================");
+                                    
                                     JSObject dev = new JSObject();
                                     dev.put("deviceName", name != null ? name : "Unknown");
                                     dev.put("deviceId", address);
                                     dev.put("address", address);
-                                    dev.put("model", "unknown");
+                                    dev.put("model", likelyBP2 ? "BP2" : "unknown");
                                     dev.put("rssi", rssi);
                                     notifyListeners("deviceFound", dev);
                                 } catch (Throwable ex) {
@@ -1428,15 +1447,12 @@ public class WelluePlugin extends Plugin {
                     ScanSettings settings = new ScanSettings.Builder()
                         .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
                         .build();
-                    // Filter scan to BP2 service UUID to avoid non-Wellue devices
-                    java.util.List<android.bluetooth.le.ScanFilter> filters = new java.util.ArrayList<>();
-                    try {
-                        android.os.ParcelUuid serviceUuid = android.os.ParcelUuid.fromString("14839AC4-7D7E-415C-9A42-167340CF2339");
-                        android.bluetooth.le.ScanFilter f = new android.bluetooth.le.ScanFilter.Builder().setServiceUuid(serviceUuid).build();
-                        filters.add(f);
-                    } catch (Throwable ignore) {}
-                    systemScanner.startScan(filters, settings, systemScanCallback);
-                    Log.d(TAG, "🛰️ System BLE scanner started");
+                    // TEMPORARY FIX: Scan for ALL devices (no filter) to find BP2
+                    // Original filter was: 14839AC4-7D7E-415C-9A42-167340CF2339
+                    // But BP2 device may advertise different UUID: 0000FFE0-0000-1000-8000-00805F9B34FB
+                    // Scanning without filter to discover actual BP2 device UUID
+                    systemScanner.startScan(null, settings, systemScanCallback); // null = no filter, scan all devices
+                    Log.d(TAG, "🛰️ System BLE scanner started - scanning for ALL devices (no UUID filter)");
                 } else {
                     Log.w(TAG, "System BLE scanner not available");
                 }

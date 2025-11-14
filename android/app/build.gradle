@@ -44,11 +44,17 @@ repositories {
 dependencies {
     implementation fileTree(include: ['*.jar'], dir: 'libs')
     
-    // Nordic BLE library (kept for future use)
-    implementation 'no.nordicsemi.android:ble:2.2.4'
-    // Live event bus for communication
+    // Nordic BLE library - REQUIRED by Lepu SDK (version 2.10.0 as per official SDK docs)
+    implementation 'no.nordicsemi.android:ble:2.10.0'
+    // Live event bus for SDK communication - REQUIRED by Lepu SDK
     implementation 'io.github.jeremyliao:live-event-bus-x:1.8.0'
-    // Lepu BLE Pro SDK AAR for BP2 support (using 1.0.8)
+    // Stream Log library - REQUIRED by Lepu SDK (for logging functionality)
+    // These are dependencies of the AAR file and must be included
+    api 'io.getstream:stream-log-android:1.1.4'
+    api 'io.getstream:stream-log-android-file:1.1.4'
+    // Lepu BLE Pro SDK AAR for BP2 support
+    // Version 1.0.8 supports BP2, BP2A, BP2T devices (as per official SDK docs)
+    // Source: https://github.com/viatom-develop/LepuDemo.git
     implementation(name: 'lepu-blepro-1.0.8', ext: 'aar')
     
     implementation "androidx.appcompat:appcompat:$androidxAppCompatVersion"
