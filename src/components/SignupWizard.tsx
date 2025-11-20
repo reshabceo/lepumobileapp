@@ -67,20 +67,31 @@ export const SignupWizard: React.FC<SignupWizardProps> = ({ onSwitchToLogin }) =
 
   const validateDoctorCode = async (doctorCode: string): Promise<boolean> => {
     try {
-      console.log('🔍 Validating doctor code:', doctorCode);
+      // Normalize doctor code - trim whitespace and convert to uppercase
+      const normalizedCode = doctorCode.trim().toUpperCase();
+      console.log('🔍 Validating doctor code:', normalizedCode);
 
-      const { data: doctor, error } = await supabase
+      // Query doctors table - use ilike for case-insensitive search
+      const { data: doctors, error } = await supabase
         .from('doctors')
         .select('id, full_name, doctor_code')
-        .eq('doctor_code', doctorCode)
-        .single();
+        .ilike('doctor_code', normalizedCode);
 
-      if (error || !doctor) {
+      if (error) {
         console.error('❌ Doctor validation error:', error);
+        console.error('❌ Error details:', JSON.stringify(error, null, 2));
         return false;
       }
 
-      console.log('✅ Doctor code validated:', doctor.full_name);
+      console.log('🔍 Query returned doctors:', doctors);
+
+      if (!doctors || doctors.length === 0) {
+        console.error('❌ Doctor not found for code:', normalizedCode);
+        return false;
+      }
+
+      const doctor = doctors[0];
+      console.log('✅ Doctor code validated:', doctor.full_name, '(ID:', doctor.id, ')');
       return true;
     } catch (err) {
       console.error('❌ Doctor validation exception:', err);
@@ -130,8 +141,6 @@ export const SignupWizard: React.FC<SignupWizardProps> = ({ onSwitchToLogin }) =
 
       if (!formData.doctorCode.trim()) {
         newErrors.doctorCode = 'Doctor code is required';
-      } else if (!/^DR\d{4}$/.test(formData.doctorCode.trim().toUpperCase())) {
-        newErrors.doctorCode = 'Doctor code must be in format DR#### (e.g., DR1234)';
       }
     }
 
@@ -212,7 +221,8 @@ export const SignupWizard: React.FC<SignupWizardProps> = ({ onSwitchToLogin }) =
     try {
       // FIRST: Validate doctor code before creating account
       console.log('🔍 Step 1: Validating doctor code before signup...');
-      const isDoctorValid = await validateDoctorCode(formData.doctorCode);
+      const normalizedDoctorCode = formData.doctorCode.trim().toUpperCase();
+      const isDoctorValid = await validateDoctorCode(normalizedDoctorCode);
 
       if (!isDoctorValid) {
         setErrors(prev => ({
@@ -248,7 +258,7 @@ export const SignupWizard: React.FC<SignupWizardProps> = ({ onSwitchToLogin }) =
       };
 
       console.log('🔍 Step 2: Creating user account...');
-      const success = await signup(formData.email, formData.password, formData.name, formData.doctorCode, additionalData);
+      const success = await signup(formData.email, formData.password, formData.name, normalizedDoctorCode, additionalData);
 
       if (success) {
         toast({
