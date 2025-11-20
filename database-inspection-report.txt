@@ -1,0 +1,297 @@
+==========================================
+🔍 COMPLETE DATABASE INSPECTION
+==========================================
+
+📋 1. ALL TABLES IN PUBLIC SCHEMA
+==========================================
+basePath
+consumes
+definitions
+externalDocs
+host
+info
+parameters
+paths
+produces
+schemes
+swagger
+
+==========================================
+📊 2. TABLE DETAILS (NAMES + ROW COUNTS)
+==========================================
+
+📌 Table: basePath
+   Rows: 
+   Sample columns:
+
+📌 Table: consumes
+   Rows: 
+   Sample columns:
+
+📌 Table: definitions
+   Rows: 
+   Sample columns:
+
+📌 Table: externalDocs
+   Rows: 
+   Sample columns:
+
+📌 Table: host
+   Rows: 
+   Sample columns:
+
+📌 Table: info
+   Rows: 
+   Sample columns:
+
+📌 Table: parameters
+   Rows: 
+   Sample columns:
+
+📌 Table: paths
+   Rows: 
+   Sample columns:
+
+📌 Table: produces
+   Rows: 
+   Sample columns:
+
+📌 Table: schemes
+   Rows: 
+   Sample columns:
+
+📌 Table: swagger
+   Rows: 
+   Sample columns:
+
+
+==========================================
+🔒 3. RLS STATUS FOR ALL TABLES
+==========================================
+
+📌 basePath
+   Service key access: "PGRST205"
+   Anon key access: "PGRST205"
+   ⚠️  RLS likely ENABLED (anon blocked)
+
+📌 consumes
+   Service key access: "PGRST205"
+   Anon key access: "PGRST205"
+   ⚠️  RLS likely ENABLED (anon blocked)
+
+📌 definitions
+   Service key access: "PGRST205"
+   Anon key access: "PGRST205"
+   ⚠️  RLS likely ENABLED (anon blocked)
+
+📌 externalDocs
+   Service key access: "PGRST205"
+   Anon key access: "PGRST205"
+   ⚠️  RLS likely ENABLED (anon blocked)
+
+📌 host
+   Service key access: "PGRST205"
+   Anon key access: "PGRST205"
+   ⚠️  RLS likely ENABLED (anon blocked)
+
+📌 info
+   Service key access: "PGRST205"
+   Anon key access: "PGRST205"
+   ⚠️  RLS likely ENABLED (anon blocked)
+
+📌 parameters
+   Service key access: "PGRST205"
+   Anon key access: "PGRST205"
+   ⚠️  RLS likely ENABLED (anon blocked)
+
+📌 paths
+   Service key access: "PGRST205"
+   Anon key access: "PGRST205"
+   ⚠️  RLS likely ENABLED (anon blocked)
+
+📌 produces
+   Service key access: "PGRST205"
+   Anon key access: "PGRST205"
+   ⚠️  RLS likely ENABLED (anon blocked)
+
+📌 schemes
+   Service key access: "PGRST205"
+   Anon key access: "PGRST205"
+   ⚠️  RLS likely ENABLED (anon blocked)
+
+📌 swagger
+   Service key access: "PGRST205"
+   Anon key access: "PGRST205"
+   ⚠️  RLS likely ENABLED (anon blocked)
+
+
+==========================================
+🔗 4. FOREIGN KEY RELATIONSHIPS
+==========================================
+Checking relationships between tables...
+
+📌 basePath foreign keys:
+
+📌 consumes foreign keys:
+
+📌 definitions foreign keys:
+
+📌 externalDocs foreign keys:
+
+📌 host foreign keys:
+
+📌 info foreign keys:
+
+📌 parameters foreign keys:
+
+📌 paths foreign keys:
+
+📌 produces foreign keys:
+
+📌 schemes foreign keys:
+
+📌 swagger foreign keys:
+
+
+==========================================
+🎯 5. CRITICAL TABLES ANALYSIS
+==========================================
+
+📌 doctors
+   ✅ Table EXISTS
+   Columns:
+      - ambulance_service_numbers
+      - auth_user_id
+      - availability
+      - bio
+      - consultation_fee
+      - created_at
+      - doctor_code
+      - email
+      - email_verified
+      - full_name
+      - hospital
+      - hospital_phone
+      - id
+      - is_active
+      - license_number
+      - national_medical_council_number
+      - phone_number
+      - profile_picture_url
+      - specialty
+      - updated_at
+      - years_experience
+
+📌 patients
+   ✅ Table EXISTS
+   Columns:
+      - address
+      - allergies
+      - assigned_doctor_id
+      - auth_user_id
+      - blood_type
+      - created_at
+      - current_medications
+      - date_of_birth
+      - email
+      - emergency_contact_name
+      - emergency_contact_phone
+      - full_name
+      - gender
+      - id
+      - is_active
+      - medical_conditions
+      - patient_code
+      - phone_number
+      - profile_picture_url
+      - updated_at
+
+📌 health_records
+   ❌ Error: Could not find the table 'public.health_records' in the schema cache
+
+📌 vital_signs
+   ✅ Table EXISTS
+   Columns:
+      - created_at
+      - data
+      - device_id
+      - device_type
+      - doctor_id
+      - id
+      - is_emergency
+      - measurement_type
+      - notes
+      - patient_id
+      - reading_timestamp
+      - sync_timestamp
+
+📌 imaging_studies
+   ✅ Table EXISTS
+   Columns:
+      - []
+
+📌 patient_reports
+   ✅ Table EXISTS
+   Columns:
+      - created_at
+      - description
+      - doctor_downloaded_at
+      - doctor_id
+      - file_name
+      - file_size
+      - file_url
+      - id
+      - mime_type
+      - patient_id
+      - patient_notes
+      - report_type
+      - title
+      - updated_at
+      - upload_status
+      - uploaded_by_patient
+
+📌 patient_uploads
+   ✅ Table EXISTS
+   Columns:
+      - created_at
+      - description
+      - doctor_downloaded_at
+      - file_name
+      - file_size
+      - file_url
+      - id
+      - mime_type
+      - patient_id
+      - patient_notes
+      - report_type
+      - title
+      - updated_at
+      - upload_source
+      - upload_status
+
+📌 video_calls
+   ✅ Table EXISTS
+   Columns:
+      - accepted_at
+      - call_duration
+      - call_type
+      - channel_name
+      - created_at
+      - doctor_id
+      - doctor_token
+      - ended_at
+      - id
+      - initiated_at
+      - metadata
+      - patient_id
+      - patient_token
+      - status
+      - updated_at
+
+
+==========================================
+✅ INSPECTION COMPLETE
+==========================================
+
+Next: Create comprehensive RLS fix script
+based on the actual database structure found above
