@@ -383,3 +383,9 @@ const fetchCustomData = async () => {
 
 **For most use cases, Supabase handles everything. Backend API is only needed for custom device management or third-party integrations.**
 
+
+
+
+
+
+

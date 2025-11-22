@@ -46,23 +46,12 @@
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
 	<key>NSBluetoothAlwaysUsageDescription</key>
-	<string>This app needs Bluetooth access to connect to Wellue BP2 blood pressure monitors for health monitoring.</string>
+	<string>This app needs Bluetooth access to connect and communicate with BP2 medical devices for blood pressure and ECG monitoring.</string>
 	<key>NSBluetoothPeripheralUsageDescription</key>
-	<string>This app needs Bluetooth access to connect to Wellue BP2 blood pressure monitors for health monitoring.</string>
-	<key>NSBluetoothUsageDescription</key>
-	<string>This app needs Bluetooth access to connect to Wellue BP2 blood pressure monitors for health monitoring.</string>
+	<string>This app needs Bluetooth access to connect and communicate with BP2 medical devices for blood pressure and ECG monitoring.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>bluetooth-central</string>
-		<string>bluetooth-peripheral</string>
 	</array>
-	<key>NSCameraUsageDescription</key>
-	<string>This app needs camera access to take photos of medical documents for upload.</string>
-	<key>NSPhotoLibraryUsageDescription</key>
-	<string>This app needs photo library access to select medical documents for upload.</string>
-	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>This app needs location access to provide location-based health monitoring features and emergency services.</string>
-	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>This app needs location access to provide location-based health monitoring features and emergency services.</string>
 </dict>
 </plist>

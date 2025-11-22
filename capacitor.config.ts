@@ -1,7 +1,10 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
-const config: CapacitorConfig = {
-  appId: 'com.priti.app',
+type IOSConfig = CapacitorConfig['ios'] & { packageClassList?: string[] };
+type ExtendedCapacitorConfig = CapacitorConfig & { ios?: IOSConfig; packageClassList?: string[] };
+
+const config: ExtendedCapacitorConfig = {
+  appId: 'com.monitraq.app',
   appName: 'Monitraq',
   webDir: 'dist',
   plugins: {
@@ -10,16 +13,23 @@ const config: CapacitorConfig = {
     }
   },
   ios: {
-    scheme: "App"
+    scheme: "App",
+    packageClassList: [
+      'WellueSDK',
+      'BluetoothLe',
+      'FilesystemPlugin',
+      'ScreenOrientationPlugin',
+      'SharePlugin'
+    ]
   },
-  // Explicitly register WellueSDK plugin to prevent 'npx cap sync' from removing it
   packageClassList: [
     'WellueSDK',
     'BluetoothLe',
     'FilesystemPlugin',
     'ScreenOrientationPlugin',
     'SharePlugin'
-  ] as any
+  ]
 };
 
 export default config;
+

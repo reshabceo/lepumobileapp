@@ -130,8 +130,8 @@ export const SignupWizard: React.FC<SignupWizardProps> = ({ onSwitchToLogin }) =
 
       if (!formData.doctorCode.trim()) {
         newErrors.doctorCode = 'Doctor code is required';
-      } else if (!/^DR\d{4}$/.test(formData.doctorCode.trim().toUpperCase())) {
-        newErrors.doctorCode = 'Doctor code must be in format DR#### (e.g., DR1234)';
+      } else if (!/^DRE\d{5}$/.test(formData.doctorCode.trim().toUpperCase())) {
+        newErrors.doctorCode = 'Doctor code must be in format DRE##### (e.g., DRE12345)';
       }
     }
 

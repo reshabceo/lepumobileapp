@@ -1,6 +1,9 @@
 //
-//  Use this file to import your target's public headers that you would like to expose to Swift.
+//  App-Bridging-Header.h
+//  App
+//
+//  Use this file to import Objective-C headers for Swift access.
 //
 
-#import <Capacitor/Capacitor.h>
-
+// This bridging header allows Swift to see Objective-C code
+// The WellueSDKPlugin is registered via Objective-C macro in WellueSDKPlugin.m
