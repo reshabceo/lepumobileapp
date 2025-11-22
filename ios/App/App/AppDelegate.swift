@@ -1,17 +1,13 @@
 import UIKit
 import Capacitor
-import CoreBluetooth
 
 @UIApplicationMain
 class AppDelegate: UIResponder, UIApplicationDelegate {
 
     var window: UIWindow?
-    private var btKickstarter: BluetoothKickstarter?
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        // Kickstart Bluetooth permission prompt as early as possible
-        btKickstarter = BluetoothKickstarter()
-        btKickstarter?.start()
+        // Override point for customization after application launch.
         return true
     }
 
@@ -50,21 +46,4 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         return ApplicationDelegateProxy.shared.application(application, continue: userActivity, restorationHandler: restorationHandler)
     }
 
-}
-
-// Minimal CoreBluetooth helper to trigger iOS Bluetooth permission prompt on first launch
-private class BluetoothKickstarter: NSObject, CBCentralManagerDelegate {
-    private var manager: CBCentralManager?
-
-    func start() {
-        // Creating CBCentralManager with a delegate triggers state updates which prompt for permission when needed
-        manager = CBCentralManager(delegate: self, queue: nil, options: [CBCentralManagerOptionShowPowerAlertKey: true])
-    }
-
-    func centralManagerDidUpdateState(_ central: CBCentralManager) {
-        // Accessing state forces the system to evaluate authorization; no-op otherwise
-        _ = central.state
-        // Once we got a state update, we can release the manager; plugin will manage Bluetooth afterwards
-        manager = nil
-    }
 }
