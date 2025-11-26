@@ -115,9 +115,9 @@ const DeviceList = () => {
     const { toast } = useToast();
     const { devices, loading, error } = useHealthData();
     
-    // Camera settings state
-    const [cameraSerialNumber, setCameraSerialNumber] = useState('');
-    const [cameraPermissionEnabled, setCameraPermissionEnabled] = useState(false);
+    // Camera settings state - COMMENTED OUT
+    // const [cameraSerialNumber, setCameraSerialNumber] = useState('');
+    // const [cameraPermissionEnabled, setCameraPermissionEnabled] = useState(false);
 
     const handleBack = () => {
         navigate('/dashboard');
@@ -217,8 +217,8 @@ const DeviceList = () => {
                         </div>
                     </div>
 
-                    {/* Camera Settings Section */}
-                    <div className="mb-6">
+                    {/* Camera Settings Section - COMMENTED OUT */}
+                    {/* <div className="mb-6">
                         <div className="bg-gradient-to-r from-purple-500/20 to-pink-500/20 border border-purple-500/30 rounded-2xl p-4">
                             <div className="mb-4">
                                 <div className="flex items-center gap-3 mb-4">
@@ -231,7 +231,6 @@ const DeviceList = () => {
                                     </div>
                                 </div>
                                 
-                                {/* Serial Number Input */}
                                 <div className="mb-4">
                                     <label className="block text-sm font-medium text-gray-300 mb-2">
                                         Camera Serial Number
@@ -250,7 +249,6 @@ const DeviceList = () => {
                                     </div>
                                 </div>
 
-                                {/* Camera Permission Toggle */}
                                 <div className="flex items-center justify-between p-3 bg-black/20 rounded-lg border border-gray-600">
                                     <div className="flex items-center gap-3">
                                         <div className="bg-purple-500/20 p-2 rounded-full">
@@ -284,7 +282,7 @@ const DeviceList = () => {
                                 </div>
                             </div>
                         </div>
-                    </div>
+                    </div> */}
 
 
 
