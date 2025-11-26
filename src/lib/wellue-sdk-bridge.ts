@@ -101,8 +101,9 @@ export interface WellueSDKPlugin {
     bp2ReadFile?(options: { address: string; fileName: string }): Promise<{ fileType?: number; fileContent?: string }>;
 }
 
-// Register the native plugin
-const WellueSDK = registerPlugin<WellueSDKPlugin>('WellueSDK');
+// Register the native plugin - Using Lepu SDK from official GitHub repository
+// Plugin name must match @CapacitorPlugin(name = "LepuSDK") in WelluePlugin.java
+const LepuSDK = registerPlugin<WellueSDKPlugin>('LepuSDK');
 
 // BP Measurement Manager
 class BPMeasurementManager {
@@ -632,17 +633,17 @@ class NativeWelluePlugin {
     private pluginAvailable: boolean = true;
 
     constructor() {
-        console.log('🚀 [NATIVE WELLUE PLUGIN] Constructor called');
-        console.log('🚀 [NATIVE WELLUE PLUGIN] WellueSDK plugin object:', WellueSDK);
-        console.log('🚀 [NATIVE WELLUE PLUGIN] WellueSDK type:', typeof WellueSDK);
+        console.log('🚀 [LEPU SDK PLUGIN] Constructor called');
+        console.log('🚀 [LEPU SDK PLUGIN] LepuSDK plugin object:', LepuSDK);
+        console.log('🚀 [LEPU SDK PLUGIN] LepuSDK type:', typeof LepuSDK);
         
-        this.nativePlugin = WellueSDK;
+        this.nativePlugin = LepuSDK;
         console.log('🚀 [NATIVE WELLUE PLUGIN] Native plugin assigned:', !!this.nativePlugin);
         
         // Detect plugin availability on this platform to avoid noisy errors
         try {
             const anyCap = Capacitor as any;
-            const capSays = typeof anyCap.isPluginAvailable === 'function' ? anyCap.isPluginAvailable('WellueSDK') : undefined;
+            const capSays = typeof anyCap.isPluginAvailable === 'function' ? anyCap.isPluginAvailable('LepuSDK') : undefined;
             const hasMethods = this.nativePlugin && typeof (this.nativePlugin as any).initialize === 'function';
             this.pluginAvailable = (capSays === true) || (!!hasMethods && Capacitor.isNativePlatform());
             console.log('🚀 [NATIVE WELLUE PLUGIN] Plugin available check result:', this.pluginAvailable);
@@ -751,36 +752,36 @@ class NativeWelluePlugin {
     }
 
     async initialize(): Promise<void> {
-        console.log('🚀 [WELLUE SDK] Starting initialization...');
-        console.log('🚀 [WELLUE SDK] Is native platform:', Capacitor.isNativePlatform());
-        console.log('🚀 [WELLUE SDK] Plugin available:', this.pluginAvailable);
-        console.log('🚀 [WELLUE SDK] Native plugin exists:', !!this.nativePlugin);
+        console.log('🚀 [LEPU SDK] Starting initialization...');
+        console.log('🚀 [LEPU SDK] Is native platform:', Capacitor.isNativePlatform());
+        console.log('🚀 [LEPU SDK] Plugin available:', this.pluginAvailable);
+        console.log('🚀 [LEPU SDK] Native plugin exists:', !!this.nativePlugin);
         
         if (!Capacitor.isNativePlatform()) {
-            console.warn('⚠️ [WELLUE SDK] Not a native platform; skipping initialization');
+            console.warn('⚠️ [LEPU SDK] Not a native platform; skipping initialization');
             this.isInitialized = false;
             return;
         }
 
         try {
-            console.log('🔵 [WELLUE SDK] Calling native plugin initialize()...');
+            console.log('🔵 [LEPU SDK] Calling native plugin initialize()...');
             await this.nativePlugin.initialize();
-            console.log('✅ [WELLUE SDK] Native plugin initialize() completed');
+            console.log('✅ [LEPU SDK] Native plugin initialize() completed');
             
-            console.log('🔵 [WELLUE SDK] Setting up event listeners...');
+            console.log('🔵 [LEPU SDK] Setting up event listeners...');
             this.setupEventListeners();
-            console.log('✅ [WELLUE SDK] Event listeners set up');
+            console.log('✅ [LEPU SDK] Event listeners set up');
             
             // Check initial Bluetooth status and notify
-            console.log('🔵 [WELLUE SDK] Checking initial Bluetooth status...');
+            console.log('🔵 [LEPU SDK] Checking initial Bluetooth status...');
             const bluetoothEnabled = await this.checkBluetoothEnabled();
-            console.log('🔵 [WELLUE SDK] Initial Bluetooth status check result:', bluetoothEnabled);
+            console.log('🔵 [LEPU SDK] Initial Bluetooth status check result:', bluetoothEnabled);
             this.callbacks.onBluetoothStatusChanged?.(bluetoothEnabled);
 
             this.isInitialized = true;
-            console.log('✅ [WELLUE SDK] Initialization completed successfully');
+            console.log('✅ [LEPU SDK] Initialization completed successfully');
         } catch (error) {
-            console.error('❌ [WELLUE SDK] Failed to initialize:', error);
+            console.error('❌ [LEPU SDK] Failed to initialize:', error);
             throw error;
         }
     }
