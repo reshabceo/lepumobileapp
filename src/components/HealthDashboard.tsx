@@ -162,7 +162,9 @@ const calculateAge = (dateOfBirth: string | undefined): number | null => {
 export const HealthDashboard = () => {
   const navigate = useNavigate();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [forceStopLoading, setForceStopLoading] = useState(false);
   const { logout } = useAuth();
+  const loadingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // DEBUG: Add console log to verify this component is rendering
   console.log(
@@ -178,6 +180,27 @@ export const HealthDashboard = () => {
     getLatestReadings,
     addVitalSign,
   } = useRealTimeVitals();
+
+  // Safety timeout - force stop loading after 5 seconds (much faster)
+  useEffect(() => {
+    if (vitalsLoading) {
+      loadingTimeoutRef.current = setTimeout(() => {
+        console.warn('⚠️ HealthDashboard: Loading timeout - forcing stop');
+        setForceStopLoading(true);
+      }, 5000); // Reduced from 12 to 5 seconds
+    } else {
+      setForceStopLoading(false);
+      if (loadingTimeoutRef.current) {
+        clearTimeout(loadingTimeoutRef.current);
+      }
+    }
+
+    return () => {
+      if (loadingTimeoutRef.current) {
+        clearTimeout(loadingTimeoutRef.current);
+      }
+    };
+  }, [vitalsLoading]);
   const {
     connectedDevice,
     bluetoothEnabled,
@@ -633,13 +656,38 @@ export const HealthDashboard = () => {
     });
   };
 
-  // Show loading state
-  if (vitalsLoading) {
+  // Show loading state (but respect timeout)
+  if (vitalsLoading && !forceStopLoading) {
     return (
       <div className="bg-[#101010] min-h-screen text-white flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
           <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
           <p className="text-gray-400">Loading health data...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // If loading was forced to stop, show error with retry
+  if (forceStopLoading && vitalsLoading) {
+    return (
+      <div className="bg-[#101010] min-h-screen text-white flex items-center justify-center p-4">
+        <div className="max-w-sm mx-auto text-center">
+          <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-6">
+            <Loader2 className="h-12 w-12 text-yellow-500 mx-auto mb-4" />
+            <h2 className="text-xl font-bold text-yellow-400 mb-2">
+              Loading Timeout
+            </h2>
+            <p className="text-gray-300 mb-4">
+              Taking longer than expected. Please try refreshing.
+            </p>
+            <button
+              onClick={() => window.location.reload()}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg transition-colors"
+            >
+              Refresh Page
+            </button>
+          </div>
         </div>
       </div>
     );

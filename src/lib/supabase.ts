@@ -193,31 +193,30 @@ export const auth = {
 
 // Database helper functions
 export const db = {
-  // Get patient profile
+  // Get patient profile - OPTIMIZED for speed
   getPatientProfile: async (authUserId: string) => {
-    console.log('🔍 DB Debug - Getting patient profile for:', authUserId)
-
     try {
+      // 🚀 OPTIMIZED: Use .single() for faster query and direct response
       const { data, error } = await supabase
         .from('patients')
         .select('*')
         .eq('auth_user_id', authUserId)
-        .limit(1)
+        .single() // Faster than limit(1) - returns single object directly
 
       if (error) {
+        // If error is "not found", return null data (not an error)
+        if (error.code === 'PGRST116') {
+          return { data: null, error: null }
+        }
         console.error('❌ Get patient profile error:', error)
         return { data: null, error }
       }
 
-      // Handle case where no patient found or multiple patients found
-      if (!data || data.length === 0) {
-        console.log('ℹ️ No patient profile found for user:', authUserId)
+      if (!data) {
         return { data: null, error: null }
       }
 
-      const patientProfile = data[0]
-      console.log('✅ Patient profile found:', patientProfile)
-      return { data: patientProfile, error: null }
+      return { data, error: null }
 
     } catch (err) {
       console.error('❌ Exception getting patient profile:', err)
