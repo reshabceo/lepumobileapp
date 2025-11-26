@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
-import { FileText, Download, Calendar, User, ArrowLeft, Upload, Stethoscope } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { FileText, Download, Calendar, User, ArrowLeft, Upload, Stethoscope, Plus, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '@/lib/supabase';
+import { supabase, db } from '@/lib/supabase';
 import { useRealTimeVitals } from '@/hooks/useRealTimeVitals';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface PatientReport {
     id: string;
@@ -19,10 +20,72 @@ interface PatientReport {
 
 const PatientReportsView: React.FC = () => {
     const navigate = useNavigate();
-    const { patientProfile } = useRealTimeVitals();
+    const { user } = useAuth();
+    const { patientProfile: hookProfile, loading: hookLoading } = useRealTimeVitals();
+    const [patientProfile, setPatientProfile] = useState<any>(null);
     const [reports, setReports] = useState<PatientReport[]>([]);
     const [loading, setLoading] = useState(true);
+    const [profileLoading, setProfileLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<'from-doctor' | 'my-uploads'>('from-doctor');
+    const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+    // 🚀 OPTIMIZED: Fetch profile with instant cache + direct fetch
+    useEffect(() => {
+        // Check cache first for instant load
+        if (user) {
+            const cacheKey = `patient_profile_${user.id}`;
+            const cachedProfile = localStorage.getItem(cacheKey);
+            if (cachedProfile) {
+                try {
+                    const parsed = JSON.parse(cachedProfile);
+                    const cacheTime = parsed._cached_at || 0;
+                    if (Date.now() - cacheTime < 5 * 60 * 1000) {
+                        console.log('✅ Using cached profile (instant)');
+                        setPatientProfile(parsed);
+                        setProfileLoading(false);
+                    }
+                } catch (e) {
+                    // Ignore cache parse errors
+                }
+            }
+        }
+
+        // Use hook profile if available
+        if (hookProfile) {
+            setPatientProfile(hookProfile);
+            setProfileLoading(false);
+            return;
+        }
+
+        // Fetch directly if hook doesn't have it yet
+        if (user && !hookProfile) {
+            const fetchProfile = async () => {
+                try {
+                    setProfileLoading(true);
+                    const profileData = await db.getPatientProfile(user.id);
+                    if (profileData.data) {
+                        setPatientProfile(profileData.data);
+                    }
+                } catch (err) {
+                    console.error('❌ Failed to fetch profile:', err);
+                } finally {
+                    setProfileLoading(false);
+                }
+            };
+            fetchProfile();
+        }
+
+        // Fast timeout - 3 seconds max
+        timeoutRef.current = setTimeout(() => {
+            setProfileLoading(false);
+        }, 3000);
+
+        return () => {
+            if (timeoutRef.current) {
+                clearTimeout(timeoutRef.current);
+            }
+        };
+    }, [hookProfile, user]);
 
     useEffect(() => {
         if (patientProfile) {
@@ -126,11 +189,38 @@ const PatientReportsView: React.FC = () => {
         return colors[type as keyof typeof colors] || 'bg-gray-100 text-gray-800';
     };
 
-    if (!patientProfile) {
+    // Show loading state
+    if (profileLoading || hookLoading) {
         return (
             <div className="bg-[#101010] min-h-screen text-white flex items-center justify-center">
-                <div className="text-center">
+                <div className="flex flex-col items-center gap-4">
+                    <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
                     <p className="text-gray-400">Loading patient profile...</p>
+                </div>
+            </div>
+        );
+    }
+
+    // Show error state if no profile after loading
+    if (!patientProfile) {
+        return (
+            <div className="bg-[#101010] min-h-screen text-white flex items-center justify-center p-4">
+                <div className="max-w-sm mx-auto text-center">
+                    <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-6">
+                        <FileText className="h-12 w-12 text-red-500 mx-auto mb-4" />
+                        <h2 className="text-xl font-bold text-red-400 mb-2">
+                            Profile Not Found
+                        </h2>
+                        <p className="text-gray-300 mb-4">
+                            Unable to load your patient profile. Please try again.
+                        </p>
+                        <button
+                            onClick={() => window.location.reload()}
+                            className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg transition-colors"
+                        >
+                            Refresh Page
+                        </button>
+                    </div>
                 </div>
             </div>
         );
@@ -150,13 +240,23 @@ const PatientReportsView: React.FC = () => {
                     >
                         <ArrowLeft className="h-5 w-5" />
                     </button>
-                    <div className="flex items-center">
+                    <div className="flex items-center flex-1">
                         <FileText className="h-5 w-5 text-blue-500 mr-3" />
-                        <div>
+                        <div className="flex-1">
                             <h1 className="text-2xl font-bold text-white">My Reports</h1>
                             <p className="text-sm text-gray-400">Medical reports and uploads</p>
                         </div>
                     </div>
+                    {/* Upload Button - Always visible when on "My Uploads" tab */}
+                    {activeTab === 'my-uploads' && (
+                        <button
+                            onClick={() => navigate('/add-reports')}
+                            className="bg-blue-600 hover:bg-blue-700 text-white p-2.5 rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl"
+                            title="Upload New Report"
+                        >
+                            <Plus className="h-5 w-5" />
+                        </button>
+                    )}
                 </div>
 
                 {/* Tabs */}
@@ -219,7 +319,7 @@ const PatientReportsView: React.FC = () => {
 
                 {/* Reports List */}
                 {!loading && filteredReports.length > 0 && (
-                    <div className="space-y-4">
+                    <div className="space-y-4 mb-20">
                         {filteredReports.map((report) => (
                             <div
                                 key={report.id}
@@ -277,6 +377,17 @@ const PatientReportsView: React.FC = () => {
                             </div>
                         ))}
                     </div>
+                )}
+
+                {/* Floating Action Button - Always visible when on "My Uploads" tab */}
+                {activeTab === 'my-uploads' && (
+                    <button
+                        onClick={() => navigate('/add-reports')}
+                        className="fixed bottom-6 right-1/2 transform translate-x-1/2 max-w-sm w-[calc(100%-2rem)] bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-6 py-4 rounded-full shadow-2xl hover:shadow-blue-500/50 transition-all duration-300 hover:scale-105 flex items-center justify-center gap-2 font-semibold z-50"
+                    >
+                        <Plus className="h-5 w-5" />
+                        <span>Upload New Report</span>
+                    </button>
                 )}
             </div>
         </div>
