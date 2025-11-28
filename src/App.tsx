@@ -30,6 +30,7 @@ import EcgDemo from "./pages/EcgDemo";
 import VideoCallPage from "./pages/VideoCall";
 import WaitingForDoctor from "./pages/WaitingForDoctor";
 import { GlobalVideoCallNotification } from "./components/GlobalVideoCallNotification";
+import { AppointmentBookingPage } from "./pages/AppointmentBookingPage";
 
 const queryClient = new QueryClient();
 
@@ -139,6 +140,11 @@ const App = () => (
               <Route path="/doctor-assignment" element={
                 <ProtectedRoute>
                   <DoctorAssignmentPage />
+                </ProtectedRoute>
+              } />
+              <Route path="/appointments" element={
+                <ProtectedRoute>
+                  <AppointmentBookingPage />
                 </ProtectedRoute>
               } />
 

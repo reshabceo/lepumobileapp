@@ -121,6 +121,18 @@ All colors MUST be HSL.
     display: none;
   }
   
+  .glass {
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
+  
+  .glass-card {
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
+  
   /* ECG Waveform Animations */
   @keyframes sweepGlow {
     0% { 
