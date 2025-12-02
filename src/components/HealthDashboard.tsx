@@ -1196,7 +1196,7 @@ export const HealthDashboard = () => {
         </div>
 
         {/* Bottom Action Buttons */}
-        <div className="grid grid-cols-3 gap-4 mb-6">
+        <div className="grid grid-cols-4 gap-4 mb-6">
           <button
             onClick={handleViewReports}
             className="bg-purple-900/60 backdrop-blur-sm hover:bg-purple-800/70 text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2 transition-all duration-200 hover:scale-105 active:scale-95 border border-purple-400/40 hover:border-purple-400/60"
@@ -1217,6 +1217,13 @@ export const HealthDashboard = () => {
           >
             <Calendar size={20} className="text-orange-400" />
             <span>Book</span>
+          </button>
+          <button
+            onClick={() => navigate("/ai-doctor")}
+            className="bg-emerald-900/60 backdrop-blur-sm hover:bg-emerald-800/70 text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2 transition-all duration-200 hover:scale-105 active:scale-95 border border-emerald-400/40 hover:border-emerald-400/60"
+          >
+            <Stethoscope size={20} className="text-emerald-400" />
+            <span>AI Doctor</span>
           </button>
         </div>
         <div className="pb-8 space-y-3">
