@@ -31,6 +31,8 @@ import VideoCallPage from "./pages/VideoCall";
 import WaitingForDoctor from "./pages/WaitingForDoctor";
 import { GlobalVideoCallNotification } from "./components/GlobalVideoCallNotification";
 import { AppointmentBookingPage } from "./pages/AppointmentBookingPage";
+import { ChatSupport } from "./components/ChatSupport";
+import AIDoctorPage from "./pages/AIDoctorPage";
 
 const queryClient = new QueryClient();
 
@@ -43,6 +45,7 @@ const App = () => (
           <Sonner />
           <BrowserRouter>
             <GlobalVideoCallNotification />
+            <ChatSupport />
             <Routes>
               {/* Public routes */}
               <Route path="/" element={
@@ -145,6 +148,11 @@ const App = () => (
               <Route path="/appointments" element={
                 <ProtectedRoute>
                   <AppointmentBookingPage />
+                </ProtectedRoute>
+              } />
+              <Route path="/ai-doctor" element={
+                <ProtectedRoute>
+                  <AIDoctorPage />
                 </ProtectedRoute>
               } />
 
