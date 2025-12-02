@@ -73,6 +73,7 @@
     "helmet": "^7.1.0",
     "input-otp": "^1.2.4",
     "jsonwebtoken": "^9.0.2",
+    "jspdf": "^2.5.2",
     "lucide-react": "^0.462.0",
     "moment": "^2.29.4",
     "next-themes": "^0.3.0",

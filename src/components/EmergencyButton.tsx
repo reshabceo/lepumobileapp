@@ -3,6 +3,7 @@ import { Siren, Phone, AlertTriangle } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import { EmergencyDoctorSelection } from './EmergencyDoctorSelection';
 
 interface EmergencyButtonProps {
     size?: 'sm' | 'md' | 'lg';
@@ -15,6 +16,12 @@ export const EmergencyButton: React.FC<EmergencyButtonProps> = ({
 }) => {
     const [isTriggering, setIsTriggering] = useState(false);
     const [showConfirm, setShowConfirm] = useState(false);
+    const [showAlternativeDoctors, setShowAlternativeDoctors] = useState(false);
+    const [patientData, setPatientData] = useState<{
+        id: string;
+        assigned_doctor_id: string | null;
+        assigned_doctor_specialty: string | null;
+    } | null>(null);
     const { user } = useAuth();
     const { toast } = useToast();
 
@@ -30,7 +37,7 @@ export const EmergencyButton: React.FC<EmergencyButtonProps> = ({
         lg: 32
     };
 
-    const triggerEmergency = async () => {
+    const checkDoctorAvailability = async () => {
         if (!user) {
             toast({
                 title: "Authentication Required",
@@ -43,10 +50,14 @@ export const EmergencyButton: React.FC<EmergencyButtonProps> = ({
         try {
             setIsTriggering(true);
 
-            // Get patient profile
+            // Get patient profile with assigned doctor info
             const { data: patientProfile, error: patientError } = await supabase
                 .from('patients')
-                .select('id, assigned_doctor_id, full_name')
+                .select(`
+                    id, 
+                    assigned_doctor_id,
+                    assigned_doctor:doctors!patients_assigned_doctor_id_fkey(specialty)
+                `)
                 .eq('auth_user_id', user.id)
                 .single();
 
@@ -55,20 +66,97 @@ export const EmergencyButton: React.FC<EmergencyButtonProps> = ({
             }
 
             if (!patientProfile.assigned_doctor_id) {
-                throw new Error('No doctor assigned to this patient');
+                // No assigned doctor - show alternative doctors
+                toast({
+                    title: "No Doctor Assigned",
+                    description: "Finding available doctors for you...",
+                    variant: "default",
+                });
+                setPatientData({
+                    id: patientProfile.id,
+                    assigned_doctor_id: null,
+                    assigned_doctor_specialty: null
+                });
+                setShowConfirm(false);
+                setShowAlternativeDoctors(true);
+                return;
             }
+
+            const assignedDoctorId = patientProfile.assigned_doctor_id;
+            const specialty = (patientProfile.assigned_doctor as any)?.specialty || null;
+
+            // Check if assigned doctor is available right now
+            const now = new Date();
+            const currentDate = now.toISOString().split('T')[0];
+            const currentTime = now.toTimeString().split(' ')[0].substring(0, 5); // HH:mm format
+            const currentDayOfWeek = now.getDay();
+
+            // Get available slots for today
+            const { data: availableSlots, error: availabilityError } = await supabase.rpc(
+                'get_available_slots',
+                {
+                    p_doctor_id: assignedDoctorId,
+                    p_date: currentDate
+                }
+            );
+
+            if (availabilityError) {
+                console.error('Error checking availability:', availabilityError);
+            }
+
+            // Check if current time falls within any available slot
+            const isAvailable = availableSlots && availableSlots.length > 0 && 
+                availableSlots.some((slot: any) => {
+                    const slotStart = slot.start_time.substring(0, 5); // HH:mm
+                    const slotEnd = slot.end_time.substring(0, 5); // HH:mm
+                    return slotStart <= currentTime && slotEnd >= currentTime;
+                });
+
+            if (isAvailable) {
+                // Doctor is available - proceed with normal emergency alert
+                await triggerEmergencyAlert(patientProfile.id, assignedDoctorId);
+            } else {
+                // Doctor is not available - show alternative doctors
+                setPatientData({
+                    id: patientProfile.id,
+                    assigned_doctor_id: assignedDoctorId,
+                    assigned_doctor_specialty: specialty
+                });
+                setShowConfirm(false);
+                setShowAlternativeDoctors(true);
+            }
+        } catch (error) {
+            console.error('Emergency check error:', error);
+            toast({
+                title: "Emergency Check Failed",
+                description: error instanceof Error ? error.message : "Failed to check doctor availability. Please call emergency services directly.",
+                variant: "destructive",
+            });
+        } finally {
+            setIsTriggering(false);
+        }
+    };
+
+    const triggerEmergencyAlert = async (patientId: string, doctorId: string) => {
+        try {
+            // Get patient name
+            const { data: patientProfile } = await supabase
+                .from('patients')
+                .select('full_name')
+                .eq('id', patientId)
+                .single();
 
             // Create emergency alert
             const { error: alertError } = await supabase
                 .from('emergency_alerts')
                 .insert({
-                    patient_id: patientProfile.id,
-                    doctor_id: patientProfile.assigned_doctor_id,
+                    patient_id: patientId,
+                    doctor_id: doctorId,
                     alert_type: 'patient_triggered',
                     severity: 'high',
                     title: 'Patient Emergency Alert',
-                    description: `Emergency alert triggered by ${patientProfile.full_name}`,
-                    vital_signs_data: null, // Could include current vital signs if available
+                    description: `Emergency alert triggered by ${patientProfile?.full_name || 'Patient'}`,
+                    vital_signs_data: null,
                 });
 
             if (alertError) {
@@ -83,20 +171,38 @@ export const EmergencyButton: React.FC<EmergencyButtonProps> = ({
 
             setShowConfirm(false);
         } catch (error) {
-            console.error('Emergency alert error:', error);
-            toast({
-                title: "Emergency Alert Failed",
-                description: error instanceof Error ? error.message : "Failed to send emergency alert. Please call emergency services directly.",
-                variant: "destructive",
-            });
-        } finally {
-            setIsTriggering(false);
+            throw error;
         }
+    };
+
+    const handleDoctorSelected = (doctorId: string) => {
+        setShowAlternativeDoctors(false);
+        setShowConfirm(false);
+        // Emergency appointment already booked in EmergencyDoctorSelection component
     };
 
     const handleEmergencyClick = () => {
         setShowConfirm(true);
     };
+
+    if (showAlternativeDoctors && patientData) {
+        return (
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+                <div className="bg-white dark:bg-gray-900 rounded-xl p-6 max-w-2xl w-full mx-auto my-8">
+                    <EmergencyDoctorSelection
+                        patientId={patientData.id}
+                        assignedDoctorId={patientData.assigned_doctor_id}
+                        requiredSpecialty={patientData.assigned_doctor_specialty || 'General Medicine'}
+                        onDoctorSelected={handleDoctorSelected}
+                        onCancel={() => {
+                            setShowAlternativeDoctors(false);
+                            setShowConfirm(false);
+                        }}
+                    />
+                </div>
+            </div>
+        );
+    }
 
     if (showConfirm) {
         return (
@@ -122,7 +228,7 @@ export const EmergencyButton: React.FC<EmergencyButtonProps> = ({
                                 Cancel
                             </button>
                             <button
-                                onClick={triggerEmergency}
+                                onClick={checkDoctorAvailability}
                                 disabled={isTriggering}
                                 className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                             >

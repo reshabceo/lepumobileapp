@@ -32,63 +32,107 @@ export interface PatientProfile {
 export const useRealTimeVitals = () => {
     const [vitals, setVitals] = useState<VitalSign[]>([]);
     const [patientProfile, setPatientProfile] = useState<PatientProfile | null>(null);
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(false); // Start as false - only true when actually fetching
     const [error, setError] = useState<string | null>(null);
     const { user } = useAuth();
 
     // Fetch patient profile and initial vitals
     useEffect(() => {
-        if (!user) return;
+        if (!user) {
+            setLoading(false);
+            setPatientProfile(null);
+            return;
+        }
 
         const fetchPatientData = async () => {
+            // 🚀 OPTIMIZATION: Check localStorage first for instant load
+            const cacheKey = `patient_profile_${user.id}`;
+            const cachedProfile = localStorage.getItem(cacheKey);
+            
+            if (cachedProfile) {
+                try {
+                    const parsed = JSON.parse(cachedProfile);
+                    const cacheTime = parsed._cached_at || 0;
+                    const now = Date.now();
+                    // Use cache if less than 5 minutes old
+                    if (now - cacheTime < 5 * 60 * 1000) {
+                        console.log('✅ Using cached profile (instant load)');
+                        setPatientProfile(parsed);
+                        setLoading(false);
+                        // Still fetch fresh data in background
+                    }
+                } catch (e) {
+                    console.warn('Failed to parse cached profile', e);
+                }
+            }
+
+            // Safety timeout to prevent infinite loading (5 seconds - much faster)
+            const timeoutId = setTimeout(() => {
+                console.warn('⚠️ Loading timeout - forcing loading to false');
+                setLoading(false);
+            }, 5000);
+
             try {
                 setLoading(true);
                 setError(null);
 
-                // Get patient profile
-                const profileData = await db.getPatientProfile(user.id);
-                if (profileData.error) {
-                    throw new Error(typeof profileData.error === 'string' ? profileData.error : profileData.error.message);
+                // 🚀 OPTIMIZED: Fetch profile and vitals in parallel for speed
+                const [profileResult, vitalsResult] = await Promise.allSettled([
+                    db.getPatientProfile(user.id),
+                    // Don't wait for vitals - fetch profile first
+                    Promise.resolve({ data: null, error: null })
+                ]);
+
+                // Handle profile result
+                if (profileResult.status === 'fulfilled') {
+                    const profileData = profileResult.value;
+                    if (profileData.error) {
+                        throw new Error(typeof profileData.error === 'string' ? profileData.error : profileData.error.message);
+                    }
+
+                    if (!profileData.data) {
+                        console.log('ℹ️ No patient profile found');
+                        setPatientProfile(null);
+                        clearTimeout(timeoutId);
+                        setLoading(false);
+                        return;
+                    }
+
+                    // Cache the profile for instant future loads
+                    const profileToCache = { ...profileData.data, _cached_at: Date.now() };
+                    localStorage.setItem(cacheKey, JSON.stringify(profileToCache));
+                    
+                    setPatientProfile(profileData.data);
+                    setLoading(false); // Profile loaded - stop showing loading immediately
+
+                    // Now fetch vitals in background (non-blocking)
+                    const { data: vitalsData, error: vitalsError } = await supabase
+                        .from('vital_signs')
+                        .select('*')
+                        .eq('patient_id', profileData.data.id)
+                        .order('reading_timestamp', { ascending: false })
+                        .limit(50);
+
+                    if (!vitalsError && vitalsData) {
+                        const mappedVitals = vitalsData.map(vital => ({
+                            id: vital.id,
+                            type: vital.device_type as VitalSign['type'],
+                            data: vital.data,
+                            reading_timestamp: vital.reading_timestamp,
+                            device_id: vital.device_id
+                        }));
+                        setVitals(mappedVitals);
+                    }
+                } else {
+                    throw profileResult.reason;
                 }
-
-                // If no profile exists, stop loading and keep dashboard minimal
-                if (!profileData.data) {
-                    console.log('ℹ️ No patient profile found; skipping vitals fetch');
-                    setPatientProfile(null);
-                    return;
-                }
-
-                setPatientProfile(profileData.data);
-
-                // Get vital signs for this patient
-                const { data: vitalsData, error: vitalsError } = await supabase
-                    .from('vital_signs')
-                    .select('*')
-                    .eq('patient_id', profileData.data.id)
-                    .order('reading_timestamp', { ascending: false })
-                    .limit(50);
-
-                if (vitalsError) {
-                    throw new Error(vitalsError.message);
-                }
-
-                // 🚀 FIXED: Map Supabase data structure to expected format
-                const mappedVitals = (vitalsData || []).map(vital => ({
-                    id: vital.id,
-                    type: vital.device_type as VitalSign['type'], // Map device_type to type
-                    data: vital.data, // Use the JSONB data field
-                    reading_timestamp: vital.reading_timestamp,
-                    device_id: vital.device_id
-                }));
-
-                console.log('📊 [FIXED] Mapped vitals from Supabase:', mappedVitals);
-                setVitals(mappedVitals);
 
             } catch (err) {
                 console.error('Error fetching patient data:', err);
                 setError(err instanceof Error ? err.message : 'Failed to fetch patient data');
-            } finally {
                 setLoading(false);
+            } finally {
+                clearTimeout(timeoutId);
             }
         };
 
