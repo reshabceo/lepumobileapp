@@ -291,3 +291,5 @@ USING (assigned_doctor_id = public.get_current_doctor_id())
 
 **All systems analyzed. Fix ready to deploy. No stone left unturned.** 🎯
 
+
+
