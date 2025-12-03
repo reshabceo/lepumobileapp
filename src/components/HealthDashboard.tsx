@@ -29,6 +29,7 @@ import {
   Monitor,
   Calendar,
   FileCheck,
+  Edit3,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
@@ -1246,6 +1247,21 @@ export const HealthDashboard = () => {
             <span className="text-xs">Claims</span>
           </button>
         </div>
+
+        {/* Manual Vital Input Button - Basic Plan */}
+        <div className="mb-6">
+          <button
+            onClick={() => navigate("/manual-vitals")}
+            className="w-full bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white font-bold py-5 rounded-xl flex items-center justify-center gap-3 transition-all duration-200 hover:scale-105 active:scale-95 border border-emerald-400/30 hover:border-emerald-400/50 shadow-lg"
+          >
+            <Edit3 size={24} className="text-white" />
+            <div className="text-left">
+              <div className="text-lg font-bold">Manual Vital Input</div>
+              <div className="text-xs text-emerald-100/80">Basic Plan - Enter vitals manually</div>
+            </div>
+          </button>
+        </div>
+
         <div className="pb-8 space-y-3">
           <EmergencyButton size="lg" className="w-full" />
           <button
