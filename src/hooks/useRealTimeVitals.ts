@@ -41,8 +41,13 @@ export const useRealTimeVitals = () => {
         if (!user) {
             setLoading(false);
             setPatientProfile(null);
+            setVitals([]);
+            setError(null);
             return;
         }
+
+        let isMounted = true;
+        let timeoutId: NodeJS.Timeout | null = null;
 
         const fetchPatientData = async () => {
             // 🚀 OPTIMIZATION: Check localStorage first for instant load
@@ -57,8 +62,10 @@ export const useRealTimeVitals = () => {
                     // Use cache if less than 5 minutes old
                     if (now - cacheTime < 5 * 60 * 1000) {
                         console.log('✅ Using cached profile (instant load)');
-                        setPatientProfile(parsed);
-                        setLoading(false);
+                        if (isMounted) {
+                            setPatientProfile(parsed);
+                            setLoading(false);
+                        }
                         // Still fetch fresh data in background
                     }
                 } catch (e) {
@@ -66,21 +73,30 @@ export const useRealTimeVitals = () => {
                 }
             }
 
-            // Safety timeout to prevent infinite loading (5 seconds - much faster)
-            const timeoutId = setTimeout(() => {
-                console.warn('⚠️ Loading timeout - forcing loading to false');
-                setLoading(false);
-            }, 5000);
+            // Safety timeout to prevent infinite loading (8 seconds)
+            timeoutId = setTimeout(() => {
+                if (isMounted) {
+                    console.warn('⚠️ Loading timeout - forcing loading to false');
+                    setLoading(false);
+                    setError('Loading took too long. Please refresh if data is missing.');
+                }
+            }, 8000);
 
             try {
-                setLoading(true);
-                setError(null);
+                if (isMounted) {
+                    setLoading(true);
+                    setError(null);
+                }
 
-                // 🚀 OPTIMIZED: Fetch profile and vitals in parallel for speed
-                const [profileResult, vitalsResult] = await Promise.allSettled([
-                    db.getPatientProfile(user.id),
-                    // Don't wait for vitals - fetch profile first
-                    Promise.resolve({ data: null, error: null })
+                // 🚀 OPTIMIZED: Fetch profile with timeout protection
+                const profilePromise = db.getPatientProfile(user.id);
+                const timeoutPromise = new Promise((_, reject) => 
+                    setTimeout(() => reject(new Error('Profile fetch timeout')), 7000)
+                );
+
+                const profileResult = await Promise.race([
+                    Promise.resolve(profilePromise).then(result => ({ status: 'fulfilled' as const, value: result })),
+                    timeoutPromise.then(() => ({ status: 'rejected' as const, reason: new Error('Timeout') }))
                 ]);
 
                 // Handle profile result
@@ -92,9 +108,11 @@ export const useRealTimeVitals = () => {
 
                     if (!profileData.data) {
                         console.log('ℹ️ No patient profile found');
-                        setPatientProfile(null);
-                        clearTimeout(timeoutId);
-                        setLoading(false);
+                        if (isMounted) {
+                            setPatientProfile(null);
+                            setLoading(false);
+                        }
+                        if (timeoutId) clearTimeout(timeoutId);
                         return;
                     }
 
@@ -102,26 +120,41 @@ export const useRealTimeVitals = () => {
                     const profileToCache = { ...profileData.data, _cached_at: Date.now() };
                     localStorage.setItem(cacheKey, JSON.stringify(profileToCache));
                     
-                    setPatientProfile(profileData.data);
-                    setLoading(false); // Profile loaded - stop showing loading immediately
+                    if (isMounted) {
+                        setPatientProfile(profileData.data);
+                        setLoading(false); // Profile loaded - stop showing loading immediately
+                    }
 
-                    // Now fetch vitals in background (non-blocking)
-                    const { data: vitalsData, error: vitalsError } = await supabase
-                        .from('vital_signs')
-                        .select('*')
-                        .eq('patient_id', profileData.data.id)
-                        .order('reading_timestamp', { ascending: false })
-                        .limit(50);
+                    if (timeoutId) clearTimeout(timeoutId);
 
-                    if (!vitalsError && vitalsData) {
-                        const mappedVitals = vitalsData.map(vital => ({
-                            id: vital.id,
-                            type: vital.device_type as VitalSign['type'],
-                            data: vital.data,
-                            reading_timestamp: vital.reading_timestamp,
-                            device_id: vital.device_id
-                        }));
-                        setVitals(mappedVitals);
+                    // Now fetch vitals in background (non-blocking, with error handling)
+                    try {
+                        const vitalsTimeout = setTimeout(() => {
+                            console.warn('Vitals fetch taking too long, skipping...');
+                        }, 5000);
+
+                        const { data: vitalsData, error: vitalsError } = await supabase
+                            .from('vital_signs')
+                            .select('*')
+                            .eq('patient_id', profileData.data.id)
+                            .order('reading_timestamp', { ascending: false })
+                            .limit(50);
+
+                        clearTimeout(vitalsTimeout);
+
+                        if (isMounted && !vitalsError && vitalsData) {
+                            const mappedVitals = vitalsData.map(vital => ({
+                                id: vital.id,
+                                type: vital.device_type as VitalSign['type'],
+                                data: vital.data,
+                                reading_timestamp: vital.reading_timestamp,
+                                device_id: vital.device_id
+                            }));
+                            setVitals(mappedVitals);
+                        }
+                    } catch (vitalsErr) {
+                        console.warn('Failed to fetch vitals (non-critical):', vitalsErr);
+                        // Don't set error for vitals failure - it's non-critical
                     }
                 } else {
                     throw profileResult.reason;
@@ -129,15 +162,22 @@ export const useRealTimeVitals = () => {
 
             } catch (err) {
                 console.error('Error fetching patient data:', err);
-                setError(err instanceof Error ? err.message : 'Failed to fetch patient data');
-                setLoading(false);
+                if (isMounted) {
+                    setError(err instanceof Error ? err.message : 'Failed to fetch patient data');
+                    setLoading(false);
+                }
             } finally {
-                clearTimeout(timeoutId);
+                if (timeoutId) clearTimeout(timeoutId);
             }
         };
 
         fetchPatientData();
-    }, [user]);
+
+        return () => {
+            isMounted = false;
+            if (timeoutId) clearTimeout(timeoutId);
+        };
+    }, [user?.id]); // Only depend on user.id to prevent unnecessary re-fetches
 
     // Set up real-time subscription for vital signs
     useEffect(() => {
