@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import {
   Phone,
   MapPin,
@@ -16,7 +16,6 @@ import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { usePatientVideoCall } from '@/hooks/usePatientVideoCall';
-// duplicate import removed
 
 interface Doctor {
   id: string;
@@ -30,21 +29,72 @@ interface Doctor {
   email: string;
 }
 
-export const DoctorInfoCard: React.FC = () => {
+export const DoctorInfoCard: React.FC = React.memo(() => {
   const [doctor, setDoctor] = useState<Doctor | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { user } = useAuth();
   const navigate = useNavigate();
-  const { currentCall, initiateCall } = usePatientVideoCall(user?.id)
+  const { currentCall, initiateCall } = usePatientVideoCall(user?.id);
+  
+  // Prevent multiple simultaneous fetches
+  const fetchingRef = useRef(false);
+  const lastUserIdRef = useRef<string | null>(null);
+  
+  // Cache key for localStorage
+  const cacheKey = useMemo(() => user ? `doctor_info_${user.id}` : null, [user?.id]);
 
   useEffect(() => {
     const fetchDoctorInfo = async () => {
-      if (!user) return;
+      // Skip if no user or already fetching
+      if (!user || fetchingRef.current) {
+        return;
+      }
+
+      // Skip if we already have data for this user
+      if (lastUserIdRef.current === user.id && doctor) {
+        setLoading(false);
+        return;
+      }
+
+      // Check cache first
+      if (cacheKey) {
+        try {
+          const cached = localStorage.getItem(cacheKey);
+          if (cached) {
+            const parsed = JSON.parse(cached);
+            const cacheTime = parsed._cached_at || 0;
+            const now = Date.now();
+            // Use cache if less than 10 minutes old
+            if (now - cacheTime < 10 * 60 * 1000) {
+              console.log('✅ Using cached doctor info');
+              setDoctor(parsed);
+              setLoading(false);
+              lastUserIdRef.current = user.id;
+              // Still fetch fresh data in background
+            }
+          }
+        } catch (e) {
+          console.warn('Failed to parse cached doctor info', e);
+        }
+      }
+
+      // Set fetching flag
+      fetchingRef.current = true;
 
       try {
-        setLoading(true);
+        // Only show loading if we don't have cached data
+        if (!doctor) {
+          setLoading(true);
+        }
         setError(null);
+
+        // Safety timeout - prevent infinite loading
+        const timeoutId = setTimeout(() => {
+          console.warn('⚠️ Doctor info fetch timeout');
+          setLoading(false);
+          fetchingRef.current = false;
+        }, 8000);
 
         // First get the patient's profile to find assigned doctor
         const { data: patientProfile, error: patientError } = await supabase
@@ -54,7 +104,10 @@ export const DoctorInfoCard: React.FC = () => {
           .single();
 
         if (patientError || !patientProfile?.assigned_doctor_id) {
+          clearTimeout(timeoutId);
           setError("No doctor assigned yet. Please contact support.");
+          setLoading(false);
+          fetchingRef.current = false;
           return;
         }
 
@@ -78,22 +131,36 @@ export const DoctorInfoCard: React.FC = () => {
           .eq("is_active", true)
           .single();
 
+        clearTimeout(timeoutId);
+
         if (doctorError || !doctorData) {
           setError("Unable to fetch doctor information.");
+          setLoading(false);
+          fetchingRef.current = false;
           return;
         }
 
+        // Cache the doctor data
+        if (cacheKey) {
+          const dataToCache = { ...doctorData, _cached_at: Date.now() };
+          localStorage.setItem(cacheKey, JSON.stringify(dataToCache));
+        }
+
         setDoctor(doctorData);
+        lastUserIdRef.current = user.id;
+        setLoading(false);
       } catch (err) {
         console.error("Error fetching doctor info:", err);
         setError("Failed to load doctor information.");
-      } finally {
         setLoading(false);
+      } finally {
+        fetchingRef.current = false;
       }
     };
 
     fetchDoctorInfo();
-  }, [user]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]); // Only depend on user.id, not the whole user object
 
   const handleChatClick = () => {
     navigate("/chat");
@@ -305,4 +372,4 @@ export const DoctorInfoCard: React.FC = () => {
       </div>
     </div>
   );
-};
+});

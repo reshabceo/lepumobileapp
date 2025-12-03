@@ -182,23 +182,31 @@ export const HealthDashboard = () => {
     addVitalSign,
   } = useRealTimeVitals();
 
-  // Safety timeout - force stop loading after 5 seconds (much faster)
+  // Safety timeout - force stop loading after 8 seconds with better error handling
   useEffect(() => {
     if (vitalsLoading) {
+      // Clear any existing timeout
+      if (loadingTimeoutRef.current) {
+        clearTimeout(loadingTimeoutRef.current);
+      }
+      
       loadingTimeoutRef.current = setTimeout(() => {
         console.warn('⚠️ HealthDashboard: Loading timeout - forcing stop');
         setForceStopLoading(true);
-      }, 5000); // Reduced from 12 to 5 seconds
+        // Don't set loading to false here - let the hook handle it
+      }, 8000); // 8 seconds timeout
     } else {
       setForceStopLoading(false);
       if (loadingTimeoutRef.current) {
         clearTimeout(loadingTimeoutRef.current);
+        loadingTimeoutRef.current = null;
       }
     }
 
     return () => {
       if (loadingTimeoutRef.current) {
         clearTimeout(loadingTimeoutRef.current);
+        loadingTimeoutRef.current = null;
       }
     };
   }, [vitalsLoading]);
@@ -669,29 +677,12 @@ export const HealthDashboard = () => {
     );
   }
 
-  // If loading was forced to stop, show error with retry
+  // If loading was forced to stop, show error with retry but still render dashboard
+  // This prevents the infinite loading state while allowing the user to see cached data
   if (forceStopLoading && vitalsLoading) {
-    return (
-      <div className="bg-[#101010] min-h-screen text-white flex items-center justify-center p-4">
-        <div className="max-w-sm mx-auto text-center">
-          <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-6">
-            <Loader2 className="h-12 w-12 text-yellow-500 mx-auto mb-4" />
-            <h2 className="text-xl font-bold text-yellow-400 mb-2">
-              Loading Timeout
-            </h2>
-            <p className="text-gray-300 mb-4">
-              Taking longer than expected. Please try refreshing.
-            </p>
-            <button
-              onClick={() => window.location.reload()}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg transition-colors"
-            >
-              Refresh Page
-            </button>
-          </div>
-        </div>
-      </div>
-    );
+    console.warn('⚠️ HealthDashboard: Loading timeout reached, showing dashboard with cached data');
+    // Don't block the UI - continue to render with whatever data we have
+    // The loading state will be cleared by the hook's timeout
   }
 
   // Show error state
@@ -1196,7 +1187,7 @@ export const HealthDashboard = () => {
         </div>
 
         {/* Bottom Action Buttons */}
-        <div className="grid grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-2 md:grid-cols-4  gap-4 mb-6">
           <button
             onClick={handleViewReports}
             className="bg-purple-900/60 backdrop-blur-sm hover:bg-purple-800/70 text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2 transition-all duration-200 hover:scale-105 active:scale-95 border border-purple-400/40 hover:border-purple-400/60"
@@ -1226,6 +1217,7 @@ export const HealthDashboard = () => {
             <span>AI Doctor</span>
           </button>
         </div>
+
         <div className="pb-8 space-y-3">
           <EmergencyButton size="lg" className="w-full" />
           <button
