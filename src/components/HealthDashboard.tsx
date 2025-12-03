@@ -28,6 +28,7 @@ import {
   Settings,
   Monitor,
   Calendar,
+  FileCheck,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
@@ -37,6 +38,7 @@ import { useDevice } from "@/contexts/DeviceContext";
 import { useRealTimeVitals } from "@/hooks/useRealTimeVitals";
 import { DoctorInfoCard } from "./DoctorInfoCard";
 import { EmergencyButton } from "./EmergencyButton";
+import { useInsuranceClaimsNotifications } from "@/hooks/useInsuranceClaimsNotifications";
 
 // Icon mapping for different health metrics
 const getMetricIcon = (name: string) => {
@@ -181,6 +183,9 @@ export const HealthDashboard = () => {
     getLatestReadings,
     addVitalSign,
   } = useRealTimeVitals();
+  
+  // Insurance claims notifications
+  const { unreadCount: claimsUnreadCount, markAsRead: markClaimsAsRead } = useInsuranceClaimsNotifications();
 
   // Safety timeout - force stop loading after 5 seconds (much faster)
   useEffect(() => {
@@ -1196,34 +1201,49 @@ export const HealthDashboard = () => {
         </div>
 
         {/* Bottom Action Buttons */}
-        <div className="grid grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-5 gap-3 mb-6">
           <button
             onClick={handleViewReports}
-            className="bg-purple-900/60 backdrop-blur-sm hover:bg-purple-800/70 text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2 transition-all duration-200 hover:scale-105 active:scale-95 border border-purple-400/40 hover:border-purple-400/60"
+            className="bg-purple-900/60 backdrop-blur-sm hover:bg-purple-800/70 text-white font-bold py-4 rounded-xl flex flex-col items-center justify-center gap-1 transition-all duration-200 hover:scale-105 active:scale-95 border border-purple-400/40 hover:border-purple-400/60"
           >
             <FileText size={20} className="text-purple-400" />
-            <span>Reports</span>
+            <span className="text-xs">Reports</span>
           </button>
           <button
             onClick={() => navigate("/doctor-assignment")}
-            className="bg-blue-900/60 backdrop-blur-sm hover:bg-blue-800/70 text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2 transition-all duration-200 hover:scale-105 active:scale-95 border border-blue-400/40 hover:border-blue-400/60"
+            className="bg-blue-900/60 backdrop-blur-sm hover:bg-blue-800/70 text-white font-bold py-4 rounded-xl flex flex-col items-center justify-center gap-1 transition-all duration-200 hover:scale-105 active:scale-95 border border-blue-400/40 hover:border-blue-400/60"
           >
             <Stethoscope size={20} className="text-blue-400" />
-            <span>Doctor</span>
+            <span className="text-xs">Doctor</span>
           </button>
           <button
             onClick={() => navigate("/appointments")}
-            className="bg-orange-900/60 backdrop-blur-sm hover:bg-orange-800/70 text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2 transition-all duration-200 hover:scale-105 active:scale-95 border border-orange-400/40 hover:border-orange-400/60"
+            className="bg-orange-900/60 backdrop-blur-sm hover:bg-orange-800/70 text-white font-bold py-4 rounded-xl flex flex-col items-center justify-center gap-1 transition-all duration-200 hover:scale-105 active:scale-95 border border-orange-400/40 hover:border-orange-400/60"
           >
             <Calendar size={20} className="text-orange-400" />
-            <span>Book</span>
+            <span className="text-xs">Book</span>
           </button>
           <button
             onClick={() => navigate("/ai-doctor")}
-            className="bg-emerald-900/60 backdrop-blur-sm hover:bg-emerald-800/70 text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2 transition-all duration-200 hover:scale-105 active:scale-95 border border-emerald-400/40 hover:border-emerald-400/60"
+            className="bg-emerald-900/60 backdrop-blur-sm hover:bg-emerald-800/70 text-white font-bold py-4 rounded-xl flex flex-col items-center justify-center gap-1 transition-all duration-200 hover:scale-105 active:scale-95 border border-emerald-400/40 hover:border-emerald-400/60"
           >
             <Stethoscope size={20} className="text-emerald-400" />
-            <span>AI Doctor</span>
+            <span className="text-xs">AI Doc</span>
+          </button>
+          <button
+            onClick={() => {
+              markClaimsAsRead();
+              navigate("/insurance-claims");
+            }}
+            className="bg-cyan-900/60 backdrop-blur-sm hover:bg-cyan-800/70 text-white font-bold py-4 rounded-xl flex flex-col items-center justify-center gap-1 transition-all duration-200 hover:scale-105 active:scale-95 border border-cyan-400/40 hover:border-cyan-400/60 relative"
+          >
+            {claimsUnreadCount > 0 && (
+              <div className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center animate-pulse">
+                {claimsUnreadCount}
+              </div>
+            )}
+            <FileCheck size={20} className="text-cyan-400" />
+            <span className="text-xs">Claims</span>
           </button>
         </div>
         <div className="pb-8 space-y-3">
