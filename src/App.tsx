@@ -35,6 +35,7 @@ import { ChatSupport } from "./components/ChatSupport";
 import AIDoctorPage from "./pages/AIDoctorPage";
 import PatientInsuranceClaims from "./components/PatientInsuranceClaims";
 import { ManualVitalInput } from "./components/ManualVitalInput";
+import { PatientPrescriptions } from "./components/PatientPrescriptions";
 
 const queryClient = new QueryClient();
 
@@ -165,6 +166,11 @@ const App = () => (
               <Route path="/manual-vitals" element={
                 <ProtectedRoute>
                   <ManualVitalInput />
+                </ProtectedRoute>
+              } />
+              <Route path="/prescriptions" element={
+                <ProtectedRoute>
+                  <PatientPrescriptions />
                 </ProtectedRoute>
               } />
 
