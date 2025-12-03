@@ -30,6 +30,7 @@ import {
   Calendar,
   FileCheck,
   Edit3,
+  Pill,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
@@ -1245,6 +1246,13 @@ export const HealthDashboard = () => {
             )}
             <FileCheck size={20} className="text-cyan-400" />
             <span className="text-xs">Claims</span>
+          </button>
+          <button
+            onClick={() => navigate("/prescriptions")}
+            className="bg-purple-900/60 backdrop-blur-sm hover:bg-purple-800/70 text-white font-bold py-4 rounded-xl flex flex-col items-center justify-center gap-1 transition-all duration-200 hover:scale-105 active:scale-95 border border-purple-400/40 hover:border-purple-400/60"
+          >
+            <Pill size={20} className="text-purple-400" />
+            <span className="text-xs">Rx</span>
           </button>
         </div>
 
