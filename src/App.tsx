@@ -33,6 +33,7 @@ import { GlobalVideoCallNotification } from "./components/GlobalVideoCallNotific
 import { AppointmentBookingPage } from "./pages/AppointmentBookingPage";
 import { ChatSupport } from "./components/ChatSupport";
 import AIDoctorPage from "./pages/AIDoctorPage";
+import PatientInsuranceClaims from "./components/PatientInsuranceClaims";
 
 const queryClient = new QueryClient();
 
@@ -153,6 +154,11 @@ const App = () => (
               <Route path="/ai-doctor" element={
                 <ProtectedRoute>
                   <AIDoctorPage />
+                </ProtectedRoute>
+              } />
+              <Route path="/insurance-claims" element={
+                <ProtectedRoute>
+                  <PatientInsuranceClaims />
                 </ProtectedRoute>
               } />
 
