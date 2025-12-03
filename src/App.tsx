@@ -34,6 +34,7 @@ import { AppointmentBookingPage } from "./pages/AppointmentBookingPage";
 import { ChatSupport } from "./components/ChatSupport";
 import AIDoctorPage from "./pages/AIDoctorPage";
 import PatientInsuranceClaims from "./components/PatientInsuranceClaims";
+import { ManualVitalInput } from "./components/ManualVitalInput";
 
 const queryClient = new QueryClient();
 
@@ -159,6 +160,11 @@ const App = () => (
               <Route path="/insurance-claims" element={
                 <ProtectedRoute>
                   <PatientInsuranceClaims />
+                </ProtectedRoute>
+              } />
+              <Route path="/manual-vitals" element={
+                <ProtectedRoute>
+                  <ManualVitalInput />
                 </ProtectedRoute>
               } />
 
