@@ -28,6 +28,9 @@ import {
   Settings,
   Monitor,
   Calendar,
+  FileCheck,
+  Edit3,
+  Pill,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
@@ -37,6 +40,7 @@ import { useDevice } from "@/contexts/DeviceContext";
 import { useRealTimeVitals } from "@/hooks/useRealTimeVitals";
 import { DoctorInfoCard } from "./DoctorInfoCard";
 import { EmergencyButton } from "./EmergencyButton";
+import { useInsuranceClaimsNotifications } from "@/hooks/useInsuranceClaimsNotifications";
 
 // Icon mapping for different health metrics
 const getMetricIcon = (name: string) => {
@@ -181,32 +185,27 @@ export const HealthDashboard = () => {
     getLatestReadings,
     addVitalSign,
   } = useRealTimeVitals();
+  
+  // Insurance claims notifications
+  const { unreadCount: claimsUnreadCount, markAsRead: markClaimsAsRead } = useInsuranceClaimsNotifications();
 
-  // Safety timeout - force stop loading after 8 seconds with better error handling
+  // Safety timeout - force stop loading after 5 seconds (much faster)
   useEffect(() => {
     if (vitalsLoading) {
-      // Clear any existing timeout
-      if (loadingTimeoutRef.current) {
-        clearTimeout(loadingTimeoutRef.current);
-      }
-      
       loadingTimeoutRef.current = setTimeout(() => {
         console.warn('⚠️ HealthDashboard: Loading timeout - forcing stop');
         setForceStopLoading(true);
-        // Don't set loading to false here - let the hook handle it
-      }, 8000); // 8 seconds timeout
+      }, 5000); // Reduced from 12 to 5 seconds
     } else {
       setForceStopLoading(false);
       if (loadingTimeoutRef.current) {
         clearTimeout(loadingTimeoutRef.current);
-        loadingTimeoutRef.current = null;
       }
     }
 
     return () => {
       if (loadingTimeoutRef.current) {
         clearTimeout(loadingTimeoutRef.current);
-        loadingTimeoutRef.current = null;
       }
     };
   }, [vitalsLoading]);
@@ -677,12 +676,29 @@ export const HealthDashboard = () => {
     );
   }
 
-  // If loading was forced to stop, show error with retry but still render dashboard
-  // This prevents the infinite loading state while allowing the user to see cached data
+  // If loading was forced to stop, show error with retry
   if (forceStopLoading && vitalsLoading) {
-    console.warn('⚠️ HealthDashboard: Loading timeout reached, showing dashboard with cached data');
-    // Don't block the UI - continue to render with whatever data we have
-    // The loading state will be cleared by the hook's timeout
+    return (
+      <div className="bg-[#101010] min-h-screen text-white flex items-center justify-center p-4">
+        <div className="max-w-sm mx-auto text-center">
+          <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-6">
+            <Loader2 className="h-12 w-12 text-yellow-500 mx-auto mb-4" />
+            <h2 className="text-xl font-bold text-yellow-400 mb-2">
+              Loading Timeout
+            </h2>
+            <p className="text-gray-300 mb-4">
+              Taking longer than expected. Please try refreshing.
+            </p>
+            <button
+              onClick={() => window.location.reload()}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg transition-colors"
+            >
+              Refresh Page
+            </button>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   // Show error state
@@ -1187,34 +1203,70 @@ export const HealthDashboard = () => {
         </div>
 
         {/* Bottom Action Buttons */}
-        <div className="grid grid-cols-2 md:grid-cols-4  gap-4 mb-6">
+        <div className="grid grid-cols-5 gap-3 mb-6">
           <button
             onClick={handleViewReports}
-            className="bg-purple-900/60 backdrop-blur-sm hover:bg-purple-800/70 text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2 transition-all duration-200 hover:scale-105 active:scale-95 border border-purple-400/40 hover:border-purple-400/60"
+            className="bg-purple-900/60 backdrop-blur-sm hover:bg-purple-800/70 text-white font-bold py-4 rounded-xl flex flex-col items-center justify-center gap-1 transition-all duration-200 hover:scale-105 active:scale-95 border border-purple-400/40 hover:border-purple-400/60"
           >
             <FileText size={20} className="text-purple-400" />
-            <span>Reports</span>
+            <span className="text-xs">Reports</span>
           </button>
           <button
             onClick={() => navigate("/doctor-assignment")}
-            className="bg-blue-900/60 backdrop-blur-sm hover:bg-blue-800/70 text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2 transition-all duration-200 hover:scale-105 active:scale-95 border border-blue-400/40 hover:border-blue-400/60"
+            className="bg-blue-900/60 backdrop-blur-sm hover:bg-blue-800/70 text-white font-bold py-4 rounded-xl flex flex-col items-center justify-center gap-1 transition-all duration-200 hover:scale-105 active:scale-95 border border-blue-400/40 hover:border-blue-400/60"
           >
             <Stethoscope size={20} className="text-blue-400" />
-            <span>Doctor</span>
+            <span className="text-xs">Doctor</span>
           </button>
           <button
             onClick={() => navigate("/appointments")}
-            className="bg-orange-900/60 backdrop-blur-sm hover:bg-orange-800/70 text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2 transition-all duration-200 hover:scale-105 active:scale-95 border border-orange-400/40 hover:border-orange-400/60"
+            className="bg-orange-900/60 backdrop-blur-sm hover:bg-orange-800/70 text-white font-bold py-4 rounded-xl flex flex-col items-center justify-center gap-1 transition-all duration-200 hover:scale-105 active:scale-95 border border-orange-400/40 hover:border-orange-400/60"
           >
             <Calendar size={20} className="text-orange-400" />
-            <span>Book</span>
+            <span className="text-xs">Book</span>
           </button>
           <button
             onClick={() => navigate("/ai-doctor")}
-            className="bg-emerald-900/60 backdrop-blur-sm hover:bg-emerald-800/70 text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2 transition-all duration-200 hover:scale-105 active:scale-95 border border-emerald-400/40 hover:border-emerald-400/60"
+            className="bg-emerald-900/60 backdrop-blur-sm hover:bg-emerald-800/70 text-white font-bold py-4 rounded-xl flex flex-col items-center justify-center gap-1 transition-all duration-200 hover:scale-105 active:scale-95 border border-emerald-400/40 hover:border-emerald-400/60"
           >
             <Stethoscope size={20} className="text-emerald-400" />
-            <span>AI Doctor</span>
+            <span className="text-xs">AI Doc</span>
+          </button>
+          <button
+            onClick={() => {
+              markClaimsAsRead();
+              navigate("/insurance-claims");
+            }}
+            className="bg-cyan-900/60 backdrop-blur-sm hover:bg-cyan-800/70 text-white font-bold py-4 rounded-xl flex flex-col items-center justify-center gap-1 transition-all duration-200 hover:scale-105 active:scale-95 border border-cyan-400/40 hover:border-cyan-400/60 relative"
+          >
+            {claimsUnreadCount > 0 && (
+              <div className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center animate-pulse">
+                {claimsUnreadCount}
+              </div>
+            )}
+            <FileCheck size={20} className="text-cyan-400" />
+            <span className="text-xs">Claims</span>
+          </button>
+          <button
+            onClick={() => navigate("/prescriptions")}
+            className="bg-purple-900/60 backdrop-blur-sm hover:bg-purple-800/70 text-white font-bold py-4 rounded-xl flex flex-col items-center justify-center gap-1 transition-all duration-200 hover:scale-105 active:scale-95 border border-purple-400/40 hover:border-purple-400/60"
+          >
+            <Pill size={20} className="text-purple-400" />
+            <span className="text-xs">Rx</span>
+          </button>
+        </div>
+
+        {/* Manual Vital Input Button - Basic Plan */}
+        <div className="mb-6">
+          <button
+            onClick={() => navigate("/manual-vitals")}
+            className="w-full bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white font-bold py-5 rounded-xl flex items-center justify-center gap-3 transition-all duration-200 hover:scale-105 active:scale-95 border border-emerald-400/30 hover:border-emerald-400/50 shadow-lg"
+          >
+            <Edit3 size={24} className="text-white" />
+            <div className="text-left">
+              <div className="text-lg font-bold">Manual Vital Input</div>
+              <div className="text-xs text-emerald-100/80">Basic Plan - Enter vitals manually</div>
+            </div>
           </button>
         </div>
 
