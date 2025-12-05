@@ -1203,7 +1203,7 @@ export const HealthDashboard = () => {
         </div>
 
         {/* Bottom Action Buttons */}
-        <div className="grid grid-cols-5 gap-3 mb-6">
+        <div className="grid grid-cols-2 md:grid-cols-5  gap-3 mb-6">
           <button
             onClick={handleViewReports}
             className="bg-purple-900/60 backdrop-blur-sm hover:bg-purple-800/70 text-white font-bold py-4 rounded-xl flex flex-col items-center justify-center gap-1 transition-all duration-200 hover:scale-105 active:scale-95 border border-purple-400/40 hover:border-purple-400/60"
