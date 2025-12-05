@@ -4,9 +4,10 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { SignupWizard } from './SignupWizard';
+import { ForgotPassword } from './ForgotPassword';
 
 export const LoginPage = () => {
-  const [isLoginMode, setIsLoginMode] = useState(true);
+  const [mode, setMode] = useState<'login' | 'signup' | 'forgot'>('login');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
@@ -80,16 +81,27 @@ export const LoginPage = () => {
   };
 
   const handleSwitchToSignup = () => {
-    setIsLoginMode(false);
+    setMode('signup');
     setErrors({});
     setFormData({ email: '', password: '' });
   };
 
   const handleSwitchToLogin = () => {
-    setIsLoginMode(true);
+    setMode('login');
     setErrors({});
     setFormData({ email: '', password: '' });
   };
+
+  const handleSwitchToForgot = () => {
+    setMode('forgot');
+    setErrors({});
+    setFormData({ email: '', password: '' });
+  };
+
+  // Show Forgot Password flow
+  if (mode === 'forgot') {
+    return <ForgotPassword onBack={handleSwitchToLogin} />;
+  }
 
   return (
     <div className="min-h-screen relative overflow-hidden bg-gradient-to-br from-black via-slate-900 to-blue-950">
@@ -108,7 +120,7 @@ export const LoginPage = () => {
       <div className="relative z-10 min-h-screen flex flex-col items-center justify-center p-4">
         <div className="w-full max-w-md mx-auto">
           {/* Logo and Branding Section - Only show during login */}
-          {isLoginMode && (
+          {mode === 'login' && (
             <div className="text-center mb-12">
               {/* Actual Monitraq Logo - Clean, no color overlay */}
               <div className="flex justify-center items-center mb-6">
@@ -147,7 +159,7 @@ export const LoginPage = () => {
 
           {/* Glassmorphic Form Container */}
           <div className="backdrop-blur-xl bg-black/20 border border-white/10 rounded-3xl p-8 shadow-2xl shadow-black/40">
-            {isLoginMode ? (
+            {mode === 'login' ? (
               // Login Form
               <form className="space-y-6" onSubmit={handleSubmit}>
                 {/* Email Input */}
@@ -223,7 +235,7 @@ export const LoginPage = () => {
             )}
 
             {/* Switch between Login and Signup */}
-            {isLoginMode ? (
+            {mode === 'login' ? (
               <div className="text-center mt-8 space-y-4">
                 <p className="text-sm text-gray-300">
                   Don't have an account?{' '}
@@ -237,7 +249,7 @@ export const LoginPage = () => {
                 <p className="text-sm text-gray-300">
                   Forgot your password?{' '}
                   <button
-                    onClick={() => navigate('/reset-password')}
+                    onClick={handleSwitchToForgot}
                     className="font-medium text-blue-400 hover:text-blue-300 hover:underline transition-colors duration-200"
                   >
                     Reset here
