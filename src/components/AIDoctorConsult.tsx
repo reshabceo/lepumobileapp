@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { runAIDoctorConsult, AIDoctorMessage } from "@/services/aiDoctorService";
 import { useAuth } from "@/contexts/AuthContext";
 import { db } from "@/lib/supabase";
@@ -10,6 +11,7 @@ import {
   Send,
   ShieldAlert,
   Activity,
+  ArrowLeft,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -24,6 +26,7 @@ interface PatientContext {
 }
 
 export const AIDoctorConsult: React.FC = () => {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
   const [patientContext, setPatientContext] = useState<PatientContext>({});
@@ -147,15 +150,23 @@ export const AIDoctorConsult: React.FC = () => {
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#050816] via-[#050816] to-black text-white flex flex-col">
       <div className="px-4 pt-4 pb-2 border-b border-white/5 bg-black/40 backdrop-blur-md">
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-500/10 text-emerald-400">
+        <div className="flex items-center gap-3 mb-3">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => navigate('/dashboard')}
+            className="text-emerald-300 hover:bg-emerald-500/20 hover:text-emerald-100 p-2 flex-shrink-0"
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </Button>
+          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-500/10 text-emerald-400 flex-shrink-0">
             <Stethoscope className="w-5 h-5" />
           </div>
-          <div className="flex flex-col">
-            <span className="text-sm uppercase tracking-[0.25em] text-emerald-400/80">
+          <div className="flex flex-col min-w-0 flex-1">
+            <span className="text-sm uppercase tracking-[0.25em] text-emerald-400/80 truncate">
               Med-Gemini AI Doctor
             </span>
-            <span className="text-lg font-semibold">
+            <span className="text-lg font-semibold truncate">
               Understand your symptoms safely
             </span>
           </div>

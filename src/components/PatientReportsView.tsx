@@ -130,11 +130,11 @@ const PatientReportsView: React.FC = () => {
     // Filter reports based on active tab
     const filteredReports = reports.filter(report => {
         if (activeTab === 'from-doctor') {
-            // Show reports uploaded by doctor OR reports that were sent to patient (analyzed reports)
-            return !report.uploaded_by_patient || (report.sent_to_patient === true);
+            // Show only reports uploaded by doctor (not by patient)
+            return !report.uploaded_by_patient;
         } else {
-            // Show reports uploaded by patient that haven't been sent back yet
-            return report.uploaded_by_patient && !report.sent_to_patient;
+            // Show all reports uploaded by patient (regardless of analysis status)
+            return report.uploaded_by_patient;
         }
     });
 
@@ -482,7 +482,7 @@ const PatientReportsView: React.FC = () => {
                                     <p className="text-gray-400 text-sm mb-3">{report.description}</p>
                                 )}
 
-                                <div className="flex items-center justify-between">
+                                <div className="flex flex-col items-start justify-between">
                                     <div className="space-y-1">
                                         <div className="flex items-center text-xs text-gray-500">
                                             <User className="h-3 w-3 mr-1" />

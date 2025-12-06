@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
 import { ArrowLeft, ArrowRight, Loader2 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/lib/supabase';
+import { db, supabase } from '@/lib/supabase';
 import { ProgressIndicator } from './ProgressIndicator';
 import { SignupStep1 } from './SignupStep1';
 import { SignupStep2 } from './SignupStep2';
 import { SignupStep3 } from './SignupStep3';
+import { OTPVerification } from './OTPVerification';
 
 interface SignupData {
   // Step 1: Basic Information
@@ -34,12 +34,36 @@ interface SignupData {
 
 interface SignupWizardProps {
   onSwitchToLogin: () => void;
-  onSignupSuccess: (email: string) => void;
+  onSignupSuccess?: (email: string) => void; // Made optional since we'll handle internally
 }
 
 export const SignupWizard: React.FC<SignupWizardProps> = ({ onSwitchToLogin, onSignupSuccess }) => {
-  const [currentStep, setCurrentStep] = useState(1);
+  // Restore currentStep from localStorage if in signup flow, otherwise default to 1
+  const getInitialStep = () => {
+    const awaitingOTP = localStorage.getItem('awaiting_otp_verification') === 'true';
+    const savedStep = localStorage.getItem('signup_current_step');
+    if (awaitingOTP && savedStep) {
+      const step = parseInt(savedStep, 10);
+      if (step >= 1 && step <= 4) {
+        console.log('🔄 Restoring signup step from localStorage:', step);
+        return step;
+      }
+    }
+    return 1;
+  };
+  
+  const [currentStep, setCurrentStep] = useState(getInitialStep);
   const [loading, setLoading] = useState(false);
+  const signupInProgressRef = React.useRef(false);
+  
+  // Persist currentStep to localStorage whenever it changes
+  React.useEffect(() => {
+    const awaitingOTP = localStorage.getItem('awaiting_otp_verification') === 'true';
+    if (awaitingOTP) {
+      localStorage.setItem('signup_current_step', currentStep.toString());
+      console.log('💾 Saved currentStep to localStorage:', currentStep);
+    }
+  }, [currentStep]);
   const [formData, setFormData] = useState<SignupData>({
     name: '',
     email: '',
@@ -60,11 +84,10 @@ export const SignupWizard: React.FC<SignupWizardProps> = ({ onSwitchToLogin, onS
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   
-  const navigate = useNavigate();
   const { toast } = useToast();
   const { signup } = useAuth();
 
-  const steps = ['Basic Info', 'Personal Details', 'Medical Info'];
+  const steps = ['Basic Info', 'Personal Details', 'Medical Info', 'Verify Email'];
 
   const validateDoctorCode = async (doctorCode: string): Promise<boolean> => {
     try {
@@ -204,7 +227,7 @@ export const SignupWizard: React.FC<SignupWizardProps> = ({ onSwitchToLogin, onS
 
   const nextStep = () => {
     if (validateStep(currentStep)) {
-      setCurrentStep(prev => Math.min(prev + 1, 3));
+      setCurrentStep(prev => Math.min(prev + 1, 4));
     }
   };
 
@@ -236,6 +259,7 @@ export const SignupWizard: React.FC<SignupWizardProps> = ({ onSwitchToLogin, onS
           variant: "destructive",
         });
         setLoading(false);
+        setCurrentStep(1); // Go back to step 1 to fix doctor code
         return;
       }
 
@@ -259,32 +283,64 @@ export const SignupWizard: React.FC<SignupWizardProps> = ({ onSwitchToLogin, onS
       };
 
       console.log('🔍 Step 2: Creating user account...');
+      
+      // CRITICAL: Set flag and ref BEFORE signup to prevent AuthContext from auto-logging in
+      // This must happen synchronously before any async operations
+      signupInProgressRef.current = true;
+      localStorage.setItem('awaiting_otp_verification', 'true');
+      console.log('✅ awaiting_otp_verification flag set to true, signupInProgressRef set to true');
+      
       const success = await signup(formData.email, formData.password, formData.name, normalizedDoctorCode, additionalData);
 
-      if (success) {
-        console.log('✅ Signup success! Calling onSignupSuccess callback...');
-        
-        // IMPORTANT: Set loading false BEFORE showing OTP screen
-        setLoading(false);
-        
-        toast({
-          title: "Verification Code Sent!",
-          description: "Please check your email for the 6-digit verification code.",
-        });
+      console.log('🔍 Signup result:', success);
 
-        // Call parent callback to show OTP verification screen
-        onSignupSuccess(formData.email);
-        console.log('✅ onSignupSuccess callback fired');
-        return; // Early return to prevent finally block
+      if (success) {
+        console.log('✅ Signup success! Moving to OTP verification step...');
+        
+        // CRITICAL: Ensure flag and ref are still set
+        signupInProgressRef.current = true;
+        localStorage.setItem('awaiting_otp_verification', 'true');
+        console.log('✅ Flags confirmed - awaiting_otp_verification: true, signupInProgressRef: true');
+        
+        // Move to step 4 immediately (synchronously if possible)
+        setLoading(false);
+        setCurrentStep(4);
+        localStorage.setItem('signup_current_step', '4');
+        console.log('✅ State updated - currentStep is now 4, saved to localStorage');
+        
+        // Show toast after a brief delay
+        setTimeout(() => {
+          toast({
+            title: "Verification Code Sent!",
+            description: "Please check your email for the 6-digit verification code.",
+          });
+        }, 100);
+        
+        return;
+      } else {
+        console.log('❌ Signup failed - success was false');
+        // Clear flag on failure
+        localStorage.removeItem('awaiting_otp_verification');
+        toast({
+          title: "Signup Failed",
+          description: "Unable to create account. Please try again.",
+          variant: "destructive",
+        });
+        setLoading(false);
       }
     } catch (error) {
       console.error('Signup error:', error);
+      
+      // Clear flag on error
+      localStorage.removeItem('awaiting_otp_verification');
+      
       let errorMessage = 'An error occurred during signup';
 
       if (error instanceof Error) {
         // Check for specific doctor code error
         if (error.message.includes('doctor code')) {
           errorMessage = 'Invalid doctor code. Please verify with your healthcare provider.';
+          setCurrentStep(1); // Go back to step 1
         } else {
           errorMessage = error.message;
         }
@@ -299,7 +355,90 @@ export const SignupWizard: React.FC<SignupWizardProps> = ({ onSwitchToLogin, onS
     }
   };
 
+  // OTP Verification handler
+  const handleOTPVerified = async () => {
+    try {
+      console.log('🔍 OTP verified - creating patient profile...');
+      
+      // Get the current user after OTP verification
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      
+      if (userError || !user) {
+        console.error('❌ Failed to get user after OTP verification:', userError);
+        throw new Error('Failed to get user information');
+      }
+
+      // Create patient profile after successful OTP verification
+      const normalizedDoctorCode = formData.doctorCode.trim().toUpperCase();
+      const additionalData = {
+        dateOfBirth: formData.dateOfBirth,
+        gender: formData.gender,
+        bloodType: formData.bloodType,
+        address: formData.address,
+        phoneNumber: formData.phoneNumber,
+        emergencyContactName: formData.emergencyContactName,
+        emergencyContactPhone: formData.emergencyContactPhone,
+        allergies: formData.allergies,
+        medicalConditions: formData.medicalConditions,
+        currentMedications: formData.currentMedications,
+        profilePictureUrl: ''
+      };
+
+      // Create patient profile in your database
+      const { data: profileResult, error: profileError } = await db.createPatientProfile(
+        user.id,
+        formData.name,
+        formData.email,
+        normalizedDoctorCode,
+        additionalData
+      );
+
+      if (profileError || !profileResult || !profileResult.success) {
+        console.error('❌ Patient profile creation error:', profileError);
+        toast({
+          title: "Profile Creation Failed",
+          description: "Your email is verified but profile creation failed. Please contact support.",
+          variant: "destructive",
+        });
+      } else {
+        console.log('✅ Patient profile created:', profileResult);
+      }
+
+      toast({
+        title: "Email Verified!",
+        description: "Your account has been successfully verified. You can now log in.",
+      });
+      
+      // Sign out the user immediately after OTP verification
+      await supabase.auth.signOut();
+      
+      // Clear ALL pending data from localStorage
+      localStorage.removeItem('pending_doctor_code');
+      localStorage.removeItem('pending_user_name');
+      localStorage.removeItem('pending_patient_data');
+      localStorage.removeItem('from_otp_verification');
+      localStorage.removeItem('awaiting_otp_verification');
+      localStorage.removeItem('signup_current_step');
+      
+      console.log('✅ OTP verification complete - redirecting to login...');
+      
+      // Reset form and go back to login after delay
+      setTimeout(() => {
+        onSwitchToLogin();
+      }, 2000);
+    } catch (error) {
+      console.error('❌ Error after OTP verification:', error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : 'An error occurred after verification',
+        variant: "destructive",
+      });
+    }
+  };
+
   const renderStep = () => {
+    console.log('🎨 SignupWizard renderStep - currentStep:', currentStep);
+    
     switch (currentStep) {
       case 1:
         return (
@@ -325,10 +464,61 @@ export const SignupWizard: React.FC<SignupWizardProps> = ({ onSwitchToLogin, onS
             updateFormData={updateFormData}
           />
         );
+      case 4:
+        console.log('🎨 Rendering OTP Verification step (Step 4)');
+        return (
+          <div className="space-y-6">
+            <OTPVerification
+              email={formData.email}
+              type="signup"
+              onVerified={handleOTPVerified}
+              onBack={() => setCurrentStep(3)}
+              embedded={true}
+            />
+          </div>
+        );
       default:
         return null;
     }
   };
+
+  // Prevent component reset during signup flow - restore step if needed
+  React.useEffect(() => {
+    const awaitingOTP = localStorage.getItem('awaiting_otp_verification') === 'true';
+    const savedStep = localStorage.getItem('signup_current_step');
+    
+    if (awaitingOTP) {
+      if (savedStep) {
+        const step = parseInt(savedStep, 10);
+        if (step >= 1 && step <= 4 && step !== currentStep) {
+          console.log('⚠️ Step mismatch detected - restoring from localStorage:', step, 'current:', currentStep);
+          setCurrentStep(step);
+        }
+      } else if (signupInProgressRef.current && currentStep !== 4) {
+        console.log('⚠️ awaiting_otp_verification flag is set but currentStep is not 4 - fixing...');
+        setCurrentStep(4);
+        localStorage.setItem('signup_current_step', '4');
+      }
+    }
+  }, [currentStep]);
+  
+  // Cleanup ref when component unmounts (only if not in signup flow)
+  React.useEffect(() => {
+    return () => {
+      const awaitingOTP = localStorage.getItem('awaiting_otp_verification') === 'true';
+      if (!awaitingOTP) {
+        signupInProgressRef.current = false;
+        localStorage.removeItem('signup_current_step');
+      }
+    };
+  }, []);
+  
+  // Debug: Log whenever component renders
+  React.useEffect(() => {
+    console.log('🔄 SignupWizard mounted/updated - currentStep:', currentStep, 'awaitingOTP:', localStorage.getItem('awaiting_otp_verification'));
+  });
+
+  console.log('🎨 SignupWizard RENDER - currentStep:', currentStep, 'loading:', loading, 'awaitingOTP:', localStorage.getItem('awaiting_otp_verification'));
 
   return (
     <div className="w-full max-w-2xl mx-auto">
@@ -336,7 +526,7 @@ export const SignupWizard: React.FC<SignupWizardProps> = ({ onSwitchToLogin, onS
       {/* Progress Indicator */}
       <ProgressIndicator
         currentStep={currentStep}
-        totalSteps={3}
+        totalSteps={4}
         steps={steps}
       />
 
@@ -350,9 +540,9 @@ export const SignupWizard: React.FC<SignupWizardProps> = ({ onSwitchToLogin, onS
         {/* Previous Button */}
         <button
           onClick={prevStep}
-          disabled={currentStep === 1}
+          disabled={currentStep === 1 || currentStep === 4}
           className={`flex items-center gap-1 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-300 ${
-            currentStep === 1
+            currentStep === 1 || currentStep === 4
               ? 'bg-white/10 text-gray-500 cursor-not-allowed'
               : 'bg-white/10 text-white hover:bg-white/20 border border-white/20'
           }`}
@@ -375,7 +565,7 @@ export const SignupWizard: React.FC<SignupWizardProps> = ({ onSwitchToLogin, onS
             Next
             <ArrowRight className="w-3 h-3" />
           </button>
-        ) : (
+        ) : currentStep === 3 ? (
           <button
             onClick={handleSubmit}
             disabled={loading}
@@ -387,9 +577,11 @@ export const SignupWizard: React.FC<SignupWizardProps> = ({ onSwitchToLogin, onS
                 Creating...
               </>
             ) : (
-              'Create Account'
+              'Send Verification Code'
             )}
           </button>
+        ) : (
+          <div className="w-16"></div> // Spacer for step 4 (OTP auto-verifies)
         )}
       </div>
     </div>

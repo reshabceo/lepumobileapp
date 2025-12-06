@@ -1,5 +1,8 @@
-import React from 'react';
-import { Calendar, User, Droplets, Phone, MapPin } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Calendar, User, Droplets, Phone, MapPin, Loader2 } from 'lucide-react';
+import { Geolocation } from '@capacitor/geolocation';
+import { Capacitor } from '@capacitor/core';
+import { useToast } from '@/hooks/use-toast';
 
 interface SignupStep2Props {
   formData: {
@@ -24,6 +27,156 @@ export const SignupStep2: React.FC<SignupStep2Props> = ({
   errors,
   updateFormData,
 }) => {
+  const [isRequestingLocation, setIsRequestingLocation] = useState(false);
+  const [locationRequested, setLocationRequested] = useState(false);
+  const { toast } = useToast();
+
+  // Request location permission and autofill address on component mount
+  useEffect(() => {
+    const requestLocationAndAutofill = async () => {
+      // Only request once
+      if (locationRequested || formData.address) {
+        return;
+      }
+
+      try {
+        setIsRequestingLocation(true);
+        setLocationRequested(true);
+
+        let position: { latitude: number; longitude: number } | null = null;
+
+        // Use Capacitor Geolocation for native apps, fallback to browser API for web
+        if (Capacitor.isNativePlatform()) {
+          // Request permissions first
+          const permissionStatus = await Geolocation.requestPermissions();
+          
+          if (permissionStatus.location === 'granted' || permissionStatus.location === 'prompt') {
+            const location = await Geolocation.getCurrentPosition({
+              enableHighAccuracy: true,
+              timeout: 10000,
+            });
+            position = {
+              latitude: location.coords.latitude,
+              longitude: location.coords.longitude,
+            };
+          } else {
+            toast({
+              title: "Location Permission Denied",
+              description: "You can manually enter your address.",
+              variant: "default",
+            });
+            setIsRequestingLocation(false);
+            return;
+          }
+        } else {
+          // Browser geolocation API
+          if (navigator.geolocation) {
+            position = await new Promise<{ latitude: number; longitude: number }>((resolve, reject) => {
+              navigator.geolocation.getCurrentPosition(
+                (pos) => {
+                  resolve({
+                    latitude: pos.coords.latitude,
+                    longitude: pos.coords.longitude,
+                  });
+                },
+                (err) => {
+                  console.warn('Geolocation error:', err);
+                  reject(err);
+                },
+                {
+                  enableHighAccuracy: true,
+                  timeout: 10000,
+                  maximumAge: 0,
+                }
+              );
+            });
+          }
+        }
+
+        if (position) {
+          // Reverse geocoding to get address from coordinates using OpenStreetMap Nominatim
+          try {
+            const addressResponse = await fetch(
+              `https://nominatim.openstreetmap.org/reverse?format=json&lat=${position.latitude}&lon=${position.longitude}&zoom=18&addressdetails=1`,
+              {
+                headers: {
+                  'User-Agent': 'MonitraqApp/1.0', // Required by Nominatim
+                },
+              }
+            );
+            
+            if (addressResponse.ok) {
+              const addressData = await addressResponse.json();
+              if (addressData.display_name) {
+                // Format the address nicely
+                let formattedAddress = addressData.display_name;
+                
+                // Try to create a more concise address if possible
+                if (addressData.address) {
+                  const addr = addressData.address;
+                  const parts = [];
+                  if (addr.house_number && addr.road) {
+                    parts.push(`${addr.house_number} ${addr.road}`);
+                  } else if (addr.road) {
+                    parts.push(addr.road);
+                  }
+                  if (addr.city || addr.town || addr.village) {
+                    parts.push(addr.city || addr.town || addr.village);
+                  }
+                  if (addr.state) {
+                    parts.push(addr.state);
+                  }
+                  if (addr.postcode) {
+                    parts.push(addr.postcode);
+                  }
+                  if (addr.country) {
+                    parts.push(addr.country);
+                  }
+                  
+                  if (parts.length > 0) {
+                    formattedAddress = parts.join(', ');
+                  }
+                }
+                
+                updateFormData({ address: formattedAddress });
+                toast({
+                  title: "Location Detected",
+                  description: "Address has been auto-filled from your location.",
+                  variant: "default",
+                });
+              } else {
+                throw new Error('No address data in response');
+              }
+            } else {
+              throw new Error('Reverse geocoding request failed');
+            }
+          } catch (geocodeError) {
+            console.warn('Reverse geocoding failed:', geocodeError);
+            // Fallback: Use coordinates as address if reverse geocoding fails
+            updateFormData({ 
+              address: `${position.latitude.toFixed(6)}, ${position.longitude.toFixed(6)}` 
+            });
+            toast({
+              title: "Location Detected",
+              description: "Coordinates have been added. Please edit the address field with your full address.",
+              variant: "default",
+            });
+          }
+        }
+      } catch (error) {
+        console.warn('Location request failed:', error);
+        toast({
+          title: "Location Access",
+          description: "Could not access location. Please enter your address manually.",
+          variant: "default",
+        });
+      } finally {
+        setIsRequestingLocation(false);
+      }
+    };
+
+    requestLocationAndAutofill();
+  }, [locationRequested, formData.address, updateFormData, toast]);
   return (
     <div className="space-y-6">
       <div className="text-center mb-6">
@@ -135,18 +288,26 @@ export const SignupStep2: React.FC<SignupStep2Props> = ({
         <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
           <MapPin className="text-gray-400 group-focus-within:text-blue-400 transition-colors duration-300" size={20} />
         </div>
-        <textarea
-          name="address"
-          value={formData.address}
-          onChange={(e) => updateFormData({ address: e.target.value })}
-          placeholder="Full Address"
-          rows={3}
-          className={`w-full pl-12 pr-4 py-4 bg-black/30 backdrop-blur-sm text-white border border-white/20 rounded-2xl focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 placeholder-gray-400 transition-all duration-300 resize-none ${
-            errors.address ? 'border-red-500/50 focus:ring-red-500/50 focus:border-red-500/50' : ''
-          }`}
-          aria-label="Address"
-          required
-        />
+        <div className="relative">
+          <textarea
+            name="address"
+            value={formData.address}
+            onChange={(e) => updateFormData({ address: e.target.value })}
+            placeholder={isRequestingLocation ? "Detecting your location..." : "Full Address"}
+            rows={3}
+            disabled={isRequestingLocation}
+            className={`w-full pl-12 pr-20 py-4 bg-black/30 backdrop-blur-sm text-white border border-white/20 rounded-2xl focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 placeholder-gray-400 transition-all duration-300 resize-none disabled:opacity-50 disabled:cursor-not-allowed ${
+              errors.address ? 'border-red-500/50 focus:ring-red-500/50 focus:border-red-500/50' : ''
+            }`}
+            aria-label="Address"
+            required
+          />
+          {isRequestingLocation && (
+            <div className="absolute right-4 top-4">
+              <Loader2 className="w-4 h-4 text-blue-400 animate-spin" />
+            </div>
+          )}
+        </div>
         {errors.address && (
           <p className="text-red-300 text-xs mt-2 ml-1">{errors.address}</p>
         )}
