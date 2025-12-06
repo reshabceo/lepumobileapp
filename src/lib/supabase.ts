@@ -106,12 +106,16 @@ export const auth = {
   // Sign up
   signUp: async (email: string, password: string, userData: any) => {
     console.log('🔍 Auth Debug - Signing up user:', email)
+    
+    // IMPORTANT: Use emailRedirectTo to prevent auto-confirmation
+    // This ensures OTP verification is required before user can sign in
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        data: userData
-        // Email confirmation enabled for patients (same as doctors)
+        data: userData,
+        emailRedirectTo: undefined, // Don't use email link confirmation, use OTP instead
+        // Explicitly disable auto-confirm - user must verify OTP
       }
     })
 
@@ -119,6 +123,15 @@ export const auth = {
       console.error('❌ Signup error:', error)
     } else {
       console.log('✅ Signup successful:', data.user?.email)
+      console.log('🔍 User confirmed?', data.user?.email_confirmed_at ? 'YES' : 'NO')
+      console.log('🔍 Session created?', data.session ? 'YES' : 'NO')
+      
+      // CRITICAL: If a session was created, sign out immediately
+      // This prevents auto-login before OTP verification
+      if (data.session) {
+        console.log('⚠️ Session created during signup - signing out to prevent auto-login')
+        await supabase.auth.signOut()
+      }
     }
 
     return { data, error }

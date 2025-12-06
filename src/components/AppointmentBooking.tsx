@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
@@ -8,7 +9,7 @@ import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Badge } from './ui/badge';
-import { Calendar, Clock, AlertCircle, CheckCircle2, XCircle, Stethoscope, MapPin, Phone } from 'lucide-react';
+import { Calendar, Clock, AlertCircle, CheckCircle2, XCircle, Stethoscope, MapPin, Phone, ArrowLeft } from 'lucide-react';
 import { format, addDays, isAfter, parseISO } from 'date-fns';
 import { toast } from '@/components/ui/sonner';
 
@@ -45,6 +46,7 @@ interface DoctorInfo {
 }
 
 export const AppointmentBooking = () => {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const [selectedDate, setSelectedDate] = useState<string>(format(addDays(new Date(), 1), 'yyyy-MM-dd'));
   const [availableSlots, setAvailableSlots] = useState<AvailableSlot[]>([]);
@@ -371,29 +373,42 @@ export const AppointmentBooking = () => {
   }
 
   return (
-    <div className="space-y-4 p-4">
+    <div className="space-y-4 p-4 max-w-full overflow-hidden">
       <Card className="glass border-white/10 bg-gradient-to-br from-emerald-950/50 via-green-900/30 to-emerald-950/50">
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="flex items-center gap-2 text-emerald-100">
-                <Calendar className="w-5 h-5 text-emerald-400" />
-                Book Appointment
+        <CardHeader className="space-y-4">
+          {/* Back Button - Mobile First */}
+          <div className="flex items-center gap-3">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => navigate('/dashboard')}
+              className="text-emerald-300 hover:bg-emerald-600/20 hover:text-emerald-100 p-2"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </Button>
+            <div className="flex-1 min-w-0">
+              <CardTitle className="flex items-center gap-2 text-emerald-100 text-lg sm:text-xl">
+                <Calendar className="w-5 h-5 text-emerald-400 flex-shrink-0" />
+                <span className="truncate">Book Appointment</span>
               </CardTitle>
-              <CardDescription className="text-emerald-200/70">
+              <CardDescription className="text-emerald-200/70 text-sm">
                 Schedule an appointment with your doctor
               </CardDescription>
             </div>
+          </div>
+          
+          {/* My Appointments Button - Responsive */}
+          <div className="flex justify-end">
             <Button
               variant="outline"
               onClick={() => setShowMyAppointments(!showMyAppointments)}
-              className="border-emerald-500/30 text-emerald-300 hover:bg-emerald-600/20"
+              className="border-emerald-500/30 text-emerald-300 hover:bg-emerald-600/20 text-sm sm:text-base whitespace-nowrap"
             >
               {showMyAppointments ? 'Hide' : 'Show'} My Appointments
             </Button>
           </div>
         </CardHeader>
-        <CardContent className="space-y-6">
+        <CardContent className="space-y-6 p-4 sm:p-6 overflow-x-hidden">
           {showMyAppointments && myAppointments.length > 0 && (
             <div className="border border-emerald-500/20 rounded-xl p-4 bg-gradient-to-br from-emerald-900/20 to-green-900/10">
               <h3 className="font-semibold mb-3 text-emerald-100">My Upcoming Appointments</h3>
@@ -449,30 +464,32 @@ export const AppointmentBooking = () => {
                 ? 'bg-gradient-to-br from-emerald-900/30 to-green-900/20 border-emerald-500/30' 
                 : 'bg-gradient-to-br from-orange-900/30 to-red-900/20 border-orange-500/30'
             }`}>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div className="flex items-center gap-3 flex-1 min-w-0">
                   {doctorInfo.is_available ? (
-                    <div className="w-10 h-10 rounded-lg bg-emerald-600/20 flex items-center justify-center border border-emerald-500/30">
+                    <div className="w-10 h-10 rounded-lg bg-emerald-600/20 flex items-center justify-center border border-emerald-500/30 flex-shrink-0">
                       <CheckCircle2 className="w-5 h-5 text-emerald-400" />
                     </div>
                   ) : (
-                    <div className="w-10 h-10 rounded-lg bg-orange-600/20 flex items-center justify-center border border-orange-500/30">
+                    <div className="w-10 h-10 rounded-lg bg-orange-600/20 flex items-center justify-center border border-orange-500/30 flex-shrink-0">
                       <XCircle className="w-5 h-5 text-orange-400" />
                     </div>
                   )}
-                  <div>
-                    <p className="font-medium text-emerald-100">
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium text-emerald-100 truncate">
                       Dr. {doctorInfo.full_name}
                     </p>
-                    <p className="text-sm text-emerald-300/70">
+                    <p className="text-sm text-emerald-300/70 truncate">
                       {doctorInfo.specialty}
                     </p>
                   </div>
                 </div>
                 <Badge className={
-                  doctorInfo.is_available 
-                    ? 'bg-emerald-600/20 text-emerald-300 border-emerald-500/30' 
-                    : 'bg-orange-600/20 text-orange-300 border-orange-500/30'
+                  `flex-shrink-0 ${
+                    doctorInfo.is_available 
+                      ? 'bg-emerald-600/20 text-emerald-300 border-emerald-500/30' 
+                      : 'bg-orange-600/20 text-orange-300 border-orange-500/30'
+                  }`
                 }>
                   {doctorInfo.is_available ? 'Available' : 'Not Available'}
                 </Badge>
@@ -506,13 +523,13 @@ export const AppointmentBooking = () => {
           {/* Alternative Doctors */}
           {showAlternativeDoctors && alternativeDoctors.length > 0 && (
             <div className="border border-blue-500/20 rounded-xl p-4 bg-gradient-to-br from-blue-900/20 to-indigo-900/10">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="font-semibold text-blue-100">Alternative Available Doctors</h3>
+              <div className="flex items-center justify-between mb-4 gap-2">
+                <h3 className="font-semibold text-blue-100 text-sm sm:text-base flex-1 min-w-0">Alternative Available Doctors</h3>
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => setShowAlternativeDoctors(false)}
-                  className="text-blue-300 hover:bg-blue-600/20"
+                  className="text-blue-300 hover:bg-blue-600/20 flex-shrink-0"
                 >
                   Hide
                 </Button>
@@ -525,10 +542,10 @@ export const AppointmentBooking = () => {
                   >
                     <div className="flex items-start justify-between mb-2">
                       <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <h4 className="font-semibold text-blue-100">{doctor.doctor_name}</h4>
+                        <div className="flex items-center gap-2 mb-1 flex-wrap">
+                          <h4 className="font-semibold text-blue-100 text-sm sm:text-base">{doctor.doctor_name}</h4>
                           {doctor.is_available_now && (
-                            <Badge className="bg-emerald-600/20 text-emerald-300 border-emerald-500/30">
+                            <Badge className="bg-emerald-600/20 text-emerald-300 border-emerald-500/30 text-xs whitespace-nowrap">
                               <CheckCircle2 className="w-3 h-3 mr-1" />
                               Available Now
                             </Badge>
@@ -592,7 +609,7 @@ export const AppointmentBooking = () => {
                 <p className="text-sm mt-2 text-emerald-300/70">Please select another date or use alternative doctors above</p>
               </div>
             ) : (
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                 {availableSlots.map((slot, index) => {
                   const slotKey = `${slot.start_time} - ${slot.end_time}`;
                   const isSelected = selectedSlot === slotKey;

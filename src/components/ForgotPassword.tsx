@@ -37,11 +37,8 @@ export const ForgotPassword: React.FC<ForgotPasswordProps> = ({ onBack }) => {
 
     setLoading(true);
     try {
-      // Check if user exists first
-      const { data: { user }, error: userError } = await supabase.auth.admin.getUserByEmail(email);
-      
-      // Note: This won't work without admin access, so we'll just try to send the reset email
-      // Supabase will only send if email exists
+      // Send password reset email with OTP
+      // Supabase will handle security - it won't reveal if email exists or not
       const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: window.location.origin + '/reset-password'
       });
