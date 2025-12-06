@@ -3,6 +3,7 @@ import { Mail, Lock, User, Eye, EyeOff, Loader2, Stethoscope, Calendar, Phone, U
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
+import { OTPVerification } from './OTPVerification';
 
 interface SignupFormProps {
   onSwitchToLogin: () => void;
@@ -39,6 +40,7 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onSwitchToLogin }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [showOTPVerification, setShowOTPVerification] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const { signup } = useAuth();
@@ -293,14 +295,12 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onSwitchToLogin }) => {
 
       if (success) {
         toast({
-          title: "Account Created Successfully!",
-          description: "Please check your email to confirm your account, then return to login.",
+          title: "Verification Code Sent!",
+          description: "Please check your email for the 6-digit verification code.",
         });
 
-        // Redirect to login page after showing the message
-        setTimeout(() => {
-          onSwitchToLogin();
-        }, 3000); // Give more time to read the email confirmation message
+        // Show OTP verification screen
+        setShowOTPVerification(true);
       }
     } catch (error) {
       console.error('Signup error:', error);
@@ -326,6 +326,30 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onSwitchToLogin }) => {
       setLoading(false);
     }
   };
+
+  const handleOTPVerified = () => {
+    toast({
+      title: "Email Verified!",
+      description: "Your account has been successfully created. You can now sign in.",
+    });
+
+    // Redirect to login page
+    setTimeout(() => {
+      onSwitchToLogin();
+    }, 1500);
+  };
+
+  // Show OTP Verification screen if signup was successful
+  if (showOTPVerification) {
+    return (
+      <OTPVerification
+        email={formData.email}
+        type="signup"
+        onVerified={handleOTPVerified}
+        onBack={() => setShowOTPVerification(false)}
+      />
+    );
+  }
 
   return (
     <div className="w-full max-w-2xl mx-auto">

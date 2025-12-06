@@ -34,9 +34,10 @@ interface SignupData {
 
 interface SignupWizardProps {
   onSwitchToLogin: () => void;
+  onSignupSuccess: (email: string) => void;
 }
 
-export const SignupWizard: React.FC<SignupWizardProps> = ({ onSwitchToLogin }) => {
+export const SignupWizard: React.FC<SignupWizardProps> = ({ onSwitchToLogin, onSignupSuccess }) => {
   const [currentStep, setCurrentStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState<SignupData>({
@@ -261,15 +262,20 @@ export const SignupWizard: React.FC<SignupWizardProps> = ({ onSwitchToLogin }) =
       const success = await signup(formData.email, formData.password, formData.name, normalizedDoctorCode, additionalData);
 
       if (success) {
+        console.log('✅ Signup success! Calling onSignupSuccess callback...');
+        
+        // IMPORTANT: Set loading false BEFORE showing OTP screen
+        setLoading(false);
+        
         toast({
-          title: "Account Created Successfully!",
-          description: "Please check your email to confirm your account, then return to login.",
+          title: "Verification Code Sent!",
+          description: "Please check your email for the 6-digit verification code.",
         });
 
-        // Redirect to login page after showing the message
-        setTimeout(() => {
-          onSwitchToLogin();
-        }, 3000); // Give more time to read the email confirmation message
+        // Call parent callback to show OTP verification screen
+        onSignupSuccess(formData.email);
+        console.log('✅ onSignupSuccess callback fired');
+        return; // Early return to prevent finally block
       }
     } catch (error) {
       console.error('Signup error:', error);
@@ -289,7 +295,6 @@ export const SignupWizard: React.FC<SignupWizardProps> = ({ onSwitchToLogin }) =
         description: errorMessage,
         variant: "destructive",
       });
-    } finally {
       setLoading(false);
     }
   };
