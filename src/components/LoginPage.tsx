@@ -5,14 +5,11 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { SignupWizard } from './SignupWizard';
 import { ForgotPassword } from './ForgotPassword';
-import { OTPVerification } from './OTPVerification';
 
 export const LoginPage = () => {
   const [mode, setMode] = useState<'login' | 'signup' | 'forgot'>('login');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [showOTPVerification, setShowOTPVerification] = useState(false);
-  const [signupEmail, setSignupEmail] = useState('');
   const [formData, setFormData] = useState({
     email: '',
     password: ''
@@ -22,6 +19,27 @@ export const LoginPage = () => {
   const navigate = useNavigate();
   const { login } = useAuth();
   const { toast } = useToast();
+
+  // Initialize mode from localStorage on mount to prevent remounts
+  React.useEffect(() => {
+    const awaitingOTP = localStorage.getItem('awaiting_otp_verification') === 'true';
+    if (awaitingOTP && mode === 'login') {
+      console.log('🔄 LoginPage - Initializing mode to signup from localStorage on mount');
+      setMode('signup');
+    }
+  }, []); // Only run on mount
+  
+  // Prevent mode switching during signup flow (but don't cause remounts)
+  React.useEffect(() => {
+    const awaitingOTP = localStorage.getItem('awaiting_otp_verification') === 'true';
+    if (awaitingOTP && mode !== 'signup') {
+      console.log('⚠️ LoginPage - Signup flow detected but mode is not signup, fixing...');
+      // Use requestAnimationFrame to ensure this happens after React's state updates
+      requestAnimationFrame(() => {
+        setMode('signup');
+      });
+    }
+  }, [mode]);
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
@@ -101,54 +119,10 @@ export const LoginPage = () => {
     setFormData({ email: '', password: '' });
   };
 
-  const handleOTPVerified = () => {
-    toast({
-      title: "Email Verified!",
-      description: "Your account has been successfully created. You can now sign in.",
-    });
-
-    // Reset states and go back to login
-    setShowOTPVerification(false);
-    setSignupEmail('');
-    setTimeout(() => {
-      handleSwitchToLogin();
-    }, 1500);
-  };
-
-  // DEBUG: Log render state
-  console.log('🔍 LoginPage RENDER - mode:', mode, 'showOTP:', showOTPVerification, 'email:', signupEmail);
-
-  // Show OTP Verification if signup was successful
-  if (showOTPVerification && signupEmail) {
-    console.log('✅ RENDERING OTP VERIFICATION SCREEN!');
-    return (
-      <div className="min-h-screen relative overflow-hidden bg-gradient-to-br from-black via-slate-900 to-blue-950">
-        <div className="absolute inset-0">
-          <div className="absolute top-20 left-20 w-72 h-72 bg-blue-900/20 rounded-full blur-3xl animate-pulse"></div>
-          <div className="absolute bottom-20 right-20 w-96 h-96 bg-slate-800/20 rounded-full blur-3xl animate-pulse delay-1000"></div>
-        </div>
-        <div className="relative z-10 min-h-screen flex flex-col items-center justify-center p-4">
-          <OTPVerification
-            email={signupEmail}
-            type="signup"
-            onVerified={handleOTPVerified}
-            onBack={() => {
-              setShowOTPVerification(false);
-              setSignupEmail('');
-            }}
-          />
-        </div>
-      </div>
-    );
-  }
-
   // Show Forgot Password flow
   if (mode === 'forgot') {
-    console.log('📧 RENDERING FORGOT PASSWORD SCREEN');
     return <ForgotPassword onBack={handleSwitchToLogin} />;
   }
-
-  console.log('📋 RENDERING MAIN LOGIN/SIGNUP SCREEN - mode:', mode);
 
   return (
     <div className="min-h-screen relative overflow-hidden bg-gradient-to-br from-black via-slate-900 to-blue-950">
@@ -207,16 +181,9 @@ export const LoginPage = () => {
           {/* Glassmorphic Form Container */}
           <div className="backdrop-blur-xl bg-black/20 border border-white/10 rounded-3xl p-8 shadow-2xl shadow-black/40">
             {mode === 'signup' ? (
-              // Signup Wizard (includes OTP verification)
+              // Signup Wizard (includes OTP verification as Step 4)
               <SignupWizard 
                 onSwitchToLogin={handleSwitchToLogin}
-                onSignupSuccess={(email) => {
-                  console.log('🎉 LoginPage: Signup success callback, email:', email);
-                  setSignupEmail(email);
-                  setShowOTPVerification(true);
-                  setMode('login'); // Reset mode to prevent SignupWizard from re-rendering
-                  console.log('✅ LoginPage: States updated - showOTPVerification: true, signupEmail:', email, 'mode: login');
-                }}
               />
             ) : mode === 'login' ? (
               // Login Form

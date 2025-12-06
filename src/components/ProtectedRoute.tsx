@@ -17,6 +17,16 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   const { isAuthenticated, isLoading } = useAuth();
   const location = useLocation();
 
+  // Check if we're in the middle of signup flow
+  const awaitingOTP = localStorage.getItem('awaiting_otp_verification') === 'true';
+  const fromOTPVerification = localStorage.getItem('from_otp_verification') === 'true';
+  const isInSignupFlow = awaitingOTP || fromOTPVerification;
+  
+  // Debug logging
+  if (isInSignupFlow) {
+    console.log('🛡️ ProtectedRoute - Signup flow detected, preventing redirect', { awaitingOTP, fromOTPVerification, isAuthenticated, requireAuth });
+  }
+
   // Show loading spinner while checking authentication
   if (isLoading) {
     return (
@@ -36,7 +46,8 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   }
 
   // If user is authenticated but trying to access login page, redirect to dashboard
-  if (!requireAuth && isAuthenticated) {
+  // BUT: Don't redirect if we're in the middle of signup/OTP verification flow
+  if (!requireAuth && isAuthenticated && !isInSignupFlow) {
     return <Navigate to="/dashboard" replace />;
   }
 
