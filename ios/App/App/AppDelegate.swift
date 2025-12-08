@@ -8,6 +8,24 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         // Override point for customization after application launch.
+        
+        // CRITICAL: Force WellueSDK class to load BEFORE Capacitor initializes
+        // This ensures the plugin is available when Capacitor builds its plugin registry
+        // Multiple references ensure the class is fully loaded and linked
+        
+        // Reference 1: Direct class reference
+        _ = WellueSDK.self
+        
+        // Reference 2: Type metadata access
+        let pluginType = type(of: WellueSDK.self)
+        let _ = String(describing: pluginType)
+        
+        // Reference 3: Force class initialization by checking if it responds to a method
+        // This ensures the class is fully loaded into the runtime
+        if WellueSDK.self.responds(to: #selector(WellueSDK.initialize(_:))) {
+            // Class is properly loaded
+        }
+        
         return true
     }
 

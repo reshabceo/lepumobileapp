@@ -2090,7 +2090,7 @@ const ECGMonitor: React.FC = () => {
 
     useEffect(() => {
 
-        const Native: any = registerPlugin('LepuSDK');
+        const Native: any = registerPlugin('WellueSDK');
 
         const subs: Array<{ remove: () => void } | void> = [];
 
