@@ -231,10 +231,18 @@ export const DeviceProvider: React.FC<DeviceProviderProps> = ({ children }) => {
     }, []);
 
     // Improved connection health check with better disconnection detection
+    // CRITICAL FIX: Disable health check during BP measurement to prevent device overload!
     useEffect(() => {
         if (!isInitialized || !connectedDevice) return;
 
         const healthCheckInterval = setInterval(async () => {
+            // SKIP health check if BP measurement is in progress (prevents command interference!)
+            const bpStatus = wellueSDK.getBPMeasurementStatus();
+            if (bpStatus.isMeasuring) {
+                console.log('⏸️ Health check SKIPPED - BP measurement in progress');
+                return; // Don't interfere with measurement!
+            }
+            
             try {
                 // Check if the device is still connected by attempting to get its status
                 const connectedDevices = await wellueSDK.getConnectedDevices();
@@ -359,7 +367,11 @@ export const DeviceProvider: React.FC<DeviceProviderProps> = ({ children }) => {
             // 🚨 FIX: ALWAYS set callbacks before scanning, even if already initialized
             // This ensures the onDeviceFound callback is active
             console.log('🔧 Setting scan callbacks before starting scan...');
+            console.log('🔧 [SCAN SETUP] Current callbacks before setting scan callbacks:', Object.keys(wellueSDK.getCallbacks()));
             wellueSDK.setCallbacks({
+                // 🚨 CRITICAL FIX: Spread EXISTING callbacks first, then add scan-specific ones
+                // This prevents overwriting callbacks set by other screens (like BP Monitor's onRealTimeUpdate)
+                ...wellueSDK.getCallbacks(),
                 onDeviceFound: (device: WellueDevice) => {
                     console.log('🔍 [SCAN CALLBACK] Device found:', device.name, device.id);
                     setAvailableDevices(prev => {
@@ -376,11 +388,9 @@ export const DeviceProvider: React.FC<DeviceProviderProps> = ({ children }) => {
                     setConnectedDevice(device);
                     setError(null);
                     setIsConnecting(false);
-                },
-                // Keep other existing callbacks from initialization
-                ...wellueSDK.getCallbacks()
+                }
             });
-            console.log('✅ Scan callbacks set, starting scan...');
+            console.log('✅ [SCAN SETUP] Scan callbacks set. Current callbacks:', Object.keys(wellueSDK.getCallbacks()));
             
             await wellueSDK.startScan();
         } catch (error) {

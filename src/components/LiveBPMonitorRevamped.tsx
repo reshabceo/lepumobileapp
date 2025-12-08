@@ -7,7 +7,7 @@ import { useDevice } from '@/contexts/DeviceContext';
 import { WellueSDKBridge } from '@/lib/wellue-sdk-bridge';
 import { ArrowLeft } from 'lucide-react';
 
-type MeasurementState = 'idle' | 'waiting' | 'inflating' | 'deflating' | 'analyzing' | 'completed' | 'canceled' | 'error';
+type MeasurementState = 'idle' | 'ready' | 'waiting' | 'inflating' | 'deflating' | 'analyzing' | 'completed' | 'canceled' | 'error';
 
 interface WaveformData {
   amplitude: number;
@@ -35,47 +35,41 @@ const heartbeatStyles = `
 `;
 
 export const LiveBPMonitorRevamped: React.FC = () => {
-  const navigate = useNavigate();
-  const { connectedDevice, wellueSDK, isInitialized } = useDevice();
+  console.log('🎬 [BP MONITOR] ===== COMPONENT FUNCTION EXECUTING =====');
   
-  // 🚀 NEW: Smooth animation system for elderly users (no complex filtering)
+  const navigate = useNavigate();
+  
+  console.log('🎬 [BP MONITOR] About to call useDevice()...');
+  const { connectedDevice, wellueSDK, isInitialized } = useDevice();
+  console.log('🎬 [BP MONITOR] useDevice() returned:', { 
+    connectedDevice: connectedDevice ? 'EXISTS' : 'NULL', 
+    wellueSDK: wellueSDK ? 'EXISTS' : 'NULL', 
+    isInitialized 
+  });
+  
+  // 🔍 DIAGNOSTIC: Log component state on every render
+  console.log('🎨 [BP MONITOR RENDER] Component rendering with:', {
+    connectedDevice: connectedDevice ? { id: connectedDevice.id, name: connectedDevice.name, isConnected: connectedDevice.isConnected } : null,
+    isInitialized,
+    wellueSDKExists: !!wellueSDK,
+    wellueSDKType: typeof wellueSDK,
+    timestamp: new Date().toISOString()
+  });
+  
+  // 🚨 DISABLED: Fake animation system that was overriding real device pressure
+  // This function was causing smoothPressure to be set to 0 after 40 seconds based on a fake timer,
+  // which was overriding the actual device pressure and causing measurements to stop incorrectly.
+  // We now ONLY use real device pressure data from handleRealTimeUpdate.
+  // DO NOT USE THIS FUNCTION - it's kept for reference only.
   const updateSmoothAnimation = () => {
-    if (!measurementStartTime) return;
+    // DISABLED - This function is no longer called
+    // It was causing smoothPressure to be set to 0 after 40 seconds, overriding real device pressure
+    return;
     
-    const elapsedTime = (Date.now() - measurementStartTime) / 1000; // seconds
-    const totalDuration = 45; // Total measurement duration in seconds
-    
-    let newPhase: typeof smoothAnimationPhase = 'idle';
-    let targetPressure = 0;
-    
-    if (elapsedTime < 15) {
-      // Inflation phase: 0-15 seconds
-      newPhase = 'inflating';
-      const inflationProgress = elapsedTime / 15; // 0 to 1
-      targetPressure = inflationProgress * inflationPeakTarget; // Smooth curve to peak
-    } else if (elapsedTime < 20) {
-      // Peak hold phase: 15-20 seconds
-      newPhase = 'peak';
-      targetPressure = inflationPeakTarget; // Hold at peak
-    } else if (elapsedTime < 40) {
-      // Deflation phase: 20-40 seconds
-      newPhase = 'deflating';
-      const deflationProgress = (elapsedTime - 20) / 20; // 0 to 1
-      targetPressure = inflationPeakTarget * (1 - deflationProgress); // Smooth curve to zero
-    } else {
-      // Complete phase: 40+ seconds
-      newPhase = 'complete';
-      targetPressure = 0;
-    }
-    
-    setSmoothAnimationPhase(newPhase);
-    
-    // Smooth transition to target pressure
-    setSmoothPressure(prev => {
-      const diff = targetPressure - prev;
-      const smoothingFactor = 0.1; // How fast to reach target (0.1 = gentle, 0.5 = faster)
-      return prev + (diff * smoothingFactor);
-    });
+    // OLD CODE (DISABLED):
+    // if (!measurementStartTime) return;
+    // const elapsedTime = (Date.now() - measurementStartTime) / 1000;
+    // ... fake timer logic that was overriding real pressure ...
   };
   
   // State management
@@ -96,17 +90,19 @@ export const LiveBPMonitorRevamped: React.FC = () => {
   
   // 🚨 FIX: Refs for latest state values to avoid stale closures in callbacks
   const measurementStateRef = useRef<MeasurementState>('idle');
+  const bpResultRef = useRef<BPResult | null>(null);
+  const currentPressureRef = useRef<number>(0);
   const targetPressureRef = useRef(0);
+  
+  // 🔒 GOD MODE: Measurement Session Lock - prevents ANY "ready" state during active measurement
+  // Once measurement starts, we LOCK and ignore ALL status 3 / ready events until completion
+  const isMeasurementSessionLockedRef = useRef<boolean>(false);
   
   // 🚀 NEW: Pressure buffer system for 0.2s delay
   const [pressureBuffer, setPressureBuffer] = useState<Array<{pressure: number, timestamp: number}>>([]);
   const pressureBufferRef = useRef<NodeJS.Timeout | null>(null);
-  
-  // 🚀 NEW: Smooth animation system for elderly users
-  const [smoothPressure, setSmoothPressure] = useState(0);
+
   const [measurementStartTime, setMeasurementStartTime] = useState<number | null>(null);
-  const [inflationPeakTarget, setInflationPeakTarget] = useState(150); // Default target for smooth animation
-  const [smoothAnimationPhase, setSmoothAnimationPhase] = useState<'idle' | 'inflating' | 'peak' | 'deflating' | 'complete'>('idle');
   
   // Refs for animations
   const pressureAnimationRef = useRef<number | null>(null);
@@ -136,49 +132,27 @@ export const LiveBPMonitorRevamped: React.FC = () => {
     };
   }, []); // Reset every time component mounts
   
-  // 🚀 NEW: Simple measurement detection for smooth animation
+  // 🚨 DISABLED: Fake pressure buffer system that was estimating peak targets
+  // This was interfering with real device measurements by setting fake targets
+  // We now ONLY use real device status and pressure data - no fake estimates
   useEffect(() => {
-    const processBufferedPressure = () => {
-      const now = Date.now();
-      const validReadings = pressureBuffer.filter(reading => now - reading.timestamp >= 200); // 0.2s delay
-      
-      if (validReadings.length > 0) {
-        const latestReading = validReadings[validReadings.length - 1];
-        
-        // Start smooth animation when device pressure detected
-        if (latestReading.pressure > 10 && !measurementStartTime) {
-          console.log('🚀 [SMOOTH] Starting smooth animation - device pressure detected:', latestReading.pressure);
-          setMeasurementStartTime(Date.now());
-          
-          // Estimate peak target based on first significant reading
-          const estimatedPeak = Math.max(140, Math.min(180, latestReading.pressure * 1.2));
-          setInflationPeakTarget(estimatedPeak);
-          console.log('🎯 [SMOOTH] Estimated peak target:', estimatedPeak, 'mmHg');
-        }
-        
-        // Remove processed readings from buffer
-        setPressureBuffer(prev => prev.filter(reading => now - reading.timestamp < 200));
-      }
-    };
-    
-    if (pressureBuffer.length > 0) {
-      if (pressureBufferRef.current) {
-        clearTimeout(pressureBufferRef.current);
-      }
-      pressureBufferRef.current = setTimeout(processBufferedPressure, 50); // Check every 50ms
-    }
-    
-    return () => {
-      if (pressureBufferRef.current) {
-        clearTimeout(pressureBufferRef.current);
-      }
-    };
-  }, [pressureBuffer, measurementStartTime]);
+    // DISABLED - This was causing fake animation targets that interfered with real measurements
+    // All pressure and animation state is now controlled by real device data only
+    return;
+  }, []);
   
   // 🚨 FIX: Keep refs in sync with state
   useEffect(() => {
     measurementStateRef.current = measurementState;
   }, [measurementState]);
+  
+  useEffect(() => {
+    bpResultRef.current = bpResult;
+  }, [bpResult]);
+  
+  useEffect(() => {
+    currentPressureRef.current = currentPressure;
+  }, [currentPressure]);
   
   useEffect(() => {
     targetPressureRef.current = targetPressure;
@@ -192,12 +166,10 @@ export const LiveBPMonitorRevamped: React.FC = () => {
     // 🔥 CRITICAL: Clear ALL cached pressure/measurement data on mount
     setCurrentPressure(0);
     setTargetPressure(0);
-    setSmoothPressure(0);
     setLastReceivedPressure(0);
     setHeartRate(0);
     setMeasurementState('idle');
     measurementStateRef.current = 'idle';
-    setSmoothAnimationPhase('idle');
     setMeasurementStartTime(null);
     
     console.log('✅ [CACHE CLEAR] All pressure/state data reset to 0');
@@ -216,36 +188,7 @@ export const LiveBPMonitorRevamped: React.FC = () => {
     }
   }, []);
 
-  // Auto-detect device-initiated measurements
-  useEffect(() => {
-    if (measurementState === 'idle' && connectedDevice && isInitialized && wellueSDK) {
-      console.log('🔍 Checking for device-initiated measurement...');
-      
-      const checkDeviceStatus = async () => {
-        try {
-          const status = await wellueSDK.getBPStatus();
-          console.log('📊 Current device status:', status);
-          
-          if (status.isMeasuring && status.status !== 'idle') {
-            console.log('🎯 Device-initiated measurement detected!');
-            setMeasurementState(status.status as MeasurementState);
-            
-            if (status.currentPressure > 0) {
-              setCurrentPressure(status.currentPressure);
-              setTargetPressure(status.currentPressure);
-            }
-          }
-        } catch (error) {
-          console.log('⚠️ Could not check device status:', error);
-        }
-      };
-      
-      checkDeviceStatus();
-      const interval = setInterval(checkDeviceStatus, 2000);
-      
-      return () => clearInterval(interval);
-    }
-  }, [measurementState, connectedDevice, isInitialized, wellueSDK]);
+  // 🚀 SIMPLIFIED: No auto-detect needed - native side will send events
 
   // Monitor device connection status
   useEffect(() => {
@@ -276,28 +219,22 @@ export const LiveBPMonitorRevamped: React.FC = () => {
   }, [connectedDevice, isInitialized, wellueSDK]);
 
   // 🚀 NEW: Smooth animation loop for elderly users
+  // 🚨 FIX: DISABLED - This fake animation was overriding real device pressure!
+  // The fake timer-based animation was setting smoothPressure to 0 after 40 seconds,
+  // which was overriding the actual device pressure and causing measurements to stop.
+  // We now ONLY use real device pressure data from handleRealTimeUpdate.
   useEffect(() => {
-    if (!measurementStartTime || smoothAnimationPhase === 'complete') {
-      if (pressureAnimationRef.current) {
-        cancelAnimationFrame(pressureAnimationRef.current);
-        pressureAnimationRef.current = null;
-      }
-      return;
+    // DISABLED: Stop the fake animation loop - we use real device pressure only
+    if (pressureAnimationRef.current) {
+      cancelAnimationFrame(pressureAnimationRef.current);
+      pressureAnimationRef.current = null;
     }
-
-    const animateSmooth = () => {
-      updateSmoothAnimation();
-      pressureAnimationRef.current = requestAnimationFrame(animateSmooth);
-    };
-    
-    pressureAnimationRef.current = requestAnimationFrame(animateSmooth);
-    
     return () => {
       if (pressureAnimationRef.current) {
         cancelAnimationFrame(pressureAnimationRef.current);
       }
     };
-  }, [measurementStartTime, smoothAnimationPhase]);
+  }, []);
 
   // 🚨 SAFETY: Enhanced pressure display with safety indicators
   const getPressureDisplayColor = (pressure: number): string => {
@@ -410,26 +347,46 @@ export const LiveBPMonitorRevamped: React.FC = () => {
 
   // SDK event handlers
   const handleBPMeasurement = useCallback((measurement: any) => {
-    console.log('📊 BP Measurement result received:', measurement);
+    console.log('✅ [SIMPLE] ⭐⭐⭐ RESULTS RECEIVED:', measurement);
     
-    const resultTimestamp = measurement.timestamp instanceof Date 
-      ? measurement.timestamp 
-      : new Date(measurement.timestamp || Date.now());
+    const bpResult: BPResult = {
+      systolic: measurement.systolic || measurement.systolicPressure || 0,
+      diastolic: measurement.diastolic || measurement.diastolicPressure || 0,
+      pulseRate: measurement.pulseRate || measurement.pulse,
+      map: measurement.meanArterialPressure || measurement.mean,
+      timestamp: new Date(measurement.timestamp || Date.now())
+    };
     
-    setBpResult({
-      systolic: measurement.systolic,
-      diastolic: measurement.diastolic,
-      pulseRate: measurement.pulseRate,
-      map: measurement.meanArterialPressure,
-      timestamp: resultTimestamp
-    });
+    setBpResult(bpResult);
+    bpResultRef.current = bpResult; // Update ref immediately
     
-    setMeasurementState('completed');
-    console.log('✅ Measurement completed, showing results');
+    // 🔒 GOD MODE: UNLOCK MEASUREMENT SESSION - results received, measurement complete
+    isMeasurementSessionLockedRef.current = false;
+    console.log('🔓 [SESSION UNLOCK] 🔓🔓🔓 MEASUREMENT SESSION UNLOCKED - Results received, measurement complete 🔓🔓🔓');
+    
+    // ✅ FIX: Set to 'ready' state after completion - results stay visible
+    setMeasurementState('ready');
+    measurementStateRef.current = 'ready'; // Update ref immediately
+    setCurrentPressure(0);
+    currentPressureRef.current = 0; // Update ref immediately
+    
+    // ✅ FIX: NO auto-reset - keep results visible!
+    // Results will stay visible until user starts a new measurement or navigates away
+    console.log('✅ Results displayed - NO auto-reset. Results will remain visible in "ready" state.');
   }, []);
 
   const handleBPProgress = useCallback((progress: any) => {
     console.log('📈 BP Progress update:', progress);
+    
+    // ✅ CRITICAL FIX: Update pressure ref when bpProgress events arrive
+    // This ensures currentPressureRef always has the latest pressure for status 3 checks
+    if (progress.pressure !== undefined && progress.pressure !== null) {
+      const calculatedPressure = Math.round(progress.pressure / 10);
+      if (calculatedPressure > 0) {
+        console.log('📈 [BP PROGRESS] Updating currentPressureRef from', currentPressureRef.current, 'to', calculatedPressure);
+        currentPressureRef.current = calculatedPressure; // ✅ CRITICAL: Update ref immediately!
+      }
+    }
     
     switch (progress.status) {
       case 'inflating':
@@ -463,7 +420,6 @@ export const LiveBPMonitorRevamped: React.FC = () => {
     console.log('📊 [REACT] Received pressure:', progress.pressure, 'mmHg');
     console.log('📊 [REACT] Received status:', progress.status);
     console.log('📊 [REACT] Current targetPressure:', targetPressure, 'mmHg');
-    console.log('📊 [REACT] Current currentPressure:', currentPressure, 'mmHg');
     
     if (progress.pressure > 0) {
       console.log('📊 [REACT] Pressure > 0, adding to buffer for 0.2s delay');
@@ -510,17 +466,31 @@ export const LiveBPMonitorRevamped: React.FC = () => {
   }, []);
 
   const handleBPStatusChanged = useCallback((status: any) => {
-    console.log('📊 BP Status changed:', status);
+    // ✅ CRITICAL FIX: Use refs to get current state values (avoid stale closures)
+    const currentState = measurementStateRef.current;
+    const currentResult = bpResultRef.current;
     
-    // Update measurement state based on device status
-    if (status.status && status.status !== measurementState) {
-      console.log('🔄 Updating measurement state from', measurementState, 'to', status.status);
+    console.log('🔍 [BP STATUS CHANGED] BP Status changed:', status, 'currentState:', currentState, 'currentResult:', !!currentResult);
+    
+    // ✅ FIX: Don't update state from status.status if we have results displayed
+    if (status.status && status.status !== currentState) {
+      if (status.status === 'complete' || status.status === 'completed') {
+        // Only set to complete if we don't already have results or are already complete
+        if (currentState !== 'completed' && !currentResult) {
+          console.log('🔄 Updating measurement state from', currentState, 'to complete (no results yet)');
+          setMeasurementState('completed');
+        } else {
+          console.log('✅ [BP STATUS] Status is complete but results already shown or already completed - preserving state');
+        }
+      } else {
+        console.log('🔄 Updating measurement state from', currentState, 'to', status.status);
       setMeasurementState(status.status as MeasurementState);
+      }
     }
     
     // Check for completed measurement
     if (status.status === 'complete' || status.status === 'completed') {
-      console.log('✅ BP measurement completed, checking for results...');
+      console.log('✅ BP measurement completed, checking for results...', 'currentResult:', !!currentResult);
       
       if (status.lastMeasurement) {
         console.log('📊 Found last measurement data:', status.lastMeasurement);
@@ -544,7 +514,7 @@ export const LiveBPMonitorRevamped: React.FC = () => {
       } else {
         console.log('⚠️ Status is complete but no lastMeasurement data, checking if we have stored results...');
         // If no lastMeasurement but status is complete, try to get results from device
-        if (measurementState === 'analyzing' || measurementState === 'deflating') {
+        if (currentState === 'analyzing' || currentState === 'deflating') {
           setMeasurementState('completed');
           console.log('🎯 Auto-detecting measurement completion from device status');
         }
@@ -557,117 +527,195 @@ export const LiveBPMonitorRevamped: React.FC = () => {
       setErrorMessage(status.error);
       setMeasurementState('error');
     }
-  }, [measurementState]);
+  }, []);
 
   const handleRealTimeUpdate = useCallback((data: any) => {
-    // 🚨 FIX: Use refs instead of closure state to avoid stale values
-    const currentMeasurementState = measurementStateRef.current;
-    const currentTargetPressure = targetPressureRef.current;
+    // 🚀 PRESSURE-DRIVEN STATE: Pressure data is the SOURCE OF TRUTH
+    const deviceStatus = data.status || data.deviceStatus;
+    const pressure = data.pressure ? Math.round(data.pressure / 10) : 0;
     
-    console.log('📊 [REALTIME] ===== REAL-TIME UPDATE =====');
-    console.log('📊 [REALTIME] Data received:', JSON.stringify(data));
-    console.log('📊 [REALTIME] Current measurementState:', currentMeasurementState);
-    console.log('📊 [REALTIME] Current targetPressure:', currentTargetPressure);
+    // ✅ CRITICAL FIX: Use refs to get current state values (avoid stale closures)
+    const currentState = measurementStateRef.current;
+    const currentResult = bpResultRef.current;
+    const currentPressure = currentPressureRef.current || 0;
     
-    // Handle pressure (already converted from raw to mmHg in bridge)
-    if (data.pressure !== undefined && data.pressure > 0) {
-      console.log('📊 [REALTIME] Pressure found in data:', data.pressure, 'mmHg');
+    // 🔍 DETAILED LOGGING: Track pressure bar and UI state
+    console.log('📡 [PRESSURE-BAR-DEBUG] ===== PRESSURE UPDATE RECEIVED =====');
+    console.log('📡 [PRESSURE-BAR-DEBUG] Raw data.pressure:', data.pressure, 'Calculated pressure:', pressure);
+    console.log('📡 [PRESSURE-BAR-DEBUG] deviceStatus:', deviceStatus);
+    console.log('📡 [PRESSURE-BAR-DEBUG] Current UI state (ref):', currentState);
+    console.log('📡 [PRESSURE-BAR-DEBUG] Current pressure (ref):', currentPressure);
+    console.log('📡 [PRESSURE-BAR-DEBUG] Current result exists:', !!currentResult);
+    console.log('📡 [PRESSURE-BAR-DEBUG] isDeflating:', data.isDeflating);
+    
+    // ✅ CRITICAL: PRESSURE-DRIVEN STATE MANAGEMENT
+    // If pressure > 0, we KNOW we're measuring (device is actively inflating/deflating)
+    // This is the SOURCE OF TRUTH - pressure bar works, so wire UI state to it!
+    if (pressure > 0) {
+      console.log('📊 [PRESSURE-BAR-DEBUG] ⬆️ PRESSURE > 0 - Updating pressure bar');
+      console.log('📊 [PRESSURE-BAR-DEBUG] Setting currentPressure from', currentPressure, 'to', pressure);
+      setCurrentPressure(pressure);
+      console.log('📊 [PRESSURE-BAR-DEBUG] ✅ Pressure bar updated - currentPressure state set to:', pressure);
       
-      // 🔥 FIX: DON'T use pressure to detect new measurements!
-      // Pressure can be stale/cached from previous session (0→225 instant jump)
-      // ONLY use device STATUS (4=Measuring) to detect when user presses device button
-      // Pressure is ONLY for updating the UI during active measurement
+      // ✅ KEY FIX: If pressure > 0 and we're not in a measuring state, set it!
+      // This ensures UI state matches pressure bar (which is working correctly)
+      const isActiveMeasurement = currentState === 'inflating' || 
+                                  currentState === 'deflating' || 
+                                  currentState === 'analyzing';
       
-      // Update last received pressure for tracking
-      setLastReceivedPressure(data.pressure);
+      console.log('📊 [PRESSURE-BAR-DEBUG] isActiveMeasurement check:', {
+        currentState,
+        isInflating: currentState === 'inflating',
+        isDeflating: currentState === 'deflating',
+        isAnalyzing: currentState === 'analyzing',
+        isActiveMeasurement,
+        hasResult: !!currentResult
+      });
       
-      // ONLY update pressure values when actively measuring (not idle and not ready)
-      if (currentMeasurementState === 'inflating' || currentMeasurementState === 'deflating') {
-        console.log('📊 [REALTIME] Updating pressure during active measurement:', data.pressure, 'mmHg');
-        setTargetPressure(data.pressure);
-        setCurrentPressure(data.pressure);
-        setSmoothPressure(data.pressure);
-      } else if (currentMeasurementState === 'idle' || currentMeasurementState === 'ready') {
-        // Ignore pressure when idle - wait for status=4 first
-        console.log('📊 [REALTIME] Ignoring pressure in idle state (waiting for status=4):', data.pressure, 'mmHg');
+      if (!isActiveMeasurement && !currentResult) {
+        // Pressure data arrived but UI not in measuring state - fix it!
+        console.log('🎯 [PRESSURE-BAR-DEBUG] ⚠️ UI STATE MISMATCH! Pressure > 0 but UI state is:', currentState);
+        console.log('🎯 [PRESSURE-BAR-DEBUG] 🔧 FIXING: Setting UI state to inflating (pressure bar is working!)');
+        // 🔒 GOD MODE: ACTIVATE SESSION LOCK when pressure > 0 (measurement has started)
+        isMeasurementSessionLockedRef.current = true;
+        console.log('🔒 [PRESSURE-DRIVEN LOCK] Pressure > 0 detected - activating session lock');
+        setMeasurementState('inflating');
+        measurementStateRef.current = 'inflating';
+        console.log('🎯 [PRESSURE-BAR-DEBUG] ✅ UI state updated to inflating');
+      } else {
+        console.log('📊 [PRESSURE-BAR-DEBUG] ✅ UI state is correct (active measurement or result exists)');
       }
     } else {
-      console.log('📊 [REALTIME] No pressure data in real-time update (pressure=' + data.pressure + ')');
+      console.log('📊 [PRESSURE-BAR-DEBUG] ⬇️ PRESSURE = 0 - No pressure bar update');
     }
     
-    // Handle heart rate (iOS: pulse, Android: hr)
-    const hr = data.pulse || data.heartRate || data.hr;
-    if (hr !== undefined && hr > 0) {
-      console.log('💓 [REALTIME] Heart rate:', hr, 'BPM');
-      setHeartRate(hr);
-    }
-    
-    // Handle battery (iOS: batteryPercent, Android: batteryStatus)
-    const battery = data.batteryPercent || data.batteryStatus;
-    if (battery !== undefined) {
-      console.log('🔋 [REALTIME] Battery:', battery, '%');
-    }
-    
-    if (data.signalQuality !== undefined) {
-      setSignalQuality(data.signalQuality);
-    }
-    
-    // Check device status (iOS: status, Android: deviceStatus)
-    // Status mapping: 3=Ready, 4=BPMeasuring, 5=BPMeasureEnd
-    // 🔥 THIS IS THE ONLY WAY TO DETECT USER PRESSING DEVICE BUTTON!
-    const deviceStatus = data.status || data.deviceStatus;
-    if (deviceStatus !== undefined) {
-      console.log('📱 [REALTIME] Device status update:', deviceStatus);
+    // State 4 = Measurement started (only if not already measuring and results are not displayed)
+    if (deviceStatus === 4) {
+      // ✅ CRITICAL FIX: Use refs to get latest state (prevents stale closures)
+      const currentStateRef = measurementStateRef.current;
+      const currentResultRef = bpResultRef.current;
+      console.log('🔍 [STATUS 4] Status 4 detected - currentState:', currentStateRef, 'currentResult:', !!currentResultRef);
       
-      // Map Viatom status codes to measurement states
-      if (deviceStatus === 4 && (currentMeasurementState === 'idle' || currentMeasurementState === 'ready')) {
-        console.log('🎯 [REALTIME] ✅ USER PRESSED DEVICE BUTTON! Status 4 (BPMeasuring) detected');
-        console.log('🎯 [REALTIME] Starting measurement with pressure:', data.pressure || 0);
-        console.log('🖥️ [UI TRANSITION] STATE CHANGE: idle → inflating');
-        console.log('🖥️ [UI TRANSITION] UI WILL SHOW: INFLATING SCREEN (BLUE BAR RISING)');
-        setMeasurementState('inflating');
-        measurementStateRef.current = 'inflating'; // 🔥 UPDATE REF IMMEDIATELY to avoid race condition
-        setSmoothAnimationPhase('inflating'); // Initialize animation
-        setMeasurementStartTime(Date.now()); // Start timer
-        if (data.pressure) {
-          console.log('🖥️ [UI TRANSITION] Initial pressure in same event:', data.pressure, 'mmHg');
-          setTargetPressure(data.pressure);
-          setCurrentPressure(data.pressure);
-          setSmoothPressure(data.pressure);
-          setInflationPeakTarget(data.pressure);
-        } else {
-          console.log('🖥️ [UI TRANSITION] No pressure in this event, will wait for next pressure update');
+      // ✅ CRITICAL FIX: Check UI state (measurementStateRef) to prevent duplicate starts during deflation
+      const isActivelyMeasuring = currentStateRef === 'inflating' || 
+                                  currentStateRef === 'deflating' || 
+                                  currentStateRef === 'analyzing';
+      
+      // ✅ FIX: Status 4 = NEW measurement starting - clear previous results if they exist
+      if (!isActivelyMeasuring) {
+        // 🔒 GOD MODE: ACTIVATE MEASUREMENT SESSION LOCK
+        // Once measurement starts, we LOCK and prevent ANY "ready" state transitions
+        isMeasurementSessionLockedRef.current = true;
+        console.log('🔒 [SESSION LOCK] 🔒🔒🔒 MEASUREMENT SESSION LOCKED - ALL STATUS 3/READY EVENTS IGNORED 🔒🔒🔒');
+        
+        // New measurement starting - clear previous results
+        if (currentResultRef) {
+          console.log('🔄 [NEW MEASUREMENT] Status 4 detected with previous results - clearing old results');
+          setBpResult(null); // Clear previous results
+          bpResultRef.current = null; // Update ref immediately
         }
-        setErrorMessage(null);
-        setBpResult(null);
-        setWaveformData([]);
-      } else if (deviceStatus === 5) {
-        console.log('🎯 [REALTIME] Status 5 (BPMeasureEnd) - measurement complete');
-        console.log('🖥️ [UI TRANSITION] STATE CHANGE: measuring → analyzing');
+        console.log('🎯 [SIMPLE] ⭐ MEASUREMENT STARTED (Status 4) - starting new measurement');
+        setMeasurementState('inflating');
+        measurementStateRef.current = 'inflating'; // Update ref immediately
+        setCurrentPressure(0);
+        currentPressureRef.current = 0; // Update ref immediately
+      } else if (isActivelyMeasuring) {
+        console.log('✅ [STATUS 4] Status 4 received but already measuring (state:', currentStateRef, ') - ignoring duplicate');
+      }
+    }
+    
+    // State 5 = Measurement complete - native will fetch file
+    if (deviceStatus === 5) {
+      console.log('🔍 [STATUS 5] Status 5 detected - currentState:', currentState, 'currentResult:', !!currentResult);
+      // ✅ FIX: Only set to analyzing if we don't already have results
+      if (!currentResult && currentState !== 'completed' && currentState !== 'analyzing') {
+        console.log('✅ [SIMPLE] ⭐ MEASUREMENT COMPLETE (Status 5) - waiting for results...');
         setMeasurementState('analyzing');
-        measurementStateRef.current = 'analyzing'; // 🔥 UPDATE REF IMMEDIATELY
+        measurementStateRef.current = 'analyzing'; // Update ref immediately
+        // 🔒 GOD MODE: Keep session locked until results are received
+        // We'll unlock it in handleBPMeasurement when results arrive
+      } else {
+        console.log('✅ [STATUS 5] Results already shown (currentResult exists) or already in analyzing/completed - ignoring status 5 to prevent state change');
       }
     }
     
-    // Handle deflating indicator
-    if (data.isDeflating === true && currentMeasurementState === 'inflating') {
-      console.log('🎯 [REALTIME] Deflating detected - transitioning state');
-      console.log('🖥️ [UI TRANSITION] STATE CHANGE: inflating → deflating');
-      console.log('🖥️ [UI TRANSITION] UI WILL SHOW: DEFLATING SCREEN (YELLOW BAR FALLING)');
-      setMeasurementState('deflating');
-      measurementStateRef.current = 'deflating'; // 🔥 UPDATE REF IMMEDIATELY
-      setSmoothAnimationPhase('deflating'); // ✅ FIX: Update smooth bar phase
-    }
-    
-    // Update smooth bar based on ongoing measurement
-    if (data.pressure !== undefined && data.pressure > 0 && currentMeasurementState !== 'idle') {
-      if (data.isDeflating) {
-        setSmoothAnimationPhase('deflating');
-      } else if (data.pressure > 100) {
-        setSmoothAnimationPhase('inflating');
+    // ✅ CRITICAL FIX: PRESSURE-DRIVEN status 3 handling
+    // State 3 = Ready - but PRESSURE DATA IS SOURCE OF TRUTH!
+    // CRITICAL: bp2Rt events may have NO pressure data, but bpProgress events DO
+    // We MUST check currentPressureRef (updated by bpProgress) not just event pressure!
+    if (deviceStatus === 3) {
+      // 🔒 GOD MODE: CHECK SESSION LOCK FIRST - if locked, COMPLETELY IGNORE status 3
+      if (isMeasurementSessionLockedRef.current) {
+        console.log('🔒 [SESSION LOCK] ⛔⛔⛔ STATUS 3 BLOCKED - MEASUREMENT SESSION IS LOCKED! ⛔⛔⛔');
+        console.log('🔒 [SESSION LOCK] Measurement in progress - ignoring ALL status 3 events until completion');
+        return; // Exit immediately - session is locked, no status 3 allowed!
+      }
+      
+      // ✅ CRITICAL FIX: Use REF instead of closure state to get latest measurement state
+      const currentStateRef = measurementStateRef.current;
+      const currentResultRef = bpResultRef.current;
+      // ✅ KEY FIX: Get pressure from REF (updated by bpProgress events), not from this event
+      // bp2Rt events may have pressure=undefined, but currentPressureRef has the real value!
+      const currentPressureValue = currentPressureRef.current || 0;
+      
+      console.log('🚨 [UI-STATE-DEBUG] ===== STATUS 3 (READY) EVENT RECEIVED =====');
+      console.log('🚨 [UI-STATE-DEBUG] Session locked:', isMeasurementSessionLockedRef.current);
+      console.log('🚨 [UI-STATE-DEBUG] Current UI state (ref):', currentStateRef);
+      console.log('🚨 [UI-STATE-DEBUG] Current pressure (ref):', currentPressureValue);
+      console.log('🚨 [UI-STATE-DEBUG] Pressure in this event:', pressure);
+      console.log('🚨 [UI-STATE-DEBUG] Current result exists:', !!currentResultRef);
+      
+      // ✅ KEY FIX: PRESSURE-DRIVEN - PRIORITIZE REF PRESSURE (from bpProgress events)
+      // bp2Rt events may have pressure=undefined, but currentPressureRef has real pressure from bpProgress!
+      // If pressure bar is showing data (ref > 0), we MUST be measuring - ignore status 3!
+      if (currentPressureValue > 0) {
+        console.log('🚨 [UI-STATE-DEBUG] ⚠️⚠️⚠️ BLOCKING STATUS 3! PRESSURE BAR IS ACTIVE! ⚠️⚠️⚠️');
+        console.log('🚨 [UI-STATE-DEBUG] - Ref pressure (from bpProgress):', currentPressureValue);
+        console.log('🚨 [UI-STATE-DEBUG] - Event pressure (bp2Rt may be undefined):', pressure);
+        console.log('🚨 [UI-STATE-DEBUG] - Pressure bar is showing data, we MUST be measuring!');
+        console.log('🚨 [UI-STATE-DEBUG] - IGNORING status 3 to prevent UI reset during measurement!');
+        return; // Exit early - pressure bar data says we're measuring
+      }
+      // Also check event pressure as fallback (in case ref isn't updated yet)
+      if (pressure > 0) {
+        console.log('🚨 [UI-STATE-DEBUG] ⚠️ BLOCKING STATUS 3! Event pressure > 0:', pressure);
+        return; // Exit early - event pressure says we're measuring
+      }
+      
+      // ✅ CRITICAL FIX: Check UI state FIRST - ignore status 3 during active measurement
+      // This is the KEY fix: ignore status 3 throughout entire measurement (inflation + deflation) until results shown
+      if (currentStateRef === 'inflating' || 
+          currentStateRef === 'deflating' || 
+          currentStateRef === 'analyzing') {
+        // Active measurement states - ignore status 3 to prevent UI reset
+        console.log('⚠️ [SIMPLE] Status 3 during active measurement (stateRef=', currentStateRef, ') - ignoring to prevent UI reset');
+        return;
+      } else if (currentStateRef === 'analyzing' || currentStateRef === 'completed') {
+        // ✅ FIX: Results are displayed - KEEP showing results, DON'T change state to ready
+        // This prevents UI fluctuation. Results stay visible until user starts a new measurement
+        console.log('✅ [SIMPLE] Status 3 after completion (stateRef=', currentStateRef, ') - IGNORING to keep results visible');
+        return; // Don't change state - keep it in 'completed'
+      } else if (currentResultRef) {
+        // Results are displayed - preserve them
+        console.log('✅ [SIMPLE] Status 3 received but results are displayed - ignoring to preserve results');
+        return;
+      } else if (currentStateRef === 'ready') {
+        // Already in ready state - do nothing
+        console.log('✅ [SIMPLE] Status 3 received but already in ready state - ignoring');
+        return;
+        } else {
+        // Normal ready state (no measurement in progress, no results displayed, no pressure)
+        console.log('🚨 [UI-STATE-DEBUG] ⚠️⚠️⚠️ RESETTING UI TO READY ⚠️⚠️⚠️');
+        console.log('🚨 [UI-STATE-DEBUG] Reason: Normal transition (no active measurement, no results, no pressure)');
+        console.log('🚨 [UI-STATE-DEBUG] Current state before reset:', currentStateRef);
+        console.log('🚨 [UI-STATE-DEBUG] Current pressure before reset:', currentPressureValue);
+        console.log('🚨 [UI-STATE-DEBUG] Event pressure:', pressure);
+        setMeasurementState('ready');
+        setCurrentPressure(0);
+        console.log('🚨 [UI-STATE-DEBUG] ✅ UI state reset to "ready"');
       }
     }
-  }, []); // 🚨 FIX: No dependencies - callback never recreated, always uses latest refs
+  }, [wellueSDK]);
 
   const handleError = useCallback((error: string, details?: any) => {
     console.error('❌ SDK Error:', error, details);
@@ -686,11 +734,11 @@ export const LiveBPMonitorRevamped: React.FC = () => {
     }
   }, [connectedDevice]);
 
-  // Initialize SDK callbacks - ONLY ONCE per mount, not on callback changes
+  // Initialize SDK callbacks - register as soon as SDK instance is available
   useEffect(() => {
-    if (!wellueSDK || !isInitialized) return;
+    if (!wellueSDK) return;
     
-    console.log('🔧 Setting up SDK callbacks for LiveBPMonitorRevamped');
+    console.log('🔧 Setting up SDK callbacks for LiveBPMonitorRevamped (early registration, no init gate)');
     
     // Set up callbacks properly using the SDK's setCallbacks method
     wellueSDK.setCallbacks({
@@ -702,13 +750,13 @@ export const LiveBPMonitorRevamped: React.FC = () => {
       onDeviceDisconnected: handleDeviceDisconnected
     });
     
-    console.log('✅ SDK callbacks registered successfully');
+    console.log('✅ SDK callbacks registered successfully (early)');
     
     return () => {
       // Don't clear callbacks on unmount - let them persist for singleton SDK
       console.log('🧹 Component unmounting (callbacks remain active in singleton)');
     };
-  }, [wellueSDK, isInitialized]); // ← REMOVED callback dependencies to prevent re-registration
+  }, [wellueSDK]);
 
   // 🚀 ENHANCED: Start measurement with proper state reset
   const handleStart = useCallback(async () => {
@@ -1052,80 +1100,100 @@ export const LiveBPMonitorRevamped: React.FC = () => {
     console.log('🔄 Smooth animation reset for new measurement');
   };
   
-  // 🚀 NEW: Enhanced peak pressure tracking for natural flow
+  // 🚨 DISABLED: Fake pressure pattern tracking that was interfering with real device measurements
+  // This was trying to detect measurement phases based on pressure patterns, which was causing
+  // the app to think measurements were complete when they weren't.
+  // We now ONLY use device status to determine measurement state - not pressure patterns.
   useEffect(() => {
-    if (currentPressure > 0 && lastPressure !== currentPressure) {
-      const pressureChange = currentPressure - lastPressure;
-      
-      // Phase 1: Inflation Detection
-      if (currentPressure > lastPressure && currentPressure > 30) {
-        if (measurementPhase !== 'inflating') {
-          console.log('📈 [NATURAL FLOW] INFLATING: Pressure increasing to', currentPressure, 'mmHg');
-          setMeasurementPhase('inflating');
-        }
-        // Track peak pressure during inflation
-        if (currentPressure > peakPressure) {
-          setPeakPressure(currentPressure);
-          console.log('🏔️ [PEAK] New peak pressure reached:', currentPressure, 'mmHg');
-        }
-      }
-      
-      // Phase 2: Peak Detection & Deflation Start
-      else if (currentPressure < lastPressure && measurementPhase === 'inflating' && currentPressure < peakPressure) {
-        console.log('📉 [NATURAL FLOW] DEFLATING: Pressure decreasing from peak', peakPressure, 'to', currentPressure, 'mmHg');
-        setMeasurementPhase('deflating');
-      }
-      
-      // Phase 3: Analysis Phase
-      else if (currentPressure < 50 && currentPressure > 0 && measurementPhase === 'deflating') {
-        console.log('🔍 [NATURAL FLOW] ANALYZING: Pressure stabilized at', currentPressure, 'mmHg');
-        setMeasurementPhase('analyzing');
-      }
-      
-      // Update last pressure for next comparison
-      setLastPressure(currentPressure);
-    }
-  }, [currentPressure, lastPressure, measurementPhase, peakPressure]);
+    // DISABLED - This fake logic was interfering with real device measurements
+    // Measurement state is now ONLY controlled by device status (status 3, 4, 5)
+    return;
+  }, []);
   
-  // Real-time monitoring for device-initiated measurements
+  // 🚀 SIMPLIFIED: Start real-time monitoring immediately on mount
+  // 🚀 CRITICAL FIX: Start real-time monitoring with proper SDK deployment checks and retries
   useEffect(() => {
-    if (!connectedDevice || !isInitialized || !wellueSDK) return;
+    console.log('🚀 [RT MONITORING] Component mounted/updated - checking requirements...');
+    console.log('🚀 [RT MONITORING] Current state:', { 
+      wellueSDK: !!wellueSDK, 
+      isInitialized, 
+      connectedDevice: !!connectedDevice 
+    });
     
-    console.log('🔍 Setting up real-time monitoring for device-initiated measurements...');
+    if (!wellueSDK || !isInitialized || !connectedDevice) {
+      console.log('⚠️ [RT MONITORING] Requirements not met yet, waiting...');
+      return;
+    }
     
-    const monitorRealTime = async () => {
+    console.log('✅ [RT MONITORING] All requirements met, starting monitoring...');
+    
+    // 🚨 FIX: Use ref to track retry state to avoid stale closures
+    let isMounted = true;
+    let retryTimeoutId: NodeJS.Timeout | null = null;
+    let currentRetryCount = 0;
+    const maxRetries = 3;
+    const retryDelay = 1000; // 1 second between retries
+    
+    // Start monitoring with retry logic for SDK deployment timing
+    const startMonitoringWithRetry = async () => {
+      // 🚨 CRITICAL: Check if component is still mounted before proceeding
+      if (!isMounted) {
+        console.log('⚠️ [RT MONITORING] Component unmounted during retry, aborting...');
+        return;
+      }
+      
       try {
-        // Start real-time monitoring
+        console.log(`🚀 [RT MONITORING] Attempt ${currentRetryCount + 1}/${maxRetries + 1} - Calling startRtTaskForConnectedDevice...`);
         await wellueSDK.startRtTaskForConnectedDevice();
-        console.log('✅ Real-time monitoring started');
-      } catch (error) {
-        console.log('⚠️ Could not start real-time monitoring:', error);
+        console.log('✅ [RT MONITORING] Real-time monitoring STARTED successfully!');
+      } catch (error: any) {
+        console.error(`❌ [RT MONITORING] Attempt ${currentRetryCount + 1} failed:`, error);
+        
+        // 🚨 CRITICAL: Check if still mounted before retrying
+        if (!isMounted) {
+          console.log('⚠️ [RT MONITORING] Component unmounted after error, not retrying...');
+          return;
+        }
+        
+        // If SDK not deployed yet, retry after delay
+        if (error.message?.includes('SDK not ready') && currentRetryCount < maxRetries) {
+          currentRetryCount++;
+          console.log(`⏰ [RT MONITORING] Retrying in ${retryDelay}ms... (attempt ${currentRetryCount + 1}/${maxRetries + 1})`);
+          retryTimeoutId = setTimeout(startMonitoringWithRetry, retryDelay);
+        } else {
+          console.error(`❌ [RT MONITORING] Failed after ${currentRetryCount + 1} attempts. Giving up.`);
+          if (isMounted) {
+            setErrorMessage(`Failed to start real-time monitoring: ${error.message || String(error)}`);
+          }
+        }
       }
     };
     
-    monitorRealTime();
+    startMonitoringWithRetry();
     
+    // 🚨 CRITICAL FIX: Cleanup function to prevent memory leaks and race conditions
     return () => {
-      // Cleanup real-time monitoring
-      try {
-        wellueSDK.stopLive(connectedDevice.id);
-        console.log('🧹 Real-time monitoring stopped');
-      } catch (error) {
-        console.log('⚠️ Could not stop real-time monitoring:', error);
+      console.log('🧹 [RT MONITORING] Cleanup running - stopping monitoring and cancelling retries...');
+      
+      // Mark component as unmounted to prevent retry callbacks from executing
+      isMounted = false;
+      
+      // Cancel any pending retry timeout
+      if (retryTimeoutId) {
+        clearTimeout(retryTimeoutId);
+        console.log('🧹 [RT MONITORING] Cancelled pending retry timeout');
+      }
+      
+      // Stop monitoring on native side
+      if (connectedDevice) {
+        wellueSDK.stopLive(connectedDevice.id).catch((err: any) => {
+          console.error('⚠️ [RT MONITORING] Error stopping monitoring:', err);
+        });
       }
     };
-  }, [connectedDevice, isInitialized, wellueSDK]);
+  }, [wellueSDK, isInitialized, connectedDevice]); // Re-run when SDK/device state changes
 
-  // 🎨 UI STATE DEBUG LOGGING
-  console.log('🎨 [UI STATE] ========================================');
-  console.log('🎨 [UI STATE] Render cycle - Current UI State:');
-  console.log('🎨 [UI STATE] - measurementState:', measurementState);
-  console.log('🎨 [UI STATE] - smoothAnimationPhase:', smoothAnimationPhase);
-  console.log('🎨 [UI STATE] - currentPressure:', currentPressure);
-  console.log('🎨 [UI STATE] - smoothPressure:', smoothPressure);
-  console.log('🎨 [UI STATE] - heartRate:', heartRate);
-  console.log('🎨 [UI STATE] - connectedDevice:', connectedDevice ? connectedDevice.name : 'NONE');
-  console.log('🎨 [UI STATE] ========================================');
+  // 🚨 REMOVED: UI STATE DEBUG LOGGING - was cluttering logs
 
   if (!connectedDevice) {
     console.log('🖥️ [UI RENDER] Showing: NO DEVICE CONNECTED SCREEN');
@@ -1163,9 +1231,6 @@ export const LiveBPMonitorRevamped: React.FC = () => {
     );
   }
 
-  console.log('🖥️ [UI RENDER] Showing: MAIN BP MONITOR SCREEN');
-  console.log('🖥️ [UI RENDER] - Current measurement state:', measurementState);
-  console.log('🖥️ [UI RENDER] - UI will show as:', measurementState === 'idle' ? 'READY TO MEASURE' : measurementState === 'inflating' ? 'INFLATING (BLUE BAR RISING)' : measurementState === 'deflating' ? 'DEFLATING (YELLOW BAR FALLING)' : measurementState === 'analyzing' ? 'ANALYZING' : measurementState === 'complete' ? 'COMPLETE WITH RESULTS' : measurementState);
 
   return (
     <div className="min-h-screen bg-slate-900 text-white w-full">
@@ -1214,21 +1279,49 @@ export const LiveBPMonitorRevamped: React.FC = () => {
 
               {/* Measuring Display with Heart Beating Effect */}
               <div className="flex-1 min-h-[280px] flex flex-col items-center justify-center">
-                {/* Measuring Text with Continuous Heart Beating Animation */}
-                {smoothAnimationPhase !== 'idle' && smoothAnimationPhase !== 'complete' ? (
-                  <div className="text-center">
-                    <div className="flex items-center justify-center gap-3 mb-4">
-                      <span className="text-4xl font-bold text-blue-400 animate-pulse">Measuring</span>
-                      <span className="text-5xl animate-pulse" style={{ animation: 'heartbeat 1.5s ease-in-out infinite' }}>🩸</span>
+                {/* 🔒 GOD MODE: Check session lock BEFORE checking state - if locked, ALWAYS show measuring */}
+                {(() => {
+                  const isLocked = isMeasurementSessionLockedRef.current;
+                  const isActiveState = measurementState === 'inflating' || 
+                                       measurementState === 'deflating' || 
+                                       measurementState === 'analyzing' ||
+                                       measurementState === 'measuring' ||
+                                       measurementState === 'starting';
+                  const hasPressure = currentPressureRef.current > 0 || currentPressure > 0;
+                  
+                  // 🔒 GOD MODE: If session is LOCKED, FORCE "measuring" display regardless of state
+                  if (isLocked || isActiveState || hasPressure) {
+                    if (!isLocked && !isActiveState && hasPressure) {
+                      console.log('🔒 [RENDER FIX] Session not locked but pressure > 0 - showing measuring');
+                    }
+                    if (isLocked) {
+                      console.log('🔒 [SESSION LOCK RENDER] Session LOCKED - FORCING measuring display');
+                    }
+                    return (
+                      <div className="text-center">
+                        <div className="flex items-center justify-center gap-3 mb-4">
+                          <span className="text-4xl font-bold text-blue-400 animate-pulse">Measuring</span>
+                          <span className="text-5xl animate-pulse" style={{ animation: 'heartbeat 1.5s ease-in-out infinite' }}>🩸</span>
+                        </div>
+                        <div className="text-lg text-blue-300">Blood Pressure in Progress</div>
+                      </div>
+                    );
+                  }
+                  
+                  // Only show "Ready" if session is NOT locked AND no active state AND no pressure
+                  console.log('🚨 [UI-STATE-RENDER] ⚠️⚠️⚠️ RENDERING "READY" TEXT ⚠️⚠️⚠️');
+                  console.log('🚨 [UI-STATE-RENDER] Session locked:', isLocked);
+                  console.log('🚨 [UI-STATE-RENDER] Current measurementState:', measurementState);
+                  console.log('🚨 [UI-STATE-RENDER] Current currentPressure:', currentPressure);
+                  console.log('🚨 [UI-STATE-RENDER] Current pressureRef:', currentPressureRef.current);
+                  console.log('🚨 [UI-STATE-RENDER] Timestamp:', new Date().toISOString());
+                  return (
+                    <div className="text-center text-gray-400">
+                      <div className="text-4xl font-bold mb-2">Ready</div>
+                      <div className="text-lg">Start measurement to begin</div>
                     </div>
-                    <div className="text-lg text-blue-300">Blood Pressure in Progress</div>
-                  </div>
-                ) : (
-                  <div className="text-center text-gray-400">
-                    <div className="text-4xl font-bold mb-2">Ready</div>
-                    <div className="text-lg">Start measurement to begin</div>
-                  </div>
-                )}
+                  );
+                })()}
                 
                 {/* Pressure Display Section Removed */}
                 
@@ -1241,25 +1334,34 @@ export const LiveBPMonitorRevamped: React.FC = () => {
             {/* Column 2: ENHANCED pressure bar with proper markings and height */}
             <div className="flex">
               <div className="w-9 rounded-[14px] p-1 bg-white/10 flex items-end relative">
-                {/* Pressure Bar Fill */}
+                {/* Pressure Bar Fill - Uses REAL device data only */}
+                {(() => {
+                  const calculatedHeight = Math.min(100, Math.max(0, (currentPressure / 200) * 100));
+                  // 🔍 LOGGING: Track pressure bar rendering
+                  if (calculatedHeight > 0 || currentPressure > 0) {
+                    console.log('📊 [PRESSURE-BAR-RENDER] Rendering pressure bar:', {
+                      currentPressure,
+                      calculatedHeight: `${calculatedHeight.toFixed(1)}%`,
+                      measurementState,
+                      timestamp: new Date().toISOString()
+                    });
+                  }
+                  return (
                 <div
                   className="w-7 rounded-[14px] transition-all duration-500 ease-out shadow-lg"
                   style={{ 
-                    height: `${(() => {
-                      const calculatedHeight = Math.min(100, Math.max(0, (smoothPressure / 200) * 100));
-                      return calculatedHeight;
-                    })()}%`,
-                    background: smoothAnimationPhase === 'inflating' 
+                        height: `${calculatedHeight}%`,
+                    background: measurementState === 'inflating' 
                       ? 'linear-gradient(180deg, #3b82f6 0%, #1d4ed8 100%)' // Blue going up
-                      : smoothAnimationPhase === 'deflating'
+                      : measurementState === 'deflating'
                       ? 'linear-gradient(180deg, #f59e0b 0%, #d97706 100%)' // Yellow going down
-                      : smoothAnimationPhase === 'peak'
-                      ? 'linear-gradient(180deg, #10b981 0%, #059669 100%)' // Green for peak
-                      : smoothAnimationPhase === 'complete'
-                      ? 'linear-gradient(180deg, #6b7280 0%, #4b5563 100%)' // Gray for complete
-                      : 'linear-gradient(180deg, #6b7280 0%, #4b5563 100%)' // Gray for idle
+                      : measurementState === 'completed' || measurementState === 'analyzing'
+                      ? 'linear-gradient(180deg, #10b981 0%, #059669 100%)' // Green for complete
+                      : 'linear-gradient(180deg, #6b7280 0%, #4b5563 100%)' // Gray for idle/ready
                   }}
                 />
+                  );
+                })()}
 
                 {/* 🎨 SMOOTH VISUAL: Clean pressure bar with no numerical markings (elderly-friendly) */}
                 <div className="absolute -right-4 top-0 bottom-0 flex flex-col justify-between">

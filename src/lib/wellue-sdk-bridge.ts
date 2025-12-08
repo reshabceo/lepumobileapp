@@ -102,8 +102,8 @@ export interface WellueSDKPlugin {
 }
 
 // Register the native plugin - Using Lepu SDK from official GitHub repository
-// Plugin name must match @CapacitorPlugin(name = "LepuSDK") in WelluePlugin.java
-const LepuSDK = registerPlugin<WellueSDKPlugin>('LepuSDK');
+// Plugin name must match CAP_PLUGIN registration in WellueSDKPlugin.m
+const LepuSDK = registerPlugin<WellueSDKPlugin>('WellueSDK');
 
 // BP Measurement Manager
 class BPMeasurementManager {
@@ -136,10 +136,8 @@ class BPMeasurementManager {
     private minPressureJump = 2; // Minimum pressure increase per update (mmHg)
     private pressureStabilizationTime = 200; // Time to stabilize pressure (ms)
 
-    // 🚨 NEW: Pressure timeout detection for abrupt stops
-    private pressureTimeoutInterval?: NodeJS.Timeout;
+    // Pressure timeout detection (disabled - now handled natively via pressure stability)
     private lastPressureUpdateTime = 0;
-    private pressureTimeoutThreshold = 2000; // 2 seconds without pressure updates = abrupt stop
     private lastRealPressureUpdate = 0; // Track when we last got actual BP pressure data
     
     constructor(callbacks: WellueSDKCallbacks) {
@@ -151,8 +149,15 @@ class BPMeasurementManager {
     }
 
     // 🚨 FIX: Add method to update callbacks without losing state
-    setCallbacks(callbacks: WellueSDKCallbacks) {
-        this.callbacks = callbacks;
+    setCallbacks(callbacks: Partial<WellueSDKCallbacks>) {
+        // 🚨 CRITICAL FIX: MERGE callbacks instead of replacing them
+        // Filter out undefined values to avoid overwriting existing callbacks with undefined
+        const definedCallbacks = Object.fromEntries(
+            Object.entries(callbacks).filter(([_, v]) => v !== undefined)
+        ) as Partial<WellueSDKCallbacks>;
+        
+        this.callbacks = { ...this.callbacks, ...definedCallbacks };
+        console.log('🔧 [BP MANAGER SET CALLBACKS] Merged callbacks. Current callbacks:', Object.keys(this.callbacks));
     }
 
     getStatus(): BPStatus {
@@ -166,12 +171,24 @@ class BPMeasurementManager {
     }
 
     startMeasurement() {
-        if (this.isMeasuring) return;
+        // ✅ CRITICAL FIX: Don't reset if we're actively measuring (status 4) - prevents reset during deflation!
+        // Only reset if we're truly in a 'complete' state AND not currently measuring
+        if (this.status === 'complete' && !this.isMeasuring) {
+            console.log('🔄 Resetting from previous complete measurement before starting new one');
+            this.reset();
+        }
+        
+        if (this.isMeasuring) {
+            console.log('🩺 Measurement already in progress, continuing...');
+            return;
+        }
         
         console.log('🚀 BP Measurement Manager: Starting measurement');
         this.isMeasuring = true;
         this.status = 'starting';
         this.currentPressure = 0;
+        // ✅ FIX 5: Keep lastMeasurement visible - only clear error
+        // this.lastMeasurement = undefined; // ❌ DON'T CLEAR - keep visible until new measurement completes
         this.error = undefined;
         this.measurementStartTime = Date.now();
         
@@ -187,17 +204,19 @@ class BPMeasurementManager {
         this.pressureUpdateQueue = [];
         this.isProcessingPressure = false;
         
-        // 🚨 NEW: Reset pressure timeout tracking
+        // 🚨 Reset pressure timeout tracking
         this.lastPressureUpdateTime = Date.now();
         this.lastRealPressureUpdate = Date.now(); // Initialize real pressure timestamp
         
         // 🚀 SIMPLIFIED: No artificial progress monitoring - let real pressure updates drive the display
         console.log('🚀 BP Measurement started - pressure bar will follow real device data');
         
-        // 🚨 NEW: Start pressure timeout monitoring
-        console.log('🚨 [START] About to call startPressureTimeoutMonitoring()');
-        this.startPressureTimeoutMonitoring();
-        console.log('🚨 [START] startPressureTimeoutMonitoring() called');
+        // ❌ DISABLED: Pressure timeout monitoring - was aborting measurements before status 5
+        // The app MUST wait for native status 5 detection, not force a timeout
+        // console.log('🚨 [START] About to call startPressureTimeoutMonitoring()');
+        // this.startPressureTimeoutMonitoring();
+        // console.log('🚨 [START] startPressureTimeoutMonitoring() called');
+        console.log('✅ [START] Pressure timeout DISABLED - will wait for native status 5 detection');
         
         this.callbacks.onBPStatusChanged?.(this.getStatus());
     }
@@ -206,29 +225,30 @@ class BPMeasurementManager {
         const previousPressure = this.currentPressure;
         this.currentPressure = pressure;
         
-        // 🚨 NEW: Reset pressure timeout timer on each update
+        // 🚨 NEW: Reset pressure update timer on each update
         this.lastPressureUpdateTime = Date.now();
-        
-        // 🚨 NEW: Only update real pressure timestamp for actual BP pressure data (not other real-time updates)
+
+        // 🚨 NEW: Track pressure stability for completion detection
         if (pressure > 0 && (status === 'inflating' || status === 'deflating' || status === 'measuring')) {
             this.lastRealPressureUpdate = Date.now();
-            console.log('🚨 [PRESSURE] Real BP pressure update:', pressure, 'mmHg, updating timeout timer');
+            // Pressure stability detection now handled natively in iOS for more accurate timing
         }
         
-        console.log('🚨 [BP MANAGER] ===== UPDATE PROGRESS =====');
-        console.log('🚨 [BP MANAGER] Input pressure:', pressure, 'mmHg');
-        console.log('🚨 [BP MANAGER] Input status:', status);
-        console.log('🚨 [BP MANAGER] Previous pressure:', previousPressure, 'mmHg');
-        console.log('🚨 [BP MANAGER] Pressure change:', pressure - previousPressure, 'mmHg');
-        console.log('🚨 [BP MANAGER] Is measuring:', this.isMeasuring);
-        console.log('🚨 [BP MANAGER] Timestamp:', new Date().toISOString());
-        console.log('🚨 [BP MANAGER] Last real pressure update:', new Date(this.lastRealPressureUpdate).toISOString());
-        
-        // 🚀 SIMPLIFIED: Start measurement if not already started
-        if (!this.isMeasuring && pressure > 0) {
-            console.log('🚨 [START] Detected pressure > 0, calling startMeasurement()');
-            this.startMeasurement();
+        // Only log significant pressure changes (every 20 mmHg)
+        if (pressure % 20 === 0 && pressure > 0 && pressure !== previousPressure) {
+            console.log(`🚨 [BP MANAGER] Pressure: ${pressure} mmHg (${status})`);
         }
+        
+        // ✅ CRITICAL FIX: Don't auto-start measurement from pressure updates!
+        // Pressure updates can arrive DURING deflation of a new measurement while status is still 'complete'
+        // Only native status 4 detection should trigger startMeasurement() to prevent premature resets
+        // This prevents reset to 'ready' during deflation when pressure updates arrive
+        
+        // ❌ REMOVED: Auto-start on pressure > 0 - was causing resets during deflation
+        // if (!this.isMeasuring && pressure > 0) {
+        //     console.log('🚨 [START] Detected pressure > 0, calling startMeasurement()');
+        //     this.startMeasurement();
+        // }
         
         // 🚀 SIMPLIFIED: Update status based on pressure patterns (not complex phase detection)
         let actualStatus: BPProgress['status'] = 'measuring';
@@ -450,6 +470,12 @@ class BPMeasurementManager {
 
         this.callbacks.onBPMeasurement?.(measurement);
         this.callbacks.onBPStatusChanged?.(this.getStatus());
+        
+        // ✅ FIX 2: NO auto-transition to ready - keep status as 'complete' so results stay visible
+        // Status will only change when:
+        // 1. User explicitly starts new measurement (handled in startMeasurement), OR
+        // 2. Device status changes to 3 (handled in native Swift code)
+        console.log('✅ Results displayed - status remains "complete" until next measurement starts');
     }
 
     setError(error: string, details?: any) {
@@ -475,15 +501,17 @@ class BPMeasurementManager {
     }
 
     reset() {
-        console.log('🔄 BP Measurement Manager: Resetting');
+        console.log('🔄 BP Measurement Manager: Resetting to ready state');
         this.isMeasuring = false;
-        this.status = 'idle';
+        this.status = 'ready';  // ✅ PRODUCTION FIX: Reset to 'ready', not 'idle'
         this.currentPressure = 0;
         this.error = undefined;
         this.measurementPhase = 'idle';
+        // ✅ FIX 5: KEEP lastMeasurement so results remain visible after reset!
+        // DO NOT clear lastMeasurement - it should persist even after reset
         
         // 🚨 NEW: Clear pressure timeout monitoring
-        this.clearPressureTimeoutMonitoring();
+        this.clearPressureStabilityMonitoring();
         
         if (this.progressInterval) {
             clearInterval(this.progressInterval);
@@ -495,6 +523,7 @@ class BPMeasurementManager {
         this.pressureUpdateQueue = [];
         this.isProcessingPressure = false;
         
+        console.log('✅ [BP MANAGER] Reset complete, ready for next measurement');
         this.callbacks.onBPStatusChanged?.(this.getStatus());
     }
 
@@ -505,7 +534,7 @@ class BPMeasurementManager {
         this.measurementPhase = 'complete';
         
         // 🚨 NEW: Clear pressure timeout monitoring
-        this.clearPressureTimeoutMonitoring();
+        this.clearPressureStabilityMonitoring();
         
         // 🚨 SAFETY: Reset safety controls
         this.lastDisplayedPressure = 0;
@@ -529,7 +558,7 @@ class BPMeasurementManager {
         this.measurementPhase = 'ready';
         
         // 🚨 NEW: Clear pressure timeout monitoring
-        this.clearPressureTimeoutMonitoring();
+        this.clearPressureStabilityMonitoring();
         
         if (this.progressInterval) {
             clearInterval(this.progressInterval);
@@ -540,7 +569,7 @@ class BPMeasurementManager {
     }
 
             // 🚨 NEW: Start pressure timeout monitoring for abrupt stop detection
-    private startPressureTimeoutMonitoring() {
+    private startPressureStabilityMonitoring() {
         console.log('🚨 [TIMEOUT] Starting pressure timeout monitoring');
         console.log('🚨 [TIMEOUT] DEBUG: Method called successfully');
         
@@ -557,7 +586,7 @@ class BPMeasurementManager {
             if (!this.isMeasuring) {
                 // Measurement already stopped, clear timeout
                 console.log('🚨 [TIMEOUT] Measurement not active, clearing timeout');
-                this.clearPressureTimeoutMonitoring();
+                this.clearPressureStabilityMonitoring();
                 return;
             }
             
@@ -583,7 +612,7 @@ class BPMeasurementManager {
     }
     
     // 🚨 NEW: Clear pressure timeout monitoring
-    private clearPressureTimeoutMonitoring() {
+    private clearPressureStabilityMonitoring() {
         if (this.pressureTimeoutInterval) {
             clearInterval(this.pressureTimeoutInterval);
             this.pressureTimeoutInterval = undefined;
@@ -595,7 +624,7 @@ class BPMeasurementManager {
         console.log('🛑 Abrupt BP measurement stop detected');
         
         // Clear timeout monitoring
-        this.clearPressureTimeoutMonitoring();
+        this.clearPressureStabilityMonitoring();
         
         // Reset measurement state
         this.isMeasuring = false;
@@ -620,6 +649,7 @@ class BPMeasurementManager {
         
         console.log('🔄 BP Measurement Manager reset to idle state after abrupt stop');
     }
+
 }
 
 // Native Wellue Plugin Implementation
@@ -636,17 +666,36 @@ class NativeWelluePlugin {
         console.log('🚀 [LEPU SDK PLUGIN] Constructor called');
         console.log('🚀 [LEPU SDK PLUGIN] LepuSDK plugin object:', LepuSDK);
         console.log('🚀 [LEPU SDK PLUGIN] LepuSDK type:', typeof LepuSDK);
+        console.log('🚀 [LEPU SDK PLUGIN] Capacitor platform:', Capacitor.getPlatform());
+        console.log('🚀 [LEPU SDK PLUGIN] Is native platform:', Capacitor.isNativePlatform());
         
         this.nativePlugin = LepuSDK;
         console.log('🚀 [NATIVE WELLUE PLUGIN] Native plugin assigned:', !!this.nativePlugin);
         
+        // Enhanced diagnostic logging
+        console.log('🔍 [DIAGNOSTIC] Plugin methods available:');
+        const pluginKeys = Object.keys(this.nativePlugin || {});
+        console.log('🔍 [DIAGNOSTIC] Plugin has', pluginKeys.length, 'properties/methods');
+        console.log('🔍 [DIAGNOSTIC] Sample methods:', pluginKeys.slice(0, 10));
+        
         // Detect plugin availability on this platform to avoid noisy errors
         try {
             const anyCap = Capacitor as any;
-            const capSays = typeof anyCap.isPluginAvailable === 'function' ? anyCap.isPluginAvailable('LepuSDK') : undefined;
+            const capSays = typeof anyCap.isPluginAvailable === 'function' ? anyCap.isPluginAvailable('WellueSDK') : undefined;
             const hasMethods = this.nativePlugin && typeof (this.nativePlugin as any).initialize === 'function';
             this.pluginAvailable = (capSays === true) || (!!hasMethods && Capacitor.isNativePlatform());
+            
+            console.log('🔍 [DIAGNOSTIC] Capacitor.isPluginAvailable result:', capSays);
+            console.log('🔍 [DIAGNOSTIC] Has initialize method:', hasMethods);
             console.log('🚀 [NATIVE WELLUE PLUGIN] Plugin available check result:', this.pluginAvailable);
+            
+            if (!this.pluginAvailable) {
+                console.error('❌ [PLUGIN NOT AVAILABLE] The WellueSDK plugin is not registered with Capacitor!');
+                console.error('❌ This usually means:');
+                console.error('❌ 1. The iOS app needs to be rebuilt in Xcode');
+                console.error('❌ 2. Pod install failed or needs to be run');
+                console.error('❌ 3. The plugin files are not compiled into the binary');
+            }
         } catch (error) {
             console.log('⚠️ [NATIVE WELLUE PLUGIN] Plugin availability check failed, defaulting to true:', error);
             this.pluginAvailable = true;
@@ -738,9 +787,11 @@ class NativeWelluePlugin {
     }
 
     setCallbacks(callbacks: WellueSDKCallbacks) {
-        this.callbacks = callbacks;
+        // 🚨 CRITICAL FIX: MERGE callbacks instead of replacing them
+        this.callbacks = { ...this.callbacks, ...callbacks };
+        console.log('🔧 [SET CALLBACKS] Merged callbacks. onRealTimeUpdate exists:', !!this.callbacks.onRealTimeUpdate);
         // 🚨 FIX: Don't create new BP manager, just update callbacks
-        this.bpManager.setCallbacks(callbacks);
+        this.bpManager.setCallbacks(this.callbacks);
         if (this.activeDeviceId) {
             this.bpManager.setDevice(this.activeDeviceId);
         }
@@ -824,6 +875,15 @@ class NativeWelluePlugin {
             this.connectedDevices.set(data.deviceId, device);
             this.activeDeviceId = data.deviceId;
             this.bpManager.setDevice(data.deviceId);
+            
+            // 🚀 CRITICAL: Start real-time data polling to detect device-initiated measurements
+            console.log('🚀 [DEVICE CONNECTED] Starting RT task for device:', device.name);
+            if (this.nativePlugin.startRtTaskForConnectedDevice) {
+                this.nativePlugin.startRtTaskForConnectedDevice().catch((error: any) => {
+                    console.error('❌ Failed to start RT task:', error);
+                });
+            }
+            
             this.callbacks.onDeviceConnected?.(device);
         });
 
@@ -840,16 +900,25 @@ class NativeWelluePlugin {
         });
 
         // BP measurement event
+        let lastMeasurementTimestamp = 0;
         this.nativePlugin.addListener('bpMeasurement', (data: any) => {
             console.log('🩺 BP Measurement result received:', data);
+            
+            // ✅ PRODUCTION FIX: Debounce duplicate measurements (device sends multiple times)
+            const now = Date.now();
+            if (now - lastMeasurementTimestamp < 2000) {
+                console.log('⏭️  Skipping duplicate bpMeasurement (within 2s of last)');
+                return;
+            }
+            lastMeasurementTimestamp = now;
             
             const measurement: BPMeasurement = {
                 systolic: data.systolic,
                 diastolic: data.diastolic,
-                pulseRate: data.pulseRate || data.pulse,  // iOS sends 'pulse', map to 'pulseRate'
+                pulseRate: data.pulseRate || data.pulse,  // iOS sends 'pulse', Android sends 'pulseRate'
                 timestamp: new Date(),
-                quality: this.getQualityFromResult(data.result || data.state),
-                meanArterialPressure: data.map
+                quality: this.getQualityFromResult(data.result || data.state || data.stateCode),
+                meanArterialPressure: data.map || data.mean  // ✅ FIX: Android sends 'map', iOS sends 'mean'
             };
             
             console.log('✅ Processed BP measurement:', measurement);
@@ -857,6 +926,12 @@ class NativeWelluePlugin {
             
             // 🚨 FIX: Force status update to ensure UI receives the completion
             this.callbacks.onBPStatusChanged?.(this.bpManager.getStatus());
+            
+            // ✅ FIX 2: NO auto-reset - let user see results!
+            // Auto-reset will happen only when:
+            // 1. User explicitly starts new measurement, OR
+            // 2. Device status changes to 3 (ready) after completion
+            console.log('✅ Results displayed - NO auto-reset. User can see results indefinitely.');
         });
 
         // BP progress event (live pressure during measurement)
@@ -893,65 +968,112 @@ class NativeWelluePlugin {
                 switch (data.state) {
                     case 'ready':
                         console.log('🩺 Device ready for measurement');
-                        this.bpManager.setReady();
+                        
+                        // 🔒 GOD MODE: Check if measurement session is locked in React component
+                        // We need to check the actual UI state, not just BP Manager state
+                        // Since we can't directly access the React ref from here, we'll use a more aggressive check
+                        const currentStatus = this.bpManager.getStatus();
+                        
+                        // ✅ CRITICAL FIX: Check BOTH isMeasuring flag AND status field
+                        // During deflation, UI state is "measuring" - check status field to catch this
+                        const isActivelyMeasuring = currentStatus.isMeasuring || 
+                                                   currentStatus.status === 'measuring' || 
+                                                   currentStatus.status === 'inflating' || 
+                                                   currentStatus.status === 'deflating' ||
+                                                   currentStatus.status === 'starting' ||
+                                                   currentStatus.status === 'analyzing';
+                        
+                        // 🔒 GOD MODE: If actively measuring OR have results, COMPLETELY IGNORE ready event
+                        // This prevents bpLifecycle("ready") from resetting UI during measurement
+                        if (isActivelyMeasuring) {
+                            console.log('🔒 [SESSION LOCK] ⛔ bpLifecycle("ready") BLOCKED - Measurement in progress!');
+                            console.log('🔒 [SESSION LOCK] isMeasuring:', currentStatus.isMeasuring, 'status:', currentStatus.status);
+                            console.log('🔒 [SESSION LOCK] IGNORING ready event to prevent UI reset during measurement');
+                            return; // Exit early - measurement session is locked
+                        }
+                        
+                        // ✅ CRITICAL FIX: NEVER reset from complete state to ready - preserve results indefinitely
+                        // Check if we have lastMeasurement (indicates completion) instead of status === 'complete'
+                        if (currentStatus.lastMeasurement || currentStatus.status === 'complete' || currentStatus.status === 'completed') {
+                            console.log('🔒 [SESSION LOCK] ⛔ bpLifecycle("ready") BLOCKED - Results are visible!');
+                            console.log('✅ Results are visible - ignoring ready event to preserve completion state');
+                            return; // Exit early - don't process ready event when results are shown
+                        }
+                        
+                        // Only set ready if truly idle/ready (no active measurement, no results)
+                        if (!isActivelyMeasuring && !currentStatus.lastMeasurement && currentStatus.status !== 'complete' && currentStatus.status !== 'completed') {
+                            console.log('✅ [READY] Setting ready state - no active measurement, no results');
+                            this.bpManager.setReady();
+                        } else {
+                            console.log('🔒 [SESSION LOCK] ⛔ bpLifecycle("ready") BLOCKED - Conditions not met for ready state');
+                        }
                         break;
                     case 'measuring':
-                        console.log('🩺 Measurement started on device');
-                        // 🚨 FIX: Don't force start measurement, let pressure detection handle it
-                        // This prevents interference with pressure-based phase detection
-                        if (!this.bpManager.getStatus().isMeasuring) {
-                            console.log('🩺 Device-initiated measurement detected, setting to waiting state');
-                            this.bpManager.setReady(); // Reset to waiting state
+                        // ✅ PRODUCTION FIX: Start measurement when lifecycle says measuring
+                        const measuringStatus = this.bpManager.getStatus();
+                        console.log('🔍 [LIFECYCLE MEASURING] Measurement lifecycle event - current status:', measuringStatus);
+                        
+                        // ✅ CRITICAL FIX: If we have previous results but status 4 arrived, it means a NEW measurement is starting
+                        // Clear previous results to allow the new measurement to proceed
+                        if (measuringStatus.lastMeasurement && !measuringStatus.isMeasuring) {
+                            console.log('🔄 [NEW MEASUREMENT] Status 4 detected with previous results - clearing old results to start new measurement');
+                            this.bpManager.reset(); // Clear previous measurement state
+                        }
+                        
+                        if (!measuringStatus.isMeasuring) {
+                            console.log('🩺 Device-initiated measurement detected, starting measurement');
+                            this.bpManager.startMeasurement();
+                        } else {
+                            console.log('🩺 Measurement already in progress, continuing...');
                         }
                         break;
                     case 'complete':
-                        console.log('🩺 Measurement completed');
-                        this.bpManager.completeMeasurement();
+                        console.log('🩺 Measurement lifecycle complete - waiting for bpMeasurement event with results');
+                        // ✅ PRODUCTION FIX: Don't call completeMeasurement() here
+                        // Let the bpMeasurement event handle completion with actual data
+                        // Just ensure we're in the right state for receiving results
+                        if (this.bpManager.getStatus().isMeasuring) {
+                            console.log('🩺 Measurement still active, will complete when bpMeasurement arrives');
+                        }
                         break;
                 }
             }
         });
 
-        // Real-time update event
+        // Native log forwarding for diagnostics
+        this.nativePlugin.addListener('nativeLog', (data: any) => {
+            const prefix = data.level === 'error' ? '❌ [NATIVE]' : data.level === 'warn' ? '⚠️ [NATIVE]' : '🔵 [NATIVE]';
+            console.log(`${prefix} ${data.message}`);
+        });
+
+        // Real-time update event (reduced logging)
+        let lastLoggedStatus: number | undefined;
         this.nativePlugin.addListener('bp2Rt', (data: any) => {
-            console.log('📊 [BP2RT BRIDGE] Raw native data:', JSON.stringify(data));
-            console.log('📊 [BP2RT BRIDGE] Callbacks object exists:', !!this.callbacks);
-            console.log('📊 [BP2RT BRIDGE] onRealTimeUpdate exists:', !!this.callbacks?.onRealTimeUpdate);
-            
             // Map both iOS and Android field names
             const rtData: RealTimeData = {
-                // Pressure (iOS: pressure, Android: might be different)
-                pressure: data?.pressure !== undefined ? Math.round(data.pressure / 100) : undefined,
-                
-                // Heart rate / Pulse (iOS: pulse, Android: hr)
+                // Viatom SDK returns pressure in 0.1 mmHg units (e.g., 1250 = 125.0 mmHg)
+                pressure: data?.pressure !== undefined ? Math.round(data.pressure / 10) : undefined,
                 heartRate: data?.pulse || data?.hr,
                 pulse: data?.pulse || data?.hr,
-                
-                // Progress/percentage
                 progress: data?.percent,
-                
-                // Device status (iOS: status, Android: deviceStatus)
                 deviceStatus: data?.deviceStatus || data?.status,
                 status: data?.status || data?.deviceStatus,
-                
-                // Battery (iOS: batteryPercent, Android: batteryStatus)
                 batteryStatus: data?.batteryStatus || data?.batteryPercent,
                 batteryPercent: data?.batteryPercent || data?.batteryStatus,
-                
-                // Deflating indicator
                 isDeflating: data?.isDeflating,
-                
                 timestamp: new Date()
             };
             
-            console.log('📊 [BP2RT BRIDGE] Mapped rtData:', JSON.stringify(rtData));
-            console.log('📊 [BP2RT BRIDGE] About to call onRealTimeUpdate...');
+            // Only log status changes
+            if (rtData.deviceStatus !== lastLoggedStatus) {
+                console.log(`📊 [BP2RT] Status: ${rtData.deviceStatus}, Battery: ${rtData.batteryPercent}%`);
+                lastLoggedStatus = rtData.deviceStatus;
+            }
             
             if (this.callbacks?.onRealTimeUpdate) {
                 this.callbacks.onRealTimeUpdate(rtData);
-                console.log('📊 [BP2RT BRIDGE] ✅ onRealTimeUpdate called successfully');
-            } else {
-                console.log('📊 [BP2RT BRIDGE] ❌ onRealTimeUpdate callback not set!');
+            } else if (lastLoggedStatus === undefined) {
+                console.warn('⚠️ [BP2RT] onRealTimeUpdate callback not set');
             }
         });
 
@@ -1444,8 +1566,10 @@ export class WellueSDKBridge {
     }
 
     setCallbacks(callbacks: WellueSDKCallbacks) {
-        this.callbacks = callbacks;
-        this.plugin.setCallbacks(callbacks);
+        // 🚨 CRITICAL FIX: MERGE callbacks instead of replacing them
+        this.callbacks = { ...this.callbacks, ...callbacks };
+        console.log('🔧 [BRIDGE SET CALLBACKS] Merged callbacks. onRealTimeUpdate exists:', !!this.callbacks.onRealTimeUpdate);
+        this.plugin.setCallbacks(this.callbacks);
     }
 
     // 🚨 FIX: Add method to get current callbacks (for merging)
@@ -1458,12 +1582,65 @@ export class WellueSDKBridge {
     }
 
     async startRtTaskForConnectedDevice(): Promise<void> {
-        return this.plugin.startRtTaskForConnectedDevice();
+        console.log('🚀 [JS BRIDGE] startRtTaskForConnectedDevice() called');
+        console.log('🚀 [JS BRIDGE] Current state:', {
+            isInitialized: this.isInitialized,
+            pluginExists: !!this.plugin,
+            methodExists: !!this.plugin.startRtTaskForConnectedDevice
+        });
+        
+        if (!this.isInitialized) {
+            const error = new Error('SDK not initialized yet. Please wait for initialization to complete.');
+            console.error('❌ [JS BRIDGE] startRtTaskForConnectedDevice failed:', error.message);
+            throw error;
+        }
+        
+        if (!this.plugin.startRtTaskForConnectedDevice) {
+            const error = new Error('Native plugin method startRtTaskForConnectedDevice not available');
+            console.error('❌ [JS BRIDGE] startRtTaskForConnectedDevice failed:', error.message);
+            throw error;
+        }
+        
+        // ✅ FIX 6: Retry logic with exponential backoff for SDK deployment
+        const maxRetries = 4;
+        let retryCount = 0;
+        let delay = 1000; // Start with 1 second
+        
+        while (retryCount < maxRetries) {
+            try {
+                console.log(`🚀 [JS BRIDGE] Attempt ${retryCount + 1}/${maxRetries}: Calling native startRtTaskForConnectedDevice...`);
+                const result = await this.plugin.startRtTaskForConnectedDevice();
+                console.log('✅ [JS BRIDGE] startRtTaskForConnectedDevice() completed successfully:', result);
+                return result;
+            } catch (error: any) {
+                retryCount++;
+                const errorMessage = error?.message || String(error);
+                
+                // If SDK not ready, wait and retry
+                if (errorMessage.includes('SDK not ready') || errorMessage.includes('deployment')) {
+                    if (retryCount < maxRetries) {
+                        console.log(`⏳ [JS BRIDGE] SDK not ready (attempt ${retryCount}/${maxRetries}), waiting ${delay}ms before retry...`);
+                        await new Promise(resolve => setTimeout(resolve, delay));
+                        delay *= 2; // Exponential backoff: 1s, 2s, 4s, 8s
+                        continue;
+                    }
+                }
+                
+                // For other errors or max retries reached, throw
+                console.error(`❌ [JS BRIDGE] startRtTaskForConnectedDevice failed after ${retryCount} attempts:`, error);
+                throw error;
+            }
+        }
     }
 
     // BP Status methods
     getBPStatus(): BPStatus {
         return this.plugin.getBPStatus();
+    }
+
+    // ✅ FIX 1: Add getBPMeasurementStatus() for health check
+    getBPMeasurementStatus(): BPStatus {
+        return this.bpManager.getStatus();
     }
 
     forceBPStatusUpdate() {
