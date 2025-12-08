@@ -28,7 +28,12 @@ export const OTPVerification: React.FC<OTPVerificationProps> = ({
   useEffect(() => {
     // Focus first input on mount
     inputRefs.current[0]?.focus();
+    console.log('🔍 OTPVerification mounted with email:', email, 'type:', type);
   }, []);
+  
+  useEffect(() => {
+    console.log('📧 OTPVerification email prop changed:', email);
+  }, [email]);
 
   useEffect(() => {
     // Countdown timer for resend button
@@ -142,19 +147,41 @@ export const OTPVerification: React.FC<OTPVerificationProps> = ({
   };
 
   const handleResendOTP = async () => {
+    console.log('🔄 Resending OTP - email:', email, 'type:', type);
+    
+    if (!email || !email.trim()) {
+      toast({
+        title: "Error",
+        description: "Email address is missing. Please try signing up again.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     setResending(true);
     try {
       if (type === 'signup') {
-        const { error } = await supabase.auth.resend({
+        console.log('📧 Calling supabase.auth.resend with:', { type: 'signup', email });
+        const { data, error } = await supabase.auth.resend({
           type: 'signup',
           email
         });
-        if (error) throw error;
+        console.log('📧 Resend response - data:', data, 'error:', error);
+        if (error) {
+          console.error('❌ Resend error:', error);
+          throw error;
+        }
       } else {
-        const { error } = await supabase.auth.resetPasswordForEmail(email);
-        if (error) throw error;
+        console.log('📧 Calling resetPasswordForEmail with:', email);
+        const { data, error } = await supabase.auth.resetPasswordForEmail(email);
+        console.log('📧 Reset password response - data:', data, 'error:', error);
+        if (error) {
+          console.error('❌ Reset password error:', error);
+          throw error;
+        }
       }
 
+      console.log('✅ Resend successful!');
       toast({
         title: "Code Resent!",
         description: "A new verification code has been sent to your email.",
@@ -163,6 +190,7 @@ export const OTPVerification: React.FC<OTPVerificationProps> = ({
       setOtp(['', '', '', '', '', '']);
       inputRefs.current[0]?.focus();
     } catch (error) {
+      console.error('❌ Resend failed:', error);
       toast({
         title: "Resend Failed",
         description: error instanceof Error ? error.message : 'Failed to resend code',
