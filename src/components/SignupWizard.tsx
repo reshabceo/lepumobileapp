@@ -64,23 +64,53 @@ export const SignupWizard: React.FC<SignupWizardProps> = ({ onSwitchToLogin, onS
       console.log('💾 Saved currentStep to localStorage:', currentStep);
     }
   }, [currentStep]);
-  const [formData, setFormData] = useState<SignupData>({
-    name: '',
-    email: '',
-    password: '',
-    confirmPassword: '',
-    doctorCode: '',
-    dateOfBirth: '',
-    gender: '',
-    bloodType: '',
-    phoneNumber: '',
-    address: '',
-    medicalConditions: '',
-    allergies: '',
-    currentMedications: '',
-    emergencyContactName: '',
-    emergencyContactPhone: '',
-  });
+  
+  // Restore signup email from localStorage if awaiting OTP
+  const getInitialFormData = (): SignupData => {
+    const awaitingOTP = localStorage.getItem('awaiting_otp_verification') === 'true';
+    const savedEmail = localStorage.getItem('signup_email');
+    
+    if (awaitingOTP && savedEmail) {
+      console.log('🔄 Restoring signup email from localStorage:', savedEmail);
+      return {
+        name: '',
+        email: savedEmail,
+        password: '',
+        confirmPassword: '',
+        doctorCode: '',
+        dateOfBirth: '',
+        gender: '',
+        bloodType: '',
+        phoneNumber: '',
+        address: '',
+        medicalConditions: '',
+        allergies: '',
+        currentMedications: '',
+        emergencyContactName: '',
+        emergencyContactPhone: '',
+      };
+    }
+    
+    return {
+      name: '',
+      email: '',
+      password: '',
+      confirmPassword: '',
+      doctorCode: '',
+      dateOfBirth: '',
+      gender: '',
+      bloodType: '',
+      phoneNumber: '',
+      address: '',
+      medicalConditions: '',
+      allergies: '',
+      currentMedications: '',
+      emergencyContactName: '',
+      emergencyContactPhone: '',
+    };
+  };
+  
+  const [formData, setFormData] = useState<SignupData>(getInitialFormData());
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   
@@ -88,6 +118,17 @@ export const SignupWizard: React.FC<SignupWizardProps> = ({ onSwitchToLogin, onS
   const { signup } = useAuth();
 
   const steps = ['Basic Info', 'Personal Details', 'Medical Info', 'Verify Email'];
+  
+  // Sync email from localStorage when on step 4 (OTP verification)
+  React.useEffect(() => {
+    if (currentStep === 4) {
+      const savedEmail = localStorage.getItem('signup_email');
+      if (savedEmail && !formData.email) {
+        console.log('🔄 Syncing email from localStorage to formData:', savedEmail);
+        setFormData(prev => ({ ...prev, email: savedEmail }));
+      }
+    }
+  }, [currentStep]); // Only depend on currentStep to avoid infinite loops
 
   const validateDoctorCode = async (doctorCode: string): Promise<boolean> => {
     try {
@@ -288,7 +329,8 @@ export const SignupWizard: React.FC<SignupWizardProps> = ({ onSwitchToLogin, onS
       // This must happen synchronously before any async operations
       signupInProgressRef.current = true;
       localStorage.setItem('awaiting_otp_verification', 'true');
-      console.log('✅ awaiting_otp_verification flag set to true, signupInProgressRef set to true');
+      localStorage.setItem('signup_email', formData.email); // Save email NOW, before signup
+      console.log('✅ awaiting_otp_verification flag set to true, signupInProgressRef set to true, email saved:', formData.email);
       
       const success = await signup(formData.email, formData.password, formData.name, normalizedDoctorCode, additionalData);
 
@@ -306,7 +348,8 @@ export const SignupWizard: React.FC<SignupWizardProps> = ({ onSwitchToLogin, onS
         setLoading(false);
         setCurrentStep(4);
         localStorage.setItem('signup_current_step', '4');
-        console.log('✅ State updated - currentStep is now 4, saved to localStorage');
+        localStorage.setItem('signup_email', formData.email); // Save email for OTP verification
+        console.log('✅ State updated - currentStep is now 4, email saved to localStorage');
         
         // Show toast after a brief delay
         setTimeout(() => {
@@ -355,77 +398,32 @@ export const SignupWizard: React.FC<SignupWizardProps> = ({ onSwitchToLogin, onS
     }
   };
 
-  // OTP Verification handler
+  // OTP Verification handler - ONLY confirm email, don't create profile yet
   const handleOTPVerified = async () => {
     try {
-      console.log('🔍 OTP verified - creating patient profile...');
-      
-      // Get the current user after OTP verification
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
-      
-      if (userError || !user) {
-        console.error('❌ Failed to get user after OTP verification:', userError);
-        throw new Error('Failed to get user information');
-      }
-
-      // Create patient profile after successful OTP verification
-      const normalizedDoctorCode = formData.doctorCode.trim().toUpperCase();
-      const additionalData = {
-        dateOfBirth: formData.dateOfBirth,
-        gender: formData.gender,
-        bloodType: formData.bloodType,
-        address: formData.address,
-        phoneNumber: formData.phoneNumber,
-        emergencyContactName: formData.emergencyContactName,
-        emergencyContactPhone: formData.emergencyContactPhone,
-        allergies: formData.allergies,
-        medicalConditions: formData.medicalConditions,
-        currentMedications: formData.currentMedications,
-        profilePictureUrl: ''
-      };
-
-      // Create patient profile in your database
-      const { data: profileResult, error: profileError } = await db.createPatientProfile(
-        user.id,
-        formData.name,
-        formData.email,
-        normalizedDoctorCode,
-        additionalData
-      );
-
-      if (profileError || !profileResult || !profileResult.success) {
-        console.error('❌ Patient profile creation error:', profileError);
-        toast({
-          title: "Profile Creation Failed",
-          description: "Your email is verified but profile creation failed. Please contact support.",
-          variant: "destructive",
-        });
-      } else {
-        console.log('✅ Patient profile created:', profileResult);
-      }
+      console.log('✅ OTP verified - email confirmed!');
 
       toast({
         title: "Email Verified!",
-        description: "Your account has been successfully verified. You can now log in.",
+        description: "Your email has been confirmed. Please login to continue.",
       });
       
-      // Sign out the user immediately after OTP verification
-      await supabase.auth.signOut();
-      
-      // Clear ALL pending data from localStorage
+      // Clean up signup state
+      signupInProgressRef.current = false;
+      localStorage.removeItem('awaiting_otp_verification');
+      localStorage.removeItem('signup_current_step');
+      localStorage.removeItem('signup_email');
       localStorage.removeItem('pending_doctor_code');
       localStorage.removeItem('pending_user_name');
       localStorage.removeItem('pending_patient_data');
       localStorage.removeItem('from_otp_verification');
-      localStorage.removeItem('awaiting_otp_verification');
-      localStorage.removeItem('signup_current_step');
       
       console.log('✅ OTP verification complete - redirecting to login...');
       
-      // Reset form and go back to login after delay
+      // Reset form and go back to login
       setTimeout(() => {
         onSwitchToLogin();
-      }, 2000);
+      }, 1500);
     } catch (error) {
       console.error('❌ Error after OTP verification:', error);
       toast({
@@ -509,6 +507,7 @@ export const SignupWizard: React.FC<SignupWizardProps> = ({ onSwitchToLogin, onS
       if (!awaitingOTP) {
         signupInProgressRef.current = false;
         localStorage.removeItem('signup_current_step');
+        localStorage.removeItem('signup_email');
       }
     };
   }, []);

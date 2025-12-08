@@ -185,21 +185,24 @@ export const SignupStep2: React.FC<SignupStep2Props> = ({
       </div>
 
       {/* Date of Birth */}
-      <div className="relative group">
-        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-          <Calendar className="text-gray-400 group-focus-within:text-blue-400 transition-colors duration-300" size={20} />
+      <div className="space-y-2">
+        <label className="text-sm font-medium text-gray-300 ml-1">Date of Birth</label>
+        <div className="relative group">
+          <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+            <Calendar className="text-gray-400 group-focus-within:text-blue-400 transition-colors duration-300" size={20} />
+          </div>
+          <input
+            type="date"
+            name="dateOfBirth"
+            value={formData.dateOfBirth}
+            onChange={(e) => updateFormData({ dateOfBirth: e.target.value })}
+            className={`w-full pl-12 pr-4 py-4 bg-black/30 backdrop-blur-sm text-white border border-white/20 rounded-2xl focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all duration-300 ${
+              errors.dateOfBirth ? 'border-red-500/50 focus:ring-red-500/50 focus:border-red-500/50' : ''
+            }`}
+            aria-label="Date of Birth"
+            required
+          />
         </div>
-        <input
-          type="date"
-          name="dateOfBirth"
-          value={formData.dateOfBirth}
-          onChange={(e) => updateFormData({ dateOfBirth: e.target.value })}
-          className={`w-full pl-12 pr-4 py-4 bg-black/30 backdrop-blur-sm text-white border border-white/20 rounded-2xl focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all duration-300 ${
-            errors.dateOfBirth ? 'border-red-500/50 focus:ring-red-500/50 focus:border-red-500/50' : ''
-          }`}
-          aria-label="Date of Birth"
-          required
-        />
         {errors.dateOfBirth && (
           <p className="text-red-300 text-xs mt-2 ml-1">{errors.dateOfBirth}</p>
         )}
