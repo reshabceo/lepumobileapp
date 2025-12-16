@@ -766,8 +766,7 @@ export const HealthDashboard = () => {
                   <button
                     onClick={() => {
                       setIsDropdownOpen(false);
-                      // Temporary routing for profile settings until a dedicated page exists
-                      navigate('/doctor-assignment');
+                      navigate('/profile');
                     }}
                     className="w-full flex items-center space-x-3 px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-[#30363D] rounded-md transition-colors duration-200"
                   >
@@ -1001,7 +1000,7 @@ export const HealthDashboard = () => {
               )}
 
               {/* CGM Device Status */}
-              {cgmConnected ? (
+              {/* {cgmConnected ? (
                 <div className="mb-2 p-2 bg-blue-500/10 border border-blue-500/20 rounded-lg">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
@@ -1046,10 +1045,10 @@ export const HealthDashboard = () => {
                     </button>
                   </div>
                 </div>
-              )}
+              )} */}
 
               {/* Camera Device Status */}
-              {cameraConnected ? (
+              {/* {cameraConnected ? (
                 <div className="p-2 bg-purple-500/10 border border-purple-500/20 rounded-lg">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
@@ -1094,7 +1093,7 @@ export const HealthDashboard = () => {
                     </button>
                   </div>
                 </div>
-              )}
+              )} */}
             </div>
 
             {/* Compact Status Summary (Always Visible) */}
