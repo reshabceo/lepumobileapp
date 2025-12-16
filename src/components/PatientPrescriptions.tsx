@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { toast } from 'sonner';
-import { Pill, Clock, Calendar, AlertCircle, CheckCircle, Bell, BellOff } from 'lucide-react';
+import { Pill, Clock, Calendar, AlertCircle, CheckCircle, Bell, BellOff, ArrowLeft } from 'lucide-react';
 import { format, isPast, parseISO } from 'date-fns';
 
 interface Prescription {
@@ -28,6 +29,7 @@ interface Reminder {
 }
 
 export const PatientPrescriptions = () => {
+  const navigate = useNavigate();
   const [prescriptions, setPrescriptions] = useState<Prescription[]>([]);
   const [reminders, setReminders] = useState<Reminder[]>([]);
   const [loading, setLoading] = useState(true);
@@ -163,16 +165,29 @@ export const PatientPrescriptions = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-emerald-900 to-slate-900 p-4 pb-20">
-      <div className="max-w-4xl mx-auto">
-        {/* Header */}
-        <div className="mb-6">
-          <h1 className="text-2xl sm:text-3xl font-bold text-white flex items-center gap-3">
-            <Pill className="w-8 h-8 text-emerald-400" />
-            My Prescriptions
-          </h1>
-          <p className="text-emerald-200/80 mt-2">View and manage your medication prescriptions</p>
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-emerald-900 to-slate-900">
+      {/* Header with Back Button */}
+      <div className="bg-slate-800/50 backdrop-blur-sm border-b border-slate-700">
+        <div className="relative flex items-center justify-between p-4" style={{ paddingTop: 'max(1rem, env(safe-area-inset-top))' }}>
+          <button
+            onClick={() => navigate(-1)}
+            className="flex items-center gap-2 px-3 py-2 text-white bg-blue-600 hover:bg-blue-700 transition-colors touch-manipulation rounded-lg"
+            style={{ minHeight: '40px', minWidth: '70px' }}
+          >
+            <ArrowLeft className="h-4 w-4" />
+            <span className="text-sm">Back</span>
+          </button>
+          <h1 className="absolute left-1/2 transform -translate-x-1/2 text-xl font-semibold text-white">Prescriptions</h1>
+          <div className="w-16" />
         </div>
+      </div>
+
+      <div className="p-4 pb-20">
+        <div className="max-w-4xl mx-auto">
+          {/* Header */}
+          <div className="mb-6">
+            <p className="text-emerald-200/80 mt-2">View and manage your medication prescriptions</p>
+          </div>
 
         {/* Tabs */}
         <div className="flex gap-2 mb-6">
@@ -347,6 +362,7 @@ export const PatientPrescriptions = () => {
             })}
           </div>
         )}
+        </div>
       </div>
     </div>
   );

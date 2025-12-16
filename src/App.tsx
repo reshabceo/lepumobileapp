@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { DeviceProvider } from "./contexts/DeviceContext";
 import { AuthProvider } from "./contexts/AuthContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
@@ -36,8 +36,15 @@ import AIDoctorPage from "./pages/AIDoctorPage";
 import PatientInsuranceClaims from "./components/PatientInsuranceClaims";
 import { ManualVitalInput } from "./components/ManualVitalInput";
 import { PatientPrescriptions } from "./components/PatientPrescriptions";
+import Profile from "./pages/Profile";
 
 const queryClient = new QueryClient();
+
+const ChatSupportOnDashboard = () => {
+  const location = useLocation();
+  if (location.pathname !== "/dashboard") return null;
+  return <ChatSupport />;
+};
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -48,7 +55,7 @@ const App = () => (
           <Sonner />
           <BrowserRouter>
             <GlobalVideoCallNotification />
-            <ChatSupport />
+            <ChatSupportOnDashboard />
             <Routes>
               {/* Public routes */}
               <Route path="/" element={
@@ -171,6 +178,11 @@ const App = () => (
               <Route path="/prescriptions" element={
                 <ProtectedRoute>
                   <PatientPrescriptions />
+                </ProtectedRoute>
+              } />
+              <Route path="/profile" element={
+                <ProtectedRoute>
+                  <Profile />
                 </ProtectedRoute>
               } />
 
