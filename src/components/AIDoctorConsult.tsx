@@ -1,9 +1,10 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { runAIDoctorConsult, AIDoctorMessage } from "@/services/aiDoctorService";
+import { runAIDoctorConsult, AIDoctorMessage, UploadedFile } from "@/services/aiDoctorService";
 import { useAuth } from "@/contexts/AuthContext";
 import { db } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
+import ReactMarkdown from "react-markdown";
 import {
   AlertTriangle,
   Loader2,
@@ -12,6 +13,10 @@ import {
   ShieldAlert,
   Activity,
   ArrowLeft,
+  Paperclip,
+  X,
+  FileText,
+  Image as ImageIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -25,6 +30,13 @@ interface PatientContext {
   medications?: string;
 }
 
+interface AttachedFile {
+  name: string;
+  type: string;
+  data: string; // base64
+  preview?: string; // for images
+}
+
 export const AIDoctorConsult: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -34,7 +46,9 @@ export const AIDoctorConsult: React.FC = () => {
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [hasStarted, setHasStarted] = useState(false);
+  const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Load basic patient context for better answers
   useEffect(() => {
@@ -90,47 +104,144 @@ export const AIDoctorConsult: React.FC = () => {
     }, 0);
   };
 
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    const newFiles: AttachedFile[] = [];
+    
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      
+      // Check file size (max 10MB)
+      if (file.size > 10 * 1024 * 1024) {
+        toast({
+          title: "File too large",
+          description: `${file.name} is larger than 10MB. Please choose a smaller file.`,
+          variant: "destructive",
+        });
+        continue;
+      }
+
+      // Check file type
+      const allowedTypes = [
+        'image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp',
+        'application/pdf',
+        'application/msword',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'text/plain'
+      ];
+
+      if (!allowedTypes.includes(file.type)) {
+        toast({
+          title: "Unsupported file type",
+          description: `${file.name} is not a supported format. Please use images, PDFs, or documents.`,
+          variant: "destructive",
+        });
+        continue;
+      }
+
+      try {
+        const base64 = await fileToBase64(file);
+        const attached: AttachedFile = {
+          name: file.name,
+          type: file.type,
+          data: base64,
+        };
+
+        // Generate preview for images
+        if (file.type.startsWith('image/')) {
+          attached.preview = `data:${file.type};base64,${base64}`;
+        }
+
+        newFiles.push(attached);
+      } catch (err) {
+        console.error('Failed to read file:', err);
+        toast({
+          title: "Upload failed",
+          description: `Could not read ${file.name}. Please try again.`,
+          variant: "destructive",
+        });
+      }
+    }
+
+    setAttachedFiles((prev) => [...prev, ...newFiles]);
+    
+    // Clear the input so the same file can be selected again
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result as string;
+        // Remove the data URL prefix to get just the base64 string
+        const base64 = result.split(',')[1];
+        resolve(base64);
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const removeFile = (index: number) => {
+    setAttachedFiles((prev) => prev.filter((_, i) => i !== index));
+  };
+
   const handleSend = async () => {
-    if (!input.trim() || isLoading) return;
+    if ((!input.trim() && attachedFiles.length === 0) || isLoading) return;
 
     const patientMessage: AIDoctorMessage = {
       role: "patient",
-      content: input.trim(),
+      content: input.trim() || "(Sent medical files for review)",
     };
 
     addMessage(patientMessage);
+    
+    const messageCopy = input.trim();
+    const filesCopy = [...attachedFiles];
+    
     setInput("");
+    setAttachedFiles([]);
     setIsLoading(true);
     setHasStarted(true);
 
     try {
+      const uploadedFiles: UploadedFile[] = filesCopy.map(f => ({
+        mimeType: f.type,
+        data: f.data,
+      }));
+
       const response = await runAIDoctorConsult({
         patientId: patientContext.id,
         age: patientContext.age,
         sex: patientContext.sex,
-        symptoms: input.trim(),
+        symptoms: messageCopy,
         medicalHistory: patientContext.medicalHistory,
         medications: patientContext.medications,
         messages,
+        files: uploadedFiles.length > 0 ? uploadedFiles : undefined,
       });
 
+      // Handle new conversational format OR legacy format
       const aiText =
+        response.response ||
         response.answerForPatient ||
         "I was not able to clearly understand your situation. Please describe your symptoms again with as much detail as possible.";
 
       const safetyPrefix =
         response.triageLevel === "emergency"
-          ? "This sounds potentially serious. If you have severe symptoms, difficulty breathing, chest pain, confusion, or feel very unwell, seek emergency medical care immediately.\n\n"
+          ? "⚠️ EMERGENCY: This sounds potentially serious. If you have severe symptoms, difficulty breathing, chest pain, confusion, or feel very unwell, seek emergency medical care immediately.\n\n"
           : response.triageLevel === "urgent"
-          ? "Your symptoms may need prompt evaluation by a doctor. Please contact your doctor or local clinic as soon as you can.\n\n"
+          ? "⚠️ URGENT: Your symptoms may need prompt evaluation by a doctor. Please contact your doctor or local clinic as soon as you can.\n\n"
           : "";
 
       addMessage({
         role: "ai",
-        content: `${safetyPrefix}${aiText}\n\n${
-          response.disclaimer ||
-          "This information is provided by an AI medical assistant and is not a diagnosis or a substitute for seeing a real doctor."
-        }`,
+        content: `${safetyPrefix}${aiText}`,
       });
     } catch (err) {
       console.error("AI doctor consult failed:", err);
@@ -263,13 +374,33 @@ export const AIDoctorConsult: React.FC = () => {
             }`}
           >
             <div
-              className={`max-w-[80%] rounded-2xl px-3 py-2 text-sm whitespace-pre-line leading-relaxed ${
+              className={`max-w-[80%] rounded-2xl px-3 py-2 text-sm leading-relaxed ${
                 msg.role === "patient"
                   ? "bg-emerald-500 text-black rounded-br-sm"
                   : "bg-white/5 text-white border border-white/10 rounded-bl-sm"
               }`}
             >
-              {msg.content}
+              {msg.role === "patient" ? (
+                <div className="whitespace-pre-line">{msg.content}</div>
+              ) : (
+                <div className="markdown-content">
+                  <ReactMarkdown
+                    components={{
+                      p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+                      strong: ({ children }) => <strong className="font-bold text-emerald-300">{children}</strong>,
+                      em: ({ children }) => <em className="italic">{children}</em>,
+                      ul: ({ children }) => <ul className="list-disc ml-4 mb-2 space-y-1">{children}</ul>,
+                      ol: ({ children }) => <ol className="list-decimal ml-4 mb-2 space-y-1">{children}</ol>,
+                      li: ({ children }) => <li className="ml-1">{children}</li>,
+                      h1: ({ children }) => <h1 className="text-lg font-bold mb-2 text-emerald-300">{children}</h1>,
+                      h2: ({ children }) => <h2 className="text-base font-bold mb-2 text-emerald-300">{children}</h2>,
+                      h3: ({ children }) => <h3 className="text-sm font-bold mb-1 text-emerald-300">{children}</h3>,
+                    }}
+                  >
+                    {msg.content}
+                  </ReactMarkdown>
+                </div>
+              )}
             </div>
           </div>
         ))}
@@ -285,11 +416,64 @@ export const AIDoctorConsult: React.FC = () => {
       </div>
 
       <div className="border-t border-white/10 bg-black/60 backdrop-blur-md px-3 py-2">
+        {/* File Preview Section */}
+        {attachedFiles.length > 0 && (
+          <div className="mb-2 flex flex-wrap gap-2">
+            {attachedFiles.map((file, idx) => (
+              <div
+                key={idx}
+                className="relative flex items-center gap-2 rounded-lg bg-emerald-500/10 border border-emerald-500/30 px-3 py-2 text-xs"
+              >
+                {file.preview ? (
+                  <img
+                    src={file.preview}
+                    alt={file.name}
+                    className="h-10 w-10 rounded object-cover"
+                  />
+                ) : (
+                  <div className="flex h-10 w-10 items-center justify-center rounded bg-white/5">
+                    <FileText className="h-5 w-5 text-emerald-400" />
+                  </div>
+                )}
+                <div className="flex-1 min-w-0">
+                  <p className="text-white truncate max-w-[120px]">{file.name}</p>
+                  <p className="text-white/50 text-[10px]">
+                    {file.type.split('/')[1]?.toUpperCase()}
+                  </p>
+                </div>
+                <button
+                  onClick={() => removeFile(idx)}
+                  className="flex h-5 w-5 items-center justify-center rounded-full bg-red-500/20 text-red-400 hover:bg-red-500/30"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
         <div className="flex items-end gap-2">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*,.pdf,.doc,.docx,.txt"
+            multiple
+            onChange={handleFileSelect}
+            className="hidden"
+          />
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-[52px] w-[52px] rounded-2xl text-emerald-400 hover:bg-emerald-500/20 hover:text-emerald-300"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isLoading}
+          >
+            <Paperclip className="h-5 w-5" />
+          </Button>
           <Textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Describe your symptoms in as much detail as you can..."
+            placeholder="Describe your symptoms or attach medical reports..."
             className="min-h-[52px] max-h-32 resize-none bg-[#050816]/80 border-white/10 text-sm text-white placeholder:text-gray-500"
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
@@ -302,7 +486,7 @@ export const AIDoctorConsult: React.FC = () => {
             size="icon"
             className="h-[52px] w-[52px] rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-black"
             onClick={() => void handleSend()}
-            disabled={isLoading || !input.trim()}
+            disabled={isLoading || (!input.trim() && attachedFiles.length === 0)}
           >
             {isLoading ? (
               <Loader2 className="h-5 w-5 animate-spin" />
@@ -312,14 +496,19 @@ export const AIDoctorConsult: React.FC = () => {
           </Button>
         </div>
         <p className="mt-1 text-[10px] text-white/50">
-          This AI doctor uses Google DeepMind Med-Gemini for medical reasoning.
-          It is for information only and does not replace seeing a real doctor
-          or emergency services.
+          📎 Attach lab reports, X-rays, or medical documents (max 10MB each). This AI doctor uses Google Med-Gemini 2.5 Flash for medical reasoning.
         </p>
       </div>
     </div>
   );
 };
+
+
+
+
+
+
+
 
 
 
