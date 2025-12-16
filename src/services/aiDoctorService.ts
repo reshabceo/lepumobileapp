@@ -9,19 +9,25 @@ export interface AIDoctorMessage {
 }
 
 export interface AIDoctorConsultResponse {
-  answerForPatient: string;
-  possibleConditions: {
+  response?: string; // New conversational response format
+  answerForPatient?: string; // Legacy format
+  possibleConditions?: {
     name: string;
     likelihood: "low" | "medium" | "high";
     why: string;
     warningSigns: string[];
   }[];
-  triageLevel: AIDoctorTriageLevel;
-  triageAdvice: string;
-  redFlagSymptoms: string[];
-  followUpQuestions: string[];
-  recommendSeeingDoctor: boolean;
-  disclaimer: string;
+  triageLevel?: AIDoctorTriageLevel;
+  triageAdvice?: string;
+  redFlagSymptoms?: string[];
+  followUpQuestions?: string[];
+  recommendSeeingDoctor?: boolean;
+  disclaimer?: string;
+}
+
+export interface UploadedFile {
+  mimeType: string;
+  data: string; // base64 encoded
 }
 
 export interface AIDoctorConsultRequest {
@@ -34,6 +40,7 @@ export interface AIDoctorConsultRequest {
   medications?: string;
   reportsSummary?: string;
   messages?: AIDoctorMessage[];
+  files?: UploadedFile[];
 }
 
 const FUNCTION_NAME = "med-gemini-consult";
@@ -69,6 +76,13 @@ export async function runAIDoctorConsult(
       : new Error("Failed to contact AI doctor. Please try again.");
   }
 }
+
+
+
+
+
+
+
 
 
 
