@@ -396,8 +396,8 @@ export const AIDoctorConsult: React.FC = () => {
                       h2: ({ children }) => <h2 className="text-base font-bold mb-2 text-emerald-300">{children}</h2>,
                       h3: ({ children }) => <h3 className="text-sm font-bold mb-1 text-emerald-300">{children}</h3>,
                     }}
-                  >
-                    {msg.content}
+            >
+              {msg.content}
                   </ReactMarkdown>
                 </div>
               )}
