@@ -106,7 +106,7 @@ const PatientReportsView: React.FC = () => {
                 .from('patient_reports')
                 .select(`
           *,
-          doctors(full_name)
+          doctors!doctor_id(full_name)
         `)
                 .eq('patient_id', patientProfile.id)
                 .order('created_at', { ascending: false });
