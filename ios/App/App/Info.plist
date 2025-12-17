@@ -53,5 +53,17 @@
 	<array>
 		<string>bluetooth-central</string>
 	</array>
+	<key>WKWebView</key>
+	<dict>
+		<key>allowsInlineMediaPlayback</key>
+		<true/>
+		<key>allowsBackForwardNavigationGestures</key>
+		<true/>
+	</dict>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsArbitraryLoads</key>
+		<true/>
+	</dict>
 </dict>
 </plist>

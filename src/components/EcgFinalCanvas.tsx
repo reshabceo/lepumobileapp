@@ -78,9 +78,21 @@ const EcgFinalCanvas: React.FC<EcgFinalCanvasProps> = ({
         const samplesToShow = Math.min(samples.length, seconds * sampleRate);
         const startIndex = Math.max(0, samples.length - samplesToShow);
         
+        // ✅ FIX: Calculate baseline (midpoint) for centering waveform
+        // Convert samples to mV and find min/max
+        const mvSamples: number[] = [];
+        for (let i = 0; i < samplesToShow; i++) {
+            const sampleIndex = startIndex + i;
+            mvSamples.push(convertToMv(samples[sampleIndex]));
+        }
+        const minMv = Math.min(...mvSamples);
+        const maxMv = Math.max(...mvSamples);
+        const midMv = (minMv + maxMv) / 2; // Baseline (midpoint)
+        const ampMv = Math.max(0.5, maxMv - minMv); // Amplitude range
+        
         const xStep = width / samplesToShow;
         const yCenter = height / 2;
-        const yScale = height / 2; // mV scale
+        const yScale = (height * 0.8) / (ampMv || 1.0); // Scale based on amplitude range
 
         ctx.strokeStyle = '#2563eb'; // Blue ECG line
         ctx.lineWidth = 2;
@@ -90,7 +102,9 @@ const EcgFinalCanvas: React.FC<EcgFinalCanvasProps> = ({
             const sampleIndex = startIndex + i;
             const x = i * xStep;
             const mv = convertToMv(samples[sampleIndex]);
-            const y = yCenter - (mv * yScale);
+            // ✅ FIX: Center waveform around baseline (midpoint)
+            const centeredMv = mv - midMv;
+            const y = yCenter - (centeredMv * yScale);
 
             if (i === 0) {
                 ctx.moveTo(x, y);

@@ -72,7 +72,7 @@ export interface WellueSDKCallbacks {
     onBPStatusChanged?: (status: BPStatus) => void;
     onRealTimeUpdate?: (data: RealTimeData) => void;
     onECGData?: (data: ECGData) => void;
-    onECGLifecycle?: (state: 'start' | 'stop') => void;
+    onECGLifecycle?: (state: 'start' | 'stop', data?: any) => void;
     onBatteryUpdate?: (deviceId: string, battery: number) => void;
     onBluetoothStatusChanged?: (enabled: boolean) => void;
     onError?: (error: string, details?: any) => void;
@@ -1036,6 +1036,24 @@ class NativeWelluePlugin {
                             console.log('🩺 Measurement still active, will complete when bpMeasurement arrives');
                         }
                         break;
+                    case 'ecgMeasuring':
+                        // 🆕 ECG: Device-initiated ECG measurement started
+                        console.log('🫀 [ECG BRIDGE] ===== bpLifecycle("ecgMeasuring") EVENT RECEIVED ====');
+                        console.log('🫀 [ECG BRIDGE] Full lifecycle data:', JSON.stringify(data, null, 2));
+                        console.log('🫀 [ECG BRIDGE] Calling onECGLifecycle("start") callback...');
+                        console.log('🫀 [ECG BRIDGE] Callback exists?', !!this.callbacks.onECGLifecycle);
+                        this.callbacks.onECGLifecycle?.('start');
+                        console.log('🫀 [ECG BRIDGE] ✅ onECGLifecycle("start") called from bpLifecycle');
+                        break;
+                    case 'ecgComplete':
+                        // 🆕 ECG: Device-initiated ECG measurement completed
+                        console.log('🫀 [ECG BRIDGE] ===== bpLifecycle("ecgComplete") EVENT RECEIVED ====');
+                        console.log('🫀 [ECG BRIDGE] Full lifecycle data:', JSON.stringify(data, null, 2));
+                        console.log('🫀 [ECG BRIDGE] Calling onECGLifecycle("stop") callback...');
+                        console.log('🫀 [ECG BRIDGE] Callback exists?', !!this.callbacks.onECGLifecycle);
+                        this.callbacks.onECGLifecycle?.('stop');
+                        console.log('🫀 [ECG BRIDGE] ✅ onECGLifecycle("stop") called from bpLifecycle');
+                        break;
                 }
             }
         });
@@ -1063,6 +1081,30 @@ class NativeWelluePlugin {
                 isDeflating: data?.isDeflating,
                 timestamp: new Date()
             };
+
+            // 🆕 ECG: Detect ECG status codes (6 = measuring, 7 = complete)
+            const deviceStatus = rtData.deviceStatus || rtData.status;
+            console.log(`🫀 [ECG BRIDGE] bp2Rt event received - deviceStatus: ${deviceStatus}, status: ${rtData.status}, deviceStatus: ${rtData.deviceStatus}`);
+            
+            if (deviceStatus === 6) {
+                // ECG measuring started on device
+                console.log('🫀 [ECG BRIDGE] ===== STATUS 6 DETECTED - ECG MEASURING STARTED ====');
+                console.log('🫀 [ECG BRIDGE] Full rtData:', JSON.stringify(rtData, null, 2));
+                console.log('🫀 [ECG BRIDGE] Calling onECGLifecycle("start") callback...');
+                console.log('🫀 [ECG BRIDGE] Callback exists?', !!this.callbacks.onECGLifecycle);
+                this.callbacks.onECGLifecycle?.('start');
+                console.log('🫀 [ECG BRIDGE] ✅ onECGLifecycle("start") called');
+            } else if (deviceStatus === 7) {
+                // ECG measuring completed on device
+                console.log('🫀 [ECG BRIDGE] ===== STATUS 7 DETECTED - ECG MEASUREMENT COMPLETED ====');
+                console.log('🫀 [ECG BRIDGE] Full rtData:', JSON.stringify(rtData, null, 2));
+                console.log('🫀 [ECG BRIDGE] Calling onECGLifecycle("stop") callback...');
+                console.log('🫀 [ECG BRIDGE] Callback exists?', !!this.callbacks.onECGLifecycle);
+                this.callbacks.onECGLifecycle?.('stop');
+                console.log('🫀 [ECG BRIDGE] ✅ onECGLifecycle("stop") called');
+            } else if (deviceStatus !== undefined) {
+                console.log(`🫀 [ECG BRIDGE] Device status is ${deviceStatus} (not ECG-related)`);
+            }
             
             // Only log status changes
             if (rtData.deviceStatus !== lastLoggedStatus) {
@@ -1079,6 +1121,49 @@ class NativeWelluePlugin {
 
         // ECG data event
         this.nativePlugin.addListener('ecgData', (data: any) => {
+            console.log('🫀 [ECG BRIDGE] ECG data received:', data);
+            console.log('🫀 [ECG BRIDGE] Source:', data.source || 'realtime');
+            
+            // 🆕 ECG FILE: If this is from a file (final result), extract all data
+            if (data.source === 'file') {
+                console.log('🫀 [ECG BRIDGE] ===== ECG FILE RESULT RECEIVED =====');
+                console.log('🫀 [ECG BRIDGE] Heart Rate:', data.heartRate, 'BPM');
+                console.log('🫀 [ECG BRIDGE] Result:', data.result);
+                console.log('🫀 [ECG BRIDGE] QRS:', data.qrs, 'ms');
+                console.log('🫀 [ECG BRIDGE] PVCs:', data.pvcs);
+                console.log('🫀 [ECG BRIDGE] QTC:', data.qtc, 'ms');
+                console.log('🫀 [ECG BRIDGE] ECG Data points:', data.ecgData?.length || 0);
+                
+                // Forward to onECGData callback with full result
+                const ecgData: ECGData = {
+                    waveform: data.ecgData || data.waveform || [],
+                    heartRate: data.heartRate || 0,
+                    timestamp: new Date(),
+                    rhythm: this.getRhythmFromDiagnosis(data.result),
+                    sampleRate: data.sampleRate || 125,
+                    mvPerCount: data.mvPerCount || 1,
+                    result: data.result,
+                    qrs: data.qrs,
+                    pvcs: data.pvcs,
+                    qtc: data.qtc
+                };
+                
+                console.log('🫀 [ECG BRIDGE] Forwarding file-based ECG result to UI');
+                this.callbacks.onECGData?.(ecgData);
+                
+                // Also emit via ecgLifecycle with full result data
+                this.callbacks.onECGLifecycle?.('stop', {
+                    finalHeartRate: data.heartRate,
+                    ecgQrsDuration: data.qrs,
+                    ecgQtInterval: data.qtc,
+                    ecgPrInterval: 160, // Default if not available
+                    ecgRhythm: this.getRhythmFromDiagnosis(data.result),
+                    ecgData: data.ecgData || []
+                });
+                return;
+            }
+            
+            // Real-time ECG data (existing logic)
             const ecgData: ECGData = {
                 waveform: data.waveform || [],
                 heartRate: data.heartRate,
@@ -1092,8 +1177,36 @@ class NativeWelluePlugin {
 
         // ECG lifecycle events
         this.nativePlugin.addListener('ecgLifecycle', (data: any) => {
+            console.log('🫀 [ECG BRIDGE] ===== ecgLifecycle EVENT RECEIVED FROM NATIVE ====');
+            console.log('🫀 [ECG BRIDGE] Raw native data:', JSON.stringify(data, null, 2));
             const state = (data?.state === 'start' || data?.state === 'stop') ? data.state : undefined;
-            if (state) this.callbacks.onECGLifecycle?.(state);
+            console.log('🫀 [ECG BRIDGE] Extracted state:', state);
+            console.log('🫀 [ECG BRIDGE] State validation:', {
+                hasData: !!data,
+                hasState: !!data?.state,
+                stateValue: data?.state,
+                isValidState: state !== undefined
+            });
+            console.log('🫀 [ECG BRIDGE] Calling onECGLifecycle callback...');
+            console.log('🫀 [ECG BRIDGE] Callback exists?', !!this.callbacks.onECGLifecycle);
+            if (state) {
+                // 🆕 FIX: Pass data parameter if available (for file-based results)
+                const lifecycleData = data?.finalHeartRate ? {
+                    finalHeartRate: data.finalHeartRate,
+                    ecgQrsDuration: data.ecgQrsDuration,
+                    ecgQtInterval: data.ecgQtInterval,
+                    ecgPrInterval: data.ecgPrInterval,
+                    ecgRhythm: data.ecgRhythm,
+                    ecgResult: data.ecgResult,
+                    ecgPvcs: data.ecgPvcs,
+                    ecgData: data.ecgData
+                } : undefined;
+                this.callbacks.onECGLifecycle?.(state, lifecycleData);
+                console.log(`🫀 [ECG BRIDGE] ✅ onECGLifecycle("${state}") callback called`, lifecycleData ? 'with data' : 'without data');
+            } else {
+                console.warn('🫀 [ECG BRIDGE] ⚠️ Invalid or missing state in ecgLifecycle event, skipping callback');
+                console.warn('🫀 [ECG BRIDGE] Expected state: "start" or "stop", got:', data?.state);
+            }
         });
 
         // Battery update event

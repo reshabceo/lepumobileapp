@@ -11,23 +11,36 @@ static void _forceLinkWellueSDK(void);
 // Force reference to ensure WellueSDK class is linked
 // This ensures the Swift class is available to Objective-C runtime
 __attribute__((used)) static void _forceLinkWellueSDK(void) {
+    NSLog(@"🔧 [WELLUE SDK] Force linking WellueSDK class...");
+    
     // Try multiple class name patterns to find the Swift class
     Class cls = NSClassFromString(@"WellueSDK");
+    NSLog(@"🔧 [WELLUE SDK] NSClassFromString('WellueSDK'): %@", cls ? @"✅ FOUND" : @"❌ NOT FOUND");
+    
     if (!cls) {
         cls = NSClassFromString(@"App.WellueSDK");
+        NSLog(@"🔧 [WELLUE SDK] NSClassFromString('App.WellueSDK'): %@", cls ? @"✅ FOUND" : @"❌ NOT FOUND");
     }
     if (!cls) {
         cls = NSClassFromString(@"_TtC3App9WellueSDK");
+        NSLog(@"🔧 [WELLUE SDK] NSClassFromString('_TtC3App9WellueSDK'): %@", cls ? @"✅ FOUND" : @"❌ NOT FOUND");
     }
     
     // CRITICAL: Force the class to be loaded by accessing its metadata
     // This ensures the class is available when Capacitor's plugin registry is built
     if (cls) {
+        NSLog(@"🔧 [WELLUE SDK] ✅ Class found! Forcing initialization...");
         // Access class metadata to force full initialization
         (void)[cls class];
         // Force method list to be loaded
         unsigned int methodCount = 0;
-        class_copyMethodList(cls, &methodCount);
+        Method *methods = class_copyMethodList(cls, &methodCount);
+        NSLog(@"🔧 [WELLUE SDK] Class has %u methods", methodCount);
+        if (methods) {
+            free(methods);
+        }
+    } else {
+        NSLog(@"❌ [WELLUE SDK] ⚠️ WellueSDK class NOT FOUND! Plugin may not work!");
     }
     
     // Keep the reference to prevent optimization
@@ -37,7 +50,9 @@ __attribute__((used)) static void _forceLinkWellueSDK(void) {
 // CRITICAL: Execute at library load time (before Capacitor initializes)
 // This ensures the plugin class is available when CAP_PLUGIN macro registers it
 __attribute__((constructor)) static void _registerWellueSDK(void) {
+    NSLog(@"🔧 [WELLUE SDK] ===== CONSTRUCTOR CALLED - REGISTERING PLUGIN =====");
     _forceLinkWellueSDK();
+    NSLog(@"🔧 [WELLUE SDK] Plugin registration complete");
 }
 
 CAP_PLUGIN(WellueSDK, "WellueSDK",
