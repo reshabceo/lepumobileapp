@@ -64,10 +64,42 @@ const nativeFetch: typeof fetch = async (input: RequestInfo | URL, init?: Reques
 
 console.log('🔍 Supabase Debug - Using native fetch:', isNative)
 
-// Default: use browser fetch (works in Simulator). If a TypeError Load failed
-// occurs during runtime, app code can switch to nativeFetch by calling
-// supabase.functions.setFetcher(nativeFetch). For now keep default for stability.
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+// Use Capacitor HTTP on native platforms to fix "TypeError: Load failed" errors
+// On web, use default fetch
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  global: {
+    fetch: isNative ? nativeFetch : undefined, // Use Capacitor HTTP on native, default fetch on web
+  },
+  auth: {
+    // Use localStorage for both web and native (works on iOS via WKWebView)
+    storage: {
+      getItem: (key: string) => {
+        try {
+          return localStorage.getItem(key);
+        } catch (error) {
+          console.error('❌ [Supabase] localStorage.getItem error:', error);
+          return null;
+        }
+      },
+      setItem: (key: string, value: string) => {
+        try {
+          localStorage.setItem(key, value);
+        } catch (error) {
+          console.error('❌ [Supabase] localStorage.setItem error:', error);
+        }
+      },
+      removeItem: (key: string) => {
+        try {
+          localStorage.removeItem(key);
+        } catch (error) {
+          console.error('❌ [Supabase] localStorage.removeItem error:', error);
+        }
+      },
+    },
+    persistSession: true,
+    autoRefreshToken: true,
+  },
+})
 
 // ECG Data Storage Functions
 export async function storeEcgRecording(ecgData: {

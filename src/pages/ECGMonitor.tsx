@@ -17,7 +17,7 @@ import { MobileAppContainer } from '@/components/MobileAppContainer';
 import { useToast } from '@/hooks/use-toast';
 
 import { wellueSDK, WellueDevice, ECGData, RealTimeData } from '@/lib/wellue-sdk-bridge';
-import { Bp2, getEcgDataInMv } from '@/plugins/bp2';
+import { Bp2, getEcgDataInMv, int16ArrayToMv } from '@/plugins/bp2';
 import { supabase, storeEcgRecording } from '@/lib/supabase';
 import EcgChartWithControls from '@/components/EcgChartWithControls';
 import EcgFullScreenChart from '@/components/EcgFullScreenChart';
@@ -779,6 +779,127 @@ const ECGMonitor: React.FC = () => {
             } catch (error) {
                 console.error('🫀 [ECG SAVE] ❌ Failed to save to filesystem:', error);
                 console.error('🫀 [ECG SAVE] Error details:', error instanceof Error ? error.message : String(error));
+            }
+            
+            // 🚀 STORE ECG DATA IN SUPABASE FOR DOCTOR PORTAL
+            console.log('🫀 [ECG SAVE] Step 3: Saving to Supabase database...');
+            try {
+                // Get current patient ID from auth context
+                const { data: { user }, error: userError } = await supabase.auth.getUser();
+                
+                if (userError) {
+                    console.error('❌ [ECG SAVE] Auth error:', userError);
+                    return;
+                }
+                
+                if (!user) {
+                    console.warn('🫀 [ECG SAVE] ⚠️ User not authenticated, cannot save to Supabase');
+                    return;
+                }
+                
+                // Get patient profile with is_active check
+                const { data: patientProfile, error: patientError } = await supabase
+                    .from('patients')
+                    .select('id, is_active')
+                    .eq('auth_user_id', user.id)
+                    .eq('is_active', true)  // ✅ ADD: Ensure patient is active
+                    .single();
+                
+                if (patientError || !patientProfile) {
+                    console.error('❌ [ECG SAVE] Patient profile not found:', patientError);
+                    console.error('❌ [ECG SAVE] User ID:', user.id);
+                    return;
+                }
+                
+                // Check if we have ECG data to save
+                const ecgDataArray = dataToSave.ecgData;
+                const hasEcgData = Array.isArray(ecgDataArray) && ecgDataArray.length > 0;
+                
+                if (!hasEcgData) {
+                    console.warn('🫀 [ECG SAVE] ⚠️ No ECG data to save to Supabase (ecgData missing or empty)');
+                    return;
+                }
+                
+                const scaleUvPerLsb = dataToSave.scaleUvPerLsb || 3.098;
+                const sampleRate = dataToSave.sampleRate || 125;
+                
+                // Convert raw Int16 values to mV if needed
+                let mvData: number[];
+                if (ecgDataArray.length > 0) {
+                    // Check if data is already in mV (values typically < 10 for ECG)
+                    // or raw Int16 (values typically -32768 to 32767)
+                    const maxAbsValue = Math.max(...ecgDataArray.map(Math.abs));
+                    const isLikelyMv = maxAbsValue < 100; // mV values are typically small
+                    
+                    if (isLikelyMv) {
+                        // Already in mV, use directly
+                        mvData = ecgDataArray;
+                        console.log('🫀 [ECG SAVE] ECG data appears to be in mV format');
+                    } else {
+                        // Convert from Int16 to mV
+                        const mvPerLsb = scaleUvPerLsb / 1000; // Convert μV to mV
+                        mvData = ecgDataArray.map(val => val * mvPerLsb);
+                        console.log('🫀 [ECG SAVE] Converted ECG data from Int16 to mV');
+                    }
+                } else {
+                    mvData = [];
+                }
+                
+                // Prepare ECG data for Supabase
+                const ecgRecord = {
+                    patient_id: patientProfile.id,  // ✅ Explicit patient_id
+                    device_id: dataToSave.deviceId || selectedDevice || 'BP2_Device',
+                    recorded_at: dataToSave.timestamp || dataToSave.savedAt || new Date().toISOString(),
+                    sample_rate: sampleRate,
+                    scale_uv_per_lsb: scaleUvPerLsb,
+                    duration_seconds: mvData.length / sampleRate,
+                    mv_data_json: mvData, // ✅ Array of numbers in mV
+                    raw_data_base64: null,  // ✅ MUST be null when using mv_data_json
+                    heart_rate: dataToSave.heartRate || 0,
+                    quality_score: 0.95,
+                    notes: 'ECG recording from BP2 device'
+                };
+                
+                console.log('🫀 [ECG SAVE] Supabase record:', {
+                    patient_id: ecgRecord.patient_id,
+                    device_id: ecgRecord.device_id,
+                    recorded_at: ecgRecord.recorded_at,
+                    sample_count: mvData.length,
+                    heart_rate: ecgRecord.heart_rate,
+                    has_mv_data: !!ecgRecord.mv_data_json && Array.isArray(ecgRecord.mv_data_json),
+                    raw_data_is_null: ecgRecord.raw_data_base64 === null
+                });
+                
+                // Store in Supabase with better error handling
+                const { data: insertedData, error: insertError } = await supabase
+                    .from('ecg_recordings')
+                    .insert(ecgRecord)
+                    .select();
+                
+                if (insertError) {
+                    console.error('❌ [ECG SAVE] Supabase insert error:', {
+                        code: insertError.code,
+                        message: insertError.message,
+                        details: insertError.details,
+                        hint: insertError.hint
+                    });
+                    
+                    // Specific error handling
+                    if (insertError.code === '42501') {
+                        console.error('❌ [ECG SAVE] RLS policy violation - patient_id may not match authenticated user');
+                    } else if (insertError.code === '23514') {
+                        console.error('❌ [ECG SAVE] Constraint violation - check raw_data_base64/mv_data_json constraint');
+                    } else if (insertError.code === '23503') {
+                        console.error('❌ [ECG SAVE] Foreign key violation - patient_id not found in patients table');
+                    }
+                    throw insertError;
+                }
+                
+                console.log('🫀 [ECG SAVE] ✅ Saved to Supabase database for doctor portal:', insertedData);
+            } catch (error) {
+                console.error('🫀 [ECG SAVE] ❌ Failed to store ECG data in Supabase:', error);
+                console.error('🫀 [ECG SAVE] Error details:', error instanceof Error ? error.message : String(error));
+                // Don't fail the main save process if Supabase storage fails
             }
             
             console.log('🫀 [ECG SAVE] ✅ Auto-save process completed successfully');
@@ -2282,7 +2403,12 @@ const ECGMonitor: React.FC = () => {
 
                             pWave: 'normal',
 
-                            ecgData: ecgBufferRef.current.map(d => d.v),
+                            // ✅ FIX: Use data.ecgData from lifecycle event instead of empty ecgBufferRef
+                            ecgData: (data?.ecgData && Array.isArray(data.ecgData) && data.ecgData.length > 0) 
+                                ? data.ecgData 
+                                : (ecgBufferRef.current.length > 0 
+                                    ? ecgBufferRef.current.map(d => d.v) 
+                                    : []),
 
                             unit: 'mV'
 
@@ -2374,6 +2500,88 @@ const ECGMonitor: React.FC = () => {
                             localStorage.setItem('storedFilesInApp', JSON.stringify(updatedReports));
 
                             console.log('💾 [ECG] ECG result saved to reports, total reports:', updatedReports.length);
+                            
+                            // 🚀 STORE ECG DATA IN SUPABASE FOR DOCTOR PORTAL (async IIFE to handle await)
+                            (async () => {
+                                try {
+                                    const { data: { user }, error: userError } = await supabase.auth.getUser();
+                                    
+                                    if (userError || !user) {
+                                        console.warn('🫀 [ECG] User not authenticated, cannot save to Supabase');
+                                        return;
+                                    }
+                                    
+                                    const { data: patientProfile, error: patientError } = await supabase
+                                        .from('patients')
+                                        .select('id, is_active')
+                                        .eq('auth_user_id', user.id)
+                                        .eq('is_active', true)  // ✅ ADD: Ensure patient is active
+                                        .single();
+                                    
+                                    if (patientError || !patientProfile) {
+                                        console.error('❌ [ECG] Patient profile not found:', patientError);
+                                        return;
+                                    }
+                                    
+                                    if (reportData.ecgData && Array.isArray(reportData.ecgData) && reportData.ecgData.length > 0) {
+                                        const scaleUvPerLsb = reportData.scaleUvPerLsb || 3.098;
+                                        const sampleRate = reportData.sampleRate || 125;
+                                        
+                                        // Convert raw Int16 values to mV if needed
+                                        const maxAbsValue = Math.max(...reportData.ecgData.map(Math.abs));
+                                        const isLikelyMv = maxAbsValue < 100;
+                                        
+                                        let mvData: number[];
+                                        if (isLikelyMv) {
+                                            mvData = reportData.ecgData;
+                                        } else {
+                                            const mvPerLsb = scaleUvPerLsb / 1000;
+                                            mvData = reportData.ecgData.map(val => val * mvPerLsb);
+                                        }
+                                        
+                                        const ecgRecord = {
+                                            patient_id: patientProfile.id,  // ✅ Explicit patient_id
+                                            device_id: reportData.deviceId || selectedDevice || 'BP2_Device',
+                                            recorded_at: reportData.timestamp || reportData.savedAt || new Date().toISOString(),
+                                            sample_rate: sampleRate,
+                                            scale_uv_per_lsb: scaleUvPerLsb,
+                                            duration_seconds: mvData.length / sampleRate,
+                                            mv_data_json: mvData,  // ✅ Array of numbers
+                                            raw_data_base64: null,  // ✅ MUST be null when using mv_data_json
+                                            heart_rate: reportData.heartRate || 0,
+                                            quality_score: 0.95,
+                                            notes: 'ECG recording from BP2 device'
+                                        };
+                                        
+                                        const { data: insertedData, error: insertError } = await supabase
+                                            .from('ecg_recordings')
+                                            .insert(ecgRecord)
+                                            .select();
+                                        
+                                        if (insertError) {
+                                            console.error('❌ [ECG] Supabase insert error:', {
+                                                code: insertError.code,
+                                                message: insertError.message,
+                                                details: insertError.details,
+                                                hint: insertError.hint
+                                            });
+                                            
+                                            // Specific error handling
+                                            if (insertError.code === '42501') {
+                                                console.error('❌ [ECG] RLS policy violation - patient_id may not match authenticated user');
+                                            } else if (insertError.code === '23514') {
+                                                console.error('❌ [ECG] Constraint violation - check raw_data_base64/mv_data_json constraint');
+                                            } else if (insertError.code === '23503') {
+                                                console.error('❌ [ECG] Foreign key violation - patient_id not found in patients table');
+                                            }
+                                        } else {
+                                            console.log('✅ [ECG] ECG data stored in Supabase for doctor portal:', insertedData);
+                                        }
+                                    }
+                                } catch (error) {
+                                    console.error('❌ [ECG] Failed to store ECG data in Supabase:', error);
+                                }
+                            })(); // End async IIFE
 
 
 
@@ -2951,7 +3159,12 @@ const ECGMonitor: React.FC = () => {
 
                             pWave: 'normal',
 
-                            ecgData: ecgBufferRef.current.map(d => d.v),
+                            // ✅ FIX: Use data.ecgData from lifecycle event instead of empty ecgBufferRef
+                            ecgData: (data?.ecgData && Array.isArray(data.ecgData) && data.ecgData.length > 0) 
+                                ? data.ecgData 
+                                : (ecgBufferRef.current.length > 0 
+                                    ? ecgBufferRef.current.map(d => d.v) 
+                                    : []),
 
                             unit: 'mV'
 
