@@ -327,16 +327,91 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onSwitchToLogin }) => {
     }
   };
 
-  const handleOTPVerified = () => {
-    toast({
-      title: "Email Verified!",
-      description: "Your account has been successfully created. You can now sign in.",
-    });
+  const handleOTPVerified = async () => {
+    try {
+      console.log('🔍 Step 3: OTP verified! Creating patient profile...');
+      
+      // Get the doctor code and patient data from localStorage (saved during signup)
+      const pendingDoctorCode = localStorage.getItem('pending_doctor_code');
+      const pendingUserName = localStorage.getItem('pending_user_name');
+      const pendingPatientDataStr = localStorage.getItem('pending_patient_data');
+      const pendingPatientData = pendingPatientDataStr ? JSON.parse(pendingPatientDataStr) : null;
 
-    // Redirect to login page
-    setTimeout(() => {
-      onSwitchToLogin();
-    }, 1500);
+      // Get current user (should be authenticated after OTP verification)
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      
+      if (userError || !user) {
+        console.error('❌ Failed to get user after OTP verification:', userError);
+        throw new Error('Authentication failed. Please try logging in.');
+      }
+
+      console.log('✅ User authenticated:', user.email, 'User ID:', user.id);
+
+      // Create patient profile with doctor assignment
+      if (pendingDoctorCode && pendingUserName) {
+        console.log('🔍 Creating patient profile with doctor code:', pendingDoctorCode);
+        
+        const { data: profileData, error: profileError } = await supabase.rpc('create_patient_profile_enhanced', {
+          auth_user_id: user.id,
+          full_name: pendingUserName,
+          email: user.email || formData.email,
+          doctor_code_input: pendingDoctorCode,
+          date_of_birth: pendingPatientData?.dateOfBirth || null,
+          gender: pendingPatientData?.gender || null,
+          blood_type: pendingPatientData?.bloodType || null,
+          address: pendingPatientData?.address || null,
+          phone_number: pendingPatientData?.phoneNumber || null,
+          emergency_contact_name: pendingPatientData?.emergencyContactName || null,
+          emergency_contact_phone: pendingPatientData?.emergencyContactPhone || null,
+          profile_picture_url: pendingPatientData?.profilePictureUrl || null,
+          allergies: pendingPatientData?.allergies ? pendingPatientData.allergies.split(',').map((s: string) => s.trim()).filter((s: string) => s) : null,
+          medical_conditions: pendingPatientData?.medicalConditions ? pendingPatientData.medicalConditions.split(',').map((s: string) => s.trim()).filter((s: string) => s) : null,
+          current_medications: pendingPatientData?.currentMedications ? pendingPatientData.currentMedications.split(',').map((s: string) => s.trim()).filter((s: string) => s) : null
+        });
+
+        if (profileError) {
+          console.error('❌ Failed to create patient profile:', profileError);
+          throw new Error('Failed to create patient profile. Please contact support.');
+        }
+
+        console.log('✅ Patient profile created successfully:', profileData);
+
+        // Clear pending data from localStorage
+        localStorage.removeItem('pending_doctor_code');
+        localStorage.removeItem('pending_user_name');
+        localStorage.removeItem('pending_patient_data');
+        localStorage.removeItem('awaiting_otp_verification');
+        localStorage.removeItem('from_otp_verification');
+      } else {
+        console.warn('⚠️ No pending doctor code found - profile not created');
+      }
+
+      // Sign out the user so they can log in with their credentials
+      await supabase.auth.signOut();
+
+      toast({
+        title: "Email Verified!",
+        description: "Your account has been successfully created. You can now sign in.",
+      });
+
+      // Redirect to login page
+      setTimeout(() => {
+        onSwitchToLogin();
+      }, 1500);
+    } catch (error) {
+      console.error('❌ Error in handleOTPVerified:', error);
+      toast({
+        title: "Profile Creation Failed",
+        description: error instanceof Error ? error.message : 'Please try logging in and contact support if the issue persists.',
+        variant: "destructive",
+      });
+      
+      // Still redirect to login even if profile creation failed
+      // They can try to complete profile after logging in
+      setTimeout(() => {
+        onSwitchToLogin();
+      }, 2000);
+    }
   };
 
   // Show OTP Verification screen if signup was successful

@@ -6,7 +6,7 @@ import { useToast } from '@/hooks/use-toast';
 interface OTPVerificationProps {
   email: string;
   type: 'signup' | 'recovery';
-  onVerified: () => void;
+  onVerified: (data?: any) => void;
   onBack: () => void;
   embedded?: boolean; // If true, don't render outer container (for use inside SignupWizard)
 }
@@ -110,8 +110,8 @@ export const OTPVerification: React.FC<OTPVerificationProps> = ({
             title: "Email Verified!",
             description: "Your account has been successfully verified.",
           });
-          // Call onVerified callback - it will handle profile creation and cleanup
-          onVerified();
+          // Call onVerified callback with user data - it will handle profile creation and cleanup
+          onVerified(data);
         }
       } else {
         // Verify recovery OTP for password reset
