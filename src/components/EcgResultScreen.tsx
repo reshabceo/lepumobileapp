@@ -3,7 +3,14 @@ import { Bp2, getEcgDataInMv } from '@/plugins/bp2';
 import EcgChartWithControls from './EcgChartWithControls';
 import { useDevice } from '@/contexts/DeviceContext';
 import { useToast } from '@/hooks/use-toast';
-import { Bluetooth, BluetoothOff, Loader2, AlertCircle, CheckCircle, Activity } from 'lucide-react';
+import { Bluetooth, BluetoothOff, Loader2, AlertCircle, CheckCircle, Activity, ActivityIcon } from 'lucide-react';
+
+interface ECGResult {
+    heartRate: number;
+    qrsDuration: number;
+    rhythm: string;
+    timestamp: string;
+}
 
 export default function EcgResultScreen() {
     const [ecg, setEcg] = useState<{s: Float32Array, sr: number, scale: number} | null>(null);
@@ -12,6 +19,8 @@ export default function EcgResultScreen() {
     const [records, setRecords] = useState<string[]>([]);
     const [filteredRecords, setFilteredRecords] = useState<string[]>([]);
     const [nonEcgFiles, setNonEcgFiles] = useState<Set<string>>(new Set());
+    const [ecgResult, setEcgResult] = useState<ECGResult | null>(null);
+    const [currentRecordId, setCurrentRecordId] = useState<string | null>(null);
     
     // Use the same device context as the dashboard
     const {
@@ -84,6 +93,7 @@ export default function EcgResultScreen() {
 
             setLoading(true);
             setError(null);
+            setCurrentRecordId(recordId);
             
             // Use the Bp2Plugin to read ECG record
             const result = await Bp2.getEcgRecord({ recordId });
@@ -95,6 +105,32 @@ export default function EcgResultScreen() {
                 s: ecgData.samples, 
                 sr: ecgData.sampleRate, 
                 scale: 1.0 // Already in mV, no scaling needed
+            });
+            
+            // 🆕 Extract timestamp from recordId (usually format: yyyyMMddHHmmss)
+            let timestamp = new Date().toISOString();
+            try {
+                // Try to parse recordId as timestamp (e.g., "20231216143025")
+                if (recordId && recordId.length >= 14 && /^\d+$/.test(recordId)) {
+                    const year = parseInt(recordId.substring(0, 4));
+                    const month = parseInt(recordId.substring(4, 6)) - 1; // JS months are 0-indexed
+                    const day = parseInt(recordId.substring(6, 8));
+                    const hour = parseInt(recordId.substring(8, 10));
+                    const minute = parseInt(recordId.substring(10, 12));
+                    const second = parseInt(recordId.substring(12, 14));
+                    timestamp = new Date(year, month, day, hour, minute, second).toISOString();
+                }
+            } catch (e) {
+                console.warn('Could not parse timestamp from recordId:', e);
+            }
+            
+            // 🆕 Set ECG result (Android SDK doesn't provide these values, so using defaults/placeholders)
+            // TODO: Update when Android SDK provides parsed ECG result values
+            setEcgResult({
+                heartRate: 0, // Will be populated if Android SDK provides this
+                qrsDuration: 0, // Will be populated if Android SDK provides this
+                rhythm: 'normal', // Default, will be updated if Android SDK provides this
+                timestamp: timestamp
             });
             
             toast({
@@ -266,6 +302,69 @@ export default function EcgResultScreen() {
                         <p className="text-gray-400 text-center py-8">
                             {loading ? 'Loading ECG records...' : 'No ECG records found. Click "Refresh Records" to scan your device.'}
                         </p>
+                    )}
+                </div>
+            )}
+
+            {/* ECG Result Display Section */}
+            {ecgResult && ecg && (
+                <div
+                    className="rounded-2xl p-4 mb-4"
+                    style={{
+                        background: 'rgba(17,24,39,0.6)',
+                        backdropFilter: 'blur(10px)',
+                        border: '1px solid rgba(55,65,81,0.3)',
+                        boxShadow: '0 0 20px rgba(0,0,0,0.3)'
+                    }}
+                >
+                    <div className="flex items-center justify-between mb-4">
+                        <h2 className="text-base font-medium text-white flex items-center gap-2">
+                            <ActivityIcon className="h-5 w-5" />
+                            ECG Result
+                        </h2>
+                        <div className="flex items-center gap-2">
+                            <div className="w-3 h-3 rounded-full bg-blue-400"></div>
+                            <span className="text-sm text-blue-400 font-medium">Loaded</span>
+                        </div>
+                    </div>
+
+                    {/* Result Values */}
+                    <div className="grid grid-cols-2 gap-4 mb-4">
+                        <div className="bg-slate-700/30 rounded-lg p-4">
+                            <div className="text-2xl font-bold text-blue-400">
+                                {ecgResult.heartRate > 0 ? ecgResult.heartRate : '—'}
+                            </div>
+                            <div className="text-xs text-gray-400">Heart Rate (BPM)</div>
+                        </div>
+                        <div className="bg-slate-700/30 rounded-lg p-4">
+                            <div className="text-lg font-bold text-white capitalize">
+                                {ecgResult.rhythm}
+                            </div>
+                            <div className="text-xs text-gray-400">Rhythm</div>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4 mb-4">
+                        <div className="bg-slate-700/30 rounded-lg p-4">
+                            <div className="text-lg font-semibold text-white">
+                                {ecgResult.qrsDuration > 0 ? `${ecgResult.qrsDuration} ms` : '—'}
+                            </div>
+                            <div className="text-xs text-gray-400">QRS Duration</div>
+                        </div>
+                        <div className="bg-slate-700/30 rounded-lg p-4">
+                            <div className="text-sm font-semibold text-gray-300">
+                                {new Date(ecgResult.timestamp).toLocaleString()}
+                            </div>
+                            <div className="text-xs text-gray-400">Timestamp</div>
+                        </div>
+                    </div>
+
+                    {ecgResult.heartRate === 0 && (
+                        <div className="mt-3 p-3 bg-yellow-900/20 border border-yellow-700 rounded-lg">
+                            <p className="text-xs text-yellow-400">
+                                ⚠️ Note: Android SDK currently only provides waveform data. Heart rate, QRS, and rhythm values are not available from the file.
+                            </p>
+                        </div>
                     )}
                 </div>
             )}

@@ -7,15 +7,11 @@ PODS:
   - CapacitorFilesystem (7.1.4):
     - Capacitor
     - IONFilesystemLib (~> 1.0.1)
-  - CapacitorGeolocation (7.1.6):
-    - Capacitor
-    - IONGeolocationLib (= 1.0.1)
   - CapacitorScreenOrientation (7.0.2):
     - Capacitor
   - CapacitorShare (7.0.2):
     - Capacitor
   - IONFilesystemLib (1.0.1)
-  - IONGeolocationLib (1.0.1)
   - VTMProductLib (1.5.2)
 
 DEPENDENCIES:
@@ -23,7 +19,6 @@ DEPENDENCIES:
   - "CapacitorCommunityBluetoothLe (from `../../node_modules/@capacitor-community/bluetooth-le`)"
   - "CapacitorCordova (from `../../node_modules/@capacitor/ios`)"
   - "CapacitorFilesystem (from `../../node_modules/@capacitor/filesystem`)"
-  - "CapacitorGeolocation (from `../../node_modules/@capacitor/geolocation`)"
   - "CapacitorScreenOrientation (from `../../node_modules/@capacitor/screen-orientation`)"
   - "CapacitorShare (from `../../node_modules/@capacitor/share`)"
   - VTMProductLib (from `../../VTProductLib_Pods`)
@@ -31,7 +26,6 @@ DEPENDENCIES:
 SPEC REPOS:
   trunk:
     - IONFilesystemLib
-    - IONGeolocationLib
 
 EXTERNAL SOURCES:
   Capacitor:
@@ -42,8 +36,6 @@ EXTERNAL SOURCES:
     :path: "../../node_modules/@capacitor/ios"
   CapacitorFilesystem:
     :path: "../../node_modules/@capacitor/filesystem"
-  CapacitorGeolocation:
-    :path: "../../node_modules/@capacitor/geolocation"
   CapacitorScreenOrientation:
     :path: "../../node_modules/@capacitor/screen-orientation"
   CapacitorShare:
@@ -56,13 +48,11 @@ SPEC CHECKSUMS:
   CapacitorCommunityBluetoothLe: a8a3b904ef86aee80d4e22b8aa3a4b07e9fe5067
   CapacitorCordova: 435121e81a2df4d0034f0fb11fcefab5104cfdb5
   CapacitorFilesystem: f9bd850c41e048180e5dc0cbb90f2033ede9d2cc
-  CapacitorGeolocation: a65213fef581c7b8c5d486abbd5a6d00192a179e
   CapacitorScreenOrientation: e0d5b9ef293b269b8f93373355d5b276f50fabea
   CapacitorShare: be166411fa995ead2d39b104aa0aae56d8615c66
   IONFilesystemLib: 89258b8e3e85465da93127d25d7ce37f977e8a6f
-  IONGeolocationLib: 20f9d0248a0b5264511fb57a37e25dd2badf797a
   VTMProductLib: 94eacd7389ab1ec8bed661eb465fe1ffbd731409
 
-PODFILE CHECKSUM: 9fc7884ef262dd4bd7550059fd5aee02ae0e773f
+PODFILE CHECKSUM: 3b13bfdde492197b44a4b1f1e54ea5e62d262d6f
 
 COCOAPODS: 1.16.2

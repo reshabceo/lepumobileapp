@@ -69,11 +69,19 @@ public class WellueSDK: CAPPlugin, CBPeripheralDelegate {
     private let maxFileReadAttempts = 3
     private var isFileReadInProgress = false // ✅ Prevent multiple file reads
     private var hasCompletedCurrentMeasurement = false // ✅ Prevent duplicate completeMeasurement calls
+    
+    // ECG file reading state
+    private var isReadingECGFile = false // ✅ Track if reading ECG file
+    private var ecgFileReadAttempts = 0
+    private let maxECGFileReadAttempts = 3
 
     // MARK: - Lifecycle
 
     public override func load() {
         super.load()
+        NSLog("🔧 [WELLUE SDK] ===== load() METHOD CALLED =====")
+        NSLog("🔧 [WELLUE SDK] Plugin class: \(type(of: self))")
+        NSLog("🔧 [WELLUE SDK] Plugin identifier: \(self.pluginId ?? "nil")")
         logInfo("Plugin loaded - starting initialization")
 
         centralManager = CBCentralManager(delegate: self, queue: bluetoothQueue)
@@ -81,6 +89,7 @@ public class WellueSDK: CAPPlugin, CBPeripheralDelegate {
         viatomUtils?.delegate = self
         viatomUtils?.deviceDelegate = self
         viatomUtils?.notifyDeviceRSSI = true
+        NSLog("🔧 [WELLUE SDK] ✅ Plugin initialization complete")
     }
 
     // MARK: - Public API
@@ -550,8 +559,35 @@ public class WellueSDK: CAPPlugin, CBPeripheralDelegate {
             }
         case 4: lifecycleState = "measuring"
         case 5: lifecycleState = "complete"
-        case 6: lifecycleState = "ecgMeasuring"
-        case 7: lifecycleState = "ecgComplete"
+        case 6: 
+            lifecycleState = "ecgMeasuring"
+            // 🆕 ECG: Emit ecgLifecycle when ECG measurement starts on device
+            logInfo("🫀 [ECG] ===== STATUS 6 DETECTED - ECG MEASURING STARTED ON DEVICE =====")
+            logInfo("🫀 [ECG] Previous status: \(previousStatus) → Current status: 6 (ecgMeasuring)")
+            logInfo("🫀 [ECG] Emitting ecgLifecycle event with state: 'start'")
+            logInfo("🫀 [ECG] Emitting bpLifecycle event with state: 'ecgMeasuring'")
+            notifyListeners("ecgLifecycle", data: ["state": "start"])
+            logInfo("🫀 [ECG] ✅ ecgLifecycle('start') event emitted successfully")
+        case 7: 
+            lifecycleState = "ecgComplete"
+            // 🆕 ECG: Emit ecgLifecycle when ECG measurement completes on device
+            logInfo("🫀 [ECG] ===== STATUS 7 DETECTED - ECG MEASUREMENT COMPLETED ON DEVICE =====")
+            logInfo("🫀 [ECG] Previous status: \(previousStatus) → Current status: 7 (ecgComplete)")
+            logInfo("🫀 [ECG] Emitting ecgLifecycle event with state: 'stop'")
+            logInfo("🫀 [ECG] Emitting bpLifecycle event with state: 'ecgComplete'")
+            notifyListeners("ecgLifecycle", data: ["state": "stop"])
+            logInfo("🫀 [ECG] ✅ ecgLifecycle('stop') event emitted successfully")
+            
+            // 🆕 ECG: Read ECG file from device to get final results
+            // ✅ FIX: Check if we just entered status 7 (previousStatus != 7) and haven't read the file yet
+            if previousStatus != 7 && !isReadingECGFile {
+                logInfo("🫀 [ECG] STATUS transition to 7 detected (previous: \(previousStatus) → 7) - reading ECG file from device...")
+                readLatestECGFile()
+            } else if previousStatus == 7 {
+                logInfo("🫀 [ECG] STATUS 7 repeated (previous: 7 → 7, isReadingECGFile=\(isReadingECGFile)) - skipping file read")
+            } else if isReadingECGFile {
+                logInfo("🫀 [ECG] STATUS 7 detected but ECG file read already in progress - skipping duplicate request")
+            }
         default: lifecycleState = "idle"
         }
         
@@ -758,6 +794,34 @@ public class WellueSDK: CAPPlugin, CBPeripheralDelegate {
         isFileReadInProgress = true
         fileReadAttempts += 1
         logInfo("📖 [FILE] Requesting file list from device (attempt \(fileReadAttempts)/\(maxFileReadAttempts))...")
+        
+        bluetoothQueue.async { [weak self] in
+            self?.viatomUtils?.requestFilelist()
+        }
+    }
+    
+    // 🆕 ECG: Read latest ECG file from device after measurement completes
+    private func readLatestECGFile() {
+        // ✅ Prevent multiple simultaneous ECG file reads
+        guard !isReadingECGFile else {
+            logInfo("⚠️ [ECG FILE] ECG file read already in progress - skipping duplicate request")
+            return
+        }
+        
+        guard isSdkDeployed, currentDevice?.state == .connected else {
+            logWarn("⚠️ [ECG FILE] Cannot read ECG files - SDK not ready")
+            return
+        }
+        
+        guard ecgFileReadAttempts < maxECGFileReadAttempts else {
+            logWarn("⚠️ [ECG FILE] Max ECG file read attempts reached")
+            isReadingECGFile = false
+            return
+        }
+        
+        isReadingECGFile = true
+        ecgFileReadAttempts += 1
+        logInfo("🫀 [ECG FILE] Requesting file list from device for ECG (attempt \(ecgFileReadAttempts)/\(maxECGFileReadAttempts))...")
         
         bluetoothQueue.async { [weak self] in
             self?.viatomUtils?.requestFilelist()
@@ -1086,12 +1150,25 @@ extension WellueSDK: VTMURATDeviceDelegate, VTMURATUtilsDelegate {
                 isMeasuring = false
                 measurementStartTime = nil
             case 2:  // ECG measuring
+                logInfo("🫀 [ECG] ===== WAVEFORM TYPE 2 - ECG MEASURING DATA RECEIVED =====")
+                logInfo("🫀 [ECG] Waveform data size: \(waveformData.count) bytes")
                 let ecg = VTMBLEParser.parseECGMeasuring(waveformData)
+                logInfo("🫀 [ECG] Parsed ECG measuring data - HR: \(ecg.pulse_rate), Duration: \(ecg.duration)")
+                logInfo("🫀 [ECG] Weak signal: \((ecg.special_status & 0x1) == 0x1), Lead off: \((ecg.special_status & 0x2) == 0x2)")
                 emitECGMeasuring(ecg)
+                logInfo("🫀 [ECG] ✅ ECG measuring data emitted to JavaScript")
             case 3:  // ECG measure finished
+                logInfo("🫀 [ECG] ===== WAVEFORM TYPE 3 - ECG MEASUREMENT FINISHED =====")
+                logInfo("🫀 [ECG] Waveform data size: \(waveformData.count) bytes")
                 let ecgEnd = VTMBLEParser.parseECGEndMeasure(waveformData)
-                logInfo("✅ [ECG RESULT] HR: \(ecgEnd.hr), Result: \(ecgEnd.result)")
+                logInfo("🫀 [ECG] ===== FINAL ECG RESULT PARSED =====")
+                logInfo("🫀 [ECG] Heart Rate: \(ecgEnd.hr) BPM")
+                logInfo("🫀 [ECG] Result Code: \(ecgEnd.result)")
+                logInfo("🫀 [ECG] QRS Duration: \(ecgEnd.qrs) ms")
+                logInfo("🫀 [ECG] PVCs: \(ecgEnd.pvcs)")
+                logInfo("🫀 [ECG] QTC: \(ecgEnd.qtc) ms")
                 emitECGEnd(ecgEnd)
+                logInfo("🫀 [ECG] ✅ Final ECG result emitted to JavaScript")
             default:
                 // Ignore unknown waveform types silently (type 255 is common when device is idle)
                 break
@@ -1143,6 +1220,80 @@ extension WellueSDK: VTMURATDeviceDelegate, VTMURATUtilsDelegate {
         let fileList = VTMBLEParser.parseFileList(response)
         logInfo("📂 [FILE] Received file list - \(fileList.file_num) files")
         
+        // 🆕 ECG: If reading ECG file, look for ECG files (start with '.')
+        if isReadingECGFile {
+            var ecgFiles: [String] = []
+            var allFileNames: [String] = [] // 🆕 DEBUG: Track all file names
+            
+            // Use Mirror to iterate through the tuple elements
+            let mirror = Mirror(reflecting: fileList.fileName)
+            var index = 0
+            for child in mirror.children {
+                if index >= Int(fileList.file_num) { break }
+                
+                if var fileName = child.value as? VTMFileName {
+                    let fileNameData = withUnsafeBytes(of: &fileName.str) { Data($0) }
+                    if let fileNameStr = String(data: fileNameData, encoding: .utf8)?.trimmingCharacters(in: CharacterSet(charactersIn: "\0")) {
+                        // 🆕 DEBUG: Log all file names
+                        allFileNames.append(fileNameStr)
+                        logInfo("🫀 [ECG FILE DEBUG] File \(index): '\(fileNameStr)' (length: \(fileNameStr.count), first char: '\(fileNameStr.first ?? Character("?"))')")
+                        
+                        // ECG files start with '.'
+                        if fileNameStr.hasPrefix(".") && !fileNameStr.isEmpty {
+                            ecgFiles.append(fileNameStr)
+                            logInfo("🫀 [ECG FILE] Found ECG file: \(fileNameStr)")
+                        }
+                    } else {
+                        logWarn("🫀 [ECG FILE DEBUG] File \(index): Failed to decode filename")
+                    }
+                }
+                index += 1
+            }
+            
+            // 🆕 DEBUG: Log summary
+            logInfo("🫀 [ECG FILE DEBUG] Total files parsed: \(allFileNames.count), ECG files found: \(ecgFiles.count)")
+            if allFileNames.count > 0 && ecgFiles.count == 0 {
+                logWarn("🫀 [ECG FILE DEBUG] ⚠️ No ECG files found! First 10 file names: \(Array(allFileNames.prefix(10)))")
+            }
+            
+            // Sort by filename (which is timestamp) and get the latest
+            let sortedECGFiles = ecgFiles.sorted().reversed()
+            if let latestECGFile = sortedECGFiles.first {
+                logInfo("🫀 [ECG FILE] Latest ECG file: \(latestECGFile)")
+                downloadingFileName = latestECGFile
+                downloadData = NSMutableData()
+                expectedFileLength = 0
+                
+                bluetoothQueue.async { [weak self] in
+                    self?.logInfo("🫀 [ECG FILE] Preparing to read ECG file: \(latestECGFile)")
+                    self?.viatomUtils?.prepareReadFile(latestECGFile)
+                }
+            } else {
+                logWarn("⚠️ [ECG FILE] No ECG files found on device (files starting with '.')")
+                logInfo("🫀 [ECG FILE] Attempting fallback: Reading latest file regardless of name...")
+                
+                // 🆕 FALLBACK: If no ECG files found, try reading the latest file (might be ECG with different naming)
+                let sortedAllFiles = allFileNames.sorted().reversed()
+                if let latestFile = sortedAllFiles.first {
+                    logInfo("🫀 [ECG FILE] Fallback: Reading latest file: \(latestFile)")
+                    downloadingFileName = latestFile
+                    downloadData = NSMutableData()
+                    expectedFileLength = 0
+                    
+                    bluetoothQueue.async { [weak self] in
+                        self?.logInfo("🫀 [ECG FILE] Preparing to read latest file (fallback): \(latestFile)")
+                        self?.viatomUtils?.prepareReadFile(latestFile)
+                    }
+                } else {
+                    logError("❌ [ECG FILE] No files found at all on device")
+                    isReadingECGFile = false
+                    ecgFileReadAttempts = 0
+                }
+            }
+            return
+        }
+        
+        // BP file reading logic (existing)
         // Find latest BP file (format: "yyyyMMddhhmmss")
         var bpFiles: [String] = []
         
@@ -1223,9 +1374,101 @@ extension WellueSDK: VTMURATDeviceDelegate, VTMURATUtilsDelegate {
     private func handleReadFileEnd() {
         guard let fileData = downloadData, fileData.length > 0 else {
             logError("❌ [FILE] File read completed but no data received")
+            if isReadingECGFile {
+                isReadingECGFile = false
+                ecgFileReadAttempts = 0
+            }
             return
         }
         
+        // 🆕 ECG: Check if this is an ECG file
+        if isReadingECGFile {
+            logInfo("🫀 [ECG FILE] ECG file downloaded successfully (\(fileData.length) bytes), parsing ECG result...")
+            
+            // Parse ECG file structure according to Viatom File Parse Protocol
+            // ECG file structure: VTMBPECGResult header + waveform points
+            if fileData.length >= MemoryLayout<VTMBPECGResult>.size {
+                let ecgResult = VTMBLEParser.parseECGResult(fileData.subdata(with: NSRange(location: 0, length: MemoryLayout<VTMBPECGResult>.size)))
+                logInfo("🫀 [ECG FILE RESULT] ⭐ Heart Rate: \(ecgResult.hr), Result: \(ecgResult.result), QRS: \(ecgResult.qrs), PVCs: \(ecgResult.pvcs), QTC: \(ecgResult.qtc) ⭐")
+                
+                // ✅ FIX: Parse ECG waveform points manually (matching web portal byte order)
+                // Web portal: value = (bytes[i + 1] << 8) | bytes[i] (little-endian)
+                // parseBPPoints might not work correctly for ECG files - parse raw bytes instead
+                var ecgPointsArray: [Int] = []
+                if fileData.length > MemoryLayout<VTMBPECGResult>.size {
+                    let waveformData = fileData.subdata(with: NSRange(location: MemoryLayout<VTMBPECGResult>.size, length: fileData.length - MemoryLayout<VTMBPECGResult>.size))
+                    let bytes = [UInt8](waveformData)
+                    
+                    // Parse as little-endian Int16 (matching web portal)
+                    // Web portal: value = (bytes[i + 1] << 8) | bytes[i]
+                    for i in stride(from: 0, to: bytes.count - 1, by: 2) {
+                        let lowByte = UInt16(bytes[i])
+                        let highByte = UInt16(bytes[i + 1])
+                        let value = Int16(bitPattern: UInt16((highByte << 8) | lowByte))
+                        ecgPointsArray.append(Int(value))
+                    }
+                    
+                    logInfo("🫀 [ECG FILE] Parsed \(ecgPointsArray.count) ECG waveform points (manual parsing)")
+                    
+                    // Log first few non-zero points
+                    var nonZeroLogged = 0
+                    for (index, value) in ecgPointsArray.enumerated() {
+                        if value != 0 && nonZeroLogged < 5 {
+                            logInfo("🫀 [ECG FILE DEBUG] Point \(index): raw Int16=\(value)")
+                            nonZeroLogged += 1
+                        }
+                    }
+                }
+                
+                // Emit ECG result
+                var payload = JSObject()
+                payload["deviceId"] = currentDevice?.identifier.uuidString
+                payload["heartRate"] = Int(ecgResult.hr)
+                payload["result"] = Int(ecgResult.result)
+                payload["qrs"] = Int(ecgResult.qrs)
+                payload["pvcs"] = Int(ecgResult.pvcs)
+                payload["qtc"] = Int(ecgResult.qtc)
+                payload["source"] = "file" // Mark as file-based result
+                
+                // ✅ FIX: ecgPointsArray already populated above with manual parsing
+                let nonZeroCount = ecgPointsArray.filter { $0 != 0 }.count
+                logInfo("🫀 [ECG FILE DEBUG] Sending \(ecgPointsArray.count) raw Int16 samples, \(nonZeroCount) non-zero values")
+                payload["ecgData"] = ecgPointsArray
+                payload["scaleUvPerLsb"] = 3.098 // BP2 scale factor (μV/LSB) - chart will convert
+                payload["sampleRate"] = 125 // BP2 sample rate (Hz)
+                
+                logInfo("🫀 [ECG FILE] Emitting ECG result with HR: \(ecgResult.hr) BPM, QRS: \(ecgResult.qrs), QTC: \(ecgResult.qtc)")
+                notifyListeners("ecgData", data: payload)
+                // 🆕 FIX: Include all ECG result data in ecgLifecycle event
+                notifyListeners("ecgLifecycle", data: [
+                    "state": "stop",
+                    "finalHeartRate": Int(ecgResult.hr),
+                    "ecgQrsDuration": Int(ecgResult.qrs),
+                    "ecgQtInterval": Int(ecgResult.qtc),
+                    "ecgPrInterval": 160, // Default if not available
+                    "ecgRhythm": ecgResult.result == 0 ? "normal" : "abnormal",
+                    "ecgResult": Int(ecgResult.result),
+                    "ecgPvcs": Int(ecgResult.pvcs),
+                    "ecgData": ecgPointsArray,
+                    "scaleUvPerLsb": 3.098, // BP2 scale factor (μV/LSB)
+                    "sampleRate": 125
+                ])
+                
+                // Reset ECG file reading state
+                isReadingECGFile = false
+                ecgFileReadAttempts = 0
+                downloadingFileName = nil
+                downloadData = nil
+                return
+            } else {
+                logError("❌ [ECG FILE] Invalid ECG file size: \(fileData.length) bytes (expected at least \(MemoryLayout<VTMBPECGResult>.size))")
+                isReadingECGFile = false
+                ecgFileReadAttempts = 0
+                return
+            }
+        }
+        
+        // BP file parsing (existing logic)
         logInfo("✅ [FILE] File downloaded successfully (\(fileData.length) bytes), parsing BP result...")
         
         // Parse BP file structure according to Viatom File Parse Protocol

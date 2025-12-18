@@ -84,13 +84,18 @@ export default function EcgStripCanvas({
     const pxPerMmX = pxPerMm;
     const pxPerMmY = pxPerMm;
     
-    // Calculate max amplitude for grid scaling
-    const maxAmplitude = Math.max(...Array.from(rowData).map(Math.abs));
-    const maxMv = convertToMv(maxAmplitude);
+    // ✅ MATCH WEB PORTAL: Convert all samples to mV first
+    // Web portal: values = waveformData.map(c => c * mvPerCount) where mvPerCount = 0.003098
+    const mvSamples = Array.from(rowData).map(sample => convertToMv(sample));
+    const minMv = Math.min(...mvSamples);
+    const maxMv = Math.max(...mvSamples);
+    const midMv = (minMv + maxMv) / 2; // Baseline (midpoint) - matches web portal
+    const ampMv = Math.max(0.5, maxMv - minMv); // Amplitude range - matches web portal
     
-    // Calculate scaling factors - NO MARGINS, fill full canvas
+    // Calculate scaling factors
     const timeScale = width / (secondsPerRow * sampleRate); // Full width, no margins
-    const amplitudeScale = rowHeight / (maxAmplitude * 2); // Full height, no margins
+    // ✅ MATCH WEB PORTAL: Use 40% of row height for scaling (web portal uses cssH * 0.4)
+    const rowHeightScale = rowHeight * 0.4; // 40% of row height, matches web portal
 
     // Draw TRUE MILLIMETRE GRID (1mm minor, 5mm major) - 35% opacity grid behind waveform
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
@@ -158,11 +163,16 @@ export default function EcgStripCanvas({
     ctx.lineWidth = 2.0;
     ctx.beginPath();
 
+    // ✅ MATCH WEB PORTAL EXACTLY: Use same normalization formula
+    // Web portal: y = cssH * 0.5 - ((values[i] - mid) / amp) * (cssH * 0.4)
+    // Mobile: y = rowY + (rowHeight / 2) - ((sampleMv - midMv) / ampMv) * (rowHeight * 0.4)
     let firstPoint = true;
     for (let i = 0; i < rowData.length; i++) {
       const x = i * timeScale;
-      const sample = convertToMv(rowData[i]);
-      const y = rowY + (rowHeight / 2) - (sample * amplitudeScale);
+      const sampleMv = convertToMv(rowData[i]);
+      // ✅ EXACT WEB PORTAL FORMULA: Normalize by amplitude, then scale
+      const normalized = (sampleMv - midMv) / ampMv; // Range: [-1, 1]
+      const y = rowY + (rowHeight / 2) - (normalized * rowHeightScale);
 
       if (firstPoint) {
         ctx.moveTo(x, y);
@@ -215,14 +225,8 @@ export default function EcgStripCanvas({
     const rowHeight = height / rows; // Full height, no margins
     const totalDuration = samples.length / sampleRate;
 
-    // Draw title and info - WHITE TEXT ON BLACK
-    ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 18px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText('ECG Recording', width / 2, 25);
-
-    ctx.font = '14px sans-serif';
-    ctx.fillText(`Sample Rate: ${sampleRate} Hz | Scale: ${scaleUvPerLsb} ${scaleUvPerLsb === 1.0 ? 'mV/LSB' : 'μV/LSB'} | Duration: ${totalDuration.toFixed(1)}s | Total Samples: ${samples.length}`, width / 2, 45);
+    // ✅ REMOVED: Title and info text for full-screen chart (minimal mode)
+    // Text removed to show only the chart waveform
 
     // Draw each row - NO TOP MARGIN
     for (let i = 0; i < rows; i++) {
@@ -268,11 +272,7 @@ export default function EcgStripCanvas({
             />
           </div>
 
-          <div className="text-sm text-gray-600 space-y-1">
-            <p><strong>Layout:</strong> {rows} rows × {secondsPerRow}s each = {rows * secondsPerRow}s total</p>
-            <p><strong>Data:</strong> {samples.length} samples at {sampleRate} Hz</p>
-            <p><strong>Scale:</strong> {scaleUvPerLsb} {scaleUvPerLsb === 1.0 ? 'mV/LSB' : 'μV/LSB'}</p>
-          </div>
+          {/* ✅ REMOVED: Layout/Data/Scale text for cleaner full-screen display */}
         </div>
       )}
       
