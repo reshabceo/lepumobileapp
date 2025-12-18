@@ -277,13 +277,16 @@ export default function EcgStripCanvas({
       )}
       
       {minimal && (
-        <div className="overflow-hidden">
+        <div className="overflow-visible w-full">
           <canvas
             ref={canvasRef}
             width={width}
             height={height}
-            className="w-full h-auto"
-            style={{ maxWidth: '100%' }}
+            className="w-full h-auto block"
+            style={{ 
+              maxWidth: '100%',
+              imageRendering: 'crisp-edges'
+            }}
           />
         </div>
       )}

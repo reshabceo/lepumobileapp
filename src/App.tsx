@@ -37,6 +37,7 @@ import PatientInsuranceClaims from "./components/PatientInsuranceClaims";
 import { ManualVitalInput } from "./components/ManualVitalInput";
 import { PatientPrescriptions } from "./components/PatientPrescriptions";
 import Profile from "./pages/Profile";
+import { BackButtonHandler } from "./components/BackButtonHandler";
 
 const queryClient = new QueryClient();
 
@@ -54,6 +55,7 @@ const App = () => (
           <Toaster />
           <Sonner />
           <BrowserRouter>
+            <BackButtonHandler />
             <GlobalVideoCallNotification />
             <ChatSupportOnDashboard />
             <Routes>
