@@ -21,10 +21,13 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         let _ = String(describing: pluginType)
         
         // Reference 3: Force class initialization by checking if it responds to a method
-        // This ensures the class is fully loaded into the runtime
+        // This ensures the class is properly loaded into the runtime
         if WellueSDK.self.responds(to: #selector(WellueSDK.initialize(_:))) {
             // Class is properly loaded
         }
+        
+        // Note: Safari Web Inspector works automatically in Debug builds
+        // No additional code needed - just enable Safari's Develop menu
         
         return true
     }
