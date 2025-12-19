@@ -5,6 +5,9 @@ import { supabase, db } from '@/lib/supabase';
 import { useRealTimeVitals } from '@/hooks/useRealTimeVitals';
 import { useAuth } from '@/contexts/AuthContext';
 import jsPDF from 'jspdf';
+import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
+import { Share } from '@capacitor/share';
+import { Capacitor } from '@capacitor/core';
 
 interface PatientReport {
     id: string;
@@ -143,7 +146,7 @@ const PatientReportsView: React.FC = () => {
             // Generate signed URL for secure download from private bucket
             const { data, error } = await supabase.storage
                 .from('patient-reports')
-                .createSignedUrl(report.file_url, 60); // 60 seconds expiry
+                .createSignedUrl(report.file_url, 300); // 5 minutes expiry for better reliability
 
             if (error) {
                 console.error('Error creating signed URL:', error);
@@ -151,18 +154,101 @@ const PatientReportsView: React.FC = () => {
                 return;
             }
 
-            // Create a temporary download link with signed URL
-            const link = document.createElement('a');
-            link.href = data.signedUrl;
-            link.download = report.file_name;
-            link.target = '_blank';
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-        } catch (err) {
+            // Fetch the file as a blob
+            const response = await fetch(data.signedUrl);
+            if (!response.ok) {
+                throw new Error('Failed to fetch file');
+            }
+            const blob = await response.blob();
+
+            // Handle download based on platform
+            if (Capacitor.isNativePlatform()) {
+                // Native platform - use Filesystem and Share
+                try {
+                    // Convert blob to base64
+                    const reader = new FileReader();
+                    const base64Data = await new Promise<string>((resolve, reject) => {
+                        reader.onloadend = () => {
+                            const base64String = reader.result as string;
+                            // Remove data URL prefix
+                            const base64 = base64String.split(',')[1];
+                            resolve(base64);
+                        };
+                        reader.onerror = reject;
+                        reader.readAsDataURL(blob);
+                    });
+
+                    // Determine file extension and MIME type
+                    const fileExt = report.file_name.split('.').pop() || 'bin';
+                    const fileName = report.file_name.replace(/[^a-zA-Z0-9._-]/g, '_');
+                    const safeFileName = `patient_report_${Date.now()}_${fileName}`;
+
+                    // Check if file is text-based (for proper encoding)
+                    const isTextFile = ['txt', 'json', 'xml', 'csv', 'html', 'css', 'js'].includes(fileExt.toLowerCase());
+                    
+                    // Save to Documents directory
+                    // For binary files (PDF, images, etc.), we need to use base64 without UTF8 encoding
+                    const filePath = await Filesystem.writeFile({
+                        path: safeFileName,
+                        data: base64Data,
+                        directory: Directory.Documents,
+                        encoding: isTextFile ? Encoding.UTF8 : undefined, // Binary files don't need encoding
+                    });
+
+                    // Get URI for sharing
+                    const uri = await Filesystem.getUri({
+                        path: safeFileName,
+                        directory: Directory.Documents,
+                    });
+
+                    // Share the file (opens native share dialog)
+                    try {
+                        await Share.share({
+                            title: report.file_name,
+                            text: `Medical Report: ${report.title}`,
+                            url: (uri as any).uri || String(uri),
+                            dialogTitle: 'Share Medical Report',
+                        });
+                    } catch (shareError) {
+                        // If share fails, at least the file is saved
+                        console.log('Share dialog not available, file saved to:', (uri as any).uri || String(uri));
+                        alert(`File saved successfully. Location: ${(uri as any).uri || String(uri)}`);
+                    }
+                } catch (fsError: any) {
+                    console.error('Filesystem error:', fsError);
+                    // Fallback to web download method
+                    downloadBlobInApp(blob, report.file_name);
+                }
+            } else {
+                // Web platform - use in-app download without opening new tab
+                downloadBlobInApp(blob, report.file_name);
+            }
+        } catch (err: any) {
             console.error('Download error:', err);
-            alert('Failed to download report');
+            alert('Failed to download report: ' + (err.message || 'Unknown error'));
         }
+    };
+
+    // Helper function for web-based downloads that stay in-app
+    const downloadBlobInApp = (blob: Blob, fileName: string) => {
+        // Create object URL from blob
+        const url = window.URL.createObjectURL(blob);
+        
+        // Create a temporary anchor element
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = fileName;
+        link.style.display = 'none';
+        
+        // Append to body, click, and remove immediately
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        // Clean up the object URL after a short delay
+        setTimeout(() => {
+            window.URL.revokeObjectURL(url);
+        }, 100);
     };
 
     const downloadAnalysisAsPDF = (report: PatientReport) => {

@@ -38,6 +38,9 @@ import { ManualVitalInput } from "./components/ManualVitalInput";
 import { PatientPrescriptions } from "./components/PatientPrescriptions";
 import Profile from "./pages/Profile";
 import { BackButtonHandler } from "./components/BackButtonHandler";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
+import ContactUs from "./pages/ContactUs";
+import Support from "./pages/Support";
 
 const queryClient = new QueryClient();
 
@@ -203,6 +206,23 @@ const App = () => (
               <Route path="/reset-password" element={
                 <ProtectedRoute requireAuth={false}>
                   <ResetPasswordPage />
+                </ProtectedRoute>
+              } />
+
+              {/* Public informational pages */}
+              <Route path="/privacy-policy" element={
+                <ProtectedRoute requireAuth={false}>
+                  <PrivacyPolicy />
+                </ProtectedRoute>
+              } />
+              <Route path="/contact-us" element={
+                <ProtectedRoute requireAuth={false}>
+                  <ContactUs />
+                </ProtectedRoute>
+              } />
+              <Route path="/support" element={
+                <ProtectedRoute requireAuth={false}>
+                  <Support />
                 </ProtectedRoute>
               } />
 
