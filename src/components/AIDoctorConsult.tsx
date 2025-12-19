@@ -113,59 +113,80 @@ export const AIDoctorConsult: React.FC = () => {
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
       
-      // Check file size (max 10MB)
-      if (file.size > 10 * 1024 * 1024) {
+      // Check file size (max 5MB for better performance)
+      if (file.size > 5 * 1024 * 1024) {
         toast({
           title: "File too large",
-          description: `${file.name} is larger than 10MB. Please choose a smaller file.`,
+          description: `${file.name} is ${(file.size / (1024 * 1024)).toFixed(2)}MB. Please compress or use a file smaller than 5MB.`,
           variant: "destructive",
         });
         continue;
       }
 
-      // Check file type
+      // Check file type with more specific validation
       const allowedTypes = [
-        'image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp',
+        'image/jpeg', 'image/jpg', 'image/png', 'image/webp',
         'application/pdf',
-        'application/msword',
-        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
         'text/plain'
       ];
 
-      if (!allowedTypes.includes(file.type)) {
+      // Normalize type (handle jpg vs jpeg)
+      let fileType = file.type;
+      if (file.name.toLowerCase().endsWith('.jpg') && file.type === 'image/jpeg') {
+        fileType = 'image/jpeg';
+      }
+
+      if (!allowedTypes.includes(fileType)) {
         toast({
           title: "Unsupported file type",
-          description: `${file.name} is not a supported format. Please use images, PDFs, or documents.`,
+          description: `${file.name} is not supported. Please use: JPEG, PNG, WebP images, PDF, or text files.`,
           variant: "destructive",
         });
         continue;
       }
 
       try {
+        console.log(`📎 Processing file: ${file.name} (${fileType}, ${(file.size / 1024).toFixed(2)} KB)`);
+        
         const base64 = await fileToBase64(file);
+        
+        // Validate base64 output
+        if (!base64 || base64.length === 0) {
+          throw new Error('Failed to convert file to base64');
+        }
+        
+        console.log(`✅ File converted to base64: ${base64.length} characters`);
+        
         const attached: AttachedFile = {
           name: file.name,
-          type: file.type,
+          type: fileType,
           data: base64,
         };
 
         // Generate preview for images
-        if (file.type.startsWith('image/')) {
-          attached.preview = `data:${file.type};base64,${base64}`;
+        if (fileType.startsWith('image/')) {
+          attached.preview = `data:${fileType};base64,${base64}`;
         }
 
         newFiles.push(attached);
+        
+        toast({
+          title: "File attached",
+          description: `${file.name} is ready to send`,
+        });
       } catch (err) {
         console.error('Failed to read file:', err);
         toast({
           title: "Upload failed",
-          description: `Could not read ${file.name}. Please try again.`,
+          description: `Could not read ${file.name}. Please try a different file.`,
           variant: "destructive",
         });
       }
     }
 
-    setAttachedFiles((prev) => [...prev, ...newFiles]);
+    if (newFiles.length > 0) {
+      setAttachedFiles((prev) => [...prev, ...newFiles]);
+    }
     
     // Clear the input so the same file can be selected again
     if (fileInputRef.current) {
@@ -215,6 +236,13 @@ export const AIDoctorConsult: React.FC = () => {
         data: f.data,
       }));
 
+      console.log(`🚀 Sending request to AI doctor with ${uploadedFiles.length} file(s)`);
+      if (uploadedFiles.length > 0) {
+        uploadedFiles.forEach((f, idx) => {
+          console.log(`  File ${idx + 1}: ${f.mimeType}, ${f.data.length} chars`);
+        });
+      }
+
       const response = await runAIDoctorConsult({
         patientId: patientContext.id,
         age: patientContext.age,
@@ -225,6 +253,8 @@ export const AIDoctorConsult: React.FC = () => {
         messages,
         files: uploadedFiles.length > 0 ? uploadedFiles : undefined,
       });
+
+      console.log('✅ Received response from AI doctor');
 
       // Handle new conversational format OR legacy format
       const aiText =
@@ -244,14 +274,27 @@ export const AIDoctorConsult: React.FC = () => {
         content: `${safetyPrefix}${aiText}`,
       });
     } catch (err) {
-      console.error("AI doctor consult failed:", err);
+      console.error("❌ AI doctor consult failed:", err);
+      
+      // Add a fallback message for the AI
+      addMessage({
+        role: "ai",
+        content: "I apologize, but I encountered an issue analyzing your request. " +
+                 (err instanceof Error && err.message.includes('timeout')
+                   ? "The analysis took too long - this can happen with large files. Please try with a smaller or clearer file."
+                   : err instanceof Error && err.message.includes('file')
+                   ? err.message
+                   : "Please try again, and if the issue persists, try describing your symptoms without attachments first."),
+      });
+      
       toast({
-        title: "AI doctor unavailable",
+        title: "AI doctor issue",
         description:
           err instanceof Error
-            ? err.message
-            : "Something went wrong while contacting the AI doctor.",
+            ? err.message.substring(0, 150) // Limit error message length
+            : "Something went wrong. Please try again.",
         variant: "destructive",
+        duration: 5000,
       });
     } finally {
       setIsLoading(false);
@@ -456,7 +499,7 @@ export const AIDoctorConsult: React.FC = () => {
           <input
             ref={fileInputRef}
             type="file"
-            accept="image/*,.pdf,.doc,.docx,.txt"
+            accept="image/jpeg,image/jpg,image/png,image/webp,.pdf,.txt"
             multiple
             onChange={handleFileSelect}
             className="hidden"
@@ -496,7 +539,7 @@ export const AIDoctorConsult: React.FC = () => {
           </Button>
         </div>
         <p className="mt-1 text-[10px] text-white/50">
-          📎 Attach lab reports, X-rays, or medical documents (max 10MB each). This AI doctor uses Google Med-Gemini 2.5 Flash for medical reasoning.
+          📎 Attach lab reports, X-rays, or medical documents (max 5MB, JPEG/PNG/PDF/TXT). AI powered by Google Med-Gemini 2.5 Flash.
         </p>
       </div>
     </div>
