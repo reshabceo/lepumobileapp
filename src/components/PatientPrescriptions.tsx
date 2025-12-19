@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { toast } from 'sonner';
-import { Pill, Clock, Calendar, AlertCircle, CheckCircle, Bell, BellOff, ArrowLeft } from 'lucide-react';
+import { Pill, Clock, Calendar, AlertCircle, CheckCircle, Bell, BellOff, ArrowLeft, Edit2, Save, X } from 'lucide-react';
 import { format, isPast, parseISO } from 'date-fns';
 
 interface Prescription {
@@ -34,6 +34,8 @@ export const PatientPrescriptions = () => {
   const [reminders, setReminders] = useState<Reminder[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'active' | 'expired'>('active');
+  const [editingReminder, setEditingReminder] = useState<string | null>(null);
+  const [newReminderTime, setNewReminderTime] = useState<string>('');
 
   useEffect(() => {
     fetchPrescriptions();
@@ -144,6 +146,50 @@ export const PatientPrescriptions = () => {
     } catch (err) {
       console.error('Error:', err);
       toast.error('Failed to update reminders');
+    }
+  };
+
+  const startEditingReminder = (reminderId: string, currentTime: string) => {
+    setEditingReminder(reminderId);
+    setNewReminderTime(currentTime);
+  };
+
+  const cancelEditingReminder = () => {
+    setEditingReminder(null);
+    setNewReminderTime('');
+  };
+
+  const updateReminderTime = async (reminderId: string) => {
+    if (!newReminderTime) {
+      toast.error('Please enter a valid time');
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('medication_reminders')
+        .update({ reminder_time: newReminderTime })
+        .eq('id', reminderId);
+
+      if (error) {
+        console.error('Error updating reminder time:', error);
+        toast.error('Failed to update reminder time');
+        return;
+      }
+
+      // Update local state
+      setReminders(reminders.map(r => 
+        r.id === reminderId 
+          ? { ...r, reminder_time: newReminderTime }
+          : r
+      ));
+
+      setEditingReminder(null);
+      setNewReminderTime('');
+      toast.success('Reminder time updated successfully');
+    } catch (err) {
+      console.error('Error:', err);
+      toast.error('Failed to update reminder time');
     }
   };
 
@@ -316,33 +362,18 @@ export const PatientPrescriptions = () => {
                   {/* Reminders */}
                   {!expired && prescriptionReminders.length > 0 && (
                     <div className="pt-4 border-t border-emerald-500/20">
-                      <div className="flex items-center justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-1">
-                            <Bell className="w-4 h-4 text-emerald-400" />
-                            <span className="text-sm font-semibold text-emerald-200">
-                              Medication Reminders
-                            </span>
-                          </div>
-                          <div className="flex flex-wrap gap-2">
-                            {prescriptionReminders.map((reminder) => (
-                              <span
-                                key={reminder.id}
-                                className="px-2 py-1 rounded-md bg-emerald-500/20 border border-emerald-500/30 text-xs text-emerald-200"
-                              >
-                                {format(new Date(`2000-01-01T${reminder.reminder_time}`), 'h:mm a')}
-                              </span>
-                            ))}
-                          </div>
-                          <p className="text-xs text-emerald-200/60 mt-2">
-                            You'll receive notifications 30 minutes before each time
-                          </p>
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          <Bell className="w-4 h-4 text-emerald-400" />
+                          <span className="text-sm font-semibold text-emerald-200">
+                            Medication Reminders
+                          </span>
                         </div>
 
                         {/* Toggle Reminders */}
                         <button
                           onClick={() => toggleReminders(prescription.id, hasActiveReminders)}
-                          className={`ml-4 p-2 rounded-lg transition-all duration-300 ${
+                          className={`p-2 rounded-lg transition-all duration-300 ${
                             hasActiveReminders
                               ? 'bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30'
                               : 'bg-red-500/20 text-red-300 hover:bg-red-500/30'
@@ -355,6 +386,56 @@ export const PatientPrescriptions = () => {
                           )}
                         </button>
                       </div>
+
+                      <div className="space-y-2">
+                        {prescriptionReminders.map((reminder) => (
+                          <div
+                            key={reminder.id}
+                            className="flex items-center justify-between p-2 rounded-md bg-emerald-500/10 border border-emerald-500/20"
+                          >
+                            {editingReminder === reminder.id ? (
+                              // Edit mode
+                              <div className="flex items-center gap-2 flex-1">
+                                <input
+                                  type="time"
+                                  value={newReminderTime}
+                                  onChange={(e) => setNewReminderTime(e.target.value)}
+                                  className="px-2 py-1 rounded bg-emerald-950/40 border border-emerald-500/30 text-emerald-100 text-sm"
+                                />
+                                <button
+                                  onClick={() => updateReminderTime(reminder.id)}
+                                  className="p-1 rounded bg-emerald-600/20 text-emerald-300 hover:bg-emerald-600/30"
+                                >
+                                  <Save className="w-4 h-4" />
+                                </button>
+                                <button
+                                  onClick={cancelEditingReminder}
+                                  className="p-1 rounded bg-red-500/20 text-red-300 hover:bg-red-500/30"
+                                >
+                                  <X className="w-4 h-4" />
+                                </button>
+                              </div>
+                            ) : (
+                              // View mode
+                              <>
+                                <span className="text-sm text-emerald-200">
+                                  {format(new Date(`2000-01-01T${reminder.reminder_time}`), 'h:mm a')}
+                                </span>
+                                <button
+                                  onClick={() => startEditingReminder(reminder.id, reminder.reminder_time)}
+                                  className="p-1 rounded bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30"
+                                >
+                                  <Edit2 className="w-4 h-4" />
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+
+                      <p className="text-xs text-emerald-200/60 mt-2">
+                        You'll receive notifications 30 minutes before each time. Click edit to change reminder times.
+                      </p>
                     </div>
                   )}
                 </div>
@@ -367,6 +448,7 @@ export const PatientPrescriptions = () => {
     </div>
   );
 };
+
 
 
 

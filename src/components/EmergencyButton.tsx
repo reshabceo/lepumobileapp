@@ -153,25 +153,39 @@ export const EmergencyButton: React.FC<EmergencyButtonProps> = ({
                     patient_id: patientId,
                     doctor_id: doctorId,
                     alert_type: 'patient_triggered',
-                    severity: 'high',
-                    title: 'Patient Emergency Alert',
-                    description: `Emergency alert triggered by ${patientProfile?.full_name || 'Patient'}`,
+                    severity: 'critical',
+                    title: '🚨 PATIENT EMERGENCY ALERT',
+                    description: `Emergency alert triggered by ${patientProfile?.full_name || 'Patient'}. Immediate attention required!`,
                     vital_signs_data: null,
+                    is_resolved: false,
+                    call_initiated: false,
+                    ems_dispatched: false,
+                    hospital_notified: false
                 });
 
             if (alertError) {
+                console.error('Error creating alert:', alertError);
+                setIsTriggering(false);
                 throw alertError;
             }
 
             toast({
-                title: "Emergency Alert Sent!",
-                description: "Your doctor has been notified immediately.",
+                title: "🚨 Emergency Alert Sent!",
+                description: "Your doctor has been notified immediately and will respond as soon as possible.",
                 variant: "default",
+                duration: 5000,
             });
 
             setShowConfirm(false);
+            setIsTriggering(false);
         } catch (error) {
-            throw error;
+            console.error('Emergency alert error:', error);
+            setIsTriggering(false);
+            toast({
+                title: "Failed to Send Alert",
+                description: error instanceof Error ? error.message : "Please try again or call your doctor directly.",
+                variant: "destructive",
+            });
         }
     };
 
