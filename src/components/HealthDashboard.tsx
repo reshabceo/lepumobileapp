@@ -1256,7 +1256,7 @@ export const HealthDashboard = () => {
         </div>
 
         {/* Manual Vital Input Button - Basic Plan */}
-        <div className="mb-6">
+        <div className="mb-6 space-y-3">
           <button
             onClick={() => navigate("/manual-vitals")}
             className="w-full bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white font-bold py-5 rounded-xl flex items-center justify-center gap-3 transition-all duration-200 hover:scale-105 active:scale-95 border border-emerald-400/30 hover:border-emerald-400/50 shadow-lg"
@@ -1265,6 +1265,17 @@ export const HealthDashboard = () => {
             <div className="text-left">
               <div className="text-lg font-bold">Manual Vital Input</div>
               <div className="text-xs text-emerald-100/80">Basic Plan - Enter vitals manually</div>
+            </div>
+          </button>
+
+          <button
+            onClick={() => navigate("/vitals-history")}
+            className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold py-4 rounded-xl flex items-center justify-center gap-3 transition-all duration-200 hover:scale-105 active:scale-95 border border-blue-400/30 hover:border-blue-400/50 shadow-lg"
+          >
+            <BarChart3 size={20} className="text-white" />
+            <div className="text-left">
+              <div className="text-base font-bold">View Vitals History</div>
+              <div className="text-xs text-blue-100/80">Track your submitted vitals</div>
             </div>
           </button>
         </div>

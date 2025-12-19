@@ -135,13 +135,31 @@ export const ManualVitalInput = () => {
         return;
       }
 
+      // Get the patient ID from the patients table using auth user ID
+      const { data: patientData, error: patientError } = await supabase
+        .from('patients')
+        .select('id')
+        .eq('auth_user_id', user.id)
+        .single();
+
+      if (patientError || !patientData) {
+        console.error('Error fetching patient:', patientError);
+        toast({
+          title: 'Error',
+          description: 'Could not find patient profile. Please contact support.',
+          variant: 'destructive'
+        });
+        return;
+      }
+
+      const patientId = patientData.id;
       const timestamp = new Date().toISOString();
       const vitalsToInsert: any[] = [];
 
       // Blood Pressure - Match device format
       if (vitals.bloodPressureSystolic && vitals.bloodPressureDiastolic) {
         vitalsToInsert.push({
-          patient_id: user.id,
+          patient_id: patientId,
           measurement_type: 'blood_pressure',
           device_type: 'BP',
           data: {
@@ -161,7 +179,7 @@ export const ManualVitalInput = () => {
       // Heart Rate (only if not included in BP)
       if (vitals.heartRate && !(vitals.bloodPressureSystolic && vitals.bloodPressureDiastolic)) {
         vitalsToInsert.push({
-          patient_id: user.id,
+          patient_id: patientId,
           measurement_type: 'heart_rate',
           device_type: 'OXIMETER',
           data: {
@@ -179,7 +197,7 @@ export const ManualVitalInput = () => {
       // SpO2
       if (vitals.spo2) {
         vitalsToInsert.push({
-          patient_id: user.id,
+          patient_id: patientId,
           measurement_type: 'spo2',
           device_type: 'OXIMETER',
           data: {
@@ -198,7 +216,7 @@ export const ManualVitalInput = () => {
       // Temperature
       if (vitals.temperature) {
         vitalsToInsert.push({
-          patient_id: user.id,
+          patient_id: patientId,
           measurement_type: 'temperature',
           device_type: 'TEMPERATURE',
           data: {
@@ -217,7 +235,7 @@ export const ManualVitalInput = () => {
       // Blood Sugar
       if (vitals.bloodSugar) {
         vitalsToInsert.push({
-          patient_id: user.id,
+          patient_id: patientId,
           measurement_type: 'blood_glucose',
           device_type: 'GLUCOSE',
           data: {
@@ -240,6 +258,7 @@ export const ManualVitalInput = () => {
 
       if (error) {
         console.error('Error saving vitals:', error);
+        setSubmitting(false); // Stop loading on error
         toast({
           title: 'Error',
           description: 'Failed to save vitals. Please try again.',
@@ -263,15 +282,16 @@ export const ManualVitalInput = () => {
         bloodSugar: ''
       });
 
+      setSubmitting(false); // Stop loading after success
+
     } catch (error) {
       console.error('Error:', error);
+      setSubmitting(false); // Stop loading on catch
       toast({
         title: 'Error',
         description: 'Failed to save vitals',
         variant: 'destructive'
       });
-    } finally {
-      setSubmitting(false);
     }
   };
 
