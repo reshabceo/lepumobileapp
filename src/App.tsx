@@ -36,6 +36,7 @@ import AIDoctorPage from "./pages/AIDoctorPage";
 import PatientInsuranceClaims from "./components/PatientInsuranceClaims";
 import { ManualVitalInput } from "./components/ManualVitalInput";
 import { PatientPrescriptions } from "./components/PatientPrescriptions";
+import { PatientVitalsHistory } from "./components/PatientVitalsHistory";
 import Profile from "./pages/Profile";
 import { BackButtonHandler } from "./components/BackButtonHandler";
 
@@ -43,7 +44,9 @@ const queryClient = new QueryClient();
 
 const ChatSupportOnDashboard = () => {
   const location = useLocation();
-  if (location.pathname !== "/dashboard") return null;
+  // Only show ChatSupport on the home/dashboard page
+  const isDashboard = location.pathname === "/dashboard" || location.pathname === "/dashboard/";
+  if (!isDashboard) return null;
   return <ChatSupport />;
 };
 
@@ -180,6 +183,11 @@ const App = () => (
               <Route path="/prescriptions" element={
                 <ProtectedRoute>
                   <PatientPrescriptions />
+                </ProtectedRoute>
+              } />
+              <Route path="/vitals-history" element={
+                <ProtectedRoute>
+                  <PatientVitalsHistory />
                 </ProtectedRoute>
               } />
               <Route path="/profile" element={
