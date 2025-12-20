@@ -130,8 +130,8 @@ const PatientReportsView: React.FC = () => {
     // Filter reports based on active tab
     const filteredReports = reports.filter(report => {
         if (activeTab === 'from-doctor') {
-            // Show only reports uploaded by doctor (not by patient)
-            return !report.uploaded_by_patient;
+            // Show reports uploaded by doctor OR patient uploads that are fully analyzed
+            return !report.uploaded_by_patient || (report.uploaded_by_patient && report.sent_to_patient && report.analysis_status === 'completed' && !!report.analysis_data);
         } else {
             // Show all reports uploaded by patient (regardless of analysis status)
             return report.uploaded_by_patient;
@@ -389,22 +389,20 @@ const PatientReportsView: React.FC = () => {
                 <div className="flex bg-gray-800/50 rounded-lg p-1 mb-6">
                     <button
                         onClick={() => setActiveTab('from-doctor')}
-                        className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-md transition-all duration-200 ${
-                            activeTab === 'from-doctor'
-                                ? 'bg-blue-600 text-white shadow-lg'
-                                : 'text-gray-400 hover:text-white hover:bg-gray-700/50'
-                        }`}
+                        className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-md transition-all duration-200 ${activeTab === 'from-doctor'
+                            ? 'bg-blue-600 text-white shadow-lg'
+                            : 'text-gray-400 hover:text-white hover:bg-gray-700/50'
+                            }`}
                     >
                         <Stethoscope className="h-4 w-4" />
                         <span className="font-medium">From Doctor</span>
                     </button>
                     <button
                         onClick={() => setActiveTab('my-uploads')}
-                        className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-md transition-all duration-200 ${
-                            activeTab === 'my-uploads'
-                                ? 'bg-blue-600 text-white shadow-lg'
-                                : 'text-gray-400 hover:text-white hover:bg-gray-700/50'
-                        }`}
+                        className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-md transition-all duration-200 ${activeTab === 'my-uploads'
+                            ? 'bg-blue-600 text-white shadow-lg'
+                            : 'text-gray-400 hover:text-white hover:bg-gray-700/50'
+                            }`}
                     >
                         <Upload className="h-4 w-4" />
                         <span className="font-medium">My Uploads</span>
@@ -427,8 +425,8 @@ const PatientReportsView: React.FC = () => {
                             {activeTab === 'from-doctor' ? 'No Reports from Doctor' : 'No Uploads Yet'}
                         </h3>
                         <p className="text-gray-500">
-                            {activeTab === 'from-doctor' 
-                                ? 'Your doctor hasn\'t uploaded any reports yet.' 
+                            {activeTab === 'from-doctor'
+                                ? 'Your doctor hasn\'t uploaded any reports yet.'
                                 : 'You haven\'t uploaded any reports yet.'
                             }
                         </p>
@@ -498,14 +496,14 @@ const PatientReportsView: React.FC = () => {
                                     </div>
 
                                     <div className="flex gap-2">
-                                        <button
+                                        {activeTab === 'my-uploads' && <button
                                             onClick={() => downloadReport(report)}
                                             className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors"
                                         >
                                             <Download className="h-4 w-4" />
                                             <span className="text-sm">Download</span>
-                                        </button>
-                                        {report.sent_to_patient && report.analysis_status === 'completed' && report.analysis_data && (
+                                        </button>}
+                                        {activeTab === 'from-doctor' && report.sent_to_patient && report.analysis_status === 'completed' && report.analysis_data && (
                                             <button
                                                 onClick={() => downloadAnalysisAsPDF(report)}
                                                 className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg transition-colors"
