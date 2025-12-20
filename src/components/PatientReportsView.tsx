@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase, db } from '@/lib/supabase';
 import { useRealTimeVitals } from '@/hooks/useRealTimeVitals';
 import { useAuth } from '@/contexts/AuthContext';
-import jsPDF from 'jspdf';
+import html2pdf from 'html2pdf.js';
 
 interface PatientReport {
     id: string;
@@ -21,6 +21,452 @@ interface PatientReport {
     analysis_data?: any;
     analysis_status?: 'pending' | 'processing' | 'completed' | 'failed';
 }
+
+const generateReportHTML = (analysisData: any, reportTitle: string): string => {
+    const currentDate = new Date();
+    const formatDate = currentDate.toLocaleDateString();
+    const formatTime = currentDate.toLocaleTimeString();
+
+    // Helper function to convert markdown to HTML
+    const markdownToHtml = (text: string): string => {
+        if (!text) return '';
+        return text
+            .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>') // Bold **text**
+            .replace(/\*(.+?)\*/g, '<em>$1</em>') // Italic *text*
+            .replace(/\n/g, '<br>'); // Line breaks
+    };
+
+    // Helper function to generate lab results table
+    const generateLabResultsTable = () => {
+        if (!analysisData.labResults || analysisData.labResults.length === 0) return '';
+
+        return `
+      <div class="section">
+        <div class="section-header success">
+          <span class="icon">🧪</span>
+          Laboratory Results
+        </div>
+        <div class="card">
+          <table style="width: 100%; border-collapse: collapse; margin-top: 10px;">
+            <thead>
+              <tr style="border-bottom: 2px solid #e5e7eb;">
+                <th style="text-align: left; padding: 8px; font-weight: 600;">Test Name</th>
+                <th style="text-align: left; padding: 8px; font-weight: 600;">Result</th>
+                <th style="text-align: left; padding: 8px; font-weight: 600;">Unit</th>
+                <th style="text-align: left; padding: 8px; font-weight: 600;">Reference Range</th>
+                <th style="text-align: left; padding: 8px; font-weight: 600;">Flag</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${analysisData.labResults.map((result: any) => `
+                <tr style="border-bottom: 1px solid #f3f4f6;">
+                  <td style="padding: 8px; font-weight: 500;">${result.testName || 'N/A'}</td>
+                  <td style="padding: 8px;">${result.result || 'N/A'}</td>
+                  <td style="padding: 8px; color: #6b7280;">${result.unit || 'N/A'}</td>
+                  <td style="padding: 8px; color: #6b7280;">${result.referenceRange || 'N/A'}</td>
+                  <td style="padding: 8px;">
+                    <span style="padding: 4px 8px; border-radius: 12px; font-size: 12px; font-weight: 500; ${result.flag === 'CRITICAL' ? 'background-color: #fee2e2; color: #991b1b;' :
+                result.flag === 'HIGH' ? 'background-color: #fed7aa; color: #c2410c;' :
+                    result.flag === 'LOW' ? 'background-color: #dbeafe; color: #1e40af;' :
+                        'background-color: #dcfce7; color: #166534;'
+            }">${result.flag || 'NORMAL'}</span>
+                  </td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>`;
+    };
+
+    // Helper function to generate findings list
+    const generateFindingsList = () => {
+        if (!analysisData.analysis?.keyFindings || analysisData.analysis.keyFindings.length === 0) return '';
+
+        return `
+      <div class="section">
+        <div class="section-header success">
+          <span class="icon">🔍</span>
+          Key Findings
+        </div>
+        <div class="card">
+          <ul style="list-style: none; padding: 0; margin: 0;">
+            ${analysisData.analysis.keyFindings.map((finding: string) => `
+              <li style="display: flex; align-items: flex-start; gap: 8px; margin-bottom: 8px;">
+                <div style="width: 6px; height: 6px; border-radius: 50%; background-color: #3b82f6; margin-top: 8px; flex-shrink: 0;"></div>
+                <span style="font-size: 14px; line-height: 1.5;">${markdownToHtml(finding)}</span>
+              </li>
+            `).join('')}
+          </ul>
+        </div>
+      </div>`;
+    };
+
+    // Helper function to generate critical risks
+    const generateCriticalRisks = () => {
+        if (!analysisData.advancedReport?.criticalRisks || analysisData.advancedReport.criticalRisks.length === 0) return '';
+
+        return `
+      <div class="section">
+        <div class="section-header danger">
+          <span class="icon">⚠️</span>
+          Critical Risks & Alerts
+        </div>
+        <div class="card">
+          <ul style="list-style: none; padding: 0; margin: 0;">
+            ${analysisData.advancedReport.criticalRisks.map((risk: string) => `
+              <li style="display: flex; align-items: flex-start; gap: 8px; margin-bottom: 8px; padding: 12px; background-color: #fef2f2; border-left: 4px solid #ef4444; border-radius: 0 8px 8px 0;">
+                <span style="color: #ef4444; font-size: 16px; margin-top: 2px;">🚨</span>
+                <span style="font-size: 14px; line-height: 1.5; color: #991b1b;">${markdownToHtml(risk)}</span>
+              </li>
+            `).join('')}
+          </ul>
+        </div>
+      </div>`;
+    };
+
+    // Helper function to generate recommendations
+    const generateRecommendations = () => {
+        if (!analysisData.analysis?.recommendations || analysisData.analysis.recommendations.length === 0) return '';
+
+        return `
+      <div class="section">
+        <div class="section-header success">
+          <span class="icon">💊</span>
+          Recommendations
+        </div>
+        <div class="card">
+          <ul style="list-style: none; padding: 0; margin: 0;">
+            ${analysisData.analysis.recommendations.map((recommendation: string) => `
+              <li style="display: flex; align-items: flex-start; gap: 8px; margin-bottom: 8px;">
+                <div style="width: 6px; height: 6px; border-radius: 50%; background-color: #22c55e; margin-top: 8px; flex-shrink: 0;"></div>
+                <span style="font-size: 14px; line-height: 1.5;">${markdownToHtml(recommendation)}</span>
+              </li>
+            `).join('')}
+          </ul>
+        </div>
+      </div>`;
+    };
+
+    return `
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>${reportTitle}</title>
+      <style>
+        * {
+          box-sizing: border-box;
+        }
+        
+        body {
+          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+          line-height: 1.6;
+          color: #374151;
+          margin: 0;
+          padding: 15px;
+          background-color: #f9fafb;
+          max-width: 100%;
+          overflow-x: hidden;
+        }
+        
+        .header {
+          background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+          color: white;
+          padding: 20px 15px;
+          border-radius: 12px;
+          margin-bottom: 20px;
+          text-align: center;
+          box-shadow: 0 10px 25px rgba(59, 130, 246, 0.3);
+          word-wrap: break-word;
+          overflow-wrap: break-word;
+        }
+        
+        .header h1 {
+          margin: 0;
+          font-size: 1.8rem;
+          font-weight: 700;
+          text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+          word-wrap: break-word;
+        }
+        
+        .header .subtitle {
+          margin-top: 8px;
+          font-size: 0.95rem;
+          opacity: 0.9;
+          word-wrap: break-word;
+        }
+        
+        .section {
+          margin-bottom: 20px;
+          page-break-inside: avoid;
+        }
+        
+        .section-header {
+          display: flex;
+          align-items: center;
+          padding: 12px 15px;
+          border-radius: 8px 8px 0 0;
+          color: white;
+          font-weight: 600;
+          font-size: 1.1rem;
+          text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+          word-wrap: break-word;
+        }
+        
+        .section-header.primary { background: linear-gradient(135deg, #3b82f6, #1e40af); }
+        .section-header.success { background: linear-gradient(135deg, #22c55e, #15803d); }
+        .section-header.warning { background: linear-gradient(135deg, #f59e0b, #d97706); }
+        .section-header.danger { background: linear-gradient(135deg, #ef4444, #dc2626); }
+        
+        .section-header .icon {
+          margin-right: 10px;
+          font-size: 1.4rem;
+        }
+        
+        .card {
+          background: white;
+          border: 1px solid #e5e7eb;
+          border-radius: 0 0 12px 12px;
+          padding: 15px;
+          box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+          word-wrap: break-word;
+          overflow-wrap: break-word;
+          max-width: 100%;
+        }
+        
+        .card p, .card li, .card span {
+          word-wrap: break-word;
+          overflow-wrap: break-word;
+          max-width: 100%;
+        }
+        
+        .patient-grid {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 12px;
+          margin-top: 12px;
+        }
+        
+        .patient-item {
+          padding: 10px;
+          background: #f8fafc;
+          border-radius: 8px;
+          border-left: 4px solid #3b82f6;
+          word-wrap: break-word;
+          overflow-wrap: break-word;
+        }
+        
+        .patient-label {
+          font-size: 0.85rem;
+          color: #6b7280;
+          margin-bottom: 4px;
+        }
+        
+        .patient-value {
+          font-weight: 600;
+          color: #111827;
+          font-size: 0.95rem;
+          word-wrap: break-word;
+          overflow-wrap: break-word;
+        }
+        
+        .disclaimer {
+          background: #fef2f2;
+          border: 2px solid #fca5a5;
+          border-radius: 12px;
+          padding: 15px;
+          margin-top: 30px;
+          word-wrap: break-word;
+          overflow-wrap: break-word;
+          page-break-inside: avoid;
+        }
+        
+        .disclaimer-title {
+          color: #b91c1c;
+          font-weight: 700;
+          font-size: 1.1rem;
+          margin-bottom: 12px;
+          display: flex;
+          align-items: center;
+        }
+        
+        .disclaimer-text {
+          color: #7f1d1d;
+          line-height: 1.6;
+          font-size: 0.9rem;
+        }
+        
+        table {
+          width: 100%;
+          border-collapse: collapse;
+          margin-top: 10px;
+          table-layout: fixed;
+        }
+        
+        table td, table th {
+          word-wrap: break-word;
+          overflow-wrap: break-word;
+          padding: 6px;
+        }
+        
+        ul, ol {
+          padding-left: 20px;
+          margin: 10px 0;
+        }
+        
+        li {
+          margin-bottom: 6px;
+          word-wrap: break-word;
+          overflow-wrap: break-word;
+          line-height: 1.5;
+        }
+        
+        @media print {
+          body { 
+            background: white; 
+            padding: 10px;
+            max-width: 100%;
+          }
+          .header { box-shadow: none; }
+          .card { box-shadow: none; border: 1px solid #ccc; }
+          .section { page-break-inside: avoid; }
+        }
+      </style>
+    </head>
+    <body>
+      <div class="header">
+        <h1>🏥 ${reportTitle}</h1>
+        <div class="subtitle">Generated on ${formatDate} at ${formatTime}</div>
+      </div>
+
+      <!-- Patient Information Section -->
+      ${analysisData.patientData ? `
+      <div class="section">
+        <div class="section-header primary">
+          <span class="icon">👤</span>
+          Patient Information
+        </div>
+        <div class="card">
+          <div class="patient-grid">
+            ${[
+                { label: '📋 Full Name', value: analysisData.patientData.fullName },
+                { label: '🆔 Patient ID', value: analysisData.patientData.patientId },
+                { label: '📄 MRN', value: analysisData.patientData.mrn },
+                { label: '🎂 Age', value: analysisData.patientData.age },
+                { label: '⚧ Gender', value: analysisData.patientData.sex },
+                { label: '📅 Date of Birth', value: analysisData.patientData.dateOfBirth },
+                { label: '🔬 Study Date', value: analysisData.patientData.studyDate },
+                { label: '📊 Report Date', value: analysisData.patientData.reportDate }
+            ].filter(item => item.value).map(item => `
+              <div class="patient-item">
+                <div class="patient-label">${item.label}:</div>
+                <div class="patient-value">${item.value}</div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      </div>
+      ` : ''}
+
+      ${analysisData.analysis?.summary ? `
+      <div class="section">
+        <div class="section-header primary">
+          <span class="icon">📋</span>
+          Analysis Summary
+        </div>
+        <div class="card">
+          <p style="white-space: pre-line; line-height: 1.7;">${markdownToHtml(analysisData.analysis.summary)}</p>
+        </div>
+      </div>
+      ` : ''}
+
+      ${generateLabResultsTable()}
+
+      ${generateFindingsList()}
+
+      ${analysisData.analysis?.impression ? `
+      <div class="section">
+        <div class="section-header primary">
+          <span class="icon">👩‍⚕️</span>
+          Clinical Impression
+        </div>
+        <div class="card">
+          <p style="white-space: pre-line; line-height: 1.7;">${markdownToHtml(analysisData.analysis.impression)}</p>
+        </div>
+      </div>
+      ` : ''}
+
+      ${generateRecommendations()}
+
+      ${generateCriticalRisks()}
+
+      ${analysisData.advancedReport?.clinicalSummary ? `
+      <div class="section">
+        <div class="section-header success">
+          <span class="icon">🩺</span>
+          Clinical Summary (Advanced Analysis)
+        </div>
+        <div class="card">
+          <p style="white-space: pre-line; line-height: 1.7;">${markdownToHtml(analysisData.advancedReport.clinicalSummary)}</p>
+        </div>
+      </div>
+      ` : ''}
+
+      ${analysisData.advancedReport?.patientSummary ? `
+      <div class="section">
+        <div class="section-header success">
+          <span class="icon">👤</span>
+          Patient-Friendly Summary
+        </div>
+        <div class="card">
+          ${analysisData.advancedReport.patientSummary.explanation ? `
+            <div style="margin-bottom: 20px;">
+              <h3 style="color: #3b82f6; display: flex; align-items: center;">💡 What This Means for You:</h3>
+              <p style="line-height: 1.7;">${markdownToHtml(analysisData.advancedReport.patientSummary.explanation)}</p>
+            </div>
+          ` : ''}
+
+          ${analysisData.advancedReport.patientSummary.keyPoints && analysisData.advancedReport.patientSummary.keyPoints.length > 0 ? `
+            <div style="margin-bottom: 20px;">
+              <h3 style="color: #22c55e; display: flex; align-items: center;">🔑 Key Points:</h3>
+              ${analysisData.advancedReport.patientSummary.keyPoints.map((point: string) => `
+                <div style="display: flex; align-items: flex-start; gap: 8px; margin-bottom: 8px; padding: 12px; background-color: #f0fdf4; border-left: 4px solid #22c55e; border-radius: 0 8px 8px 0;">
+                  <span style="color: #22c55e; font-size: 16px; margin-top: 2px;">✨</span>
+                  <span style="font-size: 14px; line-height: 1.5;">${markdownToHtml(point)}</span>
+                </div>
+              `).join('')}
+            </div>
+          ` : ''}
+
+          ${analysisData.advancedReport.patientSummary.nextSteps && analysisData.advancedReport.patientSummary.nextSteps.length > 0 ? `
+            <div>
+              <h3 style="color: #3b82f6; display: flex; align-items: center;">👣 Next Steps:</h3>
+              ${analysisData.advancedReport.patientSummary.nextSteps.map((step: string) => `
+                <div style="display: flex; align-items: flex-start; gap: 8px; margin-bottom: 8px; padding: 12px; background-color: #f0fdf4; border-left: 4px solid #22c55e; border-radius: 0 8px 8px 0;">
+                  <span style="color: #22c55e; font-size: 16px; margin-top: 2px;">▶️</span>
+                  <span style="font-size: 14px; line-height: 1.5;">${markdownToHtml(step)}</span>
+                </div>
+              `).join('')}
+            </div>
+          ` : ''}
+        </div>
+      </div>
+      ` : ''}
+
+      <div class="disclaimer">
+        <div class="disclaimer-title">
+          ⚠️ Medical Disclaimer
+        </div>
+        <div class="disclaimer-text">
+          This AI analysis is for informational purposes only and should not replace professional medical advice, diagnosis, or treatment. Always consult with qualified healthcare professionals for medical decisions.
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+};
 
 const PatientReportsView: React.FC = () => {
     const navigate = useNavigate();
@@ -165,120 +611,53 @@ const PatientReportsView: React.FC = () => {
         }
     };
 
-    const downloadAnalysisAsPDF = (report: PatientReport) => {
+    const downloadAnalysisAsPDF = async (report: PatientReport) => {
         if (!report.analysis_data) {
             alert('No analysis data available');
             return;
         }
 
         try {
-            const doc = new jsPDF();
-            const pageHeight = doc.internal.pageSize.height;
-            const pageWidth = doc.internal.pageSize.width;
-            const margin = 20;
-            const lineHeight = 7;
-            const maxLineWidth = pageWidth - 2 * margin;
-            let yPosition = margin;
+            console.log('Generating PDF... Please wait.');
 
-            const addText = (text: string, fontSize: number = 10, isBold: boolean = false) => {
-                doc.setFontSize(fontSize);
-                doc.setFont(undefined, isBold ? 'bold' : 'normal');
-                const lines = doc.splitTextToSize(String(text || ''), maxLineWidth);
-                for (const line of lines) {
-                    if (yPosition + lineHeight > pageHeight - margin) {
-                        doc.addPage();
-                        yPosition = margin;
-                    }
-                    doc.text(line, margin, yPosition);
-                    yPosition += lineHeight;
-                }
-                yPosition += lineHeight * 0.5;
+            // Generate HTML content
+            const htmlContent = generateReportHTML(report.analysis_data, report.title);
+
+            // Create a temporary element to hold the HTML
+            const element = document.createElement('div');
+            element.innerHTML = htmlContent;
+            element.style.width = '190mm'; // A4 width minus margins
+            element.style.maxWidth = '190mm';
+            element.style.margin = '0 auto';
+            element.style.padding = '0';
+            element.style.boxSizing = 'border-box';
+            element.style.overflowX = 'hidden';
+
+            // Configure PDF options
+            const opt = {
+                margin: [10, 10, 10, 10] as [number, number, number, number],
+                filename: `${report.title.replace(/[^a-z0-9]/gi, '_')}_Analysis.pdf`,
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: {
+                    scale: 2,
+                    useCORS: true,
+                    logging: false,
+                    letterRendering: true,
+                    windowWidth: 794, // A4 width in pixels at 96 DPI
+                    width: 794
+                },
+                jsPDF: {
+                    unit: 'mm',
+                    format: 'a4',
+                    orientation: 'portrait',
+                    compress: true
+                },
+                pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
             };
 
-            const addSection = (title: string, content: string | string[] | undefined) => {
-                if (!content) return;
-                addText(title, 11, true);
-                if (Array.isArray(content)) {
-                    content.forEach(item => addText(`• ${item}`, 9));
-                } else {
-                    addText(content, 9);
-                }
-                yPosition += 3;
-            };
+            // Generate and download PDF
+            await html2pdf().set(opt).from(element).save();
 
-            // Header
-            addText('Medical Analysis Report', 18, true);
-            addText(report.title, 12);
-            yPosition += 5;
-
-            const data = report.analysis_data;
-
-            // Patient Data
-            if (data.patientData) {
-                addText('Patient Information', 14, true);
-                if (data.patientData.fullName) addText(`Name: ${data.patientData.fullName}`, 10);
-                if (data.patientData.age) addText(`Age: ${data.patientData.age}`, 10);
-                if (data.patientData.sex) addText(`Sex: ${data.patientData.sex}`, 10);
-                yPosition += 5;
-            }
-
-            // Analysis Summary
-            if (data.analysis) {
-                addText('Analysis Summary', 14, true);
-                if (data.analysis.summary) addText(data.analysis.summary, 10);
-                addSection('Key Findings:', data.analysis.keyFindings);
-                if (data.analysis.impression) {
-                    addText('Clinical Impression:', 11, true);
-                    addText(data.analysis.impression, 10);
-                }
-                addSection('Recommendations:', data.analysis.recommendations);
-                yPosition += 5;
-            }
-
-            // Lab Results
-            if (data.labResults && data.labResults.length > 0) {
-                addText('Lab Results', 14, true);
-                data.labResults.forEach((result: any) => {
-                    addText(`${result.testName}: ${result.result} ${result.unit || ''} (${result.flag || 'NORMAL'})`, 9);
-                });
-                yPosition += 5;
-            }
-
-            // Advanced Report
-            if (data.advancedReport) {
-                const adv = data.advancedReport;
-                if (adv.clinicalSummary) {
-                    addText('Clinical Summary (Advanced)', 14, true);
-                    addText(adv.clinicalSummary, 10);
-                    yPosition += 5;
-                }
-                addSection('Critical Risks:', adv.criticalRisks);
-                if (adv.patientSummary) {
-                    addText('Patient-Friendly Summary', 14, true);
-                    if (adv.patientSummary.explanation) {
-                        addText('What This Means:', 11, true);
-                        addText(adv.patientSummary.explanation);
-                        yPosition += 3;
-                    }
-                    addSection('Key Points:', adv.patientSummary.keyPoints);
-                    addSection('Next Steps:', adv.patientSummary.nextSteps);
-                }
-            }
-
-            // Footer
-            doc.setFontSize(8);
-            doc.setFont(undefined, 'italic');
-            const disclaimerY = pageHeight - 15;
-            doc.text('⚠️ Medical Disclaimer:', margin, disclaimerY);
-            const disclaimerText = 'This AI analysis is for informational purposes only and should not replace professional medical advice.';
-            const disclaimerLines = doc.splitTextToSize(disclaimerText, maxLineWidth);
-            disclaimerLines.forEach((line: string, idx: number) => {
-                doc.text(line, margin, disclaimerY + 4 + (idx * 3));
-            });
-
-            // Save
-            const fileName = `${report.title.replace(/[^a-z0-9]/gi, '_')}_analysis.pdf`;
-            doc.save(fileName);
         } catch (error: any) {
             console.error('Error generating PDF:', error);
             alert(`Failed to generate PDF: ${error.message}`);
