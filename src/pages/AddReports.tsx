@@ -435,6 +435,9 @@ export default function AddReports() {
     setUploading(true);
     setUploadProgress(0);
 
+    // Declare progress interval at function scope so it can be cleared in finally
+    let progressInterval: NodeJS.Timeout | null = null;
+
     try {
       console.log('📤 Starting file upload...', {
         fileName: selectedFile.name,
@@ -444,121 +447,108 @@ export default function AddReports() {
         isNative: Capacitor.isNativePlatform(),
       });
 
-      // For Android, use a simpler file name
+      // Generate file name with patient ID prefix
       const fileExt = selectedFile.name.split('.').pop()?.toLowerCase() || 'jpg';
       const timestamp = Date.now();
       const randomId = Math.random().toString(36).substring(7);
       const fileName = `${profile.id}/report_${timestamp}_${randomId}.${fileExt}`;
 
-      // Create a Blob for reliable handling
-      let fileToUpload = selectedFile;
-      
-      // For Android, ensure we have a proper Blob
-      if (Capacitor.isNativePlatform()) {
-        try {
-          const arrayBuffer = await selectedFile.arrayBuffer();
-          fileToUpload = new File([arrayBuffer], selectedFile.name, {
-            type: selectedFile.type,
-            lastModified: selectedFile.lastModified,
-          });
-        } catch (blobError) {
-          console.warn('⚠️ Could not convert to Blob, using original file:', blobError);
-        }
-      }
-
-      // Upload to Supabase Storage
-      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-      if (sessionError || !sessionData.session?.access_token) {
-        console.error('❌ Session error:', sessionError);
-        toast({
-          title: "Authentication Error",
-          description: "Please sign in again",
-          variant: "destructive",
-        });
-        setUploading(false);
-        setUploadProgress(0);
-        return false;
-      }
-
-      const accessToken = sessionData.session.access_token;
-      const uploadUrl = `${supabaseUrl}/storage/v1/object/patient-reports/${fileName}`;
-
-      // Use XMLHttpRequest for Android (better support than fetch)
-      const uploadViaXHR = (): Promise<any> => {
-        return new Promise((resolve, reject) => {
-          const xhr = new XMLHttpRequest();
-          
-          xhr.open('POST', uploadUrl, true);
-          xhr.setRequestHeader('Authorization', `Bearer ${accessToken}`);
-          xhr.setRequestHeader('x-upsert', 'false');
-          
-          // Add progress monitoring
-          xhr.upload.onprogress = (event) => {
-            if (event.lengthComputable) {
-              const percentComplete = (event.loaded / event.total) * 100;
-              setUploadProgress(Math.round(percentComplete));
-              console.log(`📊 Upload progress: ${percentComplete.toFixed(2)}%`);
-            }
-          };
-
-          xhr.onload = () => {
-            if (xhr.status >= 200 && xhr.status < 300) {
-              try {
-                const response = JSON.parse(xhr.responseText);
-                resolve(response);
-              } catch (e) {
-                resolve(xhr.responseText);
-              }
-            } else {
-              reject(new Error(`Upload failed: ${xhr.status} ${xhr.statusText}`));
-            }
-          };
-
-          xhr.onerror = () => {
-            reject(new Error('Network error during upload'));
-          };
-
-          xhr.ontimeout = () => {
-            reject(new Error('Upload timeout'));
-          };
-
-          // Set longer timeout for Android
-          xhr.timeout = Capacitor.isNativePlatform() ? 300000 : 60000; // 5 minutes for native
-
-          const formData = new FormData();
-          formData.append('file', fileToUpload);
-          
-          console.log('🚀 Starting upload via XHR...');
-          xhr.send(formData);
-        });
-      };
-
-      let uploadData;
       try {
-        // Try XHR first for Android
-        if (Capacitor.isNativePlatform()) {
-          uploadData = await uploadViaXHR();
-        } else {
-          // Use fetch for web
-          const formData = new FormData();
-          formData.append('file', fileToUpload);
-
-          const response = await fetch(uploadUrl, {
-            method: 'POST',
-            headers: {
-              Authorization: `Bearer ${accessToken}`,
-              'x-upsert': 'false',
-            },
-            body: formData,
+        // Use Supabase Storage client API (works better on native platforms)
+        console.log('🚀 Uploading to Supabase Storage...');
+        
+        // Start progress simulation
+        progressInterval = setInterval(() => {
+          setUploadProgress((prev) => {
+            // Gradually increase progress, but don't go above 90% until upload completes
+            if (prev < 90) {
+              return Math.min(prev + 5, 90);
+            }
+            return prev;
+          });
+        }, 500);
+        
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('patient-reports')
+          .upload(fileName, selectedFile, {
+            cacheControl: '3600',
+            upsert: false,
+            contentType: selectedFile.type || 'application/octet-stream',
           });
 
-          if (!response.ok) {
-            throw new Error(`Upload failed: ${response.status}`);
-          }
-          uploadData = await response.json();
+        // Clear progress interval once upload completes
+        if (progressInterval) {
+          clearInterval(progressInterval);
+          progressInterval = null;
         }
 
-        console.log('✅ File uploaded:', uploadData);
+        if (uploadError) {
+          console.error('❌ Upload error:', uploadError);
+          
+          let errorMessage = uploadError.message || 'Upload failed';
+          
+          // Provide user-friendly error messages
+          if (errorMessage.includes('timeout') || errorMessage.includes('Network request failed')) {
+            errorMessage = "Upload took too long. Check your internet connection and try again.";
+          } else if (errorMessage.includes('Failed to fetch') || errorMessage.includes('Network error')) {
+            errorMessage = "Network connection issue. Please check your internet and try again.";
+          } else if (errorMessage.includes('413') || errorMessage.includes('too large') || errorMessage.includes('Payload too large')) {
+            errorMessage = "File is too large. Maximum size is 20MB on mobile.";
+          } else if (errorMessage.includes('JWT') || errorMessage.includes('token') || errorMessage.includes('auth')) {
+            errorMessage = "Authentication error. Please sign in again.";
+          } else if (errorMessage.includes('duplicate') || errorMessage.includes('already exists')) {
+            // Retry with a new filename if duplicate
+            const retryFileName = `${profile.id}/report_${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
+            console.log('🔄 Retrying with new filename:', retryFileName);
+            
+            const { data: retryData, error: retryError } = await supabase.storage
+              .from('patient-reports')
+              .upload(retryFileName, selectedFile, {
+                cacheControl: '3600',
+                upsert: false,
+                contentType: selectedFile.type || 'application/octet-stream',
+              });
+
+            if (retryError) {
+              throw retryError;
+            }
+            
+            // Use retry filename for database entry
+            const finalFileName = retryFileName;
+            const { error: insertError } = await supabase
+              .from('patient_reports')
+              .insert({
+                patient_id: profile.id,
+                doctor_id: profile.assigned_doctor_id,
+                title: `${reportName} (by Dr. ${doctorName})`,
+                description: `Uploaded by patient. Consulted with: ${doctorName}`,
+                report_type: reportType,
+                file_url: finalFileName,
+                file_name: selectedFile.name,
+                file_size: selectedFile.size,
+                mime_type: selectedFile.type,
+                uploaded_by_patient: true,
+              });
+
+            if (insertError) {
+              console.error('❌ Database error:', insertError);
+              throw insertError;
+            }
+
+            setUploadProgress(100);
+            toast({
+              title: "Success!",
+              description: "Report uploaded successfully",
+            });
+
+            setTimeout(() => navigate('/reports'), 1000);
+            return true;
+          }
+
+          throw new Error(errorMessage);
+        }
+
+        console.log('✅ File uploaded successfully:', uploadData);
 
         // Save to database
         const { error: insertError } = await supabase
@@ -591,6 +581,12 @@ export default function AddReports() {
         return true;
 
       } catch (uploadError: any) {
+        // Clear progress interval on error
+        if (progressInterval) {
+          clearInterval(progressInterval);
+          progressInterval = null;
+        }
+        
         console.error('❌ Upload failed:', uploadError);
         
         let errorMessage = uploadError.message || 'Upload failed';
@@ -600,8 +596,10 @@ export default function AddReports() {
           errorMessage = "Upload took too long. Check your internet connection and try again.";
         } else if (errorMessage.includes('Failed to fetch') || errorMessage.includes('Network error')) {
           errorMessage = "Network connection issue. Please check your internet and try again.";
-        } else if (errorMessage.includes('413') || errorMessage.includes('too large')) {
+        } else if (errorMessage.includes('413') || errorMessage.includes('too large') || errorMessage.includes('Payload too large')) {
           errorMessage = "File is too large. Maximum size is 20MB on mobile.";
+        } else if (errorMessage.includes('JWT') || errorMessage.includes('token') || errorMessage.includes('auth')) {
+          errorMessage = "Authentication error. Please sign in again.";
         }
 
         toast({
@@ -617,11 +615,15 @@ export default function AddReports() {
       console.error('❌ Unexpected error:', error);
       toast({
         title: "Error",
-        description: "An unexpected error occurred. Please try again.",
+        description: error.message || "An unexpected error occurred. Please try again.",
         variant: "destructive",
       });
       return false;
     } finally {
+      // Clear progress interval if still running
+      if (progressInterval) {
+        clearInterval(progressInterval);
+      }
       // Ensure uploading state is always reset
       setUploading(false);
       setUploadProgress(0);
