@@ -224,13 +224,20 @@ const Support = () => {
           </div>
 
           {/* Quick Actions */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <Button
               onClick={() => navigate('/contact-us')}
               className="backdrop-blur-md bg-emerald-500/10 border border-emerald-500/30 hover:bg-emerald-500/20 h-auto p-4 flex flex-col items-center gap-2"
             >
               <MessageSquare className="h-6 w-6 text-emerald-400" />
               <span className="text-white font-semibold">Contact Support</span>
+            </Button>
+            <Button
+              onClick={() => navigate('/medical-disclaimer')}
+              className="backdrop-blur-md bg-yellow-500/10 border border-yellow-500/30 hover:bg-yellow-500/20 h-auto p-4 flex flex-col items-center gap-2"
+            >
+              <AlertCircle className="h-6 w-6 text-yellow-400" />
+              <span className="text-white font-semibold">Medical Disclaimer</span>
             </Button>
             <Button
               onClick={() => window.open('https://www.monitraq.com/docs', '_blank')}

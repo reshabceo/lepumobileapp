@@ -1,89 +1,107 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from "react";
 
-import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
+import { Filesystem, Directory, Encoding } from "@capacitor/filesystem";
 
-import { Share } from '@capacitor/share';
+import { Share } from "@capacitor/share";
 
-import { registerPlugin } from '@capacitor/core';
+import { registerPlugin } from "@capacitor/core";
 
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from "react-router-dom";
 
-import { ArrowLeft, Activity, Heart, Power, Play, Pause, Zap, TrendingUp, Wifi, Battery, Activity as ActivityIcon, RefreshCw, XCircle, CheckCircle, AlertCircle, Bluetooth, BluetoothOff } from 'lucide-react';
+import {
+  ArrowLeft,
+  Activity,
+  Heart,
+  Power,
+  Play,
+  Pause,
+  Zap,
+  TrendingUp,
+  Wifi,
+  Battery,
+  Activity as ActivityIcon,
+  RefreshCw,
+  XCircle,
+  CheckCircle,
+  AlertCircle,
+  Bluetooth,
+  BluetoothOff,
+} from "lucide-react";
 
-import { MobileAppContainer } from '@/components/MobileAppContainer';
+import { MobileAppContainer } from "@/components/MobileAppContainer";
 
 // Removed backend API usage for this page; monitor is purely native/RT
 
-import { useToast } from '@/hooks/use-toast';
+import { useToast } from "@/hooks/use-toast";
 
-import { wellueSDK, WellueDevice, ECGData, RealTimeData } from '@/lib/wellue-sdk-bridge';
-import { Bp2, getEcgDataInMv, int16ArrayToMv } from '@/plugins/bp2';
-import { supabase, storeEcgRecording } from '@/lib/supabase';
-import EcgChartWithControls from '@/components/EcgChartWithControls';
-import EcgFullScreenChart from '@/components/EcgFullScreenChart';
+import {
+  wellueSDK,
+  WellueDevice,
+  ECGData,
+  RealTimeData,
+} from "@/lib/wellue-sdk-bridge";
+import { Bp2, getEcgDataInMv, int16ArrayToMv } from "@/plugins/bp2";
+import { supabase, storeEcgRecording } from "@/lib/supabase";
+import EcgChartWithControls from "@/components/EcgChartWithControls";
+import EcgFullScreenChart from "@/components/EcgFullScreenChart";
 
-
-import { Capacitor } from '@capacitor/core';
-
-
+import { Capacitor } from "@capacitor/core";
 
 interface ECGRhythm {
+  id: string;
 
-    id: string;
+  deviceId: string;
 
-    deviceId: string;
+  timestamp: string;
 
-    timestamp: string;
+  heartRate: number;
 
-    heartRate: number;
+  rhythm:
+    | "normal"
+    | "irregular"
+    | "bradycardia"
+    | "tachycardia"
+    | "afib"
+    | "arrhythmia";
 
-    rhythm: 'normal' | 'irregular' | 'bradycardia' | 'tachycardia' | 'afib' | 'arrhythmia';
+  qrsDuration: number;
 
-    qrsDuration: number;
+  qtInterval: number;
 
-    qtInterval: number;
+  prInterval: number;
 
-    prInterval: number;
+  stSegment: "normal" | "elevated" | "depressed";
 
-    stSegment: 'normal' | 'elevated' | 'depressed';
+  tWave: "normal" | "inverted" | "flattened";
 
-    tWave: 'normal' | 'inverted' | 'flattened';
+  pWave: "normal" | "absent" | "inverted";
 
-    pWave: 'normal' | 'absent' | 'inverted';
+  ecgData: number[]; // Raw ECG waveform data points
 
-    ecgData: number[]; // Raw ECG waveform data points
-
-    unit: string;
-
+  unit: string;
 }
-
-
 
 interface Device {
+  id: string;
 
-    id: string;
+  name: string;
 
-    name: string;
+  connected: boolean;
 
-    connected: boolean;
+  battery?: number;
 
-    battery?: number;
+  lastSeen: string;
 
-    lastSeen: string;
+  connectedAt?: string;
 
-    connectedAt?: string;
+  connectedAtFormatted?: string;
 
-    connectedAtFormatted?: string;
+  connectionDuration?: number;
 
-    connectionDuration?: number;
+  connectionDurationFormatted?: string;
 
-    connectionDurationFormatted?: string;
-
-    active?: boolean;
-
+  active?: boolean;
 }
-
-
 
 // CSS Animations for ECG Loading
 
@@ -337,234 +355,308 @@ const ecgLoadingStyles = `
 
 `;
 
-
-
 const ECGMonitor: React.FC = () => {
+  const navigate = useNavigate();
 
-    const navigate = useNavigate();
+  const { toast } = useToast();
 
-    const { toast } = useToast();
+  const [isLoading, setIsLoading] = useState(false);
 
-    const [isLoading, setIsLoading] = useState(false);
+  const [devices, setDevices] = useState<Device[]>([]);
 
+  const [selectedDevice, setSelectedDevice] = useState<string>("");
 
+  const [isMonitoring, setIsMonitoring] = useState(false);
 
-    const [devices, setDevices] = useState<Device[]>([]);
+  const [monitoringStatus, setMonitoringStatus] = useState<
+    "listening" | "active" | "stopping"
+  >("listening");
 
-    const [selectedDevice, setSelectedDevice] = useState<string>('');
+  const [rhythms, setRhythms] = useState<ECGRhythm[]>([]);
 
-    const [isMonitoring, setIsMonitoring] = useState(false);
+  const [currentRhythm, setCurrentRhythm] = useState<ECGRhythm | null>(null);
 
-    const [monitoringStatus, setMonitoringStatus] = useState<'listening' | 'active' | 'stopping'>('listening');
+  // NEW: ECG Result State Management (rebuilt from scratch)
+  const [ecgResult, setEcgResult] = useState<ECGRhythm | null>(null);
+  const [previousECGReadings, setPreviousECGReadings] = useState<ECGRhythm[]>(
+    []
+  );
+  const [isMeasurementCompleted, setIsMeasurementCompleted] = useState(false);
+  const [measurementCompletionTime, setMeasurementCompletionTime] = useState<
+    string | null
+  >(null);
+  const [hasResultBeenProcessed, setHasResultBeenProcessed] = useState(false);
 
-    const [rhythms, setRhythms] = useState<ECGRhythm[]>([]);
-
-    const [currentRhythm, setCurrentRhythm] = useState<ECGRhythm | null>(null);
-
-    // NEW: ECG Result State Management (rebuilt from scratch)
-    const [ecgResult, setEcgResult] = useState<ECGRhythm | null>(null);
-    const [previousECGReadings, setPreviousECGReadings] = useState<ECGRhythm[]>([]);
-    const [isMeasurementCompleted, setIsMeasurementCompleted] = useState(false);
-    const [measurementCompletionTime, setMeasurementCompletionTime] = useState<string | null>(null);
-    const [hasResultBeenProcessed, setHasResultBeenProcessed] = useState(false);
-    
-    // State for showing previous reading chart
-    const [selectedPreviousReadingChart, setSelectedPreviousReadingChart] = useState<{
-        ecgData: { s: Float32Array; sr: number; scale: number };
-        readingId: string;
+  // State for showing previous reading chart
+  const [selectedPreviousReadingChart, setSelectedPreviousReadingChart] =
+    useState<{
+      ecgData: { s: Float32Array; sr: number; scale: number };
+      readingId: string;
     } | null>(null);
 
-    const [rtCount, setRtCount] = useState(0);
+  const [rtCount, setRtCount] = useState(0);
 
-    const [bufferLen, setBufferLen] = useState(0);
+  const [bufferLen, setBufferLen] = useState(0);
 
-    const [ecgEvtCount, setEcgEvtCount] = useState(0);
+  const [ecgEvtCount, setEcgEvtCount] = useState(0);
 
-    // NEW: Ring buffer with timestamps for proper timebase
+  // NEW: Ring buffer with timestamps for proper timebase
 
-    const ecgBufferRef = useRef<{ t: number, v: number }[]>([]);
+  const ecgBufferRef = useRef<{ t: number; v: number }[]>([]);
 
-    const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
-    // Canvas refs for sizing
+  // Canvas refs for sizing
 
-    const fsRef = useRef<number>(125);
+  const fsRef = useRef<number>(125);
 
-    const dprRef = useRef<number>(1);
+  const dprRef = useRef<number>(1);
 
-    const sizeRef = useRef<{ W: number; H: number }>({ W: 0, H: 0 });
+  const sizeRef = useRef<{ W: number; H: number }>({ W: 0, H: 0 });
 
-    const WINDOW_MS = 4000; // Fixed 4 second window
+  const WINDOW_MS = 4000; // Fixed 4 second window
 
-    const TARGET_FS = 250; // Target sample rate for rendering
+  const TARGET_FS = 250; // Target sample rate for rendering
 
-    const CANVAS_HEIGHT = 200; // Fixed canvas height
+  const CANVAS_HEIGHT = 200; // Fixed canvas height
 
-    // Canvas drawing state - REMOVED old incremental drawing
+  // Canvas drawing state - REMOVED old incremental drawing
 
-    // Now using timestamp-based rendering
+  // Now using timestamp-based rendering
 
-    // Biquad filter cascade for ECG smoothing (normalized)
+  // Biquad filter cascade for ECG smoothing (normalized)
 
-    type Biquad = { b0: number, b1: number, b2: number, a1: number, a2: number, x1: number, x2: number, y1: number, y2: number };
+  type Biquad = {
+    b0: number;
+    b1: number;
+    b2: number;
+    a1: number;
+    a2: number;
+    x1: number;
+    x2: number;
+    y1: number;
+    y2: number;
+  };
 
-    const biquadsRef = useRef<Biquad[]>([]);
+  const biquadsRef = useRef<Biquad[]>([]);
 
-    const notchHzRef = useRef<number>(50);
+  const notchHzRef = useRef<number>(50);
 
-    const nextDetectTsRef = useRef<number>(0);
+  const nextDetectTsRef = useRef<number>(0);
 
-    // FIXED: Less aggressive filtering for ECG data
+  // FIXED: Less aggressive filtering for ECG data
 
-    const CONTROL_WORDS = useRef<Set<number>>(new Set([
+  const CONTROL_WORDS = useRef<Set<number>>(
+    new Set([
+      8192, -14415, -21784, 16396, -4008, 16718, 17633, 17637, 17674, 17683,
+      17724, 22504,
+    ])
+  );
 
-        8192, -14415, -21784, 16396, -4008, 16718, 17633, 17637, 17674, 17683, 17724, 22504
+  const MAX_ABS_COUNT = 8000; // Increased from 4000
 
-    ]));
+  const MAX_DELTA_BETWEEN = 3000; // Increased from 1200 to allow QRS complexes
 
-    const MAX_ABS_COUNT = 8000; // Increased from 4000
+  const lastLiveSampleRef = useRef<number>(0);
 
-    const MAX_DELTA_BETWEEN = 3000; // Increased from 1200 to allow QRS complexes
+  const baselineBufferRef = useRef<number[]>([]); // For DC removal
 
-    const lastLiveSampleRef = useRef<number>(0);
+  const rPeakTimesRef = useRef<number[]>([]); // For BPM calculation
 
-    const baselineBufferRef = useRef<number[]>([]); // For DC removal
+  const lastBpmRef = useRef<number>(0);
 
-    const rPeakTimesRef = useRef<number[]>([]); // For BPM calculation
+  const [deviceBpm, setDeviceBpm] = useState<number>(0); // Device-provided heart rate (more accurate)
 
-    const lastBpmRef = useRef<number>(0);
+  const [lastDeviceHeartRateTime, setLastDeviceHeartRateTime] =
+    useState<number>(0);
 
-    const [deviceBpm, setDeviceBpm] = useState<number>(0); // Device-provided heart rate (more accurate)
+  // REMOVED: ECG result state - will rebuild from scratch
 
-    const [lastDeviceHeartRateTime, setLastDeviceHeartRateTime] = useState<number>(0);
+  // NEW: Recording state for capturing longer ECG strips
 
+  const [isRecording, setIsRecording] = useState(false);
 
+  const recordingBufferRef = useRef<{ t: number; v: number }[]>([]);
 
-    // REMOVED: ECG result state - will rebuild from scratch
+  const recordingStartTimeRef = useRef<number>(0);
 
+  // NEW: Fallback measurement end detection
 
+  const [lastEcgDataTime, setLastEcgDataTime] = useState<number>(0);
 
-    // NEW: Recording state for capturing longer ECG strips
+  // Duplicated ECG data state - exact same as EcgResultScreen
+  const [ecgData, setEcgData] = useState<{
+    s: Float32Array;
+    sr: number;
+    scale: number;
+  } | null>(null);
 
-    const [isRecording, setIsRecording] = useState(false);
+  // Loading state for ECG chart
+  const [isLoadingEcgChart, setIsLoadingEcgChart] = useState(false);
 
-    const recordingBufferRef = useRef<{ t: number, v: number }[]>([]);
+  // Flag to prevent re-loading once chart is displayed
+  const [hasEcgChartLoaded, setHasEcgChartLoaded] = useState(false);
 
-    const recordingStartTimeRef = useRef<number>(0);
+  // Permanent storage for ECG data once loaded
+  const [permanentEcgData, setPermanentEcgData] = useState<{
+    s: Float32Array;
+    sr: number;
+    scale: number;
+  } | null>(null);
 
-    // NEW: Fallback measurement end detection
+  // Permanent storage for timestamp to prevent continuous updates
+  const [permanentTimestamp, setPermanentTimestamp] = useState<string>("");
 
-    const [lastEcgDataTime, setLastEcgDataTime] = useState<number>(0);
-    
-    // Duplicated ECG data state - exact same as EcgResultScreen
-    const [ecgData, setEcgData] = useState<{
-        s: Float32Array;
-        sr: number;
-        scale: number;
-    } | null>(null);
-    
-    // Loading state for ECG chart
-    const [isLoadingEcgChart, setIsLoadingEcgChart] = useState(false);
-    
-    // Flag to prevent re-loading once chart is displayed
-    const [hasEcgChartLoaded, setHasEcgChartLoaded] = useState(false);
-    
-    // Permanent storage for ECG data once loaded
-    const [permanentEcgData, setPermanentEcgData] = useState<{
-        s: Float32Array;
-        sr: number;
-        scale: number;
-    } | null>(null);
-    
-    // Permanent storage for timestamp to prevent continuous updates
-    const [permanentTimestamp, setPermanentTimestamp] = useState<string>('');
-    
-    // ✅ ROOT CAUSE FIX: Convert ecgResult.ecgData to chart format when result is set
-    // Match web portal: Convert raw Int16 to mV FIRST, then pass with scale=1.0
-    useEffect(() => {
-        if (ecgResult && ecgResult.ecgData && ecgResult.ecgData.length > 0 && !hasEcgChartLoaded) {
-            console.log('🫀 [ECG CHART] Converting ecgResult.ecgData to chart format (matching web portal)');
-            const rawSamples = ecgResult.ecgData; // Raw Int16 samples from iOS plugin
-            const scaleUvPerLsb = ecgResult.scaleUvPerLsb || 3.098; // BP2 scale factor (μV/LSB)
-            const sampleRate = ecgResult.sampleRate || 125; // BP2 sample rate (Hz)
-            
-            // ✅ FIX: Convert raw Int16 to mV Float32Array (matches web portal approach)
-            // Web portal: values = waveformData.map(c => c * mvPerCount)
-            // mvPerCount = 0.003098 (3.098 / 1000)
-            const mvPerCount = scaleUvPerLsb / 1000; // Convert μV/LSB to mV/LSB
-            const samplesArray = new Float32Array(rawSamples.length);
-            let minVal = Infinity;
-            let maxVal = -Infinity;
-            let nonZeroCount = 0;
-            
-            for (let i = 0; i < rawSamples.length; i++) {
-                const rawValue = rawSamples[i];
-                const mvValue = rawValue * mvPerCount; // Convert Int16 to mV
-                samplesArray[i] = mvValue;
-                if (mvValue !== 0) {
-                    nonZeroCount++;
-                    minVal = Math.min(minVal, mvValue);
-                    maxVal = Math.max(maxVal, mvValue);
-                }
-            }
-            
-            // ✅ VALIDATION: Check if data is valid
-            if (samplesArray.length === 0) {
-                console.error('❌ [ECG CHART] ERROR: No samples to display!');
-                return;
-            }
-            if (nonZeroCount === 0) {
-                console.error('❌ [ECG CHART] ERROR: All samples are zero!');
-                return;
-            }
-            
-            const chartData = {
-                s: samplesArray, // Now in mV (Float32Array)
-                sr: sampleRate,
-                scale: 1.0 // Already in mV, no conversion needed
-            };
-            
-            console.log('🫀 [ECG CHART] Setting chart data with', samplesArray.length, 'mV samples, scale: 1.0 (already in mV)');
-            setEcgData(chartData);
-            setPermanentEcgData(chartData);
-            setHasEcgChartLoaded(true);
+  // ✅ ROOT CAUSE FIX: Convert ecgResult.ecgData to chart format when result is set
+  // Match web portal: Convert raw Int16 to mV FIRST, then pass with scale=1.0
+  useEffect(() => {
+    if (
+      ecgResult &&
+      ecgResult.ecgData &&
+      ecgResult.ecgData.length > 0 &&
+      !hasEcgChartLoaded
+    ) {
+      console.log(
+        "🫀 [ECG CHART] Converting ecgResult.ecgData to chart format (matching web portal)"
+      );
+      const rawSamples = ecgResult.ecgData; // Raw Int16 samples from iOS plugin
+      // BP2 device defaults: scaleUvPerLsb = 3.098 μV/LSB, sampleRate = 125 Hz
+      const scaleUvPerLsb = 3.098; // BP2 scale factor (μV/LSB) - standard for Wellue BP2
+      const sampleRate = 125; // BP2 sample rate (Hz) - standard for Wellue BP2
+
+      // ✅ FIX: Convert raw Int16 to mV Float32Array (matches web portal approach)
+      // Web portal: values = waveformData.map(c => c * mvPerCount)
+      // mvPerCount = 0.003098 (3.098 / 1000)
+      const mvPerCount = scaleUvPerLsb / 1000; // Convert μV/LSB to mV/LSB
+
+      // ✅ FIX: Detect and skip initial noise/pre-measurement samples
+      // Find the actual start of ECG signal by detecting when signal variance increases
+      let signalStartIndex = 0;
+      if (rawSamples.length > sampleRate * 2) {
+        // Only if we have at least 2 seconds of data
+        const windowSize = Math.floor(sampleRate * 0.5); // 0.5 second windows
+        let maxVariance = 0;
+        let bestStartIndex = 0;
+
+        // Check first 2 seconds for signal start
+        for (
+          let start = 0;
+          start < Math.min(sampleRate * 2, rawSamples.length - windowSize);
+          start += Math.floor(windowSize / 2)
+        ) {
+          const window = rawSamples.slice(start, start + windowSize);
+          const mean = window.reduce((sum, v) => sum + v, 0) / window.length;
+          const variance =
+            window.reduce((sum, v) => sum + Math.pow(v - mean, 2), 0) /
+            window.length;
+
+          if (variance > maxVariance) {
+            maxVariance = variance;
+            bestStartIndex = start;
+          }
         }
-    }, [ecgResult, hasEcgChartLoaded]);
 
-    
-    // Background ECG processing - exact same logic as EcgResultScreen
-    const processEcgInBackground = async () => {
-        // ✅ DISABLED: Native code now reads ECG file automatically when STATUS 7 is detected
-        // The native plugin will emit ecgData event with source: "file" containing the result
-        console.log('ℹ️ [ECG] Background processing disabled - native code handles ECG file reading automatically');
+        // Use start index if variance is significant (signal detected)
+        if (maxVariance > 100) {
+          // Threshold for signal detection
+          signalStartIndex = Math.max(
+            0,
+            bestStartIndex - Math.floor(sampleRate * 0.1)
+          ); // Start slightly before for safety
+          console.log(
+            `🫀 [ECG] Detected signal start at sample ${signalStartIndex} (${(
+              signalStartIndex / sampleRate
+            ).toFixed(2)}s)`
+          );
+        }
+      }
+
+      // Convert samples starting from detected signal start
+      const effectiveLength = rawSamples.length - signalStartIndex;
+      const samplesArray = new Float32Array(effectiveLength);
+      let minVal = Infinity;
+      let maxVal = -Infinity;
+      let nonZeroCount = 0;
+
+      for (let i = 0; i < effectiveLength; i++) {
+        const rawValue = rawSamples[signalStartIndex + i];
+        const mvValue = rawValue * mvPerCount; // Convert Int16 to mV
+        samplesArray[i] = mvValue;
+        if (mvValue !== 0) {
+          nonZeroCount++;
+          minVal = Math.min(minVal, mvValue);
+          maxVal = Math.max(maxVal, mvValue);
+        }
+      }
+
+      // ✅ VALIDATION: Check if data is valid
+      if (samplesArray.length === 0) {
+        console.error("❌ [ECG CHART] ERROR: No samples to display!");
         return;
-        
-        // OLD CODE (disabled):
-        // If chart is already loaded, don't process again
-        if (hasEcgChartLoaded) {
-            console.log('ℹ️ [ECG] Chart already loaded, skipping background processing');
-            return;
-        }
-        
-        // 🛑 EXTRA SAFETY: If we're already processing, don't start another
-        if (isLoadingEcgChart) {
-            console.log('ℹ️ [ECG] Already processing, skipping duplicate call');
-            return;
-        }
-        
-        try {
-            console.log('🚀 [ECG] Background processing: Fetching latest ECG file...');
-            
-            // Show loading state
-            setIsLoadingEcgChart(true);
-            
-            // ❌ REMOVED: Bp2 plugin doesn't exist on iOS
-            // Native code now handles ECG file reading automatically
-            console.log('⚠️ [ECG] Background processing not available - native code handles file reading');
-            setIsLoadingEcgChart(false);
-            return;
-            
-            /* DISABLED CODE:
+      }
+      if (nonZeroCount === 0) {
+        console.error("❌ [ECG CHART] ERROR: All samples are zero!");
+        return;
+      }
+
+      const chartData = {
+        s: samplesArray, // Now in mV (Float32Array)
+        sr: sampleRate,
+        scale: 1.0, // Already in mV, no conversion needed
+      };
+
+      console.log(
+        "🫀 [ECG CHART] Setting chart data with",
+        samplesArray.length,
+        "mV samples, scale: 1.0 (already in mV)"
+      );
+      setEcgData(chartData);
+      setPermanentEcgData(chartData);
+      setHasEcgChartLoaded(true);
+    }
+  }, [ecgResult, hasEcgChartLoaded]);
+
+  // Background ECG processing - exact same logic as EcgResultScreen
+  const processEcgInBackground = async () => {
+    // ✅ DISABLED: Native code now reads ECG file automatically when STATUS 7 is detected
+    // The native plugin will emit ecgData event with source: "file" containing the result
+    console.log(
+      "ℹ️ [ECG] Background processing disabled - native code handles ECG file reading automatically"
+    );
+    return;
+
+    // OLD CODE (disabled):
+    // If chart is already loaded, don't process again
+    if (hasEcgChartLoaded) {
+      console.log(
+        "ℹ️ [ECG] Chart already loaded, skipping background processing"
+      );
+      return;
+    }
+
+    // 🛑 EXTRA SAFETY: If we're already processing, don't start another
+    if (isLoadingEcgChart) {
+      console.log("ℹ️ [ECG] Already processing, skipping duplicate call");
+      return;
+    }
+
+    try {
+      console.log(
+        "🚀 [ECG] Background processing: Fetching latest ECG file..."
+      );
+
+      // Show loading state
+      setIsLoadingEcgChart(true);
+
+      // ❌ REMOVED: Bp2 plugin doesn't exist on iOS
+      // Native code now handles ECG file reading automatically
+      console.log(
+        "⚠️ [ECG] Background processing not available - native code handles file reading"
+      );
+      setIsLoadingEcgChart(false);
+      return;
+
+      /* DISABLED CODE:
             // Get list of ECG records (same as EcgResultScreen)
             const result = await Bp2.listEcgRecords();
             const allRecords = result.records || [];
@@ -597,5730 +689,5406 @@ const ECGMonitor: React.FC = () => {
             // Set current ECG data
             setEcgData(finalEcgData);
             */
-            
-            // Store permanently so chart never disappears
-            setPermanentEcgData(finalEcgData);
-            
-            // Mark chart as loaded - this prevents future re-loading
-            setHasEcgChartLoaded(true);
-            
-            // Store timestamp permanently when chart loads
-            if (!permanentTimestamp) {
-                setPermanentTimestamp(new Date().toISOString());
-            }
-            
-            // 🚀 STORE ECG DATA IN SUPABASE FOR DOCTOR PORTAL
-            try {
-                // Get current patient ID from auth context
-                const { data: { user } } = await supabase.auth.getUser();
-                if (user) {
-                    // Get patient profile
-                    const { data: patientProfile } = await supabase
-                        .from('patients')
-                        .select('id')
-                        .eq('auth_user_id', user.id)
-                        .single();
-                    
-                    if (patientProfile) {
-                        // Prepare ECG data for Supabase
-                        const ecgRecord = {
-                            patient_id: patientProfile.id,
-                            device_id: selectedDevice || 'BP2_Device',
-                            recorded_at: new Date().toISOString(),
-                            sample_rate: 125, // Fixed for BP2
-                            scale_uv_per_lsb: 3.098, // Fixed for BP2
-                            duration_seconds: ecgData.samples.length / 125,
-                            mv_data_json: Array.from(ecgData.samples), // Send processed mV data
-                            heart_rate: deviceBpm || currentRhythm?.heartRate || 0,
-                            quality_score: 0.95, // Default quality score
-                            notes: 'ECG recording from BP2 device'
-                        };
-                        
-                        // Store in Supabase
-                        await storeEcgRecording(ecgRecord);
-                        console.log('✅ [ECG] ECG data stored in Supabase for doctor portal');
-                    }
-                }
-            } catch (error) {
-                console.error('❌ [ECG] Failed to store ECG data in Supabase:', error);
-                // Don't fail the main ECG process if Supabase storage fails
-            }
-            
-            // 🛑 STOP ALL BACKGROUND PROCESSES - Chart is loaded, no more device communication needed
-            console.log('🛑 [ECG] Chart loaded successfully - stopping all background processes');
-            
-            // Stop device communication
-            if (selectedDevice) {
-                try {
-                    await wellueSDK.stopLive(selectedDevice);
-                    console.log('🛑 [ECG] Stopped device live communication');
-                } catch (e) {
-                    console.log('⚠️ [ECG] Error stopping device communication:', e);
-                }
-            }
-            
-            console.log('✅ [ECG] Background ECG chart loaded successfully:', ecgData.samples.length, 'samples');
-            
-        } catch (err) {
-            console.error('❌ [ECG] Failed to process ECG in background:', err);
-            
-            // Handle "Not an ECG file" error gracefully
-            if (err.toString().includes('Not an ECG file')) {
-                console.log('ℹ️ [ECG] Latest file is not an ECG file (may be BP reading)');
-            }
-        } finally {
-            // Hide loading state
-            setIsLoadingEcgChart(false);
+
+      // Store permanently so chart never disappears
+      setPermanentEcgData(finalEcgData);
+
+      // Mark chart as loaded - this prevents future re-loading
+      setHasEcgChartLoaded(true);
+
+      // Store timestamp permanently when chart loads
+      if (!permanentTimestamp) {
+        setPermanentTimestamp(new Date().toISOString());
+      }
+
+      // 🚀 STORE ECG DATA IN SUPABASE FOR DOCTOR PORTAL
+      try {
+        // Get current patient ID from auth context
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        if (user) {
+          // Get patient profile
+          const { data: patientProfile } = await supabase
+            .from("patients")
+            .select("id")
+            .eq("auth_user_id", user.id)
+            .single();
+
+          if (patientProfile) {
+            // Prepare ECG data for Supabase
+            const ecgRecord = {
+              patient_id: patientProfile.id,
+              device_id: selectedDevice || "BP2_Device",
+              recorded_at: new Date().toISOString(),
+              sample_rate: 125, // Fixed for BP2
+              scale_uv_per_lsb: 3.098, // Fixed for BP2
+              duration_seconds: ecgData.samples.length / 125,
+              mv_data_json: Array.from(ecgData.samples), // Send processed mV data
+              heart_rate: deviceBpm || currentRhythm?.heartRate || 0,
+              quality_score: 0.95, // Default quality score
+              notes: "ECG recording from BP2 device",
+            };
+
+            // Store in Supabase
+            await storeEcgRecording(ecgRecord);
+            console.log(
+              "✅ [ECG] ECG data stored in Supabase for doctor portal"
+            );
+          }
         }
-    };
-    
+      } catch (error) {
+        console.error("❌ [ECG] Failed to store ECG data in Supabase:", error);
+        // Don't fail the main ECG process if Supabase storage fails
+      }
 
-    
+      // 🛑 STOP ALL BACKGROUND PROCESSES - Chart is loaded, no more device communication needed
+      console.log(
+        "🛑 [ECG] Chart loaded successfully - stopping all background processes"
+      );
 
+      // Stop device communication
+      if (selectedDevice) {
+        try {
+          await wellueSDK.stopLive(selectedDevice);
+          console.log("🛑 [ECG] Stopped device live communication");
+        } catch (e) {
+          console.log("⚠️ [ECG] Error stopping device communication:", e);
+        }
+      }
 
+      console.log(
+        "✅ [ECG] Background ECG chart loaded successfully:",
+        ecgData.samples.length,
+        "samples"
+      );
+    } catch (err) {
+      console.error("❌ [ECG] Failed to process ECG in background:", err);
 
+      // Handle "Not an ECG file" error gracefully
+      if (err.toString().includes("Not an ECG file")) {
+        console.log(
+          "ℹ️ [ECG] Latest file is not an ECG file (may be BP reading)"
+        );
+      }
+    } finally {
+      // Hide loading state
+      setIsLoadingEcgChart(false);
+    }
+  };
 
-    // 🆕 ECG: Auto-save ECG result (similar to BP auto-save)
-    const autoSaveECGResult = useCallback(async (result: ECGRhythm) => {
-        console.log('🫀 [ECG SAVE] ===== autoSaveECGResult CALLED ====');
-        console.log('🫀 [ECG SAVE] Input result:', JSON.stringify(result, null, 2));
-        console.log('🫀 [ECG SAVE] Validation check:', {
-            hasResult: !!result,
-            hasHeartRate: !!(result?.heartRate),
-            heartRate: result?.heartRate,
-            heartRateValid: !!(result?.heartRate && result.heartRate > 0)
+  // 🆕 ECG: Auto-save ECG result (similar to BP auto-save)
+  const autoSaveECGResult = useCallback(
+    async (result: ECGRhythm) => {
+      console.log("🫀 [ECG SAVE] ===== autoSaveECGResult CALLED ====");
+      console.log(
+        "🫀 [ECG SAVE] Input result:",
+        JSON.stringify(result, null, 2)
+      );
+      console.log("🫀 [ECG SAVE] Validation check:", {
+        hasResult: !!result,
+        hasHeartRate: !!result?.heartRate,
+        heartRate: result?.heartRate,
+        heartRateValid: !!(result?.heartRate && result.heartRate > 0),
+      });
+
+      if (!result || !result.heartRate || result.heartRate <= 0) {
+        console.warn("🫀 [ECG SAVE] ⚠️ Invalid ECG result, skipping save");
+        console.warn("🫀 [ECG SAVE] Reason:", {
+          noResult: !result,
+          noHeartRate: !result?.heartRate,
+          invalidHeartRate: result?.heartRate <= 0,
         });
-        
-        if (!result || !result.heartRate || result.heartRate <= 0) {
-            console.warn('🫀 [ECG SAVE] ⚠️ Invalid ECG result, skipping save');
-            console.warn('🫀 [ECG SAVE] Reason:', {
-                noResult: !result,
-                noHeartRate: !result?.heartRate,
-                invalidHeartRate: result?.heartRate <= 0
-            });
-            return;
+        return;
+      }
+
+      try {
+        console.log("🫀 [ECG SAVE] ===== STARTING AUTO-SAVE PROCESS ====");
+        console.log("🫀 [ECG SAVE] Result to save:", result);
+
+        const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+        const filename = `bp2_ecg_${timestamp}.json`;
+
+        const dataToSave = {
+          ...result,
+          // ✅ FIX: Explicitly ensure ecgData is included
+          ecgData: result.ecgData || [],
+          scaleUvPerLsb: (result as any).scaleUvPerLsb || 3.098,
+          sampleRate: (result as any).sampleRate || 125,
+          timestamp: result.timestamp || new Date().toISOString(),
+          deviceId: selectedDevice || "unknown",
+          deviceName: "BP2",
+          measurementId: `ecg_${Date.now()}`,
+          status: "completed",
+          type: "ecg",
+          savedAt: new Date().toISOString(),
+        };
+
+        // Save to localStorage for app access (add to storedFilesInApp for reports page)
+        console.log(
+          "🫀 [ECG SAVE] Step 1: Saving to localStorage (storedFilesInApp)..."
+        );
+        try {
+          const existingReportsRaw = localStorage.getItem("storedFilesInApp");
+          console.log(
+            "🫀 [ECG SAVE] Existing reports (raw):",
+            existingReportsRaw ? `${existingReportsRaw.length} chars` : "null"
+          );
+          const existingReports = JSON.parse(existingReportsRaw || "[]");
+          console.log(
+            "🫀 [ECG SAVE] Existing reports count:",
+            existingReports.length
+          );
+
+          const fiveMinutesAgo = Date.now() - 5 * 60 * 1000;
+          console.log("🫀 [ECG SAVE] Filtering duplicates (5 min window)...");
+          const filteredReports = existingReports.filter((r) => {
+            if (r.type !== "ecg") return true;
+            const isRecent = new Date(r.timestamp).getTime() > fiveMinutesAgo;
+            const isSameECG = r.heartRate === dataToSave.heartRate;
+            const shouldKeep = !(isRecent && isSameECG);
+            if (!shouldKeep) {
+              console.log("🫀 [ECG SAVE] Filtered duplicate:", {
+                timestamp: r.timestamp,
+                heartRate: r.heartRate,
+              });
+            }
+            return shouldKeep;
+          });
+          console.log(
+            "🫀 [ECG SAVE] Filtered reports count:",
+            filteredReports.length
+          );
+
+          const updatedReports = [dataToSave, ...filteredReports.slice(0, 49)];
+          console.log(
+            "🫀 [ECG SAVE] Final reports count:",
+            updatedReports.length
+          );
+          console.log("🫀 [ECG SAVE] Data being saved:", {
+            hasEcgData: !!dataToSave.ecgData,
+            ecgDataLength: Array.isArray(dataToSave.ecgData)
+              ? dataToSave.ecgData.length
+              : 0,
+            scaleUvPerLsb: dataToSave.scaleUvPerLsb,
+            sampleRate: dataToSave.sampleRate,
+            heartRate: dataToSave.heartRate,
+          });
+          localStorage.setItem(
+            "storedFilesInApp",
+            JSON.stringify(updatedReports)
+          );
+          console.log(
+            "🫀 [ECG SAVE] ✅ Saved to localStorage (storedFilesInApp)"
+          );
+        } catch (error) {
+          console.error(
+            "🫀 [ECG SAVE] ❌ Failed to save to localStorage:",
+            error
+          );
+          console.error(
+            "🫀 [ECG SAVE] Error details:",
+            error instanceof Error ? error.message : String(error)
+          );
         }
+
+        // Save to device storage using Capacitor Filesystem
+        console.log("🫀 [ECG SAVE] Step 2: Saving to device filesystem...");
+        console.log("🫀 [ECG SAVE] Filename:", filename);
+        try {
+          const { Filesystem, Directory } = await import(
+            "@capacitor/filesystem"
+          );
+          console.log("🫀 [ECG SAVE] Filesystem module imported");
+          const dataString = JSON.stringify(dataToSave, null, 2);
+          console.log("🫀 [ECG SAVE] Data size:", dataString.length, "chars");
+          await Filesystem.writeFile({
+            path: filename,
+            data: dataString,
+            directory: Directory.Documents,
+            recursive: true,
+          });
+          console.log("🫀 [ECG SAVE] ✅ Saved to device filesystem:", filename);
+        } catch (error) {
+          console.error(
+            "🫀 [ECG SAVE] ❌ Failed to save to filesystem:",
+            error
+          );
+          console.error(
+            "🫀 [ECG SAVE] Error details:",
+            error instanceof Error ? error.message : String(error)
+          );
+        }
+
+        // 🚀 STORE ECG DATA IN SUPABASE FOR DOCTOR PORTAL
+        console.log("🫀 [ECG SAVE] Step 3: Saving to Supabase database...");
+        try {
+          // Get current patient ID from auth context
+          const {
+            data: { user },
+            error: userError,
+          } = await supabase.auth.getUser();
+
+          if (userError) {
+            console.error("❌ [ECG SAVE] Auth error:", userError);
+            return;
+          }
+
+          if (!user) {
+            console.warn(
+              "🫀 [ECG SAVE] ⚠️ User not authenticated, cannot save to Supabase"
+            );
+            return;
+          }
+
+          // Get patient profile with is_active check
+          const { data: patientProfile, error: patientError } = await supabase
+            .from("patients")
+            .select("id, is_active")
+            .eq("auth_user_id", user.id)
+            .eq("is_active", true) // ✅ ADD: Ensure patient is active
+            .single();
+
+          if (patientError || !patientProfile) {
+            console.error(
+              "❌ [ECG SAVE] Patient profile not found:",
+              patientError
+            );
+            console.error("❌ [ECG SAVE] User ID:", user.id);
+            return;
+          }
+
+          // Check if we have ECG data to save
+          const ecgDataArray = dataToSave.ecgData;
+          const hasEcgData =
+            Array.isArray(ecgDataArray) && ecgDataArray.length > 0;
+
+          if (!hasEcgData) {
+            console.warn(
+              "🫀 [ECG SAVE] ⚠️ No ECG data to save to Supabase (ecgData missing or empty)"
+            );
+            return;
+          }
+
+          const scaleUvPerLsb = dataToSave.scaleUvPerLsb || 3.098;
+          const sampleRate = dataToSave.sampleRate || 125;
+
+          // Convert raw Int16 values to mV if needed
+          let mvData: number[];
+          if (ecgDataArray.length > 0) {
+            // Check if data is already in mV (values typically < 10 for ECG)
+            // or raw Int16 (values typically -32768 to 32767)
+            const maxAbsValue = Math.max(...ecgDataArray.map(Math.abs));
+            const isLikelyMv = maxAbsValue < 100; // mV values are typically small
+
+            if (isLikelyMv) {
+              // Already in mV, use directly
+              mvData = ecgDataArray;
+              console.log("🫀 [ECG SAVE] ECG data appears to be in mV format");
+            } else {
+              // Convert from Int16 to mV
+              const mvPerLsb = scaleUvPerLsb / 1000; // Convert μV to mV
+              mvData = ecgDataArray.map((val) => val * mvPerLsb);
+              console.log("🫀 [ECG SAVE] Converted ECG data from Int16 to mV");
+            }
+          } else {
+            mvData = [];
+          }
+
+          // Prepare ECG data for Supabase
+          const ecgRecord = {
+            patient_id: patientProfile.id, // ✅ Explicit patient_id
+            device_id: dataToSave.deviceId || selectedDevice || "BP2_Device",
+            recorded_at:
+              dataToSave.timestamp ||
+              dataToSave.savedAt ||
+              new Date().toISOString(),
+            sample_rate: sampleRate,
+            scale_uv_per_lsb: scaleUvPerLsb,
+            duration_seconds: mvData.length / sampleRate,
+            mv_data_json: mvData, // ✅ Array of numbers in mV
+            raw_data_base64: null, // ✅ MUST be null when using mv_data_json
+            heart_rate: dataToSave.heartRate || 0,
+            quality_score: 0.95,
+            notes: "ECG recording from BP2 device",
+          };
+
+          console.log("🫀 [ECG SAVE] Supabase record:", {
+            patient_id: ecgRecord.patient_id,
+            device_id: ecgRecord.device_id,
+            recorded_at: ecgRecord.recorded_at,
+            sample_count: mvData.length,
+            heart_rate: ecgRecord.heart_rate,
+            has_mv_data:
+              !!ecgRecord.mv_data_json && Array.isArray(ecgRecord.mv_data_json),
+            raw_data_is_null: ecgRecord.raw_data_base64 === null,
+          });
+
+          // Store in Supabase with better error handling
+          const { data: insertedData, error: insertError } = await supabase
+            .from("ecg_recordings")
+            .insert(ecgRecord)
+            .select();
+
+          if (insertError) {
+            console.error("❌ [ECG SAVE] Supabase insert error:", {
+              code: insertError.code,
+              message: insertError.message,
+              details: insertError.details,
+              hint: insertError.hint,
+            });
+
+            // Specific error handling
+            if (insertError.code === "42501") {
+              console.error(
+                "❌ [ECG SAVE] RLS policy violation - patient_id may not match authenticated user"
+              );
+            } else if (insertError.code === "23514") {
+              console.error(
+                "❌ [ECG SAVE] Constraint violation - check raw_data_base64/mv_data_json constraint"
+              );
+            } else if (insertError.code === "23503") {
+              console.error(
+                "❌ [ECG SAVE] Foreign key violation - patient_id not found in patients table"
+              );
+            }
+            throw insertError;
+          }
+
+          console.log(
+            "🫀 [ECG SAVE] ✅ Saved to Supabase database for doctor portal:",
+            insertedData
+          );
+        } catch (error) {
+          console.error(
+            "🫀 [ECG SAVE] ❌ Failed to store ECG data in Supabase:",
+            error
+          );
+          console.error(
+            "🫀 [ECG SAVE] Error details:",
+            error instanceof Error ? error.message : String(error)
+          );
+          // Don't fail the main save process if Supabase storage fails
+        }
+
+        console.log(
+          "🫀 [ECG SAVE] ✅ Auto-save process completed successfully"
+        );
+      } catch (error) {
+        console.error(
+          "🫀 [ECG SAVE] ❌ Failed to auto-save ECG result:",
+          error
+        );
+        console.error(
+          "🫀 [ECG SAVE] Error details:",
+          error instanceof Error ? error.stack : String(error)
+        );
+      }
+    },
+    [selectedDevice]
+  );
+
+  // FIXED: Proper ECG data decoding and filtering
+
+  const extractEcgCounts = (arr: number[]) => {
+    const out: number[] = [];
+
+    let prev = lastLiveSampleRef.current || 0;
+
+    for (const v of arr) {
+      // Skip obvious control words
+
+      if (CONTROL_WORDS.current.has(v)) continue;
+
+      // Treat as 16-bit signed little endian (ECG standard)
+
+      let sample = v;
+
+      if (sample > 32767) sample -= 65536; // Convert unsigned to signed
+
+      // Less aggressive filtering - allow ECG amplitudes and QRS complexes
+
+      if (sample > MAX_ABS_COUNT || sample < -MAX_ABS_COUNT) continue;
+
+      if (out.length > 0) {
+        const d = Math.abs(sample - prev);
+
+        if (d > MAX_DELTA_BETWEEN) continue; // Still filter extreme outliers
+      }
+
+      out.push(sample);
+
+      prev = sample;
+    }
+
+    if (out.length) lastLiveSampleRef.current = out[out.length - 1];
+
+    return out;
+  };
+
+  // Live capture (raw counts) for A/B against stored record
+
+  const captureActiveRef = useRef<boolean>(false);
+
+  const captureStartedAtRef = useRef<string | null>(null);
+
+  const captureCountsRef = useRef<number[]>([]);
+
+  const lastMvPerCountRef = useRef<number>(0.003098);
+
+  const mk = (
+    b0: number,
+    b1: number,
+    b2: number,
+    a0: number,
+    a1: number,
+    a2: number
+  ): Biquad => {
+    const nb0 = b0 / a0,
+      nb1 = b1 / a0,
+      nb2 = b2 / a0,
+      na1 = a1 / a0,
+      na2 = a2 / a0;
+
+    return {
+      b0: nb0,
+      b1: nb1,
+      b2: nb2,
+      a1: na1,
+      a2: na2,
+      x1: 0,
+      x2: 0,
+      y1: 0,
+      y2: 0,
+    };
+  };
+
+  const initFilters = (fs: number, notchHz: number = 50) => {
+    const Q = Math.SQRT1_2;
+
+    const hp = (fc: number) => {
+      const w = (2 * Math.PI * fc) / fs,
+        c = Math.cos(w),
+        s = Math.sin(w),
+        alpha = s / (2 * Q);
+
+      const b0 = (1 + c) / 2,
+        b1 = -(1 + c),
+        b2 = (1 + c) / 2,
+        a0 = 1 + alpha,
+        a1 = -2 * c,
+        a2 = 1 - alpha;
+      return mk(b0, b1, b2, a0, a1, a2);
+    };
+
+    const lp = (fc: number) => {
+      const w = (2 * Math.PI * fc) / fs,
+        c = Math.cos(w),
+        s = Math.sin(w),
+        alpha = s / (2 * Q);
+
+      const b0 = (1 - c) / 2,
+        b1 = 1 - c,
+        b2 = (1 - c) / 2,
+        a0 = 1 + alpha,
+        a1 = -2 * c,
+        a2 = 1 - alpha;
+      return mk(b0, b1, b2, a0, a1, a2);
+    };
+
+    const notch = (f0: number) => {
+      const Qn = 30;
+      const w = (2 * Math.PI * f0) / fs,
+        c = Math.cos(w),
+        s = Math.sin(w),
+        alpha = s / (2 * Qn);
+
+      const b0 = 1,
+        b1 = -2 * c,
+        b2 = 1,
+        a0 = 1 + alpha,
+        a1 = -2 * c,
+        a2 = 1 - alpha;
+      return mk(b0, b1, b2, a0, a1, a2);
+    };
+
+    // FIXED: Better ECG filtering
+
+    biquadsRef.current = [hp(0.05), notch(notchHz), lp(100)];
+  };
+
+  // FIXED: Apply filters and baseline removal
+
+  const applyFilters = (arr: number[]) => {
+    if (!arr.length) return arr;
+
+    // Apply biquad filters
+
+    let out = arr;
+
+    for (const f of biquadsRef.current) {
+      const o = new Array(out.length);
+
+      for (let i = 0; i < out.length; i++) {
+        const x = out[i];
+
+        const y =
+          f.b0 * x + f.b1 * f.x1 + f.b2 * f.x2 - f.a1 * f.y1 - f.a2 * f.y2;
+
+        f.x2 = f.x1;
+        f.x1 = x;
+        f.y2 = f.y1;
+        f.y1 = y;
+
+        o[i] = y;
+      }
+
+      out = o;
+    }
+
+    return out;
+  };
+
+  // NEW: Baseline removal for display (rolling mean)
+
+  const removeBaseline = (value: number) => {
+    const BASELINE_WINDOW_MS = 300;
+
+    const now = Date.now();
+
+    // Add current value to baseline buffer
+
+    baselineBufferRef.current.push(value);
+
+    // Remove old values (older than 300ms)
+
+    while (
+      baselineBufferRef.current.length > 0 &&
+      baselineBufferRef.current.length >
+        (fsRef.current * BASELINE_WINDOW_MS) / 1000
+    ) {
+      baselineBufferRef.current.shift();
+    }
+
+    // Compute rolling mean
+
+    const mean =
+      baselineBufferRef.current.reduce((sum, v) => sum + v, 0) /
+      baselineBufferRef.current.length;
+
+    return value - mean;
+  };
+
+  // IMPROVED: R-peak detection and BPM calculation (backup to device BPM)
+
+  const detectRPeak = (newSamples: { t: number; v: number }[]) => {
+    if (newSamples.length === 0) return;
+
+    const REFRACTORY_WINDOW = 350; // Increased to 350ms (more physiologically accurate)
+
+    const THRESHOLD_FACTOR = 0.4; // Reduced to 0.4 (less aggressive)
+
+    // Get recent samples for adaptive thresholding
+
+    const now = Date.now();
+
+    const recentSamples = ecgBufferRef.current
+
+      .filter((s) => s.t >= now - 8000) // Extended to 8 seconds for better baseline
+
+      .map((s) => s.v); // Don't use abs() - we want actual signal polarity
+
+    if (recentSamples.length < 100) return; // Need more data for reliable detection
+
+    // Use percentile-based thresholding (more robust)
+
+    const sorted = [...recentSamples].sort((a, b) => a - b);
+
+    const p90 = sorted[Math.floor(sorted.length * 0.9)] || 0;
+
+    const p10 = sorted[Math.floor(sorted.length * 0.1)] || 0;
+
+    const threshold = p10 + (p90 - p10) * THRESHOLD_FACTOR;
+
+    // Check each new sample for R-peak
+
+    for (let i = 2; i < newSamples.length - 2; i++) {
+      // Extended window for better peak detection
+
+      const prev2 = newSamples[i - 2];
+
+      const prev1 = newSamples[i - 1];
+
+      const curr = newSamples[i];
+
+      const next1 = newSamples[i + 1];
+
+      const next2 = newSamples[i + 2];
+
+      // Look for prominent local maximum (improved peak detection)
+
+      if (
+        curr.v > threshold &&
+        curr.v > prev2.v &&
+        curr.v > prev1.v &&
+        curr.v > next1.v &&
+        curr.v > next2.v &&
+        curr.v > (prev1.v + next1.v) / 2 + 0.1
+      ) {
+        // Must be significantly above neighbors
+
+        // Check refractory period
+
+        const lastPeak =
+          rPeakTimesRef.current[rPeakTimesRef.current.length - 1];
+
+        if (!lastPeak || curr.t - lastPeak >= REFRACTORY_WINDOW) {
+          rPeakTimesRef.current.push(curr.t);
+
+          // Keep only last 8 peaks for BPM calculation
+
+          if (rPeakTimesRef.current.length > 8) {
+            rPeakTimesRef.current.shift();
+          }
+
+          // Calculate BPM from last 4-6 beats (more stable)
+
+          if (rPeakTimesRef.current.length >= 3) {
+            const intervals = [];
+
+            const startIdx = Math.max(0, rPeakTimesRef.current.length - 6); // Use last 6 beats max
+
+            for (let j = startIdx + 1; j < rPeakTimesRef.current.length; j++) {
+              const interval =
+                rPeakTimesRef.current[j] - rPeakTimesRef.current[j - 1];
+
+              // Filter out obviously wrong intervals
+
+              if (interval >= 300 && interval <= 2000) {
+                // 30-200 BPM range
+
+                intervals.push(interval);
+              }
+            }
+
+            if (intervals.length >= 2) {
+              // Use median instead of mean for more robustness
+
+              intervals.sort((a, b) => a - b);
+
+              const medianInterval =
+                intervals[Math.floor(intervals.length / 2)];
+
+              const bpm = Math.round(60000 / medianInterval);
+
+              // Only update if reasonable BPM and not too different from device BPM
+
+              if (bpm >= 40 && bpm <= 200) {
+                const deviceBpmState = deviceBpm;
+
+                const difference = Math.abs(bpm - deviceBpmState);
+
+                // If device BPM is available and our calculation is way off, don't update
+
+                if (deviceBpmState === 0 || difference <= 30) {
+                  // Allow 30 BPM difference
+
+                  lastBpmRef.current = bpm;
+
+                  console.log(
+                    "📊 Calculated BPM:",
+                    bpm,
+                    "| Device BPM:",
+                    deviceBpmState,
+                    "| Difference:",
+                    difference,
+                    "BPM"
+                  );
+                } else {
+                  console.log(
+                    "⚠️ Calculated BPM",
+                    bpm,
+                    "too different from device",
+                    deviceBpmState,
+                    "- keeping device value"
+                  );
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // Clean old peaks (older than 15 seconds)
+
+    const cutoff = now - 15000;
+
+    rPeakTimesRef.current = rPeakTimesRef.current.filter((t) => t >= cutoff);
+
+    // Reset calculated BPM if no recent beats (but keep device BPM)
+
+    const lastPeak = rPeakTimesRef.current[rPeakTimesRef.current.length - 1];
+
+    if (!lastPeak || now - lastPeak > 3000) {
+      lastBpmRef.current = 0;
+    }
+  };
+
+  // Goertzel to detect 50 vs 60 Hz mains hum
+
+  const goertzelPower = (arr: number[], fs: number, f0: number) => {
+    // Use last N samples
+
+    const N = Math.min(arr.length, Math.max(250, Math.floor(fs * 2))); // ~2s window
+
+    if (N < 32) return 0;
+
+    const start = arr.length - N;
+
+    const k = Math.round((N * f0) / fs);
+
+    const w = (2 * Math.PI * k) / N;
+
+    const cosine = Math.cos(w);
+
+    const coeff = 2 * cosine;
+
+    let q0 = 0,
+      q1 = 0,
+      q2 = 0;
+
+    for (let i = 0; i < N; i++) {
+      const x = arr[start + i];
+
+      q0 = coeff * q1 - q2 + x;
+
+      q2 = q1;
+
+      q1 = q0;
+    }
+
+    const real = q1 - q2 * cosine;
+
+    const imag = q2 * Math.sin(w);
+
+    return real * real + imag * imag;
+  };
+
+  const handleBack = () => {
+    navigate("/dashboard");
+  };
+
+  // Load connected Wellue devices
+
+  const loadDevices = async () => {
+    try {
+      setIsLoading(true);
+
+      const connected = await wellueSDK.getConnectedDevices();
+
+      const mapped: Device[] = (connected || []).map((d) => ({
+        id: d.id,
+
+        name: d.name || "Device",
+
+        connected: true,
+
+        battery: d.battery,
+
+        lastSeen: new Date().toISOString(),
+
+        connectedAt: new Date().toISOString(),
+
+        connectedAtFormatted: new Date().toLocaleString(),
+
+        connectionDuration: 0,
+
+        connectionDurationFormatted: "0s",
+
+        active: false,
+      }));
+
+      setDevices(mapped);
+
+      if (mapped.length > 0) setSelectedDevice(mapped[0].id);
+    } catch (error) {
+      console.error("Failed to load connected devices:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Load ECG rhythm history
+
+  const loadRhythms = async (_deviceId: string) => {
+    try {
+      console.log("📚 [ECG] Loading ECG rhythm history for device:", _deviceId);
+
+      // FIXED: Clear old state first to prevent stale data
+
+      setRhythms([]);
+
+      console.log("🧹 [ECG] Cleared old rhythms state");
+
+      // CRITICAL FIX: Clear old stored data that might contain mock/test values
+
+      const clearOldStoredData = () => {
+        try {
+          // FIXED: Single source of truth - only clear storedFilesInApp (reports)
+
+          const storedFiles = JSON.parse(
+            localStorage.getItem("storedFilesInApp") || "[]"
+          );
+
+          const oldECGFiles = storedFiles.filter(
+            (item: any) =>
+              item.type === "ecg" &&
+              (item.heartRate === 120 ||
+                item.heartRate === 0 ||
+                !item.heartRate)
+          );
+
+          if (oldECGFiles.length > 0) {
+            console.log(
+              "🧹 [ECG] Clearing old reports with invalid heart rates:",
+              oldECGFiles
+            );
+
+            const cleanedFiles = storedFiles.filter(
+              (item: any) =>
+                !(
+                  item.type === "ecg" &&
+                  (item.heartRate === 120 ||
+                    item.heartRate === 0 ||
+                    !item.heartRate)
+                )
+            );
+
+            localStorage.setItem(
+              "storedFilesInApp",
+              JSON.stringify(cleanedFiles)
+            );
+
+            console.log(
+              "🧹 [ECG] Cleaned reports (storedFilesInApp), removed",
+              oldECGFiles.length,
+              "invalid entries"
+            );
+          }
+
+          // FIXED: No need to clear old ecgRhythms since we're not using it anymore
+
+          console.log(
+            "🧹 [ECG] Single source of truth - only clearing reports storage"
+          );
+        } catch (error) {
+          console.error("❌ [ECG] Error clearing old stored data:", error);
+        }
+      };
+
+      // Clear old data first
+
+      clearOldStoredData();
+
+      // FIXED: Single source of truth - load from reports (storedFilesInApp) instead of old ecgRhythms
+
+      const existingReports = JSON.parse(
+        localStorage.getItem("storedFilesInApp") || "[]"
+      );
+
+      console.log(
+        "📚 [ECG] Found existing reports in storedFilesInApp:",
+        existingReports.length
+      );
+
+      // Filter only ECG reports
+
+      const ecgReports = existingReports.filter((r: any) => r.type === "ecg");
+
+      console.log("📚 [ECG] Found ECG reports:", ecgReports.length);
+
+      // Filter by device if needed (optional)
+
+      const deviceRhythms = ecgReports.filter(
+        (r: any) => !_deviceId || r.deviceId === _deviceId
+      );
+
+      console.log(
+        "📚 [ECG] Device-specific ECG reports:",
+        deviceRhythms.length
+      );
+
+      // FIXED: Remove duplicates before sorting (same heart rate within 5 minutes)
+
+      const uniqueRhythms = deviceRhythms.filter((rhythm, index, self) => {
+        const firstIndex = self.findIndex(
+          (r) =>
+            r.heartRate === rhythm.heartRate &&
+            Math.abs(
+              new Date(r.savedAt || r.timestamp).getTime() -
+                new Date(rhythm.savedAt || rhythm.timestamp).getTime()
+            ) <
+              5 * 60 * 1000 // 5 minutes
+        );
+
+        return index === firstIndex;
+      });
+
+      console.log(
+        "🧹 [ECG] Removed duplicates, unique ECG reports:",
+        uniqueRhythms.length
+      );
+
+      // Sort by savedAt/timestamp (newest first) and take last 10
+
+      const sortedRhythms = uniqueRhythms
+
+        .sort(
+          (a: any, b: any) =>
+            new Date(b.savedAt || b.timestamp).getTime() -
+            new Date(a.savedAt || a.timestamp).getTime()
+        )
+
+        .slice(0, 10);
+
+      console.log(
+        "📚 [ECG] Setting rhythms state from reports with:",
+        sortedRhythms.length,
+        "entries"
+      );
+
+      console.log("📚 [ECG] First rhythm from reports:", sortedRhythms[0]);
+
+      setRhythms(sortedRhythms);
+    } catch (error) {
+      console.error("❌ [ECG] Failed to load ECG rhythms:", error);
+
+      setRhythms([]);
+    }
+  };
+
+  // Start ECG monitoring (native)
+
+  const startMonitoring = async () => {
+    if (!selectedDevice) {
+      toast({
+        title: "No Device Selected",
+
+        description: "Please select an ECG device to start monitoring.",
+
+        variant: "destructive",
+      });
+
+      return;
+    }
+
+    // Deprecated: auto-listen instead of explicit start
+  };
+
+  // Stop ECG monitoring (native) - not exposed in UI, kept for safety
+
+  const stopMonitoring = async () => {
+    setMonitoringStatus("stopping");
+
+    try {
+      await wellueSDK.stopLive(selectedDevice);
+    } catch {}
+
+    setIsMonitoring(false);
+
+    setMonitoringStatus("listening");
+
+    setDevices((prev) =>
+      prev.map((d) => (d.id === selectedDevice ? { ...d, active: false } : d))
+    );
+  };
+
+  // Start device status monitoring
+
+  const startDeviceStatusMonitoring = () => {
+    const statusInterval = setInterval(async () => {
+      if (!isMonitoring) {
+        clearInterval(statusInterval);
+
+        return;
+      }
+
+      try {
+        const statusResponse = await fetch(
+          `http://localhost:3000/api/devices/${selectedDevice}/status`
+        );
+
+        if (statusResponse.ok) {
+          const statusData = await statusResponse.json();
+
+          if (statusData.device && statusData.device.status) {
+            if (statusData.device.status === "measuring") {
+              toast({
+                title: "ECG Measurement in Progress",
+
+                description:
+                  "ECG rhythm analysis is currently being performed. Please remain still.",
+              });
+            } else if (statusData.device.status === "idle") {
+              setIsMonitoring(false);
+
+              setMonitoringStatus("listening");
+
+              toast({
+                title: "ECG Analysis Completed",
+
+                description:
+                  "ECG rhythm analysis completed successfully. You can start a new analysis anytime.",
+              });
+
+              clearInterval(statusInterval);
+            }
+          }
+        }
+      } catch (error) {
+        console.error("ECG status check error:", error);
+      }
+    }, 1000);
+
+    return () => clearInterval(statusInterval);
+  };
+
+  // Simulator removed: UI is driven only by native device stream
+
+  // Get rhythm status and color
+
+  const getRhythmStatus = (rhythm: string) => {
+    switch (rhythm) {
+      case "normal":
+        return {
+          color: "text-green-400",
+          bg: "bg-green-500/20",
+          label: "Normal",
+        };
+
+      case "irregular":
+        return {
+          color: "text-yellow-400",
+          bg: "bg-yellow-500/20",
+          label: "Irregular",
+        };
+
+      case "bradycardia":
+        return {
+          color: "text-blue-400",
+          bg: "bg-blue-500/20",
+          label: "Bradycardia",
+        };
+
+      case "tachycardia":
+        return {
+          color: "text-orange-400",
+          bg: "bg-orange-500/20",
+          label: "Tachycardia",
+        };
+
+      case "afib":
+        return {
+          color: "text-red-400",
+          bg: "bg-red-500/20",
+          label: "Atrial Fibrillation",
+        };
+
+      case "arrhythmia":
+        return {
+          color: "text-red-500",
+          bg: "bg-red-600/20",
+          label: "Arrhythmia",
+        };
+
+      default:
+        return {
+          color: "text-gray-400",
+          bg: "bg-gray-500/20",
+          label: "Unknown",
+        };
+    }
+  };
+
+  // Format time
+
+  const formatTime = (timestamp: string) => {
+    const date = new Date(timestamp);
+
+    const now = new Date();
+
+    const diffInMinutes = Math.floor(
+      (now.getTime() - date.getTime()) / (1000 * 60)
+    );
+
+    if (diffInMinutes < 1) return "Just now";
+
+    if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
+
+    const hours = Math.floor(diffInMinutes / 60);
+
+    if (hours < 24) return `${hours}h ago`;
+
+    return date.toLocaleDateString();
+  };
+
+  // Initialize SDK callbacks
+
+  useEffect(() => {
+    if (!wellueSDK || !wellueSDK.getInitialized()) return;
+
+    console.log(
+      "🔧 Setting up ECG Monitor - bridge already handles native events"
+    );
+
+    console.log("🔧 Bridge listens to: ecgData, ecgLifecycle, bp2Rt events");
+
+    console.log(
+      "🔧 Bridge forwards to: onECGData, onECGLifecycle, onRealTimeUpdate callbacks"
+    );
+
+    // 🚨 CRITICAL: Don't override setCallbacks - the bridge already handles native events!
+
+    // The bridge is already listening to:
+
+    // - ecgData → onECGData
+
+    // - ecgLifecycle → onECGLifecycle
+
+    // - bp2Rt → onRealTimeUpdate
+
+    //
+
+    // We just need to set our callback handlers
+
+    // Set up our callback handlers (these will be called by the bridge)
+
+    const callbacks = {
+      onECGData: (data: ECGData) => {
+        // 🆕 FIX: If this is a file-based result (has qrs, qtc, result fields), set result immediately
+        if (
+          data.qrs !== undefined ||
+          data.qtc !== undefined ||
+          data.result !== undefined
+        ) {
+          console.log(
+            "🫀 [ECG FILE] File-based result received in onECGData - setting result immediately"
+          );
+          console.log(
+            "🫀 [ECG FILE] Heart Rate:",
+            data.heartRate,
+            "QRS:",
+            data.qrs,
+            "QTC:",
+            data.qtc
+          );
+          console.log(
+            "🫀 [ECG FILE] Waveform data type:",
+            Array.isArray(data.waveform) ? "array" : typeof data.waveform,
+            "length:",
+            data.waveform?.length
+          );
+
+          // ✅ MATCH WEB PORTAL: Convert raw Int16 to mV (exact same as web portal)
+          // Web portal: values = waveformData.map(c => c * mvPerCount) where mvPerCount = 0.003098
+          const rawSamples = data.waveform || [];
+          const scaleUvPerLsb = (data as any).scaleUvPerLsb || 3.098; // BP2 scale factor (μV/LSB)
+          const sampleRate = (data as any).sampleRate || 125; // BP2 sample rate
+
+          // ✅ FIX: Convert raw Int16 to mV Float32Array (matches web portal exactly)
+          const mvPerCount = scaleUvPerLsb / 1000; // Convert μV/LSB to mV/LSB (0.003098)
+          const samplesArray = new Float32Array(rawSamples.length);
+          for (let i = 0; i < rawSamples.length; i++) {
+            samplesArray[i] = rawSamples[i] * mvPerCount; // Convert Int16 to mV
+          }
+
+          // Set chart data with mV samples and scale=1.0 (already in mV)
+          const chartData = {
+            s: samplesArray, // Now in mV (Float32Array)
+            sr: sampleRate,
+            scale: 1.0, // Already in mV, no conversion needed
+          };
+          console.log(
+            "🫀 [ECG FILE] Setting chart data with",
+            samplesArray.length,
+            "mV samples, scale: 1.0 (already in mV, matching web portal)"
+          );
+          setEcgData(chartData);
+          setPermanentEcgData(chartData);
+          setHasEcgChartLoaded(true);
+
+          const fileResult: ECGRhythm = {
+            id: `ecg_${Date.now()}`,
+            deviceId: selectedDevice || "unknown",
+            timestamp: new Date().toISOString(),
+            heartRate: data.heartRate || 0,
+            rhythm: data.rhythm || "normal",
+            qrsDuration: data.qrs || 80,
+            qtInterval: data.qtc || 400,
+            prInterval: 160, // Default
+            stSegment: "normal",
+            tWave: "normal",
+            pWave: "normal",
+            ecgData: rawSamples, // Store raw Int16 samples
+            unit: "raw", // Changed from 'mV' to 'raw' since we're storing Int16 samples
+          };
+
+          console.log(
+            "🫀 [ECG FILE] Setting ecgResult immediately from file data"
+          );
+          setEcgResult(fileResult);
+          setIsMeasurementCompleted(true);
+          setMeasurementCompletionTime(new Date().toISOString());
+          autoSaveECGResult(fileResult);
+          console.log("✅ [ECG FILE] Result set and saved immediately");
+          return; // Don't process as real-time data
+        }
+
+        console.log("🫀 [DEBUG] ECG Data received via bridge:", {
+          waveformLength: data?.waveform?.length || 0,
+
+          heartRate: data?.heartRate,
+
+          sampleRate: data?.sampleRate,
+
+          mvPerCount: data?.mvPerCount,
+
+          timestamp: new Date().toISOString(),
+        });
+
+        // ✅ CRITICAL FIX: Check if this is final ECG result data (from emitECGEnd - waveform type 3)
+        // Final result data has heartRate but no waveform, and may have result, qrs, qtc, etc.
+        const isFinalResultData = !data?.waveform || data.waveform.length === 0;
+        const hasFinalHeartRate = data?.heartRate && data.heartRate > 0;
+        const hasResultFields =
+          (data as any)?.result !== undefined ||
+          (data as any)?.qrs !== undefined;
+
+        if (isFinalResultData && hasFinalHeartRate) {
+          console.log(
+            "🎯 [ECG DATA] ===== FINAL ECG RESULT DATA DETECTED (from waveform type 3) ====="
+          );
+          console.log(
+            "🎯 [ECG DATA] Final heart rate from device:",
+            data.heartRate,
+            "BPM"
+          );
+          console.log("🎯 [ECG DATA] Result fields:", {
+            result: (data as any)?.result,
+            qrs: (data as any)?.qrs,
+            qtc: (data as any)?.qtc,
+            pvcs: (data as any)?.pvcs,
+          });
+
+          // ✅ CRITICAL: Update deviceBpm with final heart rate immediately
+          setDeviceBpm(data.heartRate);
+          setLastDeviceHeartRateTime(Date.now());
+          console.log(
+            "✅ [ECG DATA] Updated deviceBpm with final heart rate:",
+            data.heartRate,
+            "BPM"
+          );
+
+          // If measurement is stopping, this heart rate will be used in the result
+          // Don't process waveform since there isn't one
+          return;
+        }
+
+        // Update last ECG data time for fallback detection
+
+        setLastEcgDataTime(Date.now());
+
+        // Raw debug snapshot (first 20)
 
         try {
-            console.log('🫀 [ECG SAVE] ===== STARTING AUTO-SAVE PROCESS ====');
-            console.log('🫀 [ECG SAVE] Result to save:', result);
-            
-            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-            const filename = `bp2_ecg_${timestamp}.json`;
-            
-            const dataToSave = {
-                ...result,
-                // ✅ FIX: Explicitly ensure ecgData is included
-                ecgData: result.ecgData || [],
-                scaleUvPerLsb: (result as any).scaleUvPerLsb || 3.098,
-                sampleRate: (result as any).sampleRate || 125,
-                timestamp: result.timestamp || new Date().toISOString(),
-                deviceId: selectedDevice || 'unknown',
-                deviceName: 'BP2',
-                measurementId: `ecg_${Date.now()}`,
-                status: 'completed',
-                type: 'ecg',
-                savedAt: new Date().toISOString()
+          const prev = (data?.waveform || []).slice(0, 20);
+
+          console.log("[ui] onECGData raw", {
+            points: data?.waveform?.length || 0,
+            heartRate: data?.heartRate,
+            sampleRate: data?.sampleRate,
+            mvPerCount: data?.mvPerCount,
+            preview: prev,
+          });
+        } catch {}
+
+        // lock fs from device if provided
+
+        const sr = Number(data?.sampleRate);
+
+        if (sr && isFinite(sr) && sr > 0 && sr < 1000 && fsRef.current !== sr) {
+          fsRef.current = sr;
+
+          initFilters(fsRef.current, notchHzRef.current);
+
+          sizeRef.current = { W: 0, H: 0 }; // force rescale next draw
+        }
+
+        const mvPerCount = Number(data?.mvPerCount) || 0.003098;
+
+        lastMvPerCountRef.current = mvPerCount;
+
+        const rawCounts: number[] = (data?.waveform || []) as number[];
+
+        const counts = extractEcgCounts(rawCounts);
+
+        // Capture raw counts for A/B if capture is active
+
+        if (captureActiveRef.current && counts && counts.length) {
+          captureCountsRef.current.push(...counts);
+        }
+
+        const raw = counts.map((v) => v * mvPerCount);
+
+        // Adaptive notch detection every ~2s once we have samples
+
+        const now = Date.now();
+
+        if (
+          now > nextDetectTsRef.current &&
+          ecgBufferRef.current.length > 400
+        ) {
+          const values = ecgBufferRef.current.map((s) => s.v);
+
+          const p50 = goertzelPower(values, fsRef.current, 50);
+
+          const p60 = goertzelPower(values, fsRef.current, 60);
+
+          const target = p60 > p50 * 1.5 ? 60 : 50; // simple threshold margin
+
+          if (target !== notchHzRef.current) {
+            notchHzRef.current = target;
+
+            initFilters(fsRef.current, notchHzRef.current);
+          }
+
+          nextDetectTsRef.current = now + 2000;
+        }
+
+        const filtered = applyFilters(raw);
+
+        const packetTime = Date.now(); // Use current time as packet timestamp
+
+        pushSamples(ecgBufferRef.current, filtered, packetTime, fsRef.current);
+
+        setBufferLen(ecgBufferRef.current.length);
+
+        // Full-frame redraw
+
+        drawRealtime();
+
+        setIsMonitoring(true);
+
+        setMonitoringStatus("active");
+
+        // Store device heart rate (most accurate)
+
+        if (data.heartRate && data.heartRate > 0) {
+          console.log(
+            "🫀 [DEBUG] Received device heart rate:",
+            data.heartRate,
+            "BPM"
+          );
+
+          console.log("🫀 [DEBUG] Previous deviceBpm was:", deviceBpm, "BPM");
+
+          setDeviceBpm(data.heartRate);
+
+          setLastDeviceHeartRateTime(Date.now());
+
+          console.log(
+            "🫀 [DEBUG] Updated deviceBpm state to:",
+            data.heartRate,
+            "BPM"
+          );
+
+          console.log(
+            "🫀 Device Heart Rate:",
+            data.heartRate,
+            "BPM (accurate)"
+          );
+        } else {
+          console.log(
+            "⚠️ [DEBUG] No valid heart rate in ECG data:",
+            data.heartRate
+          );
+        }
+
+        setCurrentRhythm((prev) => ({
+          id: prev?.id || `ecg-${Date.now()}`,
+
+          deviceId: selectedDevice,
+
+          timestamp: new Date().toISOString(),
+
+          heartRate: data.heartRate || prev?.heartRate || 0,
+
+          rhythm: "normal",
+
+          qrsDuration: prev?.qrsDuration || 0,
+
+          qtInterval: prev?.qtInterval || 0,
+
+          prInterval: prev?.prInterval || 0,
+
+          stSegment: "normal",
+
+          tWave: "normal",
+
+          pWave: "normal",
+
+          ecgData: ecgBufferRef.current
+            .slice(-Math.min(100, ecgBufferRef.current.length))
+            .map((s) => s.v),
+
+          unit: "mV",
+        }));
+      },
+
+      onRealTimeUpdate: (rt: RealTimeData) => {
+        console.log("🫀 [ECG UI] ===== onRealTimeUpdate CALLBACK INVOKED ====");
+        console.log(
+          "🫀 [ECG UI] Full RealTimeData:",
+          JSON.stringify(rt, null, 2)
+        );
+        console.log("🫀 [ECG UI] Current monitoring state:", {
+          isMonitoring,
+          monitoringStatus,
+        });
+
+        setRtCount((c) => {
+          const newCount = c + 1;
+          console.log(`🫀 [ECG UI] RT count updated: ${c} → ${newCount}`);
+          return newCount;
+        });
+
+        // 🆕 ECG: Detect device-initiated ECG measurement (status 6)
+        const deviceStatus = rt?.deviceStatus || rt?.status;
+        console.log("🫀 [ECG UI] Device status check:", {
+          deviceStatus: rt?.deviceStatus,
+          status: rt?.status,
+          resolvedStatus: deviceStatus,
+          isMonitoring,
+          willAutoStart: deviceStatus === 6 && !isMonitoring,
+        });
+
+        if (deviceStatus === 6 && !isMonitoring) {
+          console.log(
+            "🫀 [ECG UI] ===== STATUS 6 DETECTED - DEVICE-INITIATED ECG START ===="
+          );
+          console.log("🫀 [ECG UI] Previous state:", {
+            isMonitoring,
+            monitoringStatus,
+          });
+
+          // ✅ FIX: Validate that this is a real measurement start
+          // Sometimes device sends STATUS 6 prematurely (before hands on device)
+          // We'll start monitoring but verify ECG data arrives within 3 seconds
+          const status6Timestamp = Date.now();
+          const ecgDataTimeoutRef = setTimeout(() => {
+            const timeSinceStatus6 = Date.now() - status6Timestamp;
+            const hasReceivedEcgData = lastEcgDataTime > status6Timestamp;
+
+            if (!hasReceivedEcgData && isMonitoring) {
+              console.warn(
+                "⚠️ [ECG UI] STATUS 6 detected but no ECG data received within 3 seconds"
+              );
+              console.warn(
+                "⚠️ [ECG UI] This may be a false start - stopping monitoring"
+              );
+              setIsMonitoring(false);
+              setMonitoringStatus("listening");
+              captureActiveRef.current = false;
+            }
+          }, 3000);
+
+          // Auto-start monitoring
+          console.log("🫀 [ECG UI] Setting isMonitoring = true...");
+          setIsMonitoring(true);
+          console.log('🫀 [ECG UI] Setting monitoringStatus = "active"...');
+          setMonitoringStatus("active");
+          console.log("🫀 [ECG UI] Clearing ECG buffer...");
+          ecgBufferRef.current = [];
+          setBufferLen(0);
+          console.log("🫀 [ECG UI] Activating capture...");
+          captureActiveRef.current = true;
+          captureCountsRef.current = [];
+          captureStartedAtRef.current = new Date().toISOString();
+          console.log(
+            "🫀 [ECG UI] Capture started at:",
+            captureStartedAtRef.current
+          );
+
+          // Reset filters
+          console.log("🫀 [ECG UI] Resetting filters (notch: 50Hz)...");
+          notchHzRef.current = 50;
+          initFilters(fsRef.current, notchHzRef.current);
+          nextDetectTsRef.current = Date.now() + 1500;
+          console.log(
+            "🫀 [ECG UI] Filters initialized, next detection at:",
+            new Date(nextDetectTsRef.current).toISOString()
+          );
+
+          // Clear any previous results
+          console.log("🫀 [ECG UI] Clearing previous results...");
+          setCurrentRhythm(null);
+          setIsMeasurementCompleted(false);
+          setMeasurementCompletionTime(null);
+          setHasResultBeenProcessed(false);
+
+          console.log(
+            "🫀 [ECG UI] ✅ Auto-started ECG monitoring from device button press"
+          );
+          console.log("🫀 [ECG UI] New state:", {
+            isMonitoring: true,
+            monitoringStatus: "active",
+          });
+        } else if (deviceStatus === 6 && isMonitoring) {
+          console.log(
+            "🫀 [ECG UI] Status 6 received but already monitoring (duplicate/ignored)"
+          );
+        }
+
+        // 🆕 ECG: Detect ECG completion (status 7)
+        if (deviceStatus === 7) {
+          console.log(
+            "🫀 [ECG UI] ===== STATUS 7 DETECTED - ECG MEASUREMENT COMPLETED ===="
+          );
+          console.log("🫀 [ECG UI] Current monitoring state:", {
+            isMonitoring,
+            monitoringStatus,
+          });
+          console.log(
+            '🫀 [ECG UI] Note: ecgLifecycle("stop") event will handle result processing'
+          );
+          // The ecgLifecycle("stop") event will handle result processing
+          // This is just for logging/state tracking
+
+          // ✅ FIX: Wait a bit for waveform type 3 data to arrive (contains final heart rate)
+          // The device sends STATUS 7 first, then waveform type 3 with final data
+          setTimeout(() => {
+            console.log(
+              "🫀 [ECG UI] Checking for final heart rate after STATUS 7..."
+            );
+            console.log(
+              "🫀 [ECG UI] Current deviceBpm:",
+              deviceBpm,
+              "lastDeviceHeartRateTime:",
+              lastDeviceHeartRateTime
+            );
+          }, 500);
+        }
+
+        if (!isMonitoring) setMonitoringStatus("listening");
+
+        // Reflect HR from RT even without waveform
+
+        if (rt?.heartRate && rt.heartRate > 0) {
+          console.log(
+            "🫀 [DEBUG] Real-time heart rate received:",
+            rt.heartRate,
+            "BPM"
+          );
+
+          console.log("🫀 [DEBUG] Previous deviceBpm was:", deviceBpm, "BPM");
+
+          setDeviceBpm(rt.heartRate);
+
+          setLastDeviceHeartRateTime(Date.now());
+
+          // Update last ECG data time for fallback detection
+
+          setLastEcgDataTime(Date.now());
+
+          console.log(
+            "🫀 [DEBUG] Updated deviceBpm to real-time value:",
+            rt.heartRate,
+            "BPM"
+          );
+        } else {
+          console.log(
+            "⚠️ [DEBUG] No valid heart rate in real-time update:",
+            rt?.heartRate
+          );
+        }
+
+        setCurrentRhythm((prev) =>
+          prev ? { ...prev, heartRate: rt?.heartRate || prev.heartRate } : prev
+        );
+      },
+
+      onECGLifecycle: async (state: "start" | "stop", data?: any) => {
+        console.log(
+          "🔄 [DEBUG] ECG Lifecycle event received via bridge:",
+          state
+        );
+        console.log("🔄 [DEBUG] Event details:", {
+          state,
+          data,
+          timestamp: new Date().toISOString(),
+        });
+
+        if (state === "start") {
+          console.log("🚀 [DEBUG] ECG measurement STARTED");
+
+          ecgBufferRef.current = [];
+          setBufferLen(0);
+
+          // Pick notch 50/60 by analyzing a short baseline after start
+
+          notchHzRef.current = 50;
+          initFilters(fsRef.current, notchHzRef.current);
+
+          nextDetectTsRef.current = Date.now() + 1500; // re-check after 1.5s of data
+
+          setIsMonitoring(true);
+          setMonitoringStatus("active");
+
+          // Begin live capture of RAW counts for A/B
+
+          captureActiveRef.current = true;
+
+          captureCountsRef.current = [];
+
+          captureStartedAtRef.current = new Date().toISOString();
+
+          // 🚀 CRITICAL: Reset completion flag for new measurement
+          setIsMeasurementCompleted(false);
+          setMeasurementCompletionTime(null); // Reset timestamp for new measurement
+          setHasResultBeenProcessed(false); // Reset duplicate prevention flag
+          console.log(
+            "🔄 [ECG] Reset measurement completion flag, timestamp, and duplicate prevention for new measurement"
+          );
+        }
+
+        if (state === "stop") {
+          console.log(
+            "🫀 [ECG UI] ===== ECG MEASUREMENT STOPPED (onECGLifecycle) ===="
+          );
+          console.log("🫀 [ECG UI] Previous state:", {
+            isMonitoring,
+            monitoringStatus,
+            bufferLen: ecgBufferRef.current.length,
+          });
+          console.log("🫀 [ECG UI] Data parameter received:", data);
+          console.log("🫀 [ECG UI] Processing final data...");
+
+          // 🆕 CRITICAL FIX: If data parameter has file result, set result IMMEDIATELY (like BP does)
+          if (data?.finalHeartRate && data.finalHeartRate > 0) {
+            console.log(
+              "🫀 [ECG FILE] File-based result data received in onECGLifecycle - setting result IMMEDIATELY"
+            );
+            console.log(
+              "🫀 [ECG FILE] Heart Rate:",
+              data.finalHeartRate,
+              "QRS:",
+              data.ecgQrsDuration,
+              "QTC:",
+              data.ecgQtInterval
+            );
+
+            const fileResult: ECGRhythm = {
+              id: `ecg_${Date.now()}`,
+              deviceId: selectedDevice || "unknown",
+              timestamp: new Date().toISOString(),
+              heartRate: data.finalHeartRate,
+              rhythm: data.ecgRhythm || "normal",
+              qrsDuration: data.ecgQrsDuration || 80,
+              qtInterval: data.ecgQtInterval || 400,
+              prInterval: data.ecgPrInterval || 160,
+              stSegment: "normal",
+              tWave: "normal",
+              pWave: "normal",
+              ecgData: data.ecgData || ecgBufferRef.current.map((d) => d.v),
+              unit: "mV",
             };
-            
-            // Save to localStorage for app access (add to storedFilesInApp for reports page)
-            console.log('🫀 [ECG SAVE] Step 1: Saving to localStorage (storedFilesInApp)...');
-            try {
-                const existingReportsRaw = localStorage.getItem('storedFilesInApp');
-                console.log('🫀 [ECG SAVE] Existing reports (raw):', existingReportsRaw ? `${existingReportsRaw.length} chars` : 'null');
-                const existingReports = JSON.parse(existingReportsRaw || '[]');
-                console.log('🫀 [ECG SAVE] Existing reports count:', existingReports.length);
-                
-                const fiveMinutesAgo = Date.now() - (5 * 60 * 1000);
-                console.log('🫀 [ECG SAVE] Filtering duplicates (5 min window)...');
-                const filteredReports = existingReports.filter(r => {
-                    if (r.type !== 'ecg') return true;
-                    const isRecent = new Date(r.timestamp).getTime() > fiveMinutesAgo;
-                    const isSameECG = r.heartRate === dataToSave.heartRate;
-                    const shouldKeep = !(isRecent && isSameECG);
-                    if (!shouldKeep) {
-                        console.log('🫀 [ECG SAVE] Filtered duplicate:', { timestamp: r.timestamp, heartRate: r.heartRate });
-                    }
-                    return shouldKeep;
-                });
-                console.log('🫀 [ECG SAVE] Filtered reports count:', filteredReports.length);
-                
-                const updatedReports = [dataToSave, ...filteredReports.slice(0, 49)];
-                console.log('🫀 [ECG SAVE] Final reports count:', updatedReports.length);
-                console.log('🫀 [ECG SAVE] Data being saved:', {
-                    hasEcgData: !!dataToSave.ecgData,
-                    ecgDataLength: Array.isArray(dataToSave.ecgData) ? dataToSave.ecgData.length : 0,
-                    scaleUvPerLsb: dataToSave.scaleUvPerLsb,
-                    sampleRate: dataToSave.sampleRate,
-                    heartRate: dataToSave.heartRate
-                });
-                localStorage.setItem('storedFilesInApp', JSON.stringify(updatedReports));
-                console.log('🫀 [ECG SAVE] ✅ Saved to localStorage (storedFilesInApp)');
-            } catch (error) {
-                console.error('🫀 [ECG SAVE] ❌ Failed to save to localStorage:', error);
-                console.error('🫀 [ECG SAVE] Error details:', error instanceof Error ? error.message : String(error));
+
+            console.log(
+              "🫀 [ECG FILE] Setting ecgResult IMMEDIATELY from file data in onECGLifecycle"
+            );
+            setEcgResult(fileResult);
+            setIsMeasurementCompleted(true);
+            setMeasurementCompletionTime(new Date().toISOString());
+            autoSaveECGResult(fileResult);
+            console.log(
+              "✅ [ECG FILE] Result set and saved IMMEDIATELY from onECGLifecycle"
+            );
+
+            // Still update monitoring state
+            setIsMonitoring(false);
+            setMonitoringStatus("listening");
+            console.log(
+              "🫀 [ECG UI] ✅ Monitoring stopped, result set from file data"
+            );
+            return; // Don't continue with setTimeout logic
+          }
+
+          console.log("🫀 [ECG UI] Setting isMonitoring = false...");
+          setIsMonitoring(false);
+          console.log('🫀 [ECG UI] Setting monitoringStatus = "listening"...');
+          setMonitoringStatus("listening");
+          console.log(
+            "🫀 [ECG UI] ✅ Monitoring stopped, status set to listening"
+          );
+
+          console.log(
+            "🛑 ECG measurement stopped - checking for final heart rate..."
+          );
+
+          // CRITICAL: Capture final heart rate when measurement completes
+
+          // The device should provide final HR at this point (e.g., 77 BPM)
+
+          setTimeout(() => {
+            console.log("📋 Final device heart rate check:", {
+              deviceBpm: deviceBpm,
+
+              rhythmBpm: currentRhythm?.heartRate,
+
+              calcBpm: lastBpmRef.current,
+
+              lastDeviceHeartRateTime: lastDeviceHeartRateTime,
+
+              timeSinceLastUpdate: Date.now() - lastDeviceHeartRateTime,
+            });
+
+            // CRITICAL: Get the most recent heart rate from any available source
+
+            let finalHeartRate = 0;
+
+            // FIXED: More robust heart rate selection logic
+
+            // Priority 1: Use deviceBpm if it's valid and recent (within last 10 seconds)
+
+            const hasRecentDeviceData =
+              Date.now() - lastDeviceHeartRateTime < 10000;
+
+            console.log("🔍 [FINAL] Recent device data check:", {
+              hasRecentDeviceData,
+
+              timeSinceLastUpdate: Date.now() - lastDeviceHeartRateTime,
+
+              deviceBpm,
+
+              lastDeviceHeartRateTime,
+            });
+
+            // Priority 1: Device heart rate (most reliable)
+
+            if (deviceBpm > 0 && hasRecentDeviceData) {
+              finalHeartRate = deviceBpm;
+
+              console.log(
+                "✅ [FINAL] Using deviceBpm:",
+                finalHeartRate,
+                "BPM (recent data)"
+              );
             }
-            
-            // Save to device storage using Capacitor Filesystem
-            console.log('🫀 [ECG SAVE] Step 2: Saving to device filesystem...');
-            console.log('🫀 [ECG SAVE] Filename:', filename);
-            try {
-                const { Filesystem, Directory } = await import('@capacitor/filesystem');
-                console.log('🫀 [ECG SAVE] Filesystem module imported');
-                const dataString = JSON.stringify(dataToSave, null, 2);
-                console.log('🫀 [ECG SAVE] Data size:', dataString.length, 'chars');
-                await Filesystem.writeFile({
-                    path: filename,
-                    data: dataString,
-                    directory: Directory.Documents,
-                    recursive: true
-                });
-                console.log('🫀 [ECG SAVE] ✅ Saved to device filesystem:', filename);
-            } catch (error) {
-                console.error('🫀 [ECG SAVE] ❌ Failed to save to filesystem:', error);
-                console.error('🫀 [ECG SAVE] Error details:', error instanceof Error ? error.message : String(error));
+
+            // Priority 2: Current rhythm heart rate
+            else if (currentRhythm?.heartRate && currentRhythm.heartRate > 0) {
+              finalHeartRate = currentRhythm.heartRate;
+
+              console.log(
+                "✅ [FINAL] Using currentRhythm.heartRate:",
+                finalHeartRate,
+                "BPM"
+              );
             }
-            
-            // 🚀 STORE ECG DATA IN SUPABASE FOR DOCTOR PORTAL
-            console.log('🫀 [ECG SAVE] Step 3: Saving to Supabase database...');
+
+            // Priority 3: Last calculated BPM
+            else if (lastBpmRef.current > 0) {
+              finalHeartRate = lastBpmRef.current;
+
+              console.log(
+                "✅ [FINAL] Using lastBpmRef.current:",
+                finalHeartRate,
+                "BPM"
+              );
+            }
+
+            // Priority 4: Last known device heart rate (fallback)
+            else if (lastDeviceHeartRateTime > 0) {
+              // Try to get the last known value from the device
+
+              console.log(
+                "⚠️ [FINAL] No current heart rate, checking last known value..."
+              );
+
+              // This will be handled by the native plugin's lastKnownHeartRate
+            }
+
+            // Priority 5: Use the immediate heart rate captured when measurement stopped
+            else {
+              console.log(
+                "❌ [FINAL] No valid heart rate found from any source!"
+              );
+
+              console.log(
+                "❌ [FINAL] This means device data is not reaching the frontend properly"
+              );
+            }
+
+            // CRITICAL FIX: If finalHeartRate is still 0, use the current live heart rate
+
+            if (finalHeartRate === 0) {
+              // Use the current live heart rate that's showing in the UI
+
+              finalHeartRate =
+                deviceBpm ||
+                currentRhythm?.heartRate ||
+                lastBpmRef.current ||
+                0;
+
+              console.log(
+                "🚨 [FINAL] finalHeartRate was 0, using fallback:",
+                finalHeartRate,
+                "BPM"
+              );
+            }
+
+            // FINAL VALIDATION: Ensure we have a valid heart rate
+            // ✅ FIX: Allow result display even with 0 heart rate (show warning)
+            if (finalHeartRate === 0) {
+              console.warn(
+                "⚠️ [FINAL] No valid heart rate found after all fallbacks!"
+              );
+              console.warn(
+                "⚠️ [FINAL] This may indicate device data not received properly"
+              );
+              console.warn(
+                "⚠️ [FINAL] Will display result with 0 BPM and warning message"
+              );
+              // Don't return - allow result to be created and displayed with warning
+            }
+
+            // Create final ECG result
+
+            const finalResult: ECGRhythm = {
+              id: `ecg_${Date.now()}`,
+
+              deviceId: selectedDevice || "unknown",
+
+              timestamp: new Date().toISOString(),
+
+              heartRate: finalHeartRate, // Use the determined final heart rate
+
+              rhythm: "normal",
+
+              qrsDuration: 80,
+
+              qtInterval: 400,
+
+              prInterval: 160,
+
+              stSegment: "normal",
+
+              tWave: "normal",
+
+              pWave: "normal",
+
+              // ✅ FIX: Use data.ecgData from lifecycle event instead of empty ecgBufferRef
+              ecgData:
+                data?.ecgData &&
+                Array.isArray(data.ecgData) &&
+                data.ecgData.length > 0
+                  ? data.ecgData
+                  : ecgBufferRef.current.length > 0
+                  ? ecgBufferRef.current.map((d) => d.v)
+                  : [],
+
+              unit: "mV",
+            };
+
+            console.log("📊 Final ECG result created:", finalResult);
+
+            console.log(
+              "🎯 [FINAL] Heart rate in result:",
+              finalResult.heartRate,
+              "BPM"
+            );
+
+            // ✅ CRITICAL: Set ecgResult for UI display
+            console.log("🎯 [FINAL] Setting ecgResult for UI display...");
+            setEcgResult(finalResult);
+            setIsMeasurementCompleted(true);
+            const completionTime = new Date().toISOString();
+            setMeasurementCompletionTime(completionTime);
+            setPermanentTimestamp(completionTime);
+            console.log("✅ [FINAL] ECG result set, completion flags updated");
+
+            // Update current rhythm to show final result in main interface
+
+            setCurrentRhythm(finalResult);
+
+            // DEBUG: Log what we're about to save
+
+            console.log(
+              "🔍 [FINAL] About to save ECG result with heart rate:",
+              finalResult.heartRate
+            );
+
+            console.log(
+              "🔍 [FINAL] Debug - finalHeartRate value:",
+              finalHeartRate
+            );
+
+            console.log("🔍 [FINAL] Debug - deviceBpm:", deviceBpm);
+
+            console.log(
+              "🔍 [FINAL] Debug - currentRhythm?.heartRate:",
+              currentRhythm?.heartRate
+            );
+
+            // FIXED: Single source of truth - save to reports only, then fetch from there
+
             try {
-                // Get current patient ID from auth context
-                const { data: { user }, error: userError } = await supabase.auth.getUser();
-                
-                if (userError) {
-                    console.error('❌ [ECG SAVE] Auth error:', userError);
+              // Save to storedFilesInApp for reports page (primary storage)
+
+              const existingReports = JSON.parse(
+                localStorage.getItem("storedFilesInApp") || "[]"
+              );
+
+              // Remove duplicate ECG reports (same heart rate within 5 minutes)
+
+              const fiveMinutesAgo = Date.now() - 5 * 60 * 1000;
+
+              const filteredReports = existingReports.filter((r) => {
+                if (r.type !== "ecg") return true; // Keep non-ECG reports
+
+                const isRecent =
+                  new Date(r.savedAt || r.timestamp).getTime() > fiveMinutesAgo;
+
+                const isSameHR = r.heartRate === finalResult.heartRate;
+
+                return !(isRecent && isSameHR);
+              });
+
+              const reportData = {
+                ...finalResult,
+
+                // ✅ FIX: Ensure ecgData is included from data if available
+                ecgData:
+                  finalResult.ecgData ||
+                  (data?.ecgData && Array.isArray(data.ecgData)
+                    ? data.ecgData
+                    : []),
+                scaleUvPerLsb: data?.scaleUvPerLsb || 3.098,
+                sampleRate: data?.sampleRate || 125,
+                type: "ecg",
+
+                savedAt: new Date().toISOString(),
+              };
+
+              console.log(
+                "💾 [ECG] Saving to reports (storedFilesInApp):",
+                reportData
+              );
+
+              const updatedReports = [
+                reportData,
+                ...filteredReports.slice(0, 49),
+              ]; // Keep last 50
+
+              localStorage.setItem(
+                "storedFilesInApp",
+                JSON.stringify(updatedReports)
+              );
+
+              console.log(
+                "💾 [ECG] ECG result saved to reports, total reports:",
+                updatedReports.length
+              );
+
+              // 🚀 STORE ECG DATA IN SUPABASE FOR DOCTOR PORTAL (async IIFE to handle await)
+              (async () => {
+                try {
+                  const {
+                    data: { user },
+                    error: userError,
+                  } = await supabase.auth.getUser();
+
+                  if (userError || !user) {
+                    console.warn(
+                      "🫀 [ECG] User not authenticated, cannot save to Supabase"
+                    );
                     return;
-                }
-                
-                if (!user) {
-                    console.warn('🫀 [ECG SAVE] ⚠️ User not authenticated, cannot save to Supabase');
+                  }
+
+                  const { data: patientProfile, error: patientError } =
+                    await supabase
+                      .from("patients")
+                      .select("id, is_active")
+                      .eq("auth_user_id", user.id)
+                      .eq("is_active", true) // ✅ ADD: Ensure patient is active
+                      .single();
+
+                  if (patientError || !patientProfile) {
+                    console.error(
+                      "❌ [ECG] Patient profile not found:",
+                      patientError
+                    );
                     return;
-                }
-                
-                // Get patient profile with is_active check
-                const { data: patientProfile, error: patientError } = await supabase
-                    .from('patients')
-                    .select('id, is_active')
-                    .eq('auth_user_id', user.id)
-                    .eq('is_active', true)  // ✅ ADD: Ensure patient is active
-                    .single();
-                
-                if (patientError || !patientProfile) {
-                    console.error('❌ [ECG SAVE] Patient profile not found:', patientError);
-                    console.error('❌ [ECG SAVE] User ID:', user.id);
-                    return;
-                }
-                
-                // Check if we have ECG data to save
-                const ecgDataArray = dataToSave.ecgData;
-                const hasEcgData = Array.isArray(ecgDataArray) && ecgDataArray.length > 0;
-                
-                if (!hasEcgData) {
-                    console.warn('🫀 [ECG SAVE] ⚠️ No ECG data to save to Supabase (ecgData missing or empty)');
-                    return;
-                }
-                
-                const scaleUvPerLsb = dataToSave.scaleUvPerLsb || 3.098;
-                const sampleRate = dataToSave.sampleRate || 125;
-                
-                // Convert raw Int16 values to mV if needed
-                let mvData: number[];
-                if (ecgDataArray.length > 0) {
-                    // Check if data is already in mV (values typically < 10 for ECG)
-                    // or raw Int16 (values typically -32768 to 32767)
-                    const maxAbsValue = Math.max(...ecgDataArray.map(Math.abs));
-                    const isLikelyMv = maxAbsValue < 100; // mV values are typically small
-                    
+                  }
+
+                  if (
+                    reportData.ecgData &&
+                    Array.isArray(reportData.ecgData) &&
+                    reportData.ecgData.length > 0
+                  ) {
+                    const scaleUvPerLsb = reportData.scaleUvPerLsb || 3.098;
+                    const sampleRate = reportData.sampleRate || 125;
+
+                    // Convert raw Int16 values to mV if needed
+                    const maxAbsValue = Math.max(
+                      ...reportData.ecgData.map(Math.abs)
+                    );
+                    const isLikelyMv = maxAbsValue < 100;
+
+                    let mvData: number[];
                     if (isLikelyMv) {
-                        // Already in mV, use directly
-                        mvData = ecgDataArray;
-                        console.log('🫀 [ECG SAVE] ECG data appears to be in mV format');
+                      mvData = reportData.ecgData;
                     } else {
-                        // Convert from Int16 to mV
-                        const mvPerLsb = scaleUvPerLsb / 1000; // Convert μV to mV
-                        mvData = ecgDataArray.map(val => val * mvPerLsb);
-                        console.log('🫀 [ECG SAVE] Converted ECG data from Int16 to mV');
+                      const mvPerLsb = scaleUvPerLsb / 1000;
+                      mvData = reportData.ecgData.map((val) => val * mvPerLsb);
                     }
-                } else {
-                    mvData = [];
-                }
-                
-                // Prepare ECG data for Supabase
-                const ecgRecord = {
-                    patient_id: patientProfile.id,  // ✅ Explicit patient_id
-                    device_id: dataToSave.deviceId || selectedDevice || 'BP2_Device',
-                    recorded_at: dataToSave.timestamp || dataToSave.savedAt || new Date().toISOString(),
-                    sample_rate: sampleRate,
-                    scale_uv_per_lsb: scaleUvPerLsb,
-                    duration_seconds: mvData.length / sampleRate,
-                    mv_data_json: mvData, // ✅ Array of numbers in mV
-                    raw_data_base64: null,  // ✅ MUST be null when using mv_data_json
-                    heart_rate: dataToSave.heartRate || 0,
-                    quality_score: 0.95,
-                    notes: 'ECG recording from BP2 device'
-                };
-                
-                console.log('🫀 [ECG SAVE] Supabase record:', {
-                    patient_id: ecgRecord.patient_id,
-                    device_id: ecgRecord.device_id,
-                    recorded_at: ecgRecord.recorded_at,
-                    sample_count: mvData.length,
-                    heart_rate: ecgRecord.heart_rate,
-                    has_mv_data: !!ecgRecord.mv_data_json && Array.isArray(ecgRecord.mv_data_json),
-                    raw_data_is_null: ecgRecord.raw_data_base64 === null
-                });
-                
-                // Store in Supabase with better error handling
-                const { data: insertedData, error: insertError } = await supabase
-                    .from('ecg_recordings')
-                    .insert(ecgRecord)
-                    .select();
-                
-                if (insertError) {
-                    console.error('❌ [ECG SAVE] Supabase insert error:', {
+
+                    const ecgRecord = {
+                      patient_id: patientProfile.id, // ✅ Explicit patient_id
+                      device_id:
+                        reportData.deviceId || selectedDevice || "BP2_Device",
+                      recorded_at:
+                        reportData.timestamp ||
+                        reportData.savedAt ||
+                        new Date().toISOString(),
+                      sample_rate: sampleRate,
+                      scale_uv_per_lsb: scaleUvPerLsb,
+                      duration_seconds: mvData.length / sampleRate,
+                      mv_data_json: mvData, // ✅ Array of numbers
+                      raw_data_base64: null, // ✅ MUST be null when using mv_data_json
+                      heart_rate: reportData.heartRate || 0,
+                      quality_score: 0.95,
+                      notes: "ECG recording from BP2 device",
+                    };
+
+                    const { data: insertedData, error: insertError } =
+                      await supabase
+                        .from("ecg_recordings")
+                        .insert(ecgRecord)
+                        .select();
+
+                    if (insertError) {
+                      console.error("❌ [ECG] Supabase insert error:", {
                         code: insertError.code,
                         message: insertError.message,
                         details: insertError.details,
-                        hint: insertError.hint
-                    });
-                    
-                    // Specific error handling
-                    if (insertError.code === '42501') {
-                        console.error('❌ [ECG SAVE] RLS policy violation - patient_id may not match authenticated user');
-                    } else if (insertError.code === '23514') {
-                        console.error('❌ [ECG SAVE] Constraint violation - check raw_data_base64/mv_data_json constraint');
-                    } else if (insertError.code === '23503') {
-                        console.error('❌ [ECG SAVE] Foreign key violation - patient_id not found in patients table');
-                    }
-                    throw insertError;
-                }
-                
-                console.log('🫀 [ECG SAVE] ✅ Saved to Supabase database for doctor portal:', insertedData);
-            } catch (error) {
-                console.error('🫀 [ECG SAVE] ❌ Failed to store ECG data in Supabase:', error);
-                console.error('🫀 [ECG SAVE] Error details:', error instanceof Error ? error.message : String(error));
-                // Don't fail the main save process if Supabase storage fails
-            }
-            
-            console.log('🫀 [ECG SAVE] ✅ Auto-save process completed successfully');
-        } catch (error) {
-            console.error('🫀 [ECG SAVE] ❌ Failed to auto-save ECG result:', error);
-            console.error('🫀 [ECG SAVE] Error details:', error instanceof Error ? error.stack : String(error));
-        }
-    }, [selectedDevice]);
-
-    // FIXED: Proper ECG data decoding and filtering
-
-    const extractEcgCounts = (arr: number[]) => {
-
-        const out: number[] = [];
-
-        let prev = lastLiveSampleRef.current || 0;
-
-
-
-        for (const v of arr) {
-
-            // Skip obvious control words
-
-            if (CONTROL_WORDS.current.has(v)) continue;
-
-
-
-            // Treat as 16-bit signed little endian (ECG standard)
-
-            let sample = v;
-
-            if (sample > 32767) sample -= 65536; // Convert unsigned to signed
-
-
-
-            // Less aggressive filtering - allow ECG amplitudes and QRS complexes
-
-            if (sample > MAX_ABS_COUNT || sample < -MAX_ABS_COUNT) continue;
-
-
-
-            if (out.length > 0) {
-
-                const d = Math.abs(sample - prev);
-
-                if (d > MAX_DELTA_BETWEEN) continue; // Still filter extreme outliers
-
-            }
-
-
-
-            out.push(sample);
-
-            prev = sample;
-
-        }
-
-
-
-        if (out.length) lastLiveSampleRef.current = out[out.length - 1];
-
-        return out;
-
-    };
-
-
-
-    // Live capture (raw counts) for A/B against stored record
-
-    const captureActiveRef = useRef<boolean>(false);
-
-    const captureStartedAtRef = useRef<string | null>(null);
-
-    const captureCountsRef = useRef<number[]>([]);
-
-    const lastMvPerCountRef = useRef<number>(0.003098);
-
-    const mk = (b0: number, b1: number, b2: number, a0: number, a1: number, a2: number): Biquad => {
-
-        const nb0 = b0 / a0, nb1 = b1 / a0, nb2 = b2 / a0, na1 = a1 / a0, na2 = a2 / a0;
-
-        return { b0: nb0, b1: nb1, b2: nb2, a1: na1, a2: na2, x1: 0, x2: 0, y1: 0, y2: 0 };
-
-    };
-
-    const initFilters = (fs: number, notchHz: number = 50) => {
-
-        const Q = Math.SQRT1_2;
-
-        const hp = (fc: number) => {
-
-            const w = 2 * Math.PI * fc / fs, c = Math.cos(w), s = Math.sin(w), alpha = s / (2 * Q);
-
-            const b0 = (1 + c) / 2, b1 = -(1 + c), b2 = (1 + c) / 2, a0 = 1 + alpha, a1 = -2 * c, a2 = 1 - alpha; return mk(b0, b1, b2, a0, a1, a2);
-
-        };
-
-        const lp = (fc: number) => {
-
-            const w = 2 * Math.PI * fc / fs, c = Math.cos(w), s = Math.sin(w), alpha = s / (2 * Q);
-
-            const b0 = (1 - c) / 2, b1 = 1 - c, b2 = (1 - c) / 2, a0 = 1 + alpha, a1 = -2 * c, a2 = 1 - alpha; return mk(b0, b1, b2, a0, a1, a2);
-
-        };
-
-        const notch = (f0: number) => {
-
-            const Qn = 30; const w = 2 * Math.PI * f0 / fs, c = Math.cos(w), s = Math.sin(w), alpha = s / (2 * Qn);
-
-            const b0 = 1, b1 = -2 * c, b2 = 1, a0 = 1 + alpha, a1 = -2 * c, a2 = 1 - alpha; return mk(b0, b1, b2, a0, a1, a2);
-
-        };
-
-        // FIXED: Better ECG filtering
-
-        biquadsRef.current = [hp(0.05), notch(notchHz), lp(100)];
-
-    };
-
-    // FIXED: Apply filters and baseline removal
-
-    const applyFilters = (arr: number[]) => {
-
-        if (!arr.length) return arr;
-
-
-
-        // Apply biquad filters
-
-        let out = arr;
-
-        for (const f of biquadsRef.current) {
-
-            const o = new Array(out.length);
-
-            for (let i = 0; i < out.length; i++) {
-
-                const x = out[i];
-
-                const y = f.b0 * x + f.b1 * f.x1 + f.b2 * f.x2 - f.a1 * f.y1 - f.a2 * f.y2;
-
-                f.x2 = f.x1; f.x1 = x; f.y2 = f.y1; f.y1 = y;
-
-                o[i] = y;
-
-            }
-
-            out = o;
-
-        }
-
-
-
-        return out;
-
-    };
-
-
-
-    // NEW: Baseline removal for display (rolling mean)
-
-    const removeBaseline = (value: number) => {
-
-        const BASELINE_WINDOW_MS = 300;
-
-        const now = Date.now();
-
-
-
-        // Add current value to baseline buffer
-
-        baselineBufferRef.current.push(value);
-
-
-
-        // Remove old values (older than 300ms)
-
-        while (baselineBufferRef.current.length > 0 &&
-
-            baselineBufferRef.current.length > (fsRef.current * BASELINE_WINDOW_MS / 1000)) {
-
-            baselineBufferRef.current.shift();
-
-        }
-
-
-
-        // Compute rolling mean
-
-        const mean = baselineBufferRef.current.reduce((sum, v) => sum + v, 0) / baselineBufferRef.current.length;
-
-
-
-        return value - mean;
-
-    };
-
-
-
-    // IMPROVED: R-peak detection and BPM calculation (backup to device BPM)
-
-    const detectRPeak = (newSamples: { t: number, v: number }[]) => {
-
-        if (newSamples.length === 0) return;
-
-
-
-        const REFRACTORY_WINDOW = 350; // Increased to 350ms (more physiologically accurate)
-
-        const THRESHOLD_FACTOR = 0.4; // Reduced to 0.4 (less aggressive)
-
-
-
-        // Get recent samples for adaptive thresholding
-
-        const now = Date.now();
-
-        const recentSamples = ecgBufferRef.current
-
-            .filter(s => s.t >= now - 8000) // Extended to 8 seconds for better baseline
-
-            .map(s => s.v); // Don't use abs() - we want actual signal polarity
-
-
-
-        if (recentSamples.length < 100) return; // Need more data for reliable detection
-
-
-
-        // Use percentile-based thresholding (more robust)
-
-        const sorted = [...recentSamples].sort((a, b) => a - b);
-
-        const p90 = sorted[Math.floor(sorted.length * 0.9)] || 0;
-
-        const p10 = sorted[Math.floor(sorted.length * 0.1)] || 0;
-
-        const threshold = p10 + (p90 - p10) * THRESHOLD_FACTOR;
-
-
-
-        // Check each new sample for R-peak
-
-        for (let i = 2; i < newSamples.length - 2; i++) { // Extended window for better peak detection
-
-            const prev2 = newSamples[i - 2];
-
-            const prev1 = newSamples[i - 1];
-
-            const curr = newSamples[i];
-
-            const next1 = newSamples[i + 1];
-
-            const next2 = newSamples[i + 2];
-
-
-
-            // Look for prominent local maximum (improved peak detection)
-
-            if (curr.v > threshold &&
-
-                curr.v > prev2.v && curr.v > prev1.v &&
-
-                curr.v > next1.v && curr.v > next2.v &&
-
-                curr.v > (prev1.v + next1.v) / 2 + 0.1) { // Must be significantly above neighbors
-
-
-
-                // Check refractory period
-
-                const lastPeak = rPeakTimesRef.current[rPeakTimesRef.current.length - 1];
-
-                if (!lastPeak || (curr.t - lastPeak) >= REFRACTORY_WINDOW) {
-
-                    rPeakTimesRef.current.push(curr.t);
-
-
-
-                    // Keep only last 8 peaks for BPM calculation
-
-                    if (rPeakTimesRef.current.length > 8) {
-
-                        rPeakTimesRef.current.shift();
-
-                    }
-
-
-
-                    // Calculate BPM from last 4-6 beats (more stable)
-
-                    if (rPeakTimesRef.current.length >= 3) {
-
-                        const intervals = [];
-
-                        const startIdx = Math.max(0, rPeakTimesRef.current.length - 6); // Use last 6 beats max
-
-
-
-                        for (let j = startIdx + 1; j < rPeakTimesRef.current.length; j++) {
-
-                            const interval = rPeakTimesRef.current[j] - rPeakTimesRef.current[j - 1];
-
-                            // Filter out obviously wrong intervals
-
-                            if (interval >= 300 && interval <= 2000) { // 30-200 BPM range
-
-                                intervals.push(interval);
-
-                            }
-
-                        }
-
-
-
-                        if (intervals.length >= 2) {
-
-                            // Use median instead of mean for more robustness
-
-                            intervals.sort((a, b) => a - b);
-
-                            const medianInterval = intervals[Math.floor(intervals.length / 2)];
-
-                            const bpm = Math.round(60000 / medianInterval);
-
-
-
-                            // Only update if reasonable BPM and not too different from device BPM
-
-                            if (bpm >= 40 && bpm <= 200) {
-
-                                const deviceBpmState = deviceBpm;
-
-                                const difference = Math.abs(bpm - deviceBpmState);
-
-
-
-                                // If device BPM is available and our calculation is way off, don't update
-
-                                if (deviceBpmState === 0 || difference <= 30) { // Allow 30 BPM difference
-
-                                    lastBpmRef.current = bpm;
-
-                                    console.log('📊 Calculated BPM:', bpm, '| Device BPM:', deviceBpmState, '| Difference:', difference, 'BPM');
-
-                                } else {
-
-                                    console.log('⚠️ Calculated BPM', bpm, 'too different from device', deviceBpmState, '- keeping device value');
-
-                                }
-
-                            }
-
-                        }
-
-                    }
-
-                }
-
-            }
-
-        }
-
-
-
-        // Clean old peaks (older than 15 seconds)
-
-        const cutoff = now - 15000;
-
-        rPeakTimesRef.current = rPeakTimesRef.current.filter(t => t >= cutoff);
-
-
-
-        // Reset calculated BPM if no recent beats (but keep device BPM)
-
-        const lastPeak = rPeakTimesRef.current[rPeakTimesRef.current.length - 1];
-
-        if (!lastPeak || (now - lastPeak) > 3000) {
-
-            lastBpmRef.current = 0;
-
-        }
-
-    };
-
-
-
-    // Goertzel to detect 50 vs 60 Hz mains hum
-
-    const goertzelPower = (arr: number[], fs: number, f0: number) => {
-
-        // Use last N samples
-
-        const N = Math.min(arr.length, Math.max(250, Math.floor(fs * 2))); // ~2s window
-
-        if (N < 32) return 0;
-
-        const start = arr.length - N;
-
-        const k = Math.round((N * f0) / fs);
-
-        const w = (2 * Math.PI * k) / N;
-
-        const cosine = Math.cos(w);
-
-        const coeff = 2 * cosine;
-
-        let q0 = 0, q1 = 0, q2 = 0;
-
-        for (let i = 0; i < N; i++) {
-
-            const x = arr[start + i];
-
-            q0 = coeff * q1 - q2 + x;
-
-            q2 = q1;
-
-            q1 = q0;
-
-        }
-
-        const real = q1 - q2 * cosine;
-
-        const imag = q2 * Math.sin(w);
-
-        return real * real + imag * imag;
-
-    };
-
-
-
-    const handleBack = () => {
-
-        navigate('/dashboard');
-
-    };
-
-
-
-    // Load connected Wellue devices
-
-    const loadDevices = async () => {
-
-        try {
-
-            setIsLoading(true);
-
-            const connected = await wellueSDK.getConnectedDevices();
-
-            const mapped: Device[] = (connected || []).map(d => ({
-
-                id: d.id,
-
-                name: d.name || 'Device',
-
-                connected: true,
-
-                battery: d.battery,
-
-                lastSeen: new Date().toISOString(),
-
-                connectedAt: new Date().toISOString(),
-
-                connectedAtFormatted: new Date().toLocaleString(),
-
-                connectionDuration: 0,
-
-                connectionDurationFormatted: '0s',
-
-                active: false,
-
-            }));
-
-            setDevices(mapped);
-
-            if (mapped.length > 0) setSelectedDevice(mapped[0].id);
-
-        } catch (error) {
-
-            console.error('Failed to load connected devices:', error);
-
-        } finally {
-
-            setIsLoading(false);
-
-        }
-
-    };
-
-
-
-
-
-    // Load ECG rhythm history
-
-    const loadRhythms = async (_deviceId: string) => {
-
-        try {
-
-            console.log('📚 [ECG] Loading ECG rhythm history for device:', _deviceId);
-
-
-
-            // FIXED: Clear old state first to prevent stale data
-
-            setRhythms([]);
-
-            console.log('🧹 [ECG] Cleared old rhythms state');
-
-
-
-            // CRITICAL FIX: Clear old stored data that might contain mock/test values
-
-            const clearOldStoredData = () => {
-
-                try {
-
-                    // FIXED: Single source of truth - only clear storedFilesInApp (reports)
-
-                    const storedFiles = JSON.parse(localStorage.getItem('storedFilesInApp') || '[]');
-
-                    const oldECGFiles = storedFiles.filter((item: any) =>
-
-                        item.type === 'ecg' &&
-
-                        (item.heartRate === 120 || item.heartRate === 0 || !item.heartRate)
-
-                    );
-
-
-
-                    if (oldECGFiles.length > 0) {
-
-                        console.log('🧹 [ECG] Clearing old reports with invalid heart rates:', oldECGFiles);
-
-                        const cleanedFiles = storedFiles.filter((item: any) =>
-
-                            !(item.type === 'ecg' && (item.heartRate === 120 || item.heartRate === 0 || !item.heartRate))
-
+                        hint: insertError.hint,
+                      });
+
+                      // Specific error handling
+                      if (insertError.code === "42501") {
+                        console.error(
+                          "❌ [ECG] RLS policy violation - patient_id may not match authenticated user"
                         );
-
-                        localStorage.setItem('storedFilesInApp', JSON.stringify(cleanedFiles));
-
-                        console.log('🧹 [ECG] Cleaned reports (storedFilesInApp), removed', oldECGFiles.length, 'invalid entries');
-
+                      } else if (insertError.code === "23514") {
+                        console.error(
+                          "❌ [ECG] Constraint violation - check raw_data_base64/mv_data_json constraint"
+                        );
+                      } else if (insertError.code === "23503") {
+                        console.error(
+                          "❌ [ECG] Foreign key violation - patient_id not found in patients table"
+                        );
+                      }
+                    } else {
+                      console.log(
+                        "✅ [ECG] ECG data stored in Supabase for doctor portal:",
+                        insertedData
+                      );
                     }
-
-
-
-                    // FIXED: No need to clear old ecgRhythms since we're not using it anymore
-
-                    console.log('🧹 [ECG] Single source of truth - only clearing reports storage');
-
+                  }
                 } catch (error) {
-
-                    console.error('❌ [ECG] Error clearing old stored data:', error);
-
+                  console.error(
+                    "❌ [ECG] Failed to store ECG data in Supabase:",
+                    error
+                  );
                 }
+              })(); // End async IIFE
 
-            };
+              // FIXED: Update rhythms state from reports data (single source of truth)
 
+              const ecgReports = updatedReports.filter((r) => r.type === "ecg");
 
+              const sortedRhythms = ecgReports
 
-            // Clear old data first
-
-            clearOldStoredData();
-
-
-
-            // FIXED: Single source of truth - load from reports (storedFilesInApp) instead of old ecgRhythms
-
-            const existingReports = JSON.parse(localStorage.getItem('storedFilesInApp') || '[]');
-
-            console.log('📚 [ECG] Found existing reports in storedFilesInApp:', existingReports.length);
-
-
-
-            // Filter only ECG reports
-
-            const ecgReports = existingReports.filter((r: any) => r.type === 'ecg');
-
-            console.log('📚 [ECG] Found ECG reports:', ecgReports.length);
-
-
-
-            // Filter by device if needed (optional)
-
-            const deviceRhythms = ecgReports.filter((r: any) => !_deviceId || r.deviceId === _deviceId);
-
-            console.log('📚 [ECG] Device-specific ECG reports:', deviceRhythms.length);
-
-
-
-            // FIXED: Remove duplicates before sorting (same heart rate within 5 minutes)
-
-            const uniqueRhythms = deviceRhythms.filter((rhythm, index, self) => {
-
-                const firstIndex = self.findIndex(r =>
-
-                    r.heartRate === rhythm.heartRate &&
-
-                    Math.abs(new Date(r.savedAt || r.timestamp).getTime() - new Date(rhythm.savedAt || rhythm.timestamp).getTime()) < (5 * 60 * 1000) // 5 minutes
-
-                );
-
-                return index === firstIndex;
-
-            });
-
-
-
-            console.log('🧹 [ECG] Removed duplicates, unique ECG reports:', uniqueRhythms.length);
-
-
-
-            // Sort by savedAt/timestamp (newest first) and take last 10
-
-            const sortedRhythms = uniqueRhythms
-
-                .sort((a: any, b: any) => new Date(b.savedAt || b.timestamp).getTime() - new Date(a.savedAt || a.timestamp).getTime())
+                .sort(
+                  (a, b) =>
+                    new Date(b.savedAt || b.timestamp).getTime() -
+                    new Date(a.savedAt || a.timestamp).getTime()
+                )
 
                 .slice(0, 10);
 
+              // 🚀 FIXED: Only update rhythms if measurement is completed (prevents overwriting previous reading)
+              if (
+                finalResult &&
+                finalResult.heartRate > 0 &&
+                isMeasurementCompleted
+              ) {
+                setRhythms(sortedRhythms);
+                console.log(
+                  "🔄 [ECG] Updated rhythms state from COMPLETED measurement, total:",
+                  sortedRhythms.length
+                );
+              } else {
+                console.log(
+                  "🔄 [ECG] Skipping rhythms update - measurement not completed yet or still in progress"
+                );
+              }
 
+              console.log(
+                "🔄 [ECG] Updated rhythms state from reports, total:",
+                sortedRhythms.length
+              );
+            } catch (error) {
+              console.error("❌ Failed to save ECG result to reports:", error);
+            }
 
-            console.log('📚 [ECG] Setting rhythms state from reports with:', sortedRhythms.length, 'entries');
+            console.log(
+              "🔄 [ECG] ECG result saved to reports, rhythms updated from single source"
+            );
 
-            console.log('📚 [ECG] First rhythm from reports:', sortedRhythms[0]);
+            // Force UI update to show final heart rate
 
+            setCurrentRhythm((prev) =>
+              prev
+                ? {
+                    ...prev,
 
+                    heartRate: finalResult.heartRate,
 
-            setRhythms(sortedRhythms);
+                    timestamp: new Date().toISOString(),
+                  }
+                : prev
+            );
+          }, 1000); // Increased from 500ms to 1000ms to ensure state updates complete
 
-        } catch (error) {
-
-            console.error('❌ [ECG] Failed to load ECG rhythms:', error);
-
-            setRhythms([]);
-
+          captureActiveRef.current = false;
         }
+      },
 
+      onError: (error: string, details?: any) => {
+        console.error("[ui] ECG error:", error, details);
+
+        toast({
+          title: "ECG Error",
+
+          description: error,
+
+          variant: "destructive",
+        });
+      },
     };
 
+    // Set the callbacks so the bridge can forward events to them
 
+    wellueSDK.setCallbacks(callbacks);
 
-    // Start ECG monitoring (native)
+    console.log("✅ ECG callback handlers registered with bridge");
 
-    const startMonitoring = async () => {
+    return () => {
+      // Cleanup callbacks
 
-        if (!selectedDevice) {
+      wellueSDK.setCallbacks({});
 
-            toast({
+      console.log("🧹 ECG callback handlers cleaned up");
+    };
+  }, [
+    wellueSDK,
+    selectedDevice,
+    deviceBpm,
+    currentRhythm?.heartRate,
+    lastBpmRef.current,
+  ]);
 
-                title: "No Device Selected",
+  // Safety net: directly subscribe to native events in case bridge callbacks are not wired yet
 
-                description: "Please select an ECG device to start monitoring.",
+  useEffect(() => {
+    const Native: any = registerPlugin("WellueSDK");
 
-                variant: "destructive",
+    const subs: Array<{ remove: () => void } | void> = [];
 
-            });
+    console.log("🔧 Setting up direct native event listeners as backup");
+
+    try {
+      // Direct ECG data listener (this was working before!)
+
+      subs.push(
+        Native.addListener("ecgData", (data: any) => {
+          console.log("🫀 [NATIVE] ECG data received directly:", data);
+
+          console.log("🫀 [NATIVE] Data structure:", {
+            hasHeartRate: !!data?.heartRate,
+
+            heartRate: data?.heartRate,
+
+            heartRateType: typeof data?.heartRate,
+
+            hasWaveform: !!data?.waveform,
+
+            waveformLength: data?.waveform?.length || 0,
+
+            hasSampleRate: !!data?.sampleRate,
+
+            sampleRate: data?.sampleRate,
+
+            hasMvPerCount: !!data?.mvPerCount,
+
+            mvPerCount: data?.mvPerCount,
+
+            fullData: JSON.stringify(data, null, 2),
+          });
+
+          if (!data?.waveform || data.waveform.length === 0) {
+            console.log("⚠️ [NATIVE] No waveform data received");
 
             return;
+          }
 
-        }
+          // Update last ECG data time for fallback detection
 
+          setLastEcgDataTime(Date.now());
 
+          try {
+            const prev = (data?.waveform || []).slice(0, 20);
 
-        // Deprecated: auto-listen instead of explicit start
+            console.log("[ui:native] ecgData raw", {
+              points: data?.waveform?.length || 0,
+              heartRate: data?.heartRate,
+              sampleRate: data?.sampleRate,
+              mvPerCount: data?.mvPerCount,
+              preview: prev,
+            });
+          } catch {}
 
+          // lock fs if provided by native
+
+          const sr = Number(data?.sampleRate);
+
+          if (
+            sr &&
+            isFinite(sr) &&
+            sr > 0 &&
+            sr < 1000 &&
+            fsRef.current !== sr
+          ) {
+            fsRef.current = sr;
+
+            initFilters(fsRef.current, notchHzRef.current);
+
+            sizeRef.current = { W: 0, H: 0 };
+          }
+
+          const mvPerCount = Number(data?.mvPerCount) || 0.003098;
+
+          const rawCounts: number[] = (data?.waveform || []) as number[];
+
+          const counts = extractEcgCounts(rawCounts);
+
+          const raw = counts.map((v) => v * mvPerCount);
+
+          const now = Date.now();
+
+          if (
+            now > nextDetectTsRef.current &&
+            ecgBufferRef.current.length > 400
+          ) {
+            const values = ecgBufferRef.current.map((s) => s.v);
+
+            const p50 = goertzelPower(values, fsRef.current, 50);
+
+            const p60 = goertzelPower(values, fsRef.current, 60);
+
+            const target = p60 > p50 * 1.5 ? 60 : 50;
+
+            if (target !== notchHzRef.current) {
+              notchHzRef.current = target;
+
+              initFilters(fsRef.current, notchHzRef.current);
+            }
+
+            nextDetectTsRef.current = now + 2000;
+          }
+
+          const filtered = applyFilters(raw);
+
+          const packetTime = Date.now();
+
+          pushSamples(
+            ecgBufferRef.current,
+            filtered,
+            packetTime,
+            fsRef.current
+          );
+
+          setBufferLen(ecgBufferRef.current.length);
+
+          // Store device heart rate (most accurate)
+
+          if (data.heartRate && data.heartRate > 0) {
+            console.log(
+              "🫀 [NATIVE] Received device heart rate:",
+              data.heartRate,
+              "BPM"
+            );
+
+            console.log(
+              "🫀 [NATIVE] Previous deviceBpm was:",
+              deviceBpm,
+              "BPM"
+            );
+
+            setDeviceBpm(data.heartRate);
+
+            setLastDeviceHeartRateTime(Date.now());
+
+            console.log(
+              "🫀 [NATIVE] Updated deviceBpm state to:",
+              data.heartRate,
+              "BPM"
+            );
+
+            console.log(
+              "🫀 Device Heart Rate:",
+              data.heartRate,
+              "BPM (accurate)"
+            );
+          } else {
+            console.log(
+              "⚠️ [DEBUG] No valid heart rate in ECG data:",
+              data.heartRate
+            );
+          }
+
+          setCurrentRhythm((prev) => ({
+            id: prev?.id || `ecg-${Date.now()}`,
+
+            deviceId: selectedDevice,
+
+            timestamp: new Date().toISOString(),
+
+            heartRate: data.heartRate || prev?.heartRate || 0,
+
+            rhythm: "normal",
+
+            qrsDuration: prev?.qrsDuration || 0,
+
+            qtInterval: prev?.qtInterval || 0,
+
+            prInterval: prev?.prInterval || 0,
+
+            stSegment: "normal",
+
+            tWave: "normal",
+
+            pWave: "normal",
+
+            ecgData: ecgBufferRef.current
+              .slice(-Math.min(100, ecgBufferRef.current.length))
+              .map((s) => s.v),
+
+            unit: "mV",
+          }));
+
+          // Full-frame redraw
+
+          drawRealtime();
+
+          setIsMonitoring(true);
+
+          setMonitoringStatus("active");
+        })
+      );
+
+      // Direct real-time update listener
+
+      subs.push(
+        Native.addListener("bp2Rt", (rt: any) => {
+          console.log("🫀 [NATIVE] Real-time update received directly:", rt);
+
+          console.log("🫀 [NATIVE] RT data structure:", {
+            hasHr: !!rt?.hr,
+
+            hr: rt?.hr,
+
+            hrType: typeof rt?.hr,
+
+            hasHeartRate: !!rt?.heartRate,
+
+            heartRate: rt?.heartRate,
+
+            heartRateType: typeof rt?.heartRate,
+
+            fullData: JSON.stringify(rt, null, 2),
+          });
+
+          setRtCount((c) => c + 1);
+
+          if (!isMonitoring) setMonitoringStatus("listening");
+
+          // Reflect HR from RT even without waveform
+
+          if (rt?.hr && rt.hr > 0) {
+            console.log(
+              "🫀 [NATIVE] Real-time heart rate received:",
+              rt.hr,
+              "BPM"
+            );
+
+            console.log(
+              "🫀 [NATIVE] Previous deviceBpm was:",
+              deviceBpm,
+              "BPM"
+            );
+
+            // Update state synchronously to avoid race conditions
+
+            setDeviceBpm(rt.hr);
+
+            setLastDeviceHeartRateTime(Date.now());
+
+            setLastEcgDataTime(Date.now());
+
+            // Also update currentRhythm immediately to avoid race condition
+
+            setCurrentRhythm((prev) =>
+              prev ? { ...prev, heartRate: rt.hr } : prev
+            );
+
+            console.log(
+              "🫀 [NATIVE] Updated deviceBpm to real-time value:",
+              rt.hr,
+              "BPM"
+            );
+
+            console.log(
+              "🫀 [NATIVE] State updated - deviceBpm should now be:",
+              rt.hr,
+              "BPM"
+            );
+          } else {
+            console.log(
+              "⚠️ [NATIVE] No valid heart rate in real-time update:",
+              rt?.hr
+            );
+          }
+        })
+      );
+
+      // Direct ECG lifecycle listener
+
+      subs.push(
+        Native.addListener("ecgLifecycle", (data: any) => {
+          const state = data?.state;
+          const finalHeartRate = data?.finalHeartRate; // 🚀 NEW: Get final HR from native
+
+          console.log(
+            "🔄 [NATIVE] ECG Lifecycle event received directly:",
+            state,
+            "finalHeartRate:",
+            finalHeartRate
+          );
+
+          if (state === "start") {
+            console.log("🚀 [NATIVE] ECG measurement STARTED");
+
+            ecgBufferRef.current = [];
+            setBufferLen(0);
+
+            notchHzRef.current = 50;
+            initFilters(fsRef.current, notchHzRef.current);
+
+            nextDetectTsRef.current = Date.now() + 1500;
+
+            setIsMonitoring(true);
+            setMonitoringStatus("active");
+
+            captureActiveRef.current = true;
+
+            captureCountsRef.current = [];
+
+            captureStartedAtRef.current = new Date().toISOString();
+          }
+
+          if (state === "stop") {
+            console.log("🛑 [NATIVE] ECG measurement STOPPED");
+
+            setIsMonitoring(false);
+            setMonitoringStatus("listening");
+
+            // 🚀 CRITICAL FIX: Use finalHeartRate from native if available
+            let immediateHeartRate = 0;
+
+            if (finalHeartRate && finalHeartRate > 0) {
+              immediateHeartRate = finalHeartRate;
+              console.log(
+                "✅ [IMMEDIATE] Using final heart rate from native:",
+                finalHeartRate,
+                "BPM"
+              );
+              // Update deviceBpm with the final heart rate to ensure it's available for result calculation
+              setDeviceBpm(finalHeartRate);
+              setLastDeviceHeartRateTime(Date.now());
+            } else {
+              // Fallback to existing logic
+              immediateHeartRate =
+                deviceBpm > 0
+                  ? deviceBpm
+                  : currentRhythm?.heartRate > 0
+                  ? currentRhythm.heartRate
+                  : lastBpmRef.current > 0
+                  ? lastBpmRef.current
+                  : 0;
+              console.log(
+                "⚠️ [IMMEDIATE] No final HR from native, using fallback:",
+                immediateHeartRate,
+                "BPM"
+              );
+            }
+
+            console.log(
+              "🚨 [IMMEDIATE] Heart rate captured at stop:",
+              immediateHeartRate,
+              "BPM"
+            );
+
+            console.log(
+              "🚨 [IMMEDIATE] Values at stop - deviceBpm:",
+              deviceBpm,
+              "rhythm:",
+              currentRhythm?.heartRate,
+              "calc:",
+              lastBpmRef.current
+            );
+
+            // CRITICAL FIX: Wait longer for state updates to complete
+
+            // The issue was that deviceBpm state update from bp2Rt event
+
+            // hadn't completed when this final calculation ran
+
+            setTimeout(() => {
+              console.log("📋 Final device heart rate check:", {
+                deviceBpm: deviceBpm,
+
+                rhythmBpm: currentRhythm?.heartRate,
+
+                calcBpm: lastBpmRef.current,
+
+                lastDeviceHeartRateTime: lastDeviceHeartRateTime,
+
+                timeSinceLastUpdate: Date.now() - lastDeviceHeartRateTime,
+              });
+
+              // CRITICAL: Get the most recent heart rate from any available source
+
+              let finalHeartRate = 0;
+
+              // FIXED: More robust heart rate selection logic
+
+              // Priority 1: Use deviceBpm if it's valid and recent (within last 10 seconds)
+
+              const hasRecentDeviceData =
+                Date.now() - lastDeviceHeartRateTime < 10000;
+
+              console.log("🔍 [FINAL] Recent device data check:", {
+                hasRecentDeviceData,
+
+                timeSinceLastUpdate: Date.now() - lastDeviceHeartRateTime,
+
+                deviceBpm,
+
+                lastDeviceHeartRateTime,
+              });
+
+              // Priority 1: Device heart rate (most reliable)
+
+              if (deviceBpm > 0 && hasRecentDeviceData) {
+                finalHeartRate = deviceBpm;
+
+                console.log(
+                  "✅ [FINAL] Using deviceBpm:",
+                  finalHeartRate,
+                  "BPM (recent data)"
+                );
+              }
+
+              // Priority 2: Current rhythm heart rate
+              else if (
+                currentRhythm?.heartRate &&
+                currentRhythm.heartRate > 0
+              ) {
+                finalHeartRate = currentRhythm.heartRate;
+
+                console.log(
+                  "✅ [FINAL] Using currentRhythm.heartRate:",
+                  finalHeartRate,
+                  "BPM"
+                );
+              }
+
+              // Priority 3: Last calculated BPM
+              else if (lastBpmRef.current > 0) {
+                finalHeartRate = lastBpmRef.current;
+
+                console.log(
+                  "✅ [FINAL] Using lastBpmRef.current:",
+                  finalHeartRate,
+                  "BPM"
+                );
+              }
+
+              // Priority 4: Last known device heart rate (fallback)
+              else if (lastDeviceHeartRateTime > 0) {
+                // Try to get the last known value from the device
+
+                console.log(
+                  "⚠️ [FINAL] No current heart rate, checking last known value..."
+                );
+
+                // This will be handled by the native plugin's lastKnownHeartRate
+              }
+
+              // Priority 5: Use the immediate heart rate captured when measurement stopped
+              else if (immediateHeartRate > 0) {
+                finalHeartRate = immediateHeartRate;
+
+                console.log(
+                  "✅ [FINAL] Using immediate heart rate captured at stop:",
+                  finalHeartRate,
+                  "BPM"
+                );
+              } else {
+                console.log(
+                  "❌ [FINAL] No valid heart rate found from any source!"
+                );
+
+                console.log(
+                  "❌ [FINAL] This means device data is not reaching the frontend properly"
+                );
+              }
+
+              // Create final ECG result
+
+              const finalResult: ECGRhythm = {
+                id: `ecg_${Date.now()}`,
+
+                deviceId: selectedDevice || "unknown",
+
+                timestamp: new Date().toISOString(),
+
+                heartRate: finalHeartRate, // Use the determined final heart rate
+
+                rhythm: "normal",
+
+                qrsDuration: 80,
+
+                qtInterval: 400,
+
+                prInterval: 160,
+
+                stSegment: "normal",
+
+                tWave: "normal",
+
+                pWave: "normal",
+
+                // ✅ FIX: Use data.ecgData from lifecycle event instead of empty ecgBufferRef
+                ecgData:
+                  data?.ecgData &&
+                  Array.isArray(data.ecgData) &&
+                  data.ecgData.length > 0
+                    ? data.ecgData
+                    : ecgBufferRef.current.length > 0
+                    ? ecgBufferRef.current.map((d) => d.v)
+                    : [],
+
+                unit: "mV",
+              };
+
+              console.log("📊 Final ECG result created:", finalResult);
+
+              console.log(
+                "🎯 [FINAL] Heart rate in result:",
+                finalResult.heartRate,
+                "BPM"
+              );
+
+              // Set the result and show popup
+
+              // 🚀 NEW: Process and store ECG result (rebuilt from scratch)
+              // Extract real ECG data from native plugin if available
+              // ✅ ROOT CAUSE FIX: Handle raw Int16 samples from native event
+              // iOS plugin sends raw Int16 samples (like Android/web portal)
+              // Chart component expects raw Int16 and converts using scaleUvPerLsb=3.098
+              let ecgDataForResult = finalResult.ecgData;
+              if (
+                data?.ecgData &&
+                Array.isArray(data.ecgData) &&
+                data.ecgData.length > 0
+              ) {
+                // Native plugin sends raw Int16 values - use them directly
+                ecgDataForResult = data.ecgData;
+                console.log(
+                  "🫀 [ECG LIFECYCLE] Using raw Int16 samples from native event:",
+                  ecgDataForResult.length,
+                  "samples"
+                );
+
+                // Also set chart data if not already set
+                if (!hasEcgChartLoaded) {
+                  const scaleUvPerLsb = data?.scaleUvPerLsb || 3.098; // BP2 scale factor (μV/LSB)
+                  const sampleRate = data?.sampleRate || 125;
+                  // ✅ FIX: Convert raw Int16 to mV (matches web portal)
+                  const mvPerCount = scaleUvPerLsb / 1000; // Convert μV/LSB to mV/LSB
+                  const samplesArray = new Float32Array(
+                    ecgDataForResult.length
+                  );
+                  for (let i = 0; i < ecgDataForResult.length; i++) {
+                    samplesArray[i] = ecgDataForResult[i] * mvPerCount; // Convert Int16 to mV
+                  }
+                  const chartData = {
+                    s: samplesArray, // Now in mV
+                    sr: sampleRate,
+                    scale: 1.0, // Already in mV, no conversion needed
+                  };
+                  console.log(
+                    "🫀 [ECG LIFECYCLE] Setting chart data from ecgLifecycle event (converted to mV, scale=1.0)"
+                  );
+                  setEcgData(chartData);
+                  setPermanentEcgData(chartData);
+                  setHasEcgChartLoaded(true);
+                }
+              }
+
+              const enhancedResult = {
+                ...finalResult,
+                // Use real device data if available, otherwise use calculated values
+                heartRate: data?.finalHeartRate || finalResult.heartRate,
+                qrsDuration: data?.ecgQrsDuration || finalResult.qrsDuration,
+                qtInterval: data?.ecgQtInterval || finalResult.qtInterval,
+                prInterval: data?.ecgPrInterval || finalResult.prInterval,
+                rhythm: data?.ecgRhythm || finalResult.rhythm,
+                // ✅ FIX: Ensure ecgData is included - prioritize from data, then ecgDataForResult, then finalResult
+                ecgData:
+                  data?.ecgData &&
+                  Array.isArray(data.ecgData) &&
+                  data.ecgData.length > 0
+                    ? data.ecgData
+                    : ecgDataForResult &&
+                      Array.isArray(ecgDataForResult) &&
+                      ecgDataForResult.length > 0
+                    ? ecgDataForResult
+                    : finalResult.ecgData &&
+                      Array.isArray(finalResult.ecgData) &&
+                      finalResult.ecgData.length > 0
+                    ? finalResult.ecgData
+                    : [],
+                scaleUvPerLsb: data?.scaleUvPerLsb || 3.098,
+                sampleRate: data?.sampleRate || 125,
+                unit: "raw", // Raw Int16 samples, not mV
+              };
+
+              console.log("🫀 [ECG LIFECYCLE] Enhanced result ecgData check:", {
+                hasDataEcgData: !!(data?.ecgData && data.ecgData.length > 0),
+                hasEcgDataForResult: !!(
+                  ecgDataForResult && ecgDataForResult.length > 0
+                ),
+                hasFinalResultEcgData: !!(
+                  finalResult.ecgData && finalResult.ecgData.length > 0
+                ),
+                finalEcgDataLength: enhancedResult.ecgData.length,
+              });
+
+              // Mark measurement as completed
+              setIsMeasurementCompleted(true);
+              const completionTime = new Date().toISOString();
+              setMeasurementCompletionTime(completionTime);
+
+              // Store timestamp permanently to prevent continuous updates
+              setPermanentTimestamp(completionTime);
+
+              // ✅ CRITICAL: Set ecgResult for UI display (even if heart rate is 0)
+              console.log(
+                "🎯 [FINAL] Setting ecgResult for UI display (from ecgLifecycle stop)..."
+              );
+              setEcgResult(enhancedResult);
+              console.log("✅ [FINAL] ECG result set for UI display");
+
+              // ✅ FIX: Show warning toast if heart rate is 0
+              if (enhancedResult.heartRate === 0) {
+                console.warn(
+                  "⚠️ [FINAL] Result displayed with 0 BPM - device may not have sent heart rate data"
+                );
+              }
+
+              // 🆕 ECG: Auto-save ECG result (similar to BP auto-save)
+              autoSaveECGResult(enhancedResult);
+
+              // Trigger background ECG processing (duplicated from EcgResultScreen)
+              // Only process if chart hasn't been loaded yet
+              if (!hasEcgChartLoaded) {
+                processEcgInBackground();
+              } else {
+                console.log(
+                  "ℹ️ [ECG] Chart already loaded, skipping background processing call"
+                );
+              }
+
+              // Force UI update to show final heart rate
+              setCurrentRhythm((prev) =>
+                prev
+                  ? {
+                      ...prev,
+                      heartRate: finalResult.heartRate,
+                      timestamp: new Date().toISOString(),
+                    }
+                  : prev
+              );
+            }, 1000); // Increased from 500ms to 1000ms to ensure state updates complete
+
+            captureActiveRef.current = false;
+          }
+        })
+      );
+
+      console.log("✅ Direct native event listeners set up successfully");
+    } catch (error) {
+      console.error("❌ Failed to set up native event listeners:", error);
+    }
+
+    return () => {
+      console.log("🧹 Cleaning up native event listeners");
+
+      subs.forEach((s) => s && s.remove && s.remove());
+    };
+  }, [selectedDevice, deviceBpm, currentRhythm?.heartRate, lastBpmRef.current]);
+
+  // NOTE: Removed auto-start logic - app should only respond to device-initiated measurements
+  // The app will detect status 6 (ECG measuring) when user starts measurement on device
+  // and status 7 (ECG complete) when measurement finishes
+
+  useEffect(() => {
+    const setupDevice = async () => {
+      if (!selectedDevice) return;
+
+      try {
+        console.log(
+          "🫀 [ECGMonitor] Device selected:",
+          selectedDevice,
+          "- waiting for device-initiated measurement"
+        );
+
+        // Just ensure RT task is running to receive status updates
+        // Do NOT start ECG measurement - wait for user to press button on device
+      } catch (e) {
+        console.log("⚠️ [ECGMonitor] Setup failed:", e);
+      }
     };
 
+    setupDevice();
+  }, [selectedDevice, wellueSDK]);
 
+  useEffect(() => {
+    if (selectedDevice) {
+      console.log(
+        "🔄 [ECG] Component mounted/device changed, loading fresh rhythms"
+      );
 
-    // Stop ECG monitoring (native) - not exposed in UI, kept for safety
+      loadRhythms(selectedDevice);
+    }
+  }, [selectedDevice]);
 
-    const stopMonitoring = async () => {
+  // FIXED: Force refresh when component becomes visible (page return)
 
-        setMonitoringStatus('stopping');
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden && selectedDevice) {
+        console.log("🔄 [ECG] Page became visible, resetting ECG state");
 
-        try { await wellueSDK.stopLive(selectedDevice); } catch { }
+        // Reset current ECG result when returning to page
+
+        setCurrentRhythm(null);
+
+        // REMOVED: setEcgResult - will rebuild from scratch
+
+        setDeviceBpm(0);
+
+        setLastDeviceHeartRateTime(0);
 
         setIsMonitoring(false);
 
-        setMonitoringStatus('listening');
+        setMonitoringStatus("listening");
 
-        setDevices(prev => prev.map(d => d.id === selectedDevice ? { ...d, active: false } : d));
+        // Then refresh rhythms
 
+        loadRhythms(selectedDevice);
+      }
     };
 
+    document.addEventListener("visibilitychange", handleVisibilityChange);
 
+    // Also refresh on focus (when user returns to app)
 
-    // Start device status monitoring
+    const handleFocus = () => {
+      if (selectedDevice) {
+        console.log("🔄 [ECG] App focused, resetting ECG state");
 
-    const startDeviceStatusMonitoring = () => {
+        // Reset current ECG result when returning to page
 
-        const statusInterval = setInterval(async () => {
+        setCurrentRhythm(null);
 
-            if (!isMonitoring) {
+        // REMOVED: setEcgResult - will rebuild from scratch
 
-                clearInterval(statusInterval);
+        setDeviceBpm(0);
 
-                return;
+        setLastDeviceHeartRateTime(0);
 
-            }
+        setIsMonitoring(false);
 
+        setMonitoringStatus("listening");
 
+        // Then refresh rhythms
 
-            try {
-
-                const statusResponse = await fetch(`http://localhost:3000/api/devices/${selectedDevice}/status`);
-
-                if (statusResponse.ok) {
-
-                    const statusData = await statusResponse.json();
-
-
-
-                    if (statusData.device && statusData.device.status) {
-
-                        if (statusData.device.status === 'measuring') {
-
-                            toast({
-
-                                title: "ECG Measurement in Progress",
-
-                                description: "ECG rhythm analysis is currently being performed. Please remain still.",
-
-                            });
-
-                        } else if (statusData.device.status === 'idle') {
-
-                            setIsMonitoring(false);
-
-                            setMonitoringStatus('listening');
-
-                            toast({
-
-                                title: "ECG Analysis Completed",
-
-                                description: "ECG rhythm analysis completed successfully. You can start a new analysis anytime.",
-
-                            });
-
-                            clearInterval(statusInterval);
-
-                        }
-
-                    }
-
-                }
-
-            } catch (error) {
-
-                console.error('ECG status check error:', error);
-
-            }
-
-        }, 1000);
-
-
-
-        return () => clearInterval(statusInterval);
-
+        loadRhythms(selectedDevice);
+      }
     };
 
+    window.addEventListener("focus", handleFocus);
 
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
 
-    // Simulator removed: UI is driven only by native device stream
-
-
-
-    // Get rhythm status and color
-
-    const getRhythmStatus = (rhythm: string) => {
-
-        switch (rhythm) {
-
-            case 'normal':
-
-                return { color: 'text-green-400', bg: 'bg-green-500/20', label: 'Normal' };
-
-            case 'irregular':
-
-                return { color: 'text-yellow-400', bg: 'bg-yellow-500/20', label: 'Irregular' };
-
-            case 'bradycardia':
-
-                return { color: 'text-blue-400', bg: 'bg-blue-500/20', label: 'Bradycardia' };
-
-            case 'tachycardia':
-
-                return { color: 'text-orange-400', bg: 'bg-orange-500/20', label: 'Tachycardia' };
-
-            case 'afib':
-
-                return { color: 'text-red-400', bg: 'bg-red-500/20', label: 'Atrial Fibrillation' };
-
-            case 'arrhythmia':
-
-                return { color: 'text-red-500', bg: 'bg-red-600/20', label: 'Arrhythmia' };
-
-            default:
-
-                return { color: 'text-gray-400', bg: 'bg-gray-500/20', label: 'Unknown' };
-
-        }
-
+      window.removeEventListener("focus", handleFocus);
     };
+  }, [selectedDevice]);
 
+  // FIXED: Reset page state when component unmounts or page changes
 
+  useEffect(() => {
+    return () => {
+      // Cleanup when leaving the page
 
-    // Format time
+      console.log("🧹 [ECG] Cleaning up ECG monitor state");
 
-    const formatTime = (timestamp: string) => {
+      setCurrentRhythm(null);
 
-        const date = new Date(timestamp);
+      // REMOVED: setEcgResult - will rebuild from scratch
 
-        const now = new Date();
+      setIsMonitoring(false);
 
-        const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60));
+      setMonitoringStatus("listening");
 
+      setDeviceBpm(0); // Reset device heart rate
 
-
-        if (diffInMinutes < 1) return 'Just now';
-
-        if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
-
-
-
-        const hours = Math.floor(diffInMinutes / 60);
-
-        if (hours < 24) return `${hours}h ago`;
-
-        return date.toLocaleDateString();
-
+      setLastDeviceHeartRateTime(0); // Reset last update time
     };
-
-
-
-    // Initialize SDK callbacks
-
-    useEffect(() => {
-
-        if (!wellueSDK || !wellueSDK.getInitialized()) return;
-
-
-
-        console.log('🔧 Setting up ECG Monitor - bridge already handles native events');
-
-        console.log('🔧 Bridge listens to: ecgData, ecgLifecycle, bp2Rt events');
-
-        console.log('🔧 Bridge forwards to: onECGData, onECGLifecycle, onRealTimeUpdate callbacks');
-
-
-
-        // 🚨 CRITICAL: Don't override setCallbacks - the bridge already handles native events!
-
-        // The bridge is already listening to:
-
-        // - ecgData → onECGData
-
-        // - ecgLifecycle → onECGLifecycle  
-
-        // - bp2Rt → onRealTimeUpdate
-
-        // 
-
-        // We just need to set our callback handlers
-
-
-
-        // Set up our callback handlers (these will be called by the bridge)
-
-        const callbacks = {
-
-            onECGData: (data: ECGData) => {
-                // 🆕 FIX: If this is a file-based result (has qrs, qtc, result fields), set result immediately
-                if (data.qrs !== undefined || data.qtc !== undefined || data.result !== undefined) {
-                    console.log('🫀 [ECG FILE] File-based result received in onECGData - setting result immediately');
-                    console.log('🫀 [ECG FILE] Heart Rate:', data.heartRate, 'QRS:', data.qrs, 'QTC:', data.qtc);
-                    console.log('🫀 [ECG FILE] Waveform data type:', Array.isArray(data.waveform) ? 'array' : typeof data.waveform, 'length:', data.waveform?.length);
-                    
-                    // ✅ MATCH WEB PORTAL: Convert raw Int16 to mV (exact same as web portal)
-                    // Web portal: values = waveformData.map(c => c * mvPerCount) where mvPerCount = 0.003098
-                    const rawSamples = data.waveform || [];
-                    const scaleUvPerLsb = (data as any).scaleUvPerLsb || 3.098; // BP2 scale factor (μV/LSB)
-                    const sampleRate = (data as any).sampleRate || 125; // BP2 sample rate
-                    
-                    // ✅ FIX: Convert raw Int16 to mV Float32Array (matches web portal exactly)
-                    const mvPerCount = scaleUvPerLsb / 1000; // Convert μV/LSB to mV/LSB (0.003098)
-                    const samplesArray = new Float32Array(rawSamples.length);
-                    for (let i = 0; i < rawSamples.length; i++) {
-                        samplesArray[i] = rawSamples[i] * mvPerCount; // Convert Int16 to mV
-                    }
-                    
-                    // Set chart data with mV samples and scale=1.0 (already in mV)
-                    const chartData = {
-                        s: samplesArray, // Now in mV (Float32Array)
-                        sr: sampleRate,
-                        scale: 1.0 // Already in mV, no conversion needed
-                    };
-                    console.log('🫀 [ECG FILE] Setting chart data with', samplesArray.length, 'mV samples, scale: 1.0 (already in mV, matching web portal)');
-                    setEcgData(chartData);
-                    setPermanentEcgData(chartData);
-                    setHasEcgChartLoaded(true);
-                    
-                    const fileResult: ECGRhythm = {
-                        id: `ecg_${Date.now()}`,
-                        deviceId: selectedDevice || 'unknown',
-                        timestamp: new Date().toISOString(),
-                        heartRate: data.heartRate || 0,
-                        rhythm: data.rhythm || 'normal',
-                        qrsDuration: data.qrs || 80,
-                        qtInterval: data.qtc || 400,
-                        prInterval: 160, // Default
-                        stSegment: 'normal',
-                        tWave: 'normal',
-                        pWave: 'normal',
-                        ecgData: rawSamples, // Store raw Int16 samples
-                        unit: 'raw' // Changed from 'mV' to 'raw' since we're storing Int16 samples
-                    };
-                    
-                    console.log('🫀 [ECG FILE] Setting ecgResult immediately from file data');
-                    setEcgResult(fileResult);
-                    setIsMeasurementCompleted(true);
-                    setMeasurementCompletionTime(new Date().toISOString());
-                    autoSaveECGResult(fileResult);
-                    console.log('✅ [ECG FILE] Result set and saved immediately');
-                    return; // Don't process as real-time data
-                }
-
-                console.log('🫀 [DEBUG] ECG Data received via bridge:', {
-
-                    waveformLength: data?.waveform?.length || 0,
-
-                    heartRate: data?.heartRate,
-
-                    sampleRate: data?.sampleRate,
-
-                    mvPerCount: data?.mvPerCount,
-
-                    timestamp: new Date().toISOString()
-
-                });
-
-
-                // ✅ CRITICAL FIX: Check if this is final ECG result data (from emitECGEnd - waveform type 3)
-                // Final result data has heartRate but no waveform, and may have result, qrs, qtc, etc.
-                const isFinalResultData = !data?.waveform || data.waveform.length === 0;
-                const hasFinalHeartRate = data?.heartRate && data.heartRate > 0;
-                const hasResultFields = (data as any)?.result !== undefined || (data as any)?.qrs !== undefined;
-                
-                if (isFinalResultData && hasFinalHeartRate) {
-                    console.log('🎯 [ECG DATA] ===== FINAL ECG RESULT DATA DETECTED (from waveform type 3) =====');
-                    console.log('🎯 [ECG DATA] Final heart rate from device:', data.heartRate, 'BPM');
-                    console.log('🎯 [ECG DATA] Result fields:', { 
-                        result: (data as any)?.result, 
-                        qrs: (data as any)?.qrs, 
-                        qtc: (data as any)?.qtc,
-                        pvcs: (data as any)?.pvcs 
-                    });
-                    
-                    // ✅ CRITICAL: Update deviceBpm with final heart rate immediately
-                    setDeviceBpm(data.heartRate);
-                    setLastDeviceHeartRateTime(Date.now());
-                    console.log('✅ [ECG DATA] Updated deviceBpm with final heart rate:', data.heartRate, 'BPM');
-                    
-                    // If measurement is stopping, this heart rate will be used in the result
-                    // Don't process waveform since there isn't one
-                    return;
-                }
-
-                // Update last ECG data time for fallback detection
-
-                setLastEcgDataTime(Date.now());
-
-
-
-                // Raw debug snapshot (first 20)
-
-                try {
-
-                    const prev = (data?.waveform || []).slice(0, 20);
-
-                    console.log('[ui] onECGData raw', { points: data?.waveform?.length || 0, heartRate: data?.heartRate, sampleRate: data?.sampleRate, mvPerCount: data?.mvPerCount, preview: prev });
-
-                } catch { }
-
-
-
-                // lock fs from device if provided
-
-                const sr = Number(data?.sampleRate);
-
-                if (sr && isFinite(sr) && sr > 0 && sr < 1000 && fsRef.current !== sr) {
-
-                    fsRef.current = sr;
-
-                    initFilters(fsRef.current, notchHzRef.current);
-
-                    sizeRef.current = { W: 0, H: 0 }; // force rescale next draw
-
-                }
-
-
-
-                const mvPerCount = Number(data?.mvPerCount) || 0.003098;
-
-                lastMvPerCountRef.current = mvPerCount;
-
-                const rawCounts: number[] = (data?.waveform || []) as number[];
-
-                const counts = extractEcgCounts(rawCounts);
-
-
-
-                // Capture raw counts for A/B if capture is active
-
-                if (captureActiveRef.current && counts && counts.length) {
-
-                    captureCountsRef.current.push(...counts);
-
-                }
-
-
-
-                const raw = counts.map(v => v * mvPerCount);
-
-
-
-                // Adaptive notch detection every ~2s once we have samples
-
-                const now = Date.now();
-
-                if (now > nextDetectTsRef.current && ecgBufferRef.current.length > 400) {
-
-                    const values = ecgBufferRef.current.map(s => s.v);
-
-                    const p50 = goertzelPower(values, fsRef.current, 50);
-
-                    const p60 = goertzelPower(values, fsRef.current, 60);
-
-                    const target = p60 > p50 * 1.5 ? 60 : 50; // simple threshold margin
-
-                    if (target !== notchHzRef.current) {
-
-                        notchHzRef.current = target;
-
-                        initFilters(fsRef.current, notchHzRef.current);
-
-                    }
-
-                    nextDetectTsRef.current = now + 2000;
-
-                }
-
-
-
-                const filtered = applyFilters(raw);
-
-                const packetTime = Date.now(); // Use current time as packet timestamp
-
-                pushSamples(ecgBufferRef.current, filtered, packetTime, fsRef.current);
-
-                setBufferLen(ecgBufferRef.current.length);
-
-
-
-                // Full-frame redraw
-
-                drawRealtime();
-
-                setIsMonitoring(true);
-
-                setMonitoringStatus('active');
-
-
-
-                // Store device heart rate (most accurate)
-
-                if (data.heartRate && data.heartRate > 0) {
-
-                    console.log('🫀 [DEBUG] Received device heart rate:', data.heartRate, 'BPM');
-
-                    console.log('🫀 [DEBUG] Previous deviceBpm was:', deviceBpm, 'BPM');
-
-                    setDeviceBpm(data.heartRate);
-
-                    setLastDeviceHeartRateTime(Date.now());
-
-                    console.log('🫀 [DEBUG] Updated deviceBpm state to:', data.heartRate, 'BPM');
-
-                    console.log('🫀 Device Heart Rate:', data.heartRate, 'BPM (accurate)');
-
-                } else {
-
-                    console.log('⚠️ [DEBUG] No valid heart rate in ECG data:', data.heartRate);
-
-                }
-
-
-
-                setCurrentRhythm(prev => ({
-
-                    id: prev?.id || `ecg-${Date.now()}`,
-
-                    deviceId: selectedDevice,
-
-                    timestamp: new Date().toISOString(),
-
-                    heartRate: data.heartRate || prev?.heartRate || 0,
-
-                    rhythm: 'normal',
-
-                    qrsDuration: prev?.qrsDuration || 0,
-
-                    qtInterval: prev?.qtInterval || 0,
-
-                    prInterval: prev?.prInterval || 0,
-
-                    stSegment: 'normal',
-
-                    tWave: 'normal',
-
-                    pWave: 'normal',
-
-                    ecgData: ecgBufferRef.current.slice(-Math.min(100, ecgBufferRef.current.length)).map(s => s.v),
-
-                    unit: 'mV',
-
-                }));
-
-            },
-
-            onRealTimeUpdate: (rt: RealTimeData) => {
-
-                console.log('🫀 [ECG UI] ===== onRealTimeUpdate CALLBACK INVOKED ====');
-                console.log('🫀 [ECG UI] Full RealTimeData:', JSON.stringify(rt, null, 2));
-                console.log('🫀 [ECG UI] Current monitoring state:', { isMonitoring, monitoringStatus });
-
-                setRtCount((c) => {
-                    const newCount = c + 1;
-                    console.log(`🫀 [ECG UI] RT count updated: ${c} → ${newCount}`);
-                    return newCount;
-                });
-
-                // 🆕 ECG: Detect device-initiated ECG measurement (status 6)
-                const deviceStatus = rt?.deviceStatus || rt?.status;
-                console.log('🫀 [ECG UI] Device status check:', {
-                    deviceStatus: rt?.deviceStatus,
-                    status: rt?.status,
-                    resolvedStatus: deviceStatus,
-                    isMonitoring,
-                    willAutoStart: deviceStatus === 6 && !isMonitoring
-                });
-                
-                if (deviceStatus === 6 && !isMonitoring) {
-                    console.log('🫀 [ECG UI] ===== STATUS 6 DETECTED - DEVICE-INITIATED ECG START ====');
-                    console.log('🫀 [ECG UI] Previous state:', { isMonitoring, monitoringStatus });
-                    
-                    // ✅ FIX: Validate that this is a real measurement start
-                    // Sometimes device sends STATUS 6 prematurely (before hands on device)
-                    // We'll start monitoring but verify ECG data arrives within 3 seconds
-                    const status6Timestamp = Date.now();
-                    const ecgDataTimeoutRef = setTimeout(() => {
-                        const timeSinceStatus6 = Date.now() - status6Timestamp;
-                        const hasReceivedEcgData = lastEcgDataTime > status6Timestamp;
-                        
-                        if (!hasReceivedEcgData && isMonitoring) {
-                            console.warn('⚠️ [ECG UI] STATUS 6 detected but no ECG data received within 3 seconds');
-                            console.warn('⚠️ [ECG UI] This may be a false start - stopping monitoring');
-                            setIsMonitoring(false);
-                            setMonitoringStatus('listening');
-                            captureActiveRef.current = false;
-                        }
-                    }, 3000);
-                    
-                    // Auto-start monitoring
-                    console.log('🫀 [ECG UI] Setting isMonitoring = true...');
-                    setIsMonitoring(true);
-                    console.log('🫀 [ECG UI] Setting monitoringStatus = "active"...');
-                    setMonitoringStatus('active');
-                    console.log('🫀 [ECG UI] Clearing ECG buffer...');
-                    ecgBufferRef.current = [];
-                    setBufferLen(0);
-                    console.log('🫀 [ECG UI] Activating capture...');
-                    captureActiveRef.current = true;
-                    captureCountsRef.current = [];
-                    captureStartedAtRef.current = new Date().toISOString();
-                    console.log('🫀 [ECG UI] Capture started at:', captureStartedAtRef.current);
-                    
-                    // Reset filters
-                    console.log('🫀 [ECG UI] Resetting filters (notch: 50Hz)...');
-                    notchHzRef.current = 50;
-                    initFilters(fsRef.current, notchHzRef.current);
-                    nextDetectTsRef.current = Date.now() + 1500;
-                    console.log('🫀 [ECG UI] Filters initialized, next detection at:', new Date(nextDetectTsRef.current).toISOString());
-                    
-                    // Clear any previous results
-                    console.log('🫀 [ECG UI] Clearing previous results...');
-                    setCurrentRhythm(null);
-                    setIsMeasurementCompleted(false);
-                    setMeasurementCompletionTime(null);
-                    setHasResultBeenProcessed(false);
-                    
-                    console.log('🫀 [ECG UI] ✅ Auto-started ECG monitoring from device button press');
-                    console.log('🫀 [ECG UI] New state:', { isMonitoring: true, monitoringStatus: 'active' });
-                } else if (deviceStatus === 6 && isMonitoring) {
-                    console.log('🫀 [ECG UI] Status 6 received but already monitoring (duplicate/ignored)');
-                }
-                
-                // 🆕 ECG: Detect ECG completion (status 7)
-                if (deviceStatus === 7) {
-                    console.log('🫀 [ECG UI] ===== STATUS 7 DETECTED - ECG MEASUREMENT COMPLETED ====');
-                    console.log('🫀 [ECG UI] Current monitoring state:', { isMonitoring, monitoringStatus });
-                    console.log('🫀 [ECG UI] Note: ecgLifecycle("stop") event will handle result processing');
-                    // The ecgLifecycle("stop") event will handle result processing
-                    // This is just for logging/state tracking
-                    
-                    // ✅ FIX: Wait a bit for waveform type 3 data to arrive (contains final heart rate)
-                    // The device sends STATUS 7 first, then waveform type 3 with final data
-                    setTimeout(() => {
-                        console.log('🫀 [ECG UI] Checking for final heart rate after STATUS 7...');
-                        console.log('🫀 [ECG UI] Current deviceBpm:', deviceBpm, 'lastDeviceHeartRateTime:', lastDeviceHeartRateTime);
-                    }, 500);
-                }
-
-                if (!isMonitoring) setMonitoringStatus('listening');
-
-
-
-                // Reflect HR from RT even without waveform
-
-                if (rt?.heartRate && rt.heartRate > 0) {
-
-                    console.log('🫀 [DEBUG] Real-time heart rate received:', rt.heartRate, 'BPM');
-
-                    console.log('🫀 [DEBUG] Previous deviceBpm was:', deviceBpm, 'BPM');
-
-                    setDeviceBpm(rt.heartRate);
-
-                    setLastDeviceHeartRateTime(Date.now());
-
-                    // Update last ECG data time for fallback detection
-
-                    setLastEcgDataTime(Date.now());
-
-
-
-                    console.log('🫀 [DEBUG] Updated deviceBpm to real-time value:', rt.heartRate, 'BPM');
-
-                } else {
-
-                    console.log('⚠️ [DEBUG] No valid heart rate in real-time update:', rt?.heartRate);
-
-                }
-
-                setCurrentRhythm(prev => prev ? { ...prev, heartRate: rt?.heartRate || prev.heartRate } : prev);
-
-            },
-
-            onECGLifecycle: async (state: 'start' | 'stop', data?: any) => {
-
-                console.log('🔄 [DEBUG] ECG Lifecycle event received via bridge:', state);
-                console.log('🔄 [DEBUG] Event details:', { state, data, timestamp: new Date().toISOString() });
-
-
-
-                if (state === 'start') {
-
-                    console.log('🚀 [DEBUG] ECG measurement STARTED');
-
-                    ecgBufferRef.current = []; setBufferLen(0);
-
-                    // Pick notch 50/60 by analyzing a short baseline after start
-
-                    notchHzRef.current = 50; initFilters(fsRef.current, notchHzRef.current);
-
-                    nextDetectTsRef.current = Date.now() + 1500; // re-check after 1.5s of data
-
-                    setIsMonitoring(true); setMonitoringStatus('active');
-
-                    // Begin live capture of RAW counts for A/B
-
-                    captureActiveRef.current = true;
-
-                    captureCountsRef.current = [];
-
-                    captureStartedAtRef.current = new Date().toISOString();
-                    
-                    // 🚀 CRITICAL: Reset completion flag for new measurement
-                    setIsMeasurementCompleted(false);
-                    setMeasurementCompletionTime(null); // Reset timestamp for new measurement
-                    setHasResultBeenProcessed(false); // Reset duplicate prevention flag
-                    console.log('🔄 [ECG] Reset measurement completion flag, timestamp, and duplicate prevention for new measurement');
-
-                }
-
-                if (state === 'stop') {
-
-                    console.log('🫀 [ECG UI] ===== ECG MEASUREMENT STOPPED (onECGLifecycle) ====');
-                    console.log('🫀 [ECG UI] Previous state:', { isMonitoring, monitoringStatus, bufferLen: ecgBufferRef.current.length });
-                    console.log('🫀 [ECG UI] Data parameter received:', data);
-                    console.log('🫀 [ECG UI] Processing final data...');
-
-                    // 🆕 CRITICAL FIX: If data parameter has file result, set result IMMEDIATELY (like BP does)
-                    if (data?.finalHeartRate && data.finalHeartRate > 0) {
-                        console.log('🫀 [ECG FILE] File-based result data received in onECGLifecycle - setting result IMMEDIATELY');
-                        console.log('🫀 [ECG FILE] Heart Rate:', data.finalHeartRate, 'QRS:', data.ecgQrsDuration, 'QTC:', data.ecgQtInterval);
-                        
-                        const fileResult: ECGRhythm = {
-                            id: `ecg_${Date.now()}`,
-                            deviceId: selectedDevice || 'unknown',
-                            timestamp: new Date().toISOString(),
-                            heartRate: data.finalHeartRate,
-                            rhythm: data.ecgRhythm || 'normal',
-                            qrsDuration: data.ecgQrsDuration || 80,
-                            qtInterval: data.ecgQtInterval || 400,
-                            prInterval: data.ecgPrInterval || 160,
-                            stSegment: 'normal',
-                            tWave: 'normal',
-                            pWave: 'normal',
-                            ecgData: data.ecgData || ecgBufferRef.current.map(d => d.v),
-                            unit: 'mV'
-                        };
-                        
-                        console.log('🫀 [ECG FILE] Setting ecgResult IMMEDIATELY from file data in onECGLifecycle');
-                        setEcgResult(fileResult);
-                        setIsMeasurementCompleted(true);
-                        setMeasurementCompletionTime(new Date().toISOString());
-                        autoSaveECGResult(fileResult);
-                        console.log('✅ [ECG FILE] Result set and saved IMMEDIATELY from onECGLifecycle');
-                        
-                        // Still update monitoring state
-                        setIsMonitoring(false);
-                        setMonitoringStatus('listening');
-                        console.log('🫀 [ECG UI] ✅ Monitoring stopped, result set from file data');
-                        return; // Don't continue with setTimeout logic
-                    }
-
-                    console.log('🫀 [ECG UI] Setting isMonitoring = false...');
-                    setIsMonitoring(false); 
-                    console.log('🫀 [ECG UI] Setting monitoringStatus = "listening"...');
-                    setMonitoringStatus('listening');
-                    console.log('🫀 [ECG UI] ✅ Monitoring stopped, status set to listening');
-
-                    console.log('🛑 ECG measurement stopped - checking for final heart rate...');
-
-
-
-                    // CRITICAL: Capture final heart rate when measurement completes
-
-                    // The device should provide final HR at this point (e.g., 77 BPM)
-
-                    setTimeout(() => {
-
-                        console.log('📋 Final device heart rate check:', {
-
-                            deviceBpm: deviceBpm,
-
-                            rhythmBpm: currentRhythm?.heartRate,
-
-                            calcBpm: lastBpmRef.current,
-
-                            lastDeviceHeartRateTime: lastDeviceHeartRateTime,
-
-                            timeSinceLastUpdate: Date.now() - lastDeviceHeartRateTime
-
-                        });
-
-
-
-                        // CRITICAL: Get the most recent heart rate from any available source
-
-                        let finalHeartRate = 0;
-
-
-
-                        // FIXED: More robust heart rate selection logic
-
-                        // Priority 1: Use deviceBpm if it's valid and recent (within last 10 seconds)
-
-                        const hasRecentDeviceData = (Date.now() - lastDeviceHeartRateTime) < 10000;
-
-                        console.log('🔍 [FINAL] Recent device data check:', {
-
-                            hasRecentDeviceData,
-
-                            timeSinceLastUpdate: Date.now() - lastDeviceHeartRateTime,
-
-                            deviceBpm,
-
-                            lastDeviceHeartRateTime
-
-                        });
-
-
-
-                        // Priority 1: Device heart rate (most reliable)
-
-                        if (deviceBpm > 0 && hasRecentDeviceData) {
-
-                            finalHeartRate = deviceBpm;
-
-                            console.log('✅ [FINAL] Using deviceBpm:', finalHeartRate, 'BPM (recent data)');
-
-                        }
-
-                        // Priority 2: Current rhythm heart rate
-
-                        else if (currentRhythm?.heartRate && currentRhythm.heartRate > 0) {
-
-                            finalHeartRate = currentRhythm.heartRate;
-
-                            console.log('✅ [FINAL] Using currentRhythm.heartRate:', finalHeartRate, 'BPM');
-
-                        }
-
-                        // Priority 3: Last calculated BPM
-
-                        else if (lastBpmRef.current > 0) {
-
-                            finalHeartRate = lastBpmRef.current;
-
-                            console.log('✅ [FINAL] Using lastBpmRef.current:', finalHeartRate, 'BPM');
-
-                        }
-
-                        // Priority 4: Last known device heart rate (fallback)
-
-                        else if (lastDeviceHeartRateTime > 0) {
-
-                            // Try to get the last known value from the device
-
-                            console.log('⚠️ [FINAL] No current heart rate, checking last known value...');
-
-                            // This will be handled by the native plugin's lastKnownHeartRate
-
-                        }
-
-                        // Priority 5: Use the immediate heart rate captured when measurement stopped
-
-                        else {
-
-                            console.log('❌ [FINAL] No valid heart rate found from any source!');
-
-                            console.log('❌ [FINAL] This means device data is not reaching the frontend properly');
-
-                        }
-
-
-
-                        // CRITICAL FIX: If finalHeartRate is still 0, use the current live heart rate
-
-                        if (finalHeartRate === 0) {
-
-                            // Use the current live heart rate that's showing in the UI
-
-                            finalHeartRate = deviceBpm || currentRhythm?.heartRate || lastBpmRef.current || 0;
-
-                            console.log('🚨 [FINAL] finalHeartRate was 0, using fallback:', finalHeartRate, 'BPM');
-
-                        }
-
-
-
-                        // FINAL VALIDATION: Ensure we have a valid heart rate
-                        // ✅ FIX: Allow result display even with 0 heart rate (show warning)
-                        if (finalHeartRate === 0) {
-                            console.warn('⚠️ [FINAL] No valid heart rate found after all fallbacks!');
-                            console.warn('⚠️ [FINAL] This may indicate device data not received properly');
-                            console.warn('⚠️ [FINAL] Will display result with 0 BPM and warning message');
-                            // Don't return - allow result to be created and displayed with warning
-                        }
-
-
-
-                        // Create final ECG result
-
-                        const finalResult: ECGRhythm = {
-
-                            id: `ecg_${Date.now()}`,
-
-                            deviceId: selectedDevice || 'unknown',
-
-                            timestamp: new Date().toISOString(),
-
-                            heartRate: finalHeartRate, // Use the determined final heart rate
-
-                            rhythm: 'normal',
-
-                            qrsDuration: 80,
-
-                            qtInterval: 400,
-
-                            prInterval: 160,
-
-                            stSegment: 'normal',
-
-                            tWave: 'normal',
-
-                            pWave: 'normal',
-
-                            // ✅ FIX: Use data.ecgData from lifecycle event instead of empty ecgBufferRef
-                            ecgData: (data?.ecgData && Array.isArray(data.ecgData) && data.ecgData.length > 0) 
-                                ? data.ecgData 
-                                : (ecgBufferRef.current.length > 0 
-                                    ? ecgBufferRef.current.map(d => d.v) 
-                                    : []),
-
-                            unit: 'mV'
-
-                        };
-
-
-
-                        console.log('📊 Final ECG result created:', finalResult);
-
-                        console.log('🎯 [FINAL] Heart rate in result:', finalResult.heartRate, 'BPM');
-
-
-
-                        // ✅ CRITICAL: Set ecgResult for UI display
-                        console.log('🎯 [FINAL] Setting ecgResult for UI display...');
-                        setEcgResult(finalResult);
-                        setIsMeasurementCompleted(true);
-                        const completionTime = new Date().toISOString();
-                        setMeasurementCompletionTime(completionTime);
-                        setPermanentTimestamp(completionTime);
-                        console.log('✅ [FINAL] ECG result set, completion flags updated');
-
-
-
-                        // Update current rhythm to show final result in main interface
-
-                        setCurrentRhythm(finalResult);
-
-
-
-                        // DEBUG: Log what we're about to save
-
-                        console.log('🔍 [FINAL] About to save ECG result with heart rate:', finalResult.heartRate);
-
-                        console.log('🔍 [FINAL] Debug - finalHeartRate value:', finalHeartRate);
-
-                        console.log('🔍 [FINAL] Debug - deviceBpm:', deviceBpm);
-
-                        console.log('🔍 [FINAL] Debug - currentRhythm?.heartRate:', currentRhythm?.heartRate);
-
-
-
-                        // FIXED: Single source of truth - save to reports only, then fetch from there
-
-                        try {
-
-                            // Save to storedFilesInApp for reports page (primary storage)
-
-                            const existingReports = JSON.parse(localStorage.getItem('storedFilesInApp') || '[]');
-
-
-
-                            // Remove duplicate ECG reports (same heart rate within 5 minutes)
-
-                            const fiveMinutesAgo = Date.now() - (5 * 60 * 1000);
-
-                            const filteredReports = existingReports.filter(r => {
-
-                                if (r.type !== 'ecg') return true; // Keep non-ECG reports
-
-                                const isRecent = new Date(r.savedAt || r.timestamp).getTime() > fiveMinutesAgo;
-
-                                const isSameHR = r.heartRate === finalResult.heartRate;
-
-                                return !(isRecent && isSameHR);
-
-                            });
-
-
-
-                            const reportData = {
-
-                                ...finalResult,
-
-                                // ✅ FIX: Ensure ecgData is included from data if available
-                                ecgData: finalResult.ecgData || (data?.ecgData && Array.isArray(data.ecgData) ? data.ecgData : []),
-                                scaleUvPerLsb: data?.scaleUvPerLsb || 3.098,
-                                sampleRate: data?.sampleRate || 125,
-                                type: 'ecg',
-
-                                savedAt: new Date().toISOString()
-
-                            };
-
-                            console.log('💾 [ECG] Saving to reports (storedFilesInApp):', reportData);
-
-                            const updatedReports = [reportData, ...filteredReports.slice(0, 49)]; // Keep last 50
-
-                            localStorage.setItem('storedFilesInApp', JSON.stringify(updatedReports));
-
-                            console.log('💾 [ECG] ECG result saved to reports, total reports:', updatedReports.length);
-                            
-                            // 🚀 STORE ECG DATA IN SUPABASE FOR DOCTOR PORTAL (async IIFE to handle await)
-                            (async () => {
-                                try {
-                                    const { data: { user }, error: userError } = await supabase.auth.getUser();
-                                    
-                                    if (userError || !user) {
-                                        console.warn('🫀 [ECG] User not authenticated, cannot save to Supabase');
-                                        return;
-                                    }
-                                    
-                                    const { data: patientProfile, error: patientError } = await supabase
-                                        .from('patients')
-                                        .select('id, is_active')
-                                        .eq('auth_user_id', user.id)
-                                        .eq('is_active', true)  // ✅ ADD: Ensure patient is active
-                                        .single();
-                                    
-                                    if (patientError || !patientProfile) {
-                                        console.error('❌ [ECG] Patient profile not found:', patientError);
-                                        return;
-                                    }
-                                    
-                                    if (reportData.ecgData && Array.isArray(reportData.ecgData) && reportData.ecgData.length > 0) {
-                                        const scaleUvPerLsb = reportData.scaleUvPerLsb || 3.098;
-                                        const sampleRate = reportData.sampleRate || 125;
-                                        
-                                        // Convert raw Int16 values to mV if needed
-                                        const maxAbsValue = Math.max(...reportData.ecgData.map(Math.abs));
-                                        const isLikelyMv = maxAbsValue < 100;
-                                        
-                                        let mvData: number[];
-                                        if (isLikelyMv) {
-                                            mvData = reportData.ecgData;
-                                        } else {
-                                            const mvPerLsb = scaleUvPerLsb / 1000;
-                                            mvData = reportData.ecgData.map(val => val * mvPerLsb);
-                                        }
-                                        
-                                        const ecgRecord = {
-                                            patient_id: patientProfile.id,  // ✅ Explicit patient_id
-                                            device_id: reportData.deviceId || selectedDevice || 'BP2_Device',
-                                            recorded_at: reportData.timestamp || reportData.savedAt || new Date().toISOString(),
-                                            sample_rate: sampleRate,
-                                            scale_uv_per_lsb: scaleUvPerLsb,
-                                            duration_seconds: mvData.length / sampleRate,
-                                            mv_data_json: mvData,  // ✅ Array of numbers
-                                            raw_data_base64: null,  // ✅ MUST be null when using mv_data_json
-                                            heart_rate: reportData.heartRate || 0,
-                                            quality_score: 0.95,
-                                            notes: 'ECG recording from BP2 device'
-                                        };
-                                        
-                                        const { data: insertedData, error: insertError } = await supabase
-                                            .from('ecg_recordings')
-                                            .insert(ecgRecord)
-                                            .select();
-                                        
-                                        if (insertError) {
-                                            console.error('❌ [ECG] Supabase insert error:', {
-                                                code: insertError.code,
-                                                message: insertError.message,
-                                                details: insertError.details,
-                                                hint: insertError.hint
-                                            });
-                                            
-                                            // Specific error handling
-                                            if (insertError.code === '42501') {
-                                                console.error('❌ [ECG] RLS policy violation - patient_id may not match authenticated user');
-                                            } else if (insertError.code === '23514') {
-                                                console.error('❌ [ECG] Constraint violation - check raw_data_base64/mv_data_json constraint');
-                                            } else if (insertError.code === '23503') {
-                                                console.error('❌ [ECG] Foreign key violation - patient_id not found in patients table');
-                                            }
-                                        } else {
-                                            console.log('✅ [ECG] ECG data stored in Supabase for doctor portal:', insertedData);
-                                        }
-                                    }
-                                } catch (error) {
-                                    console.error('❌ [ECG] Failed to store ECG data in Supabase:', error);
-                                }
-                            })(); // End async IIFE
-
-
-
-                            // FIXED: Update rhythms state from reports data (single source of truth)
-
-                            const ecgReports = updatedReports.filter(r => r.type === 'ecg');
-
-                            const sortedRhythms = ecgReports
-
-                                .sort((a, b) => new Date(b.savedAt || b.timestamp).getTime() - new Date(a.savedAt || a.timestamp).getTime())
-
-                                .slice(0, 10);
-
-
-
-                            // 🚀 FIXED: Only update rhythms if measurement is completed (prevents overwriting previous reading)
-                            if (finalResult && finalResult.heartRate > 0 && isMeasurementCompleted) {
-                                setRhythms(sortedRhythms);
-                                console.log('🔄 [ECG] Updated rhythms state from COMPLETED measurement, total:', sortedRhythms.length);
-                            } else {
-                                console.log('🔄 [ECG] Skipping rhythms update - measurement not completed yet or still in progress');
-                            }
-
-                            console.log('🔄 [ECG] Updated rhythms state from reports, total:', sortedRhythms.length);
-
-
-
-                        } catch (error) {
-
-                            console.error('❌ Failed to save ECG result to reports:', error);
-
-                        }
-
-
-
-                        console.log('🔄 [ECG] ECG result saved to reports, rhythms updated from single source');
-
-
-
-                        // Force UI update to show final heart rate
-
-                        setCurrentRhythm(prev => prev ? {
-
-                            ...prev,
-
-                            heartRate: finalResult.heartRate,
-
-                            timestamp: new Date().toISOString()
-
-                        } : prev);
-
-                    }, 1000); // Increased from 500ms to 1000ms to ensure state updates complete
-
-
-
-                    captureActiveRef.current = false;
-
-                }
-
-            },
-
-            onError: (error: string, details?: any) => {
-
-                console.error('[ui] ECG error:', error, details);
-
-                toast({
-
-                    title: "ECG Error",
-
-                    description: error,
-
-                    variant: "destructive",
-
-                });
-
-            }
-
-        };
-
-
-
-        // Set the callbacks so the bridge can forward events to them
-
-        wellueSDK.setCallbacks(callbacks);
-
-
-
-        console.log('✅ ECG callback handlers registered with bridge');
-
-
-
-        return () => {
-
-            // Cleanup callbacks
-
-            wellueSDK.setCallbacks({});
-
-            console.log('🧹 ECG callback handlers cleaned up');
-
-        };
-
-    }, [wellueSDK, selectedDevice, deviceBpm, currentRhythm?.heartRate, lastBpmRef.current]);
-
-
-
-    // Safety net: directly subscribe to native events in case bridge callbacks are not wired yet
-
-    useEffect(() => {
-
-        const Native: any = registerPlugin('WellueSDK');
-
-        const subs: Array<{ remove: () => void } | void> = [];
-
-
-
-        console.log('🔧 Setting up direct native event listeners as backup');
-
-
-
-        try {
-
-            // Direct ECG data listener (this was working before!)
-
-            subs.push(Native.addListener('ecgData', (data: any) => {
-
-                console.log('🫀 [NATIVE] ECG data received directly:', data);
-
-                console.log('🫀 [NATIVE] Data structure:', {
-
-                    hasHeartRate: !!data?.heartRate,
-
-                    heartRate: data?.heartRate,
-
-                    heartRateType: typeof data?.heartRate,
-
-                    hasWaveform: !!data?.waveform,
-
-                    waveformLength: data?.waveform?.length || 0,
-
-                    hasSampleRate: !!data?.sampleRate,
-
-                    sampleRate: data?.sampleRate,
-
-                    hasMvPerCount: !!data?.mvPerCount,
-
-                    mvPerCount: data?.mvPerCount,
-
-                    fullData: JSON.stringify(data, null, 2)
-
-                });
-
-
-
-                if (!data?.waveform || data.waveform.length === 0) {
-
-                    console.log('⚠️ [NATIVE] No waveform data received');
-
-                    return;
-
-                }
-
-
-
-                // Update last ECG data time for fallback detection
-
-                setLastEcgDataTime(Date.now());
-
-
-
-                try {
-
-                    const prev = (data?.waveform || []).slice(0, 20);
-
-                    console.log('[ui:native] ecgData raw', { points: data?.waveform?.length || 0, heartRate: data?.heartRate, sampleRate: data?.sampleRate, mvPerCount: data?.mvPerCount, preview: prev });
-
-                } catch { }
-
-
-
-                // lock fs if provided by native
-
-                const sr = Number(data?.sampleRate);
-
-                if (sr && isFinite(sr) && sr > 0 && sr < 1000 && fsRef.current !== sr) {
-
-                    fsRef.current = sr;
-
-                    initFilters(fsRef.current, notchHzRef.current);
-
-                    sizeRef.current = { W: 0, H: 0 };
-
-                }
-
-
-
-                const mvPerCount = Number(data?.mvPerCount) || 0.003098;
-
-                const rawCounts: number[] = (data?.waveform || []) as number[];
-
-                const counts = extractEcgCounts(rawCounts);
-
-                const raw = counts.map(v => v * mvPerCount);
-
-
-
-                const now = Date.now();
-
-                if (now > nextDetectTsRef.current && ecgBufferRef.current.length > 400) {
-
-                    const values = ecgBufferRef.current.map(s => s.v);
-
-                    const p50 = goertzelPower(values, fsRef.current, 50);
-
-                    const p60 = goertzelPower(values, fsRef.current, 60);
-
-                    const target = p60 > p50 * 1.5 ? 60 : 50;
-
-                    if (target !== notchHzRef.current) {
-
-                        notchHzRef.current = target;
-
-                        initFilters(fsRef.current, notchHzRef.current);
-
-                    }
-
-                    nextDetectTsRef.current = now + 2000;
-
-                }
-
-
-
-                const filtered = applyFilters(raw);
-
-                const packetTime = Date.now();
-
-                pushSamples(ecgBufferRef.current, filtered, packetTime, fsRef.current);
-
-                setBufferLen(ecgBufferRef.current.length);
-
-
-
-                // Store device heart rate (most accurate)
-
-                if (data.heartRate && data.heartRate > 0) {
-
-                    console.log('🫀 [NATIVE] Received device heart rate:', data.heartRate, 'BPM');
-
-                    console.log('🫀 [NATIVE] Previous deviceBpm was:', deviceBpm, 'BPM');
-
-                    setDeviceBpm(data.heartRate);
-
-                    setLastDeviceHeartRateTime(Date.now());
-
-                    console.log('🫀 [NATIVE] Updated deviceBpm state to:', data.heartRate, 'BPM');
-
-                    console.log('🫀 Device Heart Rate:', data.heartRate, 'BPM (accurate)');
-
-                } else {
-
-                    console.log('⚠️ [DEBUG] No valid heart rate in ECG data:', data.heartRate);
-
-                }
-
-
-
-                setCurrentRhythm(prev => ({
-
-                    id: prev?.id || `ecg-${Date.now()}`,
-
-                    deviceId: selectedDevice,
-
-                    timestamp: new Date().toISOString(),
-
-                    heartRate: data.heartRate || prev?.heartRate || 0,
-
-                    rhythm: 'normal',
-
-                    qrsDuration: prev?.qrsDuration || 0,
-
-                    qtInterval: prev?.qtInterval || 0,
-
-                    prInterval: prev?.prInterval || 0,
-
-                    stSegment: 'normal',
-
-                    tWave: 'normal',
-
-                    pWave: 'normal',
-
-                    ecgData: ecgBufferRef.current.slice(-Math.min(100, ecgBufferRef.current.length)).map(s => s.v),
-
-                    unit: 'mV',
-
-                }));
-
-
-
-                // Full-frame redraw
-
-                drawRealtime();
-
-                setIsMonitoring(true);
-
-                setMonitoringStatus('active');
-
-            }));
-
-
-
-            // Direct real-time update listener
-
-            subs.push(Native.addListener('bp2Rt', (rt: any) => {
-
-                console.log('🫀 [NATIVE] Real-time update received directly:', rt);
-
-                console.log('🫀 [NATIVE] RT data structure:', {
-
-                    hasHr: !!rt?.hr,
-
-                    hr: rt?.hr,
-
-                    hrType: typeof rt?.hr,
-
-                    hasHeartRate: !!rt?.heartRate,
-
-                    heartRate: rt?.heartRate,
-
-                    heartRateType: typeof rt?.heartRate,
-
-                    fullData: JSON.stringify(rt, null, 2)
-
-                });
-
-
-
-                setRtCount((c) => c + 1);
-
-                if (!isMonitoring) setMonitoringStatus('listening');
-
-
-
-                // Reflect HR from RT even without waveform
-
-                if (rt?.hr && rt.hr > 0) {
-
-                    console.log('🫀 [NATIVE] Real-time heart rate received:', rt.hr, 'BPM');
-
-                    console.log('🫀 [NATIVE] Previous deviceBpm was:', deviceBpm, 'BPM');
-
-
-
-                    // Update state synchronously to avoid race conditions
-
-                    setDeviceBpm(rt.hr);
-
-                    setLastDeviceHeartRateTime(Date.now());
-
-                    setLastEcgDataTime(Date.now());
-
-
-
-                    // Also update currentRhythm immediately to avoid race condition
-
-                    setCurrentRhythm(prev => prev ? { ...prev, heartRate: rt.hr } : prev);
-
-
-
-                    console.log('🫀 [NATIVE] Updated deviceBpm to real-time value:', rt.hr, 'BPM');
-
-                    console.log('🫀 [NATIVE] State updated - deviceBpm should now be:', rt.hr, 'BPM');
-
-                } else {
-
-                    console.log('⚠️ [NATIVE] No valid heart rate in real-time update:', rt?.hr);
-
-                }
-
-            }));
-
-
-
-            // Direct ECG lifecycle listener
-
-            subs.push(Native.addListener('ecgLifecycle', (data: any) => {
-
-                const state = data?.state;
-                const finalHeartRate = data?.finalHeartRate; // 🚀 NEW: Get final HR from native
-
-                console.log('🔄 [NATIVE] ECG Lifecycle event received directly:', state, 'finalHeartRate:', finalHeartRate);
-
-
-
-                if (state === 'start') {
-
-                    console.log('🚀 [NATIVE] ECG measurement STARTED');
-
-                    ecgBufferRef.current = []; setBufferLen(0);
-
-                    notchHzRef.current = 50; initFilters(fsRef.current, notchHzRef.current);
-
-                    nextDetectTsRef.current = Date.now() + 1500;
-
-                    setIsMonitoring(true); setMonitoringStatus('active');
-
-                    captureActiveRef.current = true;
-
-                    captureCountsRef.current = [];
-
-                    captureStartedAtRef.current = new Date().toISOString();
-
-                }
-
-                if (state === 'stop') {
-
-                    console.log('🛑 [NATIVE] ECG measurement STOPPED');
-
-                    setIsMonitoring(false); setMonitoringStatus('listening');
-
-                    // 🚀 CRITICAL FIX: Use finalHeartRate from native if available
-                    let immediateHeartRate = 0;
-                    
-                    if (finalHeartRate && finalHeartRate > 0) {
-                        immediateHeartRate = finalHeartRate;
-                        console.log('✅ [IMMEDIATE] Using final heart rate from native:', finalHeartRate, 'BPM');
-                        // Update deviceBpm with the final heart rate to ensure it's available for result calculation
-                        setDeviceBpm(finalHeartRate);
-                        setLastDeviceHeartRateTime(Date.now());
-                    } else {
-                        // Fallback to existing logic
-                        immediateHeartRate = deviceBpm > 0 ? deviceBpm :
-                        (currentRhythm?.heartRate > 0 ? currentRhythm.heartRate :
-                            (lastBpmRef.current > 0 ? lastBpmRef.current : 0));
-                        console.log('⚠️ [IMMEDIATE] No final HR from native, using fallback:', immediateHeartRate, 'BPM');
-                    }
-
-                    console.log('🚨 [IMMEDIATE] Heart rate captured at stop:', immediateHeartRate, 'BPM');
-
-                    console.log('🚨 [IMMEDIATE] Values at stop - deviceBpm:', deviceBpm, 'rhythm:', currentRhythm?.heartRate, 'calc:', lastBpmRef.current);
-
-
-
-                    // CRITICAL FIX: Wait longer for state updates to complete
-
-                    // The issue was that deviceBpm state update from bp2Rt event
-
-                    // hadn't completed when this final calculation ran
-
-                    setTimeout(() => {
-
-                        console.log('📋 Final device heart rate check:', {
-
-                            deviceBpm: deviceBpm,
-
-                            rhythmBpm: currentRhythm?.heartRate,
-
-                            calcBpm: lastBpmRef.current,
-
-                            lastDeviceHeartRateTime: lastDeviceHeartRateTime,
-
-                            timeSinceLastUpdate: Date.now() - lastDeviceHeartRateTime
-
-                        });
-
-
-
-                        // CRITICAL: Get the most recent heart rate from any available source
-
-                        let finalHeartRate = 0;
-
-
-
-                        // FIXED: More robust heart rate selection logic
-
-                        // Priority 1: Use deviceBpm if it's valid and recent (within last 10 seconds)
-
-                        const hasRecentDeviceData = (Date.now() - lastDeviceHeartRateTime) < 10000;
-
-                        console.log('🔍 [FINAL] Recent device data check:', {
-
-                            hasRecentDeviceData,
-
-                            timeSinceLastUpdate: Date.now() - lastDeviceHeartRateTime,
-
-                            deviceBpm,
-
-                            lastDeviceHeartRateTime
-
-                        });
-
-
-
-                        // Priority 1: Device heart rate (most reliable)
-
-                        if (deviceBpm > 0 && hasRecentDeviceData) {
-
-                            finalHeartRate = deviceBpm;
-
-                            console.log('✅ [FINAL] Using deviceBpm:', finalHeartRate, 'BPM (recent data)');
-
-                        }
-
-                        // Priority 2: Current rhythm heart rate
-
-                        else if (currentRhythm?.heartRate && currentRhythm.heartRate > 0) {
-
-                            finalHeartRate = currentRhythm.heartRate;
-
-                            console.log('✅ [FINAL] Using currentRhythm.heartRate:', finalHeartRate, 'BPM');
-
-                        }
-
-                        // Priority 3: Last calculated BPM
-
-                        else if (lastBpmRef.current > 0) {
-
-                            finalHeartRate = lastBpmRef.current;
-
-                            console.log('✅ [FINAL] Using lastBpmRef.current:', finalHeartRate, 'BPM');
-
-                        }
-
-                        // Priority 4: Last known device heart rate (fallback)
-
-                        else if (lastDeviceHeartRateTime > 0) {
-
-                            // Try to get the last known value from the device
-
-                            console.log('⚠️ [FINAL] No current heart rate, checking last known value...');
-
-                            // This will be handled by the native plugin's lastKnownHeartRate
-
-                        }
-
-                        // Priority 5: Use the immediate heart rate captured when measurement stopped
-
-                        else if (immediateHeartRate > 0) {
-
-                            finalHeartRate = immediateHeartRate;
-
-                            console.log('✅ [FINAL] Using immediate heart rate captured at stop:', finalHeartRate, 'BPM');
-
-                        } else {
-
-                            console.log('❌ [FINAL] No valid heart rate found from any source!');
-
-                            console.log('❌ [FINAL] This means device data is not reaching the frontend properly');
-
-                        }
-
-
-
-                        // Create final ECG result
-
-                        const finalResult: ECGRhythm = {
-
-                            id: `ecg_${Date.now()}`,
-
-                            deviceId: selectedDevice || 'unknown',
-
-                            timestamp: new Date().toISOString(),
-
-                            heartRate: finalHeartRate, // Use the determined final heart rate
-
-                            rhythm: 'normal',
-
-                            qrsDuration: 80,
-
-                            qtInterval: 400,
-
-                            prInterval: 160,
-
-                            stSegment: 'normal',
-
-                            tWave: 'normal',
-
-                            pWave: 'normal',
-
-                            // ✅ FIX: Use data.ecgData from lifecycle event instead of empty ecgBufferRef
-                            ecgData: (data?.ecgData && Array.isArray(data.ecgData) && data.ecgData.length > 0) 
-                                ? data.ecgData 
-                                : (ecgBufferRef.current.length > 0 
-                                    ? ecgBufferRef.current.map(d => d.v) 
-                                    : []),
-
-                            unit: 'mV'
-
-                        };
-
-
-
-                        console.log('📊 Final ECG result created:', finalResult);
-
-                        console.log('🎯 [FINAL] Heart rate in result:', finalResult.heartRate, 'BPM');
-
-
-
-                        // Set the result and show popup
-
-                        // 🚀 NEW: Process and store ECG result (rebuilt from scratch)
-                        // Extract real ECG data from native plugin if available
-                        // ✅ ROOT CAUSE FIX: Handle raw Int16 samples from native event
-                        // iOS plugin sends raw Int16 samples (like Android/web portal)
-                        // Chart component expects raw Int16 and converts using scaleUvPerLsb=3.098
-                        let ecgDataForResult = finalResult.ecgData;
-                        if (data?.ecgData && Array.isArray(data.ecgData) && data.ecgData.length > 0) {
-                            // Native plugin sends raw Int16 values - use them directly
-                            ecgDataForResult = data.ecgData;
-                            console.log('🫀 [ECG LIFECYCLE] Using raw Int16 samples from native event:', ecgDataForResult.length, 'samples');
-                            
-                            // Also set chart data if not already set
-                            if (!hasEcgChartLoaded) {
-                                const scaleUvPerLsb = data?.scaleUvPerLsb || 3.098; // BP2 scale factor (μV/LSB)
-                                const sampleRate = data?.sampleRate || 125;
-                                // ✅ FIX: Convert raw Int16 to mV (matches web portal)
-                                const mvPerCount = scaleUvPerLsb / 1000; // Convert μV/LSB to mV/LSB
-                                const samplesArray = new Float32Array(ecgDataForResult.length);
-                                for (let i = 0; i < ecgDataForResult.length; i++) {
-                                    samplesArray[i] = ecgDataForResult[i] * mvPerCount; // Convert Int16 to mV
-                                }
-                                const chartData = {
-                                    s: samplesArray, // Now in mV
-                                    sr: sampleRate,
-                                    scale: 1.0 // Already in mV, no conversion needed
-                                };
-                                console.log('🫀 [ECG LIFECYCLE] Setting chart data from ecgLifecycle event (converted to mV, scale=1.0)');
-                                setEcgData(chartData);
-                                setPermanentEcgData(chartData);
-                                setHasEcgChartLoaded(true);
-                            }
-                        }
-                        
-                        const enhancedResult = {
-                            ...finalResult,
-                            // Use real device data if available, otherwise use calculated values
-                            heartRate: data?.finalHeartRate || finalResult.heartRate,
-                            qrsDuration: data?.ecgQrsDuration || finalResult.qrsDuration,
-                            qtInterval: data?.ecgQtInterval || finalResult.qtInterval,
-                            prInterval: data?.ecgPrInterval || finalResult.prInterval,
-                            rhythm: data?.ecgRhythm || finalResult.rhythm,
-                            // ✅ FIX: Ensure ecgData is included - prioritize from data, then ecgDataForResult, then finalResult
-                            ecgData: (data?.ecgData && Array.isArray(data.ecgData) && data.ecgData.length > 0) 
-                                ? data.ecgData 
-                                : (ecgDataForResult && Array.isArray(ecgDataForResult) && ecgDataForResult.length > 0)
-                                    ? ecgDataForResult
-                                    : (finalResult.ecgData && Array.isArray(finalResult.ecgData) && finalResult.ecgData.length > 0)
-                                        ? finalResult.ecgData
-                                        : [],
-                            scaleUvPerLsb: data?.scaleUvPerLsb || 3.098,
-                            sampleRate: data?.sampleRate || 125,
-                            unit: 'raw' // Raw Int16 samples, not mV
-                        };
-                        
-                        console.log('🫀 [ECG LIFECYCLE] Enhanced result ecgData check:', {
-                            hasDataEcgData: !!(data?.ecgData && data.ecgData.length > 0),
-                            hasEcgDataForResult: !!(ecgDataForResult && ecgDataForResult.length > 0),
-                            hasFinalResultEcgData: !!(finalResult.ecgData && finalResult.ecgData.length > 0),
-                            finalEcgDataLength: enhancedResult.ecgData.length
-                        });
-                        
-                        // Mark measurement as completed
-                        setIsMeasurementCompleted(true);
-                        const completionTime = new Date().toISOString();
-                        setMeasurementCompletionTime(completionTime);
-                        
-                        // Store timestamp permanently to prevent continuous updates
-                        setPermanentTimestamp(completionTime);
-                        
-                        // ✅ CRITICAL: Set ecgResult for UI display (even if heart rate is 0)
-                        console.log('🎯 [FINAL] Setting ecgResult for UI display (from ecgLifecycle stop)...');
-                        setEcgResult(enhancedResult);
-                        console.log('✅ [FINAL] ECG result set for UI display');
-                        
-                        // ✅ FIX: Show warning toast if heart rate is 0
-                        if (enhancedResult.heartRate === 0) {
-                            console.warn('⚠️ [FINAL] Result displayed with 0 BPM - device may not have sent heart rate data');
-                        }
-                        
-                        // 🆕 ECG: Auto-save ECG result (similar to BP auto-save)
-                        autoSaveECGResult(enhancedResult);
-                        
-                        // Trigger background ECG processing (duplicated from EcgResultScreen)
-                        // Only process if chart hasn't been loaded yet
-                        if (!hasEcgChartLoaded) {
-                            processEcgInBackground();
-                        } else {
-                            console.log('ℹ️ [ECG] Chart already loaded, skipping background processing call');
-                        }
-                        
-
-
-                        // Force UI update to show final heart rate
-                        setCurrentRhythm(prev => prev ? {
-                            ...prev,
-                            heartRate: finalResult.heartRate,
-                            timestamp: new Date().toISOString()
-                        } : prev);
-
-
-
-                    }, 1000); // Increased from 500ms to 1000ms to ensure state updates complete
-
-
-
-                    captureActiveRef.current = false;
-
-                }
-
-            }));
-
-
-
-            console.log('✅ Direct native event listeners set up successfully');
-
-
-
-        } catch (error) {
-
-            console.error('❌ Failed to set up native event listeners:', error);
-
-        }
-
-
-
-        return () => {
-
-            console.log('🧹 Cleaning up native event listeners');
-
-            subs.forEach(s => s && s.remove && s.remove());
-
-        };
-
-    }, [selectedDevice, deviceBpm, currentRhythm?.heartRate, lastBpmRef.current]);
-
-
-
-    // NOTE: Removed auto-start logic - app should only respond to device-initiated measurements
-    // The app will detect status 6 (ECG measuring) when user starts measurement on device
-    // and status 7 (ECG complete) when measurement finishes
-
-    useEffect(() => {
-
-        const setupDevice = async () => {
-
-            if (!selectedDevice) return;
-
-            try {
-
-                console.log('🫀 [ECGMonitor] Device selected:', selectedDevice, '- waiting for device-initiated measurement');
-
-                // Just ensure RT task is running to receive status updates
-                // Do NOT start ECG measurement - wait for user to press button on device
-
-            } catch (e) {
-
-                console.log('⚠️ [ECGMonitor] Setup failed:', e);
-
-            }
-
-        };
-
-        setupDevice();
-
-    }, [selectedDevice, wellueSDK]);
-
-
-
-    useEffect(() => {
-
-        if (selectedDevice) {
-
-            console.log('🔄 [ECG] Component mounted/device changed, loading fresh rhythms');
-
-            loadRhythms(selectedDevice);
-
-        }
-
-    }, [selectedDevice]);
-
-
-
-
-
-    // FIXED: Force refresh when component becomes visible (page return)
-
-    useEffect(() => {
-
-        const handleVisibilityChange = () => {
-
-            if (!document.hidden && selectedDevice) {
-
-                console.log('🔄 [ECG] Page became visible, resetting ECG state');
-
-                // Reset current ECG result when returning to page
-
-                setCurrentRhythm(null);
-
-                // REMOVED: setEcgResult - will rebuild from scratch
-
-                setDeviceBpm(0);
-
-                setLastDeviceHeartRateTime(0);
-
-                setIsMonitoring(false);
-
-                setMonitoringStatus('listening');
-
-                // Then refresh rhythms
-
-                loadRhythms(selectedDevice);
-
-            }
-
-        };
-
-
-
-        document.addEventListener('visibilitychange', handleVisibilityChange);
-
-
-
-        // Also refresh on focus (when user returns to app)
-
-        const handleFocus = () => {
-
-            if (selectedDevice) {
-
-                console.log('🔄 [ECG] App focused, resetting ECG state');
-
-                // Reset current ECG result when returning to page
-
-                setCurrentRhythm(null);
-
-                // REMOVED: setEcgResult - will rebuild from scratch
-
-                setDeviceBpm(0);
-
-                setLastDeviceHeartRateTime(0);
-
-                setIsMonitoring(false);
-
-                setMonitoringStatus('listening');
-
-                // Then refresh rhythms
-
-                loadRhythms(selectedDevice);
-
-            }
-
-        };
-
-
-
-        window.addEventListener('focus', handleFocus);
-
-
-
-        return () => {
-
-            document.removeEventListener('visibilitychange', handleVisibilityChange);
-
-            window.removeEventListener('focus', handleFocus);
-
-        };
-
-    }, [selectedDevice]);
-
-
-
-    // FIXED: Reset page state when component unmounts or page changes
-
-    useEffect(() => {
-
-        return () => {
-
-            // Cleanup when leaving the page
-
-            console.log('🧹 [ECG] Cleaning up ECG monitor state');
-
-            setCurrentRhythm(null);
-
-            // REMOVED: setEcgResult - will rebuild from scratch
-
-            setIsMonitoring(false);
-
-            setMonitoringStatus('listening');
-
-            setDeviceBpm(0); // Reset device heart rate
-
-            setLastDeviceHeartRateTime(0); // Reset last update time
-
-        };
-
-    }, []);
-
-
-
-    // FIXED: ECG Auto-save function (copying BP pattern)
-
-    // REMOVED: ECG Auto-save function - will rebuild from scratch
-
-
-
-    // Load previous ECG readings from localStorage (like BP has)
-
-    // REMOVED: Previous ECG readings state - will rebuild from scratch
-
-
-
-    // Load previous ECG readings from storedFilesInApp
-    useEffect(() => {
-        try {
-            // Load from storedFilesInApp (single source of truth for ECG reports)
-            const existingReportsRaw = localStorage.getItem('storedFilesInApp');
-            if (!existingReportsRaw) {
-                console.log('📚 [ECG] No storedFilesInApp found, no previous readings to load');
-                return;
-            }
-
-            const existingReports = JSON.parse(existingReportsRaw);
-            console.log('📚 [ECG] Found', existingReports.length, 'total reports in storedFilesInApp');
-
-            // Filter only ECG reports
-            const ecgReports = existingReports.filter((r: any) => r.type === 'ecg');
-            console.log('📚 [ECG] Found', ecgReports.length, 'ECG reports');
-
-            if (ecgReports.length === 0) {
-                console.log('📚 [ECG] No ECG reports found');
-                return;
-            }
-
-            // Filter by device if selectedDevice is available
-            const deviceFiltered = selectedDevice 
-                ? ecgReports.filter((r: any) => r.deviceId === selectedDevice)
-                : ecgReports;
-            console.log('📚 [ECG] Device-filtered ECG reports:', deviceFiltered.length);
-
-            // Remove duplicates (same heart rate within 5 minutes)
-            const fiveMinutes = 5 * 60 * 1000;
-            const uniqueReports = deviceFiltered.filter((report, index, self) => {
-                const firstIndex = self.findIndex(r =>
-                    r.heartRate === report.heartRate &&
-                    Math.abs(
-                        new Date(r.savedAt || r.timestamp).getTime() - 
-                        new Date(report.savedAt || report.timestamp).getTime()
-                    ) < fiveMinutes
-                );
-                return index === firstIndex;
-            });
-            console.log('📚 [ECG] Unique ECG reports (after deduplication):', uniqueReports.length);
-
-            // Sort by timestamp (newest first) and take only 1 (most recent)
-            const sortedReports = uniqueReports
-                .sort((a: any, b: any) => 
-                    new Date(b.savedAt || b.timestamp).getTime() - 
-                    new Date(a.savedAt || a.timestamp).getTime()
-                )
-                .slice(0, 1);
-
-            // Map to ECGRhythm format
-            const previousReadings: ECGRhythm[] = sortedReports.map((report: any) => {
-                // ✅ FIX: Ensure ecgData is properly loaded - check if it exists and is an array
-                const ecgData = (report.ecgData && Array.isArray(report.ecgData) && report.ecgData.length > 0) 
-                    ? report.ecgData 
-                    : [];
-                console.log('📚 [ECG] Loading previous reading:', {
-                    id: report.measurementId,
-                    heartRate: report.heartRate,
-                    hasEcgData: ecgData.length > 0,
-                    ecgDataLength: ecgData.length,
-                    reportHasEcgData: !!report.ecgData,
-                    reportEcgDataType: typeof report.ecgData,
-                    reportKeys: Object.keys(report)
-                });
-                
-                return {
-                    id: report.measurementId || `ecg_${Date.now()}_${Math.random()}`,
-                    deviceId: report.deviceId || selectedDevice || 'unknown',
-                    timestamp: report.timestamp || report.savedAt || new Date().toISOString(),
-                    heartRate: report.heartRate || 0,
-                    rhythm: report.rhythm || 'normal',
-                    qrsDuration: report.qrsDuration || report.ecgQrsDuration || 0,
-                    qtInterval: report.qtInterval || report.ecgQtInterval || 0,
-                    prInterval: report.prInterval || report.ecgPrInterval || 0,
-                    stSegment: 'normal',
-                    tWave: 'normal',
-                    pWave: 'normal',
-                    ecgData: ecgData, // Use the extracted ecgData
-                    unit: 'bpm'
-                };
-            });
-
-            console.log('📚 [ECG] Loaded', previousReadings.length, 'previous ECG readings');
-            setPreviousECGReadings(previousReadings);
-
-        } catch (error) {
-            console.error('❌ [ECG] Failed to load previous ECG readings:', error);
-        }
-    }, [selectedDevice]); // Re-load when device changes
-
-
-
-    // FIXED: Auto-save ECG result when it's set (copying BP pattern)
-
-    // REMOVED: ECG auto-save useEffect - will rebuild from scratch
-
-
-
-    // REMOVED: ECG result auto-save useEffect - will rebuild from scratch
-
-
-
-    // Ensure canvas sizing and compute pixels/sample for 6s viewport
-
-    const ensureCanvas = () => {
-
-        const canvas = canvasRef.current;
-
-        if (!canvas) return null as CanvasRenderingContext2D | null;
-
-
-
-        const ctx = canvas.getContext('2d');
-
-        if (!ctx) return null;
-
-
-
-        // Read devicePixelRatio on mount and set backing store size
-
-        const dpr = window.devicePixelRatio || 1;
-
-        const cssW = canvas.clientWidth || 320;
-
-        const cssH = canvas.clientHeight || 300; // FIXED: Use actual container height
-
-
-
-        if (canvas.width !== cssW * dpr || canvas.height !== cssH * dpr) {
-
-            canvas.style.width = cssW + 'px';
-
-            canvas.style.height = cssH + 'px';
-
-            canvas.width = Math.floor(cssW * dpr);
-
-            canvas.height = Math.floor(cssH * dpr);
-
-
-
-            // Scale context to handle DPR properly
-
-            ctx.scale(dpr, dpr);
-
-
-
-            dprRef.current = dpr;
-
-            sizeRef.current = { W: canvas.width, H: canvas.height };
-
-
-
-            // Canvas is ready - grid will be drawn on next render
-
-        }
-
-
-
-        return ctx;
-
-    };
-
-
-
-    const drawGrid = (ctx: CanvasRenderingContext2D, W: number, H: number) => {
-
-        ctx.clearRect(0, 0, W, H);
-
-
-
-        // Grid aligned to timebase: vertical lines every 200ms, bold every 1 second
-
-        const timePerPixel = WINDOW_MS / W; // ms per pixel
-
-        const gridInterval200ms = Math.max(1, Math.floor(200 / timePerPixel)); // pixels per 200ms
-
-        const gridInterval1s = Math.max(1, Math.floor(1000 / timePerPixel)); // pixels per 1s
-
-
-
-        ctx.save();
-
-
-
-        // Draw faint horizontal grid lines (8-10 lines evenly across height)
-
-        const horizontalLines = 8;
-
-        const lineSpacing = H / horizontalLines;
-
-        ctx.strokeStyle = 'rgba(255,255,255,0.05)';
-
-        ctx.lineWidth = 1;
-
-
-
-        for (let i = 0; i <= horizontalLines; i++) {
-
-            const y = Math.round(i * lineSpacing);
-
-            ctx.beginPath();
-
-            ctx.moveTo(0, y + 0.5);
-
-            ctx.lineTo(W, y + 0.5);
-
-            ctx.stroke();
-
-        }
-
-
-
-        // Draw vertical grid lines every 200ms
-
-        ctx.strokeStyle = 'rgba(255,255,255,0.05)';
-
-        ctx.lineWidth = 1;
-
-        for (let x = 0; x <= W; x += gridInterval200ms) {
-
-            ctx.beginPath();
-
-            ctx.moveTo(x + 0.5, 0);
-
-            ctx.lineTo(x + 0.5, H);
-
-            ctx.stroke();
-
-        }
-
-
-
-        // Draw bold vertical grid lines every 1 second
-
-        ctx.strokeStyle = 'rgba(255,255,255,0.1)';
-
-        ctx.lineWidth = 1.5;
-
-        for (let x = 0; x <= W; x += gridInterval1s) {
-
-            ctx.beginPath();
-
-            ctx.moveTo(x + 0.5, 0);
-
-            ctx.lineTo(x + 0.5, H);
-
-            ctx.stroke();
-
-        }
-
-
-
-        ctx.restore();
-
-    };
-
-
-
-    // NEW: Ring buffer with timestamps for fixed time window
-
-    const pushSamples = (buffer: { t: number, v: number }[], newSamples: number[], packetTimestamp: number, fs: number) => {
-
-        const now = Date.now();
-
-        const maxAge = WINDOW_MS * 1.2; // Keep 20% extra for smooth transitions
-
-
-
-        // Add new samples with proper timestamps
-
-        const processedSamples: { t: number, v: number }[] = [];
-
-        newSamples.forEach((sample, i) => {
-
-            const sampleTime = packetTimestamp + (i * 1000 / fs);
-
-            const baselineRemoved = removeBaseline(sample);
-
-            const processedSample = { t: sampleTime, v: baselineRemoved };
-
-            buffer.push(processedSample);
-
-            processedSamples.push(processedSample);
-
+  }, []);
+
+  // FIXED: ECG Auto-save function (copying BP pattern)
+
+  // REMOVED: ECG Auto-save function - will rebuild from scratch
+
+  // Load previous ECG readings from localStorage (like BP has)
+
+  // REMOVED: Previous ECG readings state - will rebuild from scratch
+
+  // Load previous ECG readings from storedFilesInApp
+  useEffect(() => {
+    try {
+      // Load from storedFilesInApp (single source of truth for ECG reports)
+      const existingReportsRaw = localStorage.getItem("storedFilesInApp");
+      if (!existingReportsRaw) {
+        console.log(
+          "📚 [ECG] No storedFilesInApp found, no previous readings to load"
+        );
+        return;
+      }
+
+      const existingReports = JSON.parse(existingReportsRaw);
+      console.log(
+        "📚 [ECG] Found",
+        existingReports.length,
+        "total reports in storedFilesInApp"
+      );
+
+      // Filter only ECG reports
+      const ecgReports = existingReports.filter((r: any) => r.type === "ecg");
+      console.log("📚 [ECG] Found", ecgReports.length, "ECG reports");
+
+      if (ecgReports.length === 0) {
+        console.log("📚 [ECG] No ECG reports found");
+        return;
+      }
+
+      // Filter by device if selectedDevice is available
+      const deviceFiltered = selectedDevice
+        ? ecgReports.filter((r: any) => r.deviceId === selectedDevice)
+        : ecgReports;
+      console.log(
+        "📚 [ECG] Device-filtered ECG reports:",
+        deviceFiltered.length
+      );
+
+      // Remove duplicates (same heart rate within 5 minutes)
+      const fiveMinutes = 5 * 60 * 1000;
+      const uniqueReports = deviceFiltered.filter((report, index, self) => {
+        const firstIndex = self.findIndex(
+          (r) =>
+            r.heartRate === report.heartRate &&
+            Math.abs(
+              new Date(r.savedAt || r.timestamp).getTime() -
+                new Date(report.savedAt || report.timestamp).getTime()
+            ) < fiveMinutes
+        );
+        return index === firstIndex;
+      });
+      console.log(
+        "📚 [ECG] Unique ECG reports (after deduplication):",
+        uniqueReports.length
+      );
+
+      // Sort by timestamp (newest first) and take only 1 (most recent)
+      const sortedReports = uniqueReports
+        .sort(
+          (a: any, b: any) =>
+            new Date(b.savedAt || b.timestamp).getTime() -
+            new Date(a.savedAt || a.timestamp).getTime()
+        )
+        .slice(0, 1);
+
+      // Map to ECGRhythm format
+      const previousReadings: ECGRhythm[] = sortedReports.map((report: any) => {
+        // ✅ FIX: Ensure ecgData is properly loaded - check if it exists and is an array
+        const ecgData =
+          report.ecgData &&
+          Array.isArray(report.ecgData) &&
+          report.ecgData.length > 0
+            ? report.ecgData
+            : [];
+        console.log("📚 [ECG] Loading previous reading:", {
+          id: report.measurementId,
+          heartRate: report.heartRate,
+          hasEcgData: ecgData.length > 0,
+          ecgDataLength: ecgData.length,
+          reportHasEcgData: !!report.ecgData,
+          reportEcgDataType: typeof report.ecgData,
+          reportKeys: Object.keys(report),
         });
 
+        return {
+          id: report.measurementId || `ecg_${Date.now()}_${Math.random()}`,
+          deviceId: report.deviceId || selectedDevice || "unknown",
+          timestamp:
+            report.timestamp || report.savedAt || new Date().toISOString(),
+          heartRate: report.heartRate || 0,
+          rhythm: report.rhythm || "normal",
+          qrsDuration: report.qrsDuration || report.ecgQrsDuration || 0,
+          qtInterval: report.qtInterval || report.ecgQtInterval || 0,
+          prInterval: report.prInterval || report.ecgPrInterval || 0,
+          stSegment: "normal",
+          tWave: "normal",
+          pWave: "normal",
+          ecgData: ecgData, // Use the extracted ecgData
+          unit: "bpm",
+        };
+      });
 
+      console.log(
+        "📚 [ECG] Loaded",
+        previousReadings.length,
+        "previous ECG readings"
+      );
+      setPreviousECGReadings(previousReadings);
+    } catch (error) {
+      console.error("❌ [ECG] Failed to load previous ECG readings:", error);
+    }
+  }, [selectedDevice]); // Re-load when device changes
 
-        // Detect R-peaks in new samples for BPM calculation
+  // FIXED: Auto-save ECG result when it's set (copying BP pattern)
 
-        detectRPeak(processedSamples);
+  // REMOVED: ECG auto-save useEffect - will rebuild from scratch
 
+  // REMOVED: ECG result auto-save useEffect - will rebuild from scratch
 
+  // Ensure canvas sizing and compute pixels/sample for 6s viewport
 
-        // If recording, also add to recording buffer (longer timeline)
+  const ensureCanvas = () => {
+    const canvas = canvasRef.current;
 
-        if (isRecording) {
+    if (!canvas) return null as CanvasRenderingContext2D | null;
 
-            recordingBufferRef.current.push(...processedSamples);
+    const ctx = canvas.getContext("2d");
 
+    if (!ctx) return null;
 
+    // Read devicePixelRatio on mount and set backing store size
 
-            // Keep max 60 seconds of recording data
+    const dpr = window.devicePixelRatio || 1;
 
-            const maxRecordingAge = 60000; // 60 seconds
+    const cssW = canvas.clientWidth || 320;
 
-            const cutoffTime = now - maxRecordingAge;
+    const cssH = canvas.clientHeight || 300; // FIXED: Use actual container height
 
-            while (recordingBufferRef.current.length > 0 && recordingBufferRef.current[0].t < cutoffTime) {
+    if (canvas.width !== cssW * dpr || canvas.height !== cssH * dpr) {
+      canvas.style.width = cssW + "px";
 
-                recordingBufferRef.current.shift();
+      canvas.style.height = cssH + "px";
 
-            }
+      canvas.width = Math.floor(cssW * dpr);
 
+      canvas.height = Math.floor(cssH * dpr);
+
+      // Scale context to handle DPR properly
+
+      ctx.scale(dpr, dpr);
+
+      dprRef.current = dpr;
+
+      sizeRef.current = { W: canvas.width, H: canvas.height };
+
+      // Canvas is ready - grid will be drawn on next render
+    }
+
+    return ctx;
+  };
+
+  const drawGrid = (ctx: CanvasRenderingContext2D, W: number, H: number) => {
+    ctx.clearRect(0, 0, W, H);
+
+    // Grid aligned to timebase: vertical lines every 200ms, bold every 1 second
+
+    const timePerPixel = WINDOW_MS / W; // ms per pixel
+
+    const gridInterval200ms = Math.max(1, Math.floor(200 / timePerPixel)); // pixels per 200ms
+
+    const gridInterval1s = Math.max(1, Math.floor(1000 / timePerPixel)); // pixels per 1s
+
+    ctx.save();
+
+    // Draw faint horizontal grid lines (8-10 lines evenly across height)
+
+    const horizontalLines = 8;
+
+    const lineSpacing = H / horizontalLines;
+
+    ctx.strokeStyle = "rgba(255,255,255,0.05)";
+
+    ctx.lineWidth = 1;
+
+    for (let i = 0; i <= horizontalLines; i++) {
+      const y = Math.round(i * lineSpacing);
+
+      ctx.beginPath();
+
+      ctx.moveTo(0, y + 0.5);
+
+      ctx.lineTo(W, y + 0.5);
+
+      ctx.stroke();
+    }
+
+    // Draw vertical grid lines every 200ms
+
+    ctx.strokeStyle = "rgba(255,255,255,0.05)";
+
+    ctx.lineWidth = 1;
+
+    for (let x = 0; x <= W; x += gridInterval200ms) {
+      ctx.beginPath();
+
+      ctx.moveTo(x + 0.5, 0);
+
+      ctx.lineTo(x + 0.5, H);
+
+      ctx.stroke();
+    }
+
+    // Draw bold vertical grid lines every 1 second
+
+    ctx.strokeStyle = "rgba(255,255,255,0.1)";
+
+    ctx.lineWidth = 1.5;
+
+    for (let x = 0; x <= W; x += gridInterval1s) {
+      ctx.beginPath();
+
+      ctx.moveTo(x + 0.5, 0);
+
+      ctx.lineTo(x + 0.5, H);
+
+      ctx.stroke();
+    }
+
+    ctx.restore();
+  };
+
+  // NEW: Ring buffer with timestamps for fixed time window
+
+  const pushSamples = (
+    buffer: { t: number; v: number }[],
+    newSamples: number[],
+    packetTimestamp: number,
+    fs: number
+  ) => {
+    const now = Date.now();
+
+    const maxAge = WINDOW_MS * 1.2; // Keep 20% extra for smooth transitions
+
+    // Add new samples with proper timestamps
+
+    const processedSamples: { t: number; v: number }[] = [];
+
+    newSamples.forEach((sample, i) => {
+      const sampleTime = packetTimestamp + (i * 1000) / fs;
+
+      const baselineRemoved = removeBaseline(sample);
+
+      const processedSample = { t: sampleTime, v: baselineRemoved };
+
+      buffer.push(processedSample);
+
+      processedSamples.push(processedSample);
+    });
+
+    // Detect R-peaks in new samples for BPM calculation
+
+    detectRPeak(processedSamples);
+
+    // If recording, also add to recording buffer (longer timeline)
+
+    if (isRecording) {
+      recordingBufferRef.current.push(...processedSamples);
+
+      // Keep max 60 seconds of recording data
+
+      const maxRecordingAge = 60000; // 60 seconds
+
+      const cutoffTime = now - maxRecordingAge;
+
+      while (
+        recordingBufferRef.current.length > 0 &&
+        recordingBufferRef.current[0].t < cutoffTime
+      ) {
+        recordingBufferRef.current.shift();
+      }
+    }
+
+    // Prune old samples beyond time window
+
+    const cutoffTime = now - maxAge;
+
+    while (buffer.length > 0 && buffer[0].t < cutoffTime) {
+      buffer.shift();
+    }
+  };
+
+  // REMOVED: Old geometry helpers - using timestamp-based rendering now
+
+  // FIXED: Proper canvas viewport rendering using full dimensions
+
+  const renderFrame = (
+    ctx: CanvasRenderingContext2D,
+
+    W: number,
+
+    H: number,
+
+    buffer: { t: number; v: number }[]
+  ) => {
+    // CRITICAL FIX: Convert back to CSS coordinates since ctx is already DPR-scaled
+
+    const dpr = dprRef.current;
+
+    const cssW = W / dpr;
+
+    const cssH = H / dpr;
+
+    // Clear the entire canvas first
+
+    ctx.save();
+
+    ctx.clearRect(0, 0, cssW, cssH);
+
+    // Set clipping to canvas bounds (no rounding to use full space)
+
+    ctx.beginPath();
+
+    ctx.rect(0, 0, cssW, cssH);
+
+    ctx.clip();
+
+    // Draw grid using full canvas dimensions
+
+    drawGrid(ctx, cssW, cssH);
+
+    if (!buffer.length) {
+      ctx.restore();
+
+      return;
+    }
+
+    const now = Date.now();
+
+    const startT = now - WINDOW_MS;
+
+    // Filter samples within time window
+
+    const visibleSamples = buffer.filter(
+      (sample) => sample.t >= startT && sample.t <= now
+    );
+
+    if (visibleSamples.length === 0) {
+      ctx.restore();
+
+      return;
+    }
+
+    // Robust autoscaling from last 2 seconds to prevent clipping
+
+    const twoSecsAgo = now - 2000;
+
+    const recentSamples = buffer
+      .filter((sample) => sample.t >= twoSecsAgo)
+
+      .map((sample) => sample.v);
+
+    if (recentSamples.length === 0) {
+      ctx.restore();
+
+      return;
+    }
+
+    // Use percentiles for robust scaling
+
+    const sorted = [...recentSamples].sort((a, b) => a - b);
+
+    const p10 = sorted[Math.floor(sorted.length * 0.1)] || 0;
+
+    const p90 = sorted[Math.floor(sorted.length * 0.9)] || 0;
+
+    const mid = (p10 + p90) / 2;
+
+    const range = Math.max(1e-6, p90 - p10); // Avoid division by zero
+
+    const usable = cssH * 0.85;
+
+    // Setup ECG stroke
+
+    ctx.save();
+
+    ctx.strokeStyle = "#13E68A"; // Brand green
+
+    ctx.lineWidth = 2.5;
+
+    ctx.lineJoin = "round";
+
+    ctx.lineCap = "round";
+
+    ctx.shadowColor = "#13E68A";
+
+    ctx.shadowBlur = 1;
+
+    ctx.beginPath();
+
+    let firstPoint = true;
+
+    // Draw waveform with fixed time window mapping
+
+    for (const sample of visibleSamples) {
+      // Map time to X coordinate (fixed 4 second window) - FULL WIDTH
+
+      const x = ((sample.t - startT) / WINDOW_MS) * cssW;
+
+      // Map amplitude to Y coordinate with robust scaling - FULL HEIGHT
+
+      const y = cssH / 2 - ((sample.v - mid) / range) * (usable / 2);
+
+      // Bounds checking to prevent drawing outside canvas
+
+      if (x < 0 || x > cssW || y < 0 || y > cssH) continue;
+
+      if (firstPoint) {
+        ctx.moveTo(x, y);
+
+        firstPoint = false;
+      } else {
+        ctx.lineTo(x, y);
+      }
+    }
+
+    ctx.stroke();
+
+    ctx.restore();
+
+    ctx.restore(); // Restore clipping
+  };
+
+  // FIXED: Redraw using timestamp-based buffer
+
+  const drawRealtime = () => {
+    const ctx = ensureCanvas();
+
+    if (!ctx) return;
+
+    const { W, H } = sizeRef.current;
+
+    if (!W || !H) return;
+
+    renderFrame(ctx, W, H, ecgBufferRef.current);
+  };
+
+  // UI refresh loop to keep waveform and buffer display responsive between native packets
+
+  useEffect(() => {
+    let rafId: number;
+
+    let lastUpdate = 0;
+
+    const tick = (ts: number) => {
+      if (ts - lastUpdate > 33) {
+        // ~30 FPS refresh for smooth waveform
+
+        lastUpdate = ts;
+
+        if (ecgBufferRef.current.length) {
+          setBufferLen(ecgBufferRef.current.length);
+
+          // Redraw waveform on each frame for real-time updates
+
+          drawRealtime();
         }
+      }
 
-
-
-        // Prune old samples beyond time window
-
-        const cutoffTime = now - maxAge;
-
-        while (buffer.length > 0 && buffer[0].t < cutoffTime) {
-
-            buffer.shift();
-
-        }
-
+      rafId = requestAnimationFrame(tick);
     };
 
+    rafId = requestAnimationFrame(tick);
 
+    return () => cancelAnimationFrame(rafId);
 
-    // REMOVED: Old geometry helpers - using timestamp-based rendering now
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
+  // Handle window resize for responsive canvas
 
+  useEffect(() => {
+    const handleResize = () => {
+      const canvas = canvasRef.current;
 
-    // FIXED: Proper canvas viewport rendering using full dimensions
-
-    const renderFrame = (
-
-        ctx: CanvasRenderingContext2D,
-
-        W: number,
-
-        H: number,
-
-        buffer: { t: number, v: number }[]
-
-    ) => {
-
-        // CRITICAL FIX: Convert back to CSS coordinates since ctx is already DPR-scaled
-
-        const dpr = dprRef.current;
-
-        const cssW = W / dpr;
-
-        const cssH = H / dpr;
-
-
-
-        // Clear the entire canvas first
-
-        ctx.save();
-
-        ctx.clearRect(0, 0, cssW, cssH);
-
-
-
-        // Set clipping to canvas bounds (no rounding to use full space)
-
-        ctx.beginPath();
-
-        ctx.rect(0, 0, cssW, cssH);
-
-        ctx.clip();
-
-
-
-        // Draw grid using full canvas dimensions
-
-        drawGrid(ctx, cssW, cssH);
-
-
-
-        if (!buffer.length) {
-
-            ctx.restore();
-
-            return;
-
-        }
-
-
-
-        const now = Date.now();
-
-        const startT = now - WINDOW_MS;
-
-
-
-        // Filter samples within time window
-
-        const visibleSamples = buffer.filter(sample => sample.t >= startT && sample.t <= now);
-
-
-
-        if (visibleSamples.length === 0) {
-
-            ctx.restore();
-
-            return;
-
-        }
-
-
-
-        // Robust autoscaling from last 2 seconds to prevent clipping
-
-        const twoSecsAgo = now - 2000;
-
-        const recentSamples = buffer.filter(sample => sample.t >= twoSecsAgo)
-
-            .map(sample => sample.v);
-
-
-
-        if (recentSamples.length === 0) {
-
-            ctx.restore();
-
-            return;
-
-        }
-
-
-
-        // Use percentiles for robust scaling
-
-        const sorted = [...recentSamples].sort((a, b) => a - b);
-
-        const p10 = sorted[Math.floor(sorted.length * 0.1)] || 0;
-
-        const p90 = sorted[Math.floor(sorted.length * 0.9)] || 0;
-
-        const mid = (p10 + p90) / 2;
-
-        const range = Math.max(1e-6, p90 - p10); // Avoid division by zero
-
-        const usable = cssH * 0.85;
-
-
-
-        // Setup ECG stroke
-
-        ctx.save();
-
-        ctx.strokeStyle = '#13E68A'; // Brand green
-
-        ctx.lineWidth = 2.5;
-
-        ctx.lineJoin = 'round';
-
-        ctx.lineCap = 'round';
-
-        ctx.shadowColor = '#13E68A';
-
-        ctx.shadowBlur = 1;
-
-
-
-        ctx.beginPath();
-
-        let firstPoint = true;
-
-
-
-        // Draw waveform with fixed time window mapping
-
-        for (const sample of visibleSamples) {
-
-            // Map time to X coordinate (fixed 4 second window) - FULL WIDTH
-
-            const x = ((sample.t - startT) / WINDOW_MS) * cssW;
-
-
-
-            // Map amplitude to Y coordinate with robust scaling - FULL HEIGHT
-
-            const y = cssH / 2 - ((sample.v - mid) / range) * (usable / 2);
-
-
-
-            // Bounds checking to prevent drawing outside canvas
-
-            if (x < 0 || x > cssW || y < 0 || y > cssH) continue;
-
-
-
-            if (firstPoint) {
-
-                ctx.moveTo(x, y);
-
-                firstPoint = false;
-
-            } else {
-
-                ctx.lineTo(x, y);
-
-            }
-
-        }
-
-
-
-        ctx.stroke();
-
-        ctx.restore();
-
-        ctx.restore(); // Restore clipping
-
-    };
-
-
-
-    // FIXED: Redraw using timestamp-based buffer
-
-    const drawRealtime = () => {
+      if (canvas) {
+        // Force canvas recreation on resize
 
         const ctx = ensureCanvas();
 
-        if (!ctx) return;
-
-        const { W, H } = sizeRef.current;
-
-        if (!W || !H) return;
-
-        renderFrame(ctx, W, H, ecgBufferRef.current);
-
+        if (ctx) {
+          drawRealtime();
+        }
+      }
     };
 
+    window.addEventListener("resize", handleResize);
 
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
-    // UI refresh loop to keep waveform and buffer display responsive between native packets
+  // Enhanced debug panel with heart rate comparison
 
-    useEffect(() => {
-
-        let rafId: number;
-
-        let lastUpdate = 0;
-
-        const tick = (ts: number) => {
-
-            if (ts - lastUpdate > 33) { // ~30 FPS refresh for smooth waveform
-
-                lastUpdate = ts;
-
-                if (ecgBufferRef.current.length) {
-
-                    setBufferLen(ecgBufferRef.current.length);
-
-                    // Redraw waveform on each frame for real-time updates
-
-                    drawRealtime();
-
-                }
-
-            }
-
-            rafId = requestAnimationFrame(tick);
-
-        };
-
-        rafId = requestAnimationFrame(tick);
-
-        return () => cancelAnimationFrame(rafId);
-
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-
-    }, []);
-
-
-
-    // Handle window resize for responsive canvas
-
-    useEffect(() => {
-
-        const handleResize = () => {
-
-            const canvas = canvasRef.current;
-
-            if (canvas) {
-
-                // Force canvas recreation on resize
-
-                const ctx = ensureCanvas();
-
-                if (ctx) {
-
-                    drawRealtime();
-
-                }
-
-            }
-
-        };
-
-
-
-        window.addEventListener('resize', handleResize);
-
-        return () => window.removeEventListener('resize', handleResize);
-
-    }, []);
-
-
-
-    // Enhanced debug panel with heart rate comparison
-
-    const DebugPanel = () => {
-
-        const deviceAge = Date.now() - lastDeviceHeartRateTime;
-
-        return (
-
-            <div className="mt-2 text-xs text-gray-400 space-y-1">
-
-                <div className="grid grid-cols-4 gap-2">
-
-                    <div>Buffer: {bufferLen} pts</div>
-
-                    <div>Status: {isMonitoring ? 'active' : 'listening'}</div>
-
-                    <div>RT msgs: {rtCount}</div>
-
-                    <div>ECG evts: {ecgEvtCount}</div>
-
-                </div>
-
-                <div className="grid grid-cols-3 gap-2 pt-1 border-t border-gray-600">
-
-                    <div className="text-green-400">Device HR: {deviceBpm} BPM</div>
-
-                    <div className="text-blue-400">Calc HR: {lastBpmRef.current} BPM</div>
-
-                    <div className="text-yellow-400">R-Peaks: {rPeakTimesRef.current.length}</div>
-
-                </div>
-
-                <div className="text-xs text-gray-500">
-
-                    Device age: {Math.round(deviceAge / 1000)}s | Recording: {isRecording ? '🔴' : '⚪'}
-
-                </div>
-
-            </div>
-
-        );
-
-    };
-
-
-
-    // NEW: Start/Stop ECG Recording
-
-    const toggleRecording = () => {
-
-        if (isRecording) {
-
-            setIsRecording(false);
-
-            toast({
-
-                title: 'Recording Stopped 🛑',
-
-                description: `Recorded ${recordingBufferRef.current.length} samples over ${Math.round((Date.now() - recordingStartTimeRef.current) / 1000)}s`,
-
-                duration: 2000,
-
-            });
-
-        } else {
-
-            setIsRecording(true);
-
-            recordingStartTimeRef.current = Date.now();
-
-            recordingBufferRef.current = [...ecgBufferRef.current]; // Start with current buffer
-
-            toast({
-
-                title: 'Recording Started 🔴',
-
-                description: 'Capturing ECG waveform for download',
-
-                duration: 2000,
-
-            });
-
-        }
-
-    };
-
-
-
-    // FIXED: Get the best heart rate (prioritize device over calculated)
-
-    const getBestHeartRate = () => {
-
-        const now = Date.now();
-
-        const deviceHeartRateAge = now - lastDeviceHeartRateTime;
-
-
-
-        // Debug logging
-
-        console.log('📋 getBestHeartRate:', {
-
-            deviceBpm: deviceBpm,
-
-            deviceAge: deviceHeartRateAge,
-
-            calcBpm: lastBpmRef.current,
-
-            rhythmBpm: currentRhythm?.heartRate
-
-        });
-
-
-
-        // PRIORITY 1: Use device heart rate if available and recent (within 30 seconds)
-
-        if (deviceBpm > 0 && deviceHeartRateAge < 30000) {
-
-            console.log('💚 Using device heart rate:', deviceBpm);
-
-            return deviceBpm;
-
-        }
-
-
-
-        // PRIORITY 2: Use current rhythm heart rate
-
-        if (currentRhythm?.heartRate && currentRhythm.heartRate > 0) {
-
-            console.log('📊 Using rhythm heart rate:', currentRhythm.heartRate);
-
-            return currentRhythm.heartRate;
-
-        }
-
-
-
-        // PRIORITY 3: Fallback to calculated heart rate
-
-        if (lastBpmRef.current > 0) {
-
-            console.log('🤖 Using calculated heart rate:', lastBpmRef.current);
-
-            return lastBpmRef.current;
-
-        }
-
-
-
-        console.log('⚠️ No heart rate available');
-
-        return 0;
-
-    };
-
-
-
-    // NEW: Fetch stored device data to compare with real-time data
-
-    const fetchStoredDeviceData = async () => {
-
-        if (!selectedDevice) {
-
-            toast({
-
-                title: 'No Device Selected',
-
-                description: 'Please connect a device first.',
-
-                variant: 'destructive',
-
-            });
-
-            return;
-
-        }
-
-
-
-        try {
-
-            console.log('🔍 Fetching stored device data for comparison...');
-
-
-
-            // Get list of stored files
-
-            const storedFiles = await wellueSDK.getStoredFiles(selectedDevice);
-
-            console.log('📁 Stored files:', storedFiles);
-
-
-
-            if (storedFiles.length === 0) {
-
-                toast({
-
-                    title: 'No Stored Data',
-
-                    description: 'Device has no stored ECG measurements.',
-
-                    variant: 'default',
-
-                });
-
-                return;
-
-            }
-
-
-
-            // Find the most recent ECG file
-
-            const ecgFiles = storedFiles.filter(file =>
-
-                file.fileName?.includes('ECG') ||
-
-                file.fileName?.includes('ecg') ||
-
-                file.fileType === 2 // Assuming 2 is ECG file type
-
-            );
-
-
-
-            if (ecgFiles.length === 0) {
-
-                toast({
-
-                    title: 'No ECG Files',
-
-                    description: 'No stored ECG measurements found.',
-
-                    variant: 'default',
-
-                });
-
-                return;
-
-            }
-
-
-
-            // Get the most recent file
-
-            const latestFile = ecgFiles[ecgFiles.length - 1];
-
-            console.log('📄 Latest ECG file:', latestFile);
-
-
-
-            // Read the file content
-
-            const fileContent = await wellueSDK.readStoredFile(selectedDevice, latestFile.fileName);
-
-            console.log('📖 File content:', fileContent);
-
-
-
-            // Extract the final heart rate from stored data
-
-            let storedHeartRate = 0;
-
-            let storedData = null;
-
-
-
-            if (fileContent.fileContent) {
-
-                try {
-
-                    // Parse the file content to extract heart rate
-
-                    const content = fileContent.fileContent;
-
-                    console.log('🔍 Analyzing stored file content for heart rate...');
-
-
-
-                    // Look for heart rate patterns in the content
-
-                    const hrMatch = content.match(/heart[_-]?rate[:\s]*(\d+)/i) ||
-
-                        content.match(/hr[:\s]*(\d+)/i) ||
-
-                        content.match(/bpm[:\s]*(\d+)/i) ||
-
-                        content.match(/(\d+)\s*bpm/i);
-
-
-
-                    if (hrMatch) {
-
-                        storedHeartRate = parseInt(hrMatch[1]);
-
-                        console.log('💚 Found stored heart rate:', storedHeartRate, 'BPM');
-
-                    }
-
-
-
-                    // Also look for any numeric values that could be heart rate
-
-                    const numbers = content.match(/\b(\d{2,3})\b/g);
-
-                    if (numbers && numbers.length > 0) {
-
-                        const possibleHR = numbers.map(n => parseInt(n)).filter(n => n >= 40 && n <= 200);
-
-                        if (possibleHR.length > 0) {
-
-                            storedHeartRate = possibleHR[0]; // Take first reasonable value
-
-                            console.log('💚 Inferred stored heart rate:', storedHeartRate, 'BPM');
-
-                        }
-
-                    }
-
-
-
-                    // Store the raw content for analysis
-
-                    storedData = {
-
-                        fileName: latestFile.fileName,
-
-                        fileType: fileContent.fileType,
-
-                        content: content,
-
-                        timestamp: new Date().toISOString()
-
-                    };
-
-
-
-                } catch (parseError) {
-
-                    console.error('❌ Failed to parse stored file content:', parseError);
-
-                }
-
-            }
-
-
-
-            // Compare stored vs real-time data
-
-            const realTimeHR = getBestHeartRate();
-
-            const deviceHR = deviceBpm;
-
-            const calculatedHR = lastBpmRef.current;
-
-
-
-            console.log('📊 HEART RATE COMPARISON:', {
-
-                storedDeviceHR: storedHeartRate,
-
-                realTimeHR: realTimeHR,
-
-                deviceHR: deviceHR,
-
-                calculatedHR: calculatedHR,
-
-                currentRhythmHR: currentRhythm?.heartRate
-
-            });
-
-
-
-            // Save the stored data to phone for analysis
-
-            if (storedData) {
-
-                try {
-
-                    const { Filesystem, Directory } = await import('@capacitor/filesystem');
-
-
-
-                    // Save raw device data
-
-                    const deviceDataPath = `device_stored_data_${Date.now()}.json`;
-
-                    await Filesystem.writeFile({
-
-                        path: deviceDataPath,
-
-                        data: JSON.stringify(storedData, null, 2),
-
-                        directory: Directory.Documents
-
-                    });
-
-
-
-                    // Save comparison analysis
-
-                    const comparisonData = {
-
-                        timestamp: new Date().toISOString(),
-
-                        deviceId: selectedDevice,
-
-                        comparison: {
-
-                            storedDeviceHR: storedHeartRate,
-
-                            realTimeHR: realTimeHR,
-
-                            deviceHR: deviceHR,
-
-                            calculatedHR: calculatedHR,
-
-                            currentRhythmHR: currentRhythm?.heartRate
-
-                        },
-
-                        realTimeData: {
-
-                            ecgBufferLength: ecgBufferRef.current.length,
-
-                            recordingBufferLength: recordingBufferRef.current.length,
-
-                            lastBpm: lastBpmRef.current,
-
-                            deviceBpm: deviceBpm,
-
-                            isRecording: isRecording,
-
-                            isMonitoring: isMonitoring
-
-                        },
-
-                        analysis: {
-
-                            hasDiscrepancy: Math.abs(storedHeartRate - realTimeHR) > 5,
-
-                            discrepancyAmount: Math.abs(storedHeartRate - realTimeHR),
-
-                            dataQuality: {
-
-                                storedDataAvailable: storedHeartRate > 0,
-
-                                realTimeDataAvailable: realTimeHR > 0,
-
-                                deviceDataAvailable: deviceHR > 0
-
-                            }
-
-                        }
-
-                    };
-
-
-
-                    const comparisonPath = `ecg_comparison_analysis_${Date.now()}.json`;
-
-                    await Filesystem.writeFile({
-
-                        path: comparisonPath,
-
-                        data: JSON.stringify(comparisonData, null, 2),
-
-                        directory: Directory.Documents
-
-                    });
-
-
-
-                    console.log('💾 Saved device data and comparison analysis to phone');
-
-                    console.log('📁 Device data saved to:', deviceDataPath);
-
-                    console.log('📁 Comparison analysis saved to:', comparisonPath);
-
-
-
-                    // Show success toast with file paths
-
-                    toast({
-
-                        title: 'Data Saved Successfully 💾',
-
-                        description: `Device data and analysis saved to Documents folder`,
-
-                        variant: 'default',
-
-                    });
-
-
-
-                } catch (saveError) {
-
-                    console.error('❌ Failed to save data to phone:', saveError);
-
-                    toast({
-
-                        title: 'Failed to Save Data',
-
-                        description: 'Could not save device data to phone storage.',
-
-                        variant: 'destructive',
-
-                    });
-
-                }
-
-            }
-
-
-
-            // Show comparison toast
-
-            if (storedHeartRate > 0) {
-
-                toast({
-
-                    title: 'Device Data Comparison 📊',
-
-                    description: `Stored: ${storedHeartRate} BPM | Real-time: ${realTimeHR} BPM | Device: ${deviceHR} BPM`,
-
-                    variant: 'default',
-
-                });
-
-
-
-                // If there's a significant discrepancy, log it
-
-                if (Math.abs(storedHeartRate - realTimeHR) > 5) {
-
-                    console.warn('⚠️ HEART RATE DISCREPANCY DETECTED:', {
-
-                        stored: storedHeartRate,
-
-                        realTime: realTimeHR,
-
-                        difference: Math.abs(storedHeartRate - realTimeHR)
-
-                    });
-
-
-
-                    // Additional analysis for discrepancy
-
-                    console.log('🔍 DISCREPANCY ANALYSIS:', {
-
-                        possibleCauses: [
-
-                            'Real-time data not updating properly',
-
-                            'Device data not being captured correctly',
-
-                            'Timing issues between device and app',
-
-                            'Data processing errors in app'
-
-                        ],
-
-                        recommendations: [
-
-                            'Check if deviceBpm state is updating',
-
-                            'Verify onECGData callback is working',
-
-                            'Check if onECGLifecycle stop event is captured',
-
-                            'Compare stored vs real-time data structure'
-
-                        ]
-
-                    });
-
-                }
-
-            }
-
-
-
-        } catch (error) {
-
-            console.error('❌ Failed to fetch stored device data:', error);
-
-            toast({
-
-                title: 'Failed to Fetch Stored Data',
-
-                description: 'Could not retrieve device stored measurements.',
-
-                variant: 'destructive',
-
-            });
-
-        }
-
-    };
-
-
-
-    // NEW: Download ECG waveform as JPEG image
-
-    const downloadCurrentECG = async () => {
-
-        try {
-
-            // Request storage permissions properly
-
-            try {
-
-                const perms = await (Filesystem as any).requestPermissions?.();
-
-                console.log('📁 Storage permissions:', perms);
-
-            } catch (permError) {
-
-                console.warn('📁 Permission request failed:', permError);
-
-            }
-
-
-
-            const canvas = canvasRef.current;
-
-            if (!canvas) {
-
-                toast({
-
-                    title: 'No ECG Data',
-
-                    description: 'No waveform to capture. Start ECG monitoring first.',
-
-                    variant: 'destructive',
-
-                });
-
-                return;
-
-            }
-
-
-
-            // Create a high-quality capture canvas with device info
-
-            const captureCanvas = document.createElement('canvas');
-
-            const ctx = captureCanvas.getContext('2d');
-
-            if (!ctx) return;
-
-
-
-            // Set high resolution for quality image
-
-            const scale = 2; // 2x resolution for crisp image
-
-            captureCanvas.width = canvas.width * scale;
-
-            captureCanvas.height = (canvas.height + 120) * scale; // Extra space for header
-
-
-
-            // Scale context for high DPI
-
-            ctx.scale(scale, scale);
-
-
-
-            // Fill background
-
-            ctx.fillStyle = '#0f172a'; // Dark background like the app
-
-            ctx.fillRect(0, 0, captureCanvas.width / scale, captureCanvas.height / scale);
-
-
-
-            // Add header with device info and timestamp
-
-            ctx.fillStyle = '#ffffff';
-
-            ctx.font = 'bold 16px Arial';
-
-            ctx.textAlign = 'left';
-
-            ctx.fillText(`ECG Recording - ${selectedDevice || 'BP2 Device'}`, 20, 30);
-
-
-
-            ctx.font = '14px Arial';
-
-            ctx.fillStyle = '#94a3b8';
-
-            ctx.fillText(`Recorded: ${new Date().toLocaleString()}`, 20, 50);
-
-            ctx.fillText(`Heart Rate: ${getBestHeartRate()} BPM (Device: ${deviceBpm}, Calc: ${lastBpmRef.current})`, 20, 70);
-
-            const samplesCount = recordingBufferRef.current.length > 0 ? recordingBufferRef.current.length : ecgBufferRef.current.length;
-
-            const recordingTime = isRecording ? Math.round((Date.now() - recordingStartTimeRef.current) / 1000) : 0;
-
-            ctx.fillText(`Sample Rate: ${fsRef.current}Hz | Samples: ${samplesCount} ${recordingTime > 0 ? `| Recording: ${recordingTime}s` : ''}`, 20, 90);
-
-
-
-            // Decide whether to draw live view or recorded timeline
-
-            const dataToRender = recordingBufferRef.current.length > ecgBufferRef.current.length
-
-                ? recordingBufferRef.current
-
-                : ecgBufferRef.current;
-
-
-
-            if (dataToRender.length > 0) {
-
-                // Create a temporary canvas for the ECG strip
-
-                const tempCanvas = document.createElement('canvas');
-
-                const tempCtx = tempCanvas.getContext('2d');
-
-                if (tempCtx) {
-
-                    tempCanvas.width = canvas.width;
-
-                    tempCanvas.height = canvas.height;
-
-
-
-                    // Render the ECG data to temp canvas
-
-                    renderFrame(tempCtx, tempCanvas.width, tempCanvas.height, dataToRender);
-
-
-
-                    // Draw the temp canvas to capture canvas
-
-                    ctx.drawImage(tempCanvas, 0, 110, canvas.width / dprRef.current, canvas.height / dprRef.current);
-
-                }
-
-            } else {
-
-                // Draw the live canvas if no recorded data
-
-                ctx.drawImage(canvas, 0, 110, canvas.width / dprRef.current, canvas.height / dprRef.current);
-
-            }
-
-
-
-            // Add footer
-
-            ctx.fillStyle = '#64748b';
-
-            ctx.font = '12px Arial';
-
-            ctx.textAlign = 'right';
-
-            ctx.fillText('Vital Sign Monitor - ECG Lead II', captureCanvas.width / scale - 20, captureCanvas.height / scale - 10);
-
-
-
-            // Convert to JPEG blob
-
-            const dataURL = captureCanvas.toDataURL('image/jpeg', 0.9); // High quality JPEG
-
-            const base64Data = dataURL.split(',')[1];
-
-
-
-            const now = Date.now();
-
-            const fileName = `ECG_Recording_${now}.jpg`;
-
-
-
-            // FIXED: Use browser download as fallback
-
-            let saveSuccess = false;
-
-            let savedLocation = '';
-
-
-
-            // Try native file save first
-
-            if (Capacitor.isNativePlatform()) {
-
-                try {
-
-                    await Filesystem.writeFile({
-
-                        path: fileName,
-
-                        data: base64Data,
-
-                        directory: Directory.Documents,
-
-                    });
-
-                    saveSuccess = true;
-
-                    savedLocation = 'Documents folder';
-
-                    console.log('📁 Native save to Documents:', fileName);
-
-                } catch (nativeError) {
-
-                    console.warn('📁 Native save failed:', nativeError);
-
-                }
-
-            }
-
-
-
-            // Fallback to browser download (works on all platforms)
-
-            if (!saveSuccess) {
-
-                try {
-
-                    const blob = await fetch(`data:image/jpeg;base64,${base64Data}`).then(r => r.blob());
-
-                    const url = URL.createObjectURL(blob);
-
-                    const a = document.createElement('a');
-
-                    a.href = url;
-
-                    a.download = fileName;
-
-                    document.body.appendChild(a);
-
-                    a.click();
-
-                    document.body.removeChild(a);
-
-                    URL.revokeObjectURL(url);
-
-                    saveSuccess = true;
-
-                    savedLocation = 'Downloads folder';
-
-                    console.log('📁 Browser download triggered:', fileName);
-
-                } catch (browserError) {
-
-                    console.error('📁 Browser download failed:', browserError);
-
-                }
-
-            }
-
-
-
-            if (!saveSuccess) {
-
-                throw new Error('Could not save file using any method');
-
-            }
-
-
-
-            console.log('📸 ECG chart image saved:', fileName);
-
-
-
-            toast({
-
-                title: 'ECG Chart Downloaded! 📸',
-
-                description: `Saved ${fileName} to ${savedLocation}`,
-
-                duration: 3000,
-
-            });
-
-
-
-            // Also trigger share if possible
-
-            try {
-
-                await Share.share({
-
-                    title: 'ECG Recording',
-
-                    text: `ECG Recording from ${new Date().toLocaleString()}`,
-
-                    url: dataURL,
-
-                    dialogTitle: 'Share ECG Chart'
-
-                });
-
-            } catch (shareError) {
-
-                console.log('Share not available:', shareError);
-
-            }
-
-
-
-        } catch (error) {
-
-            console.error('❌ Failed to capture ECG chart:', error);
-
-            toast({
-
-                title: 'Download Failed',
-
-                description: 'Could not capture ECG chart: ' + error.message,
-
-                variant: 'destructive',
-
-            });
-
-        }
-
-    };
-
-
-
-    // Export latest live + device ECG JSONs to external Downloads for A/B
-
-    const exportABToDownloads = async () => {
-
-        try {
-
-            // Ask for storage permissions (Android scoped storage)
-
-            try { await (Filesystem as any).requestPermissions?.(); } catch { }
-
-            toast({ title: 'Exporting…', description: 'Preparing live and device JSON files', duration: 1500 });
-
-            let deviceShareUrl: string | null = null;
-
-            let liveShareUrl: string | null = null;
-
-
-
-            // Helper: ensure we always have a sharable URI. If getUri fails, write a copy to Cache and retry
-
-            const ensureSharableUri = async (path: string, directory: Directory, dataText?: string) => {
-
-                try {
-
-                    const uri = await Filesystem.getUri({ path, directory });
-
-                    const u = (uri as any)?.uri || (uri as any);
-
-                    if (u) return String(u);
-
-                } catch { }
-
-                if (dataText) {
-
-                    try {
-
-                        const cacheName = path.split('/').pop() || `share_${Date.now()}.json`;
-
-                        await Filesystem.writeFile({ path: cacheName, data: dataText, directory: Directory.Cache, encoding: Encoding.UTF8 });
-
-                        const uri2 = await Filesystem.getUri({ path: cacheName, directory: Directory.Cache });
-
-                        const u2 = (uri2 as any)?.uri || (uri2 as any);
-
-                        if (u2) return String(u2);
-
-                    } catch { }
-
-                }
-
-                return null;
-
-            };
-
-            // Helpers for decoding and extracting ECG from stored file
-
-            const decodeBase64ToBytes = (b64: string): Uint8Array => {
-
-                try {
-
-                    const bin = atob(b64);
-
-                    const out = new Uint8Array(bin.length);
-
-                    for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
-
-                    return out;
-
-                } catch {
-
-                    return new Uint8Array();
-
-                }
-
-            };
-
-            const readLE16 = (bytes: Uint8Array, pos: number) => bytes[pos] | (bytes[pos + 1] << 8);
-
-            const findEcgDataOffset = (bytes: Uint8Array): number => {
-
-                let bestOffset = 0, bestVar = -1;
-
-                const maxLook = Math.min(256, bytes.length - 512);
-
-                for (let off = 0; off <= maxLook; off += 2) {
-
-                    let mean = 0, m2 = 0, count = 0;
-
-                    for (let i = off; i < off + 512; i += 2) {
-
-                        const v = readLE16(bytes, i);
-
-                        count++;
-
-                        const d = v - mean; mean += d / count; m2 += d * (v - mean);
-
-                    }
-
-                    const variance = count > 1 ? m2 / (count - 1) : 0;
-
-                    if (variance > bestVar) { bestVar = variance; bestOffset = off; }
-
-                }
-
-                return bestOffset;
-
-            };
-
-            const int16ToBase64LE = (arr: Int16Array): string => {
-
-                const u8 = new Uint8Array(arr.length * 2);
-
-                for (let i = 0; i < arr.length; i++) {
-
-                    const v = arr[i];
-
-                    u8[2 * i] = v & 0xFF;
-
-                    u8[2 * i + 1] = (v >> 8) & 0xFF;
-
-                }
-
-                let s = '';
-
-                for (let i = 0; i < u8.length; i++) s += String.fromCharCode(u8[i]);
-
-                try { return btoa(s); } catch {
-
-                    const chunk = 8192; let out = '';
-
-                    for (let i = 0; i < s.length; i += chunk) out += btoa(s.slice(i, i + chunk));
-
-                    return out;
-
-                }
-
-            };
-
-            // 1) Device record → build JSON → write to Downloads
-
-            let deviceOutName: string | null = null;
-
-            try {
-
-                const devId = selectedDevice || devices[0]?.id;
-
-                if (devId) {
-
-                    const files = await wellueSDK.getStoredFiles(devId);
-
-                    const last = (files || []).at(-1)?.fileName || (files || []).at(-1) as any;
-
-                    if (last) {
-
-                        const res: any = await wellueSDK.readStoredFile(devId, String(last));
-
-                        let waveformCounts: number[] = Array.isArray(res?.waveformCounts) ? res.waveformCounts : [];
-
-                        let savedBinBase64: string | null = null;
-
-                        let sr: number = Number(res?.sampleRate) || 125;
-
-                        let durSec: number = Number(res?.recordingTimeSec || res?.measureTimeSec) || 30;
-
-                        const expected = Math.max(1, Math.round(sr * durSec));
-
-                        if ((!waveformCounts || waveformCounts.length === 0) && typeof (res as any)?.fileContent === 'string') {
-
-                            try {
-
-                                const bytes = decodeBase64ToBytes((res as any).fileContent as string);
-
-                                let off = findEcgDataOffset(bytes);
-
-                                const availSamples = Math.floor((bytes.length - off) / 2);
-
-                                const take = Math.min(expected, availSamples);
-
-                                const arr = new Int16Array(take);
-
-                                for (let i = 0; i < take; i++) arr[i] = readLE16(bytes, off + i * 2);
-
-                                // Use raw counts directly; extractor may remove control words, but stored files should be clean
-
-                                waveformCounts = Array.from(arr);
-
-                                // Save a .bin alongside
-
-                                savedBinBase64 = int16ToBase64LE(arr);
-
-                            } catch (e) { console.warn('decode stored file failed', e); }
-
-                        }
-
-                        const payload = {
-
-                            measurement_id: String(last),
-
-                            start_time: new Date().toISOString(),
-
-                            duration_ms: ((res?.recordingTimeSec ?? res?.measureTimeSec ?? 30) * 1000),
-
-                            sample_rate_hz: (sr || 125),
-
-                            mv_per_count: (res?.mvPerCount ?? 0.003098),
-
-                            waveform_counts: waveformCounts || [],
-
-                        };
-
-                        deviceOutName = `Documents/bp2_device_${Date.now()}.json`;
-
-                        await Filesystem.writeFile({
-
-                            path: deviceOutName,
-
-                            data: JSON.stringify(payload),
-
-                            directory: Directory.ExternalStorage,
-
-                            encoding: Encoding.UTF8,
-
-                        });
-
-                        // If we have binary waveform, write .bin and a sidecar JSON
-
-                        if (savedBinBase64) {
-
-                            const base = `Documents/bp2_device_${Date.now()}`;
-
-                            const binName = `${base}.bin`;
-
-                            const metaName = `${base}.meta.json`;
-
-                            try {
-
-                                await Filesystem.writeFile({ path: binName, data: savedBinBase64, directory: Directory.ExternalStorage, encoding: 'base64' as any });
-
-                                await Filesystem.writeFile({
-                                    path: metaName, data: JSON.stringify({
-
-                                        measurement_id: payload.measurement_id,
-
-                                        sample_rate_hz: payload.sample_rate_hz,
-
-                                        mv_per_count: payload.mv_per_count,
-
-                                        duration_ms: payload.duration_ms,
-
-                                        format: 'int16le',
-
-                                        samples: waveformCounts.length,
-
-                                    }), directory: Directory.ExternalStorage, encoding: Encoding.UTF8
-                                });
-
-                                console.log('[A/B] device BIN saved', binName, 'with sidecar', metaName);
-
-                            } catch (e) { console.warn('failed writing bin/meta', e); }
-
-                        }
-
-                        // Also save an internal copy for adb run-as retrieval
-
-                        try {
-
-                            const internalName = `bp2_device_${Date.now()}_app.json`;
-
-                            await Filesystem.writeFile({ path: internalName, data: JSON.stringify(payload), directory: Directory.Documents, encoding: Encoding.UTF8 });
-
-                            console.log('[A/B] device JSON internal copy', internalName);
-
-                        } catch { }
-
-                        deviceShareUrl = await ensureSharableUri(deviceOutName, Directory.ExternalStorage, JSON.stringify(payload));
-
-                        console.log('[A/B] device JSON saved', deviceShareUrl);
-
-                    }
-
-                }
-
-            } catch (e) {
-
-                console.warn('device export failed', e);
-
-            }
-
-            // 2) Live record: prefer in-memory capture of latest run; otherwise copy latest saved live JSON from Documents
-
-            let liveOutName: string | null = null;
-
-            try {
-
-                if (captureCountsRef.current.length > 0 && captureStartedAtRef.current) {
-
-                    const fsHz = fsRef.current || 125;
-
-                    const counts = captureCountsRef.current.slice();
-
-                    const payload = {
-
-                        measurement_id: `live_${Date.now()}`,
-
-                        start_time: captureStartedAtRef.current,
-
-                        duration_ms: Math.round((counts.length / Math.max(1, fsHz)) * 1000),
-
-                        sample_rate_hz: fsHz,
-
-                        mv_per_count: lastMvPerCountRef.current || 0.003098,
-
-                        waveform_counts: counts,
-
-                    };
-
-                    liveOutName = `Documents/bp2_live_${Date.now()}.json`;
-
-                    await Filesystem.writeFile({
-
-                        path: liveOutName,
-
-                        data: JSON.stringify(payload),
-
-                        directory: Directory.ExternalStorage,
-
-                        encoding: Encoding.UTF8,
-
-                    });
-
-                    // Also save an internal copy for adb run-as retrieval
-
-                    try {
-
-                        const internalName = `bp2_live_${Date.now()}_app.json`;
-
-                        await Filesystem.writeFile({ path: internalName, data: JSON.stringify(payload), directory: Directory.Documents, encoding: Encoding.UTF8 });
-
-                        console.log('[A/B] live JSON internal copy', internalName);
-
-                    } catch { }
-
-                    liveShareUrl = await ensureSharableUri(liveOutName, Directory.ExternalStorage, JSON.stringify(payload));
-
-                    console.log('[A/B] live JSON saved', liveShareUrl);
-
-                } else {
-
-                    // Try to copy the last saved live JSON from Documents to Downloads
-
-                    try {
-
-                        const entries: any = await Filesystem.readdir({ path: '', directory: Directory.Documents });
-
-                        const names: string[] = (entries?.files || entries || []).map((x: any) => x.name || x).filter((n: string) => typeof n === 'string');
-
-                        const liveNames = names.filter((n: string) => n.startsWith('bp2_live_') && n.endsWith('.json')).sort();
-
-                        const lastLive = liveNames.at(-1);
-
-                        if (lastLive) {
-
-                            const data = await Filesystem.readFile({ path: lastLive, directory: Directory.Documents, encoding: Encoding.UTF8 });
-
-                            const txt = (data as any)?.data || (data as any);
-
-                            liveOutName = `Documents/${lastLive}`;
-
-                            await Filesystem.writeFile({ path: liveOutName, data: txt, directory: Directory.ExternalStorage, encoding: Encoding.UTF8 });
-
-                            liveShareUrl = await ensureSharableUri(liveOutName, Directory.ExternalStorage, txt as string);
-
-                            console.log('[A/B] copied live JSON saved', liveShareUrl);
-
-                        }
-
-                    } catch (e) { /* ignore */ }
-
-                }
-
-            } catch (e) {
-
-                console.warn('live export failed', e);
-
-            }
-
-            const msg = `Exported${deviceOutName ? ' device→' + deviceOutName : ''}${liveOutName ? ' live→' + liveOutName : ''}`;
-
-            toast({ title: (deviceOutName || liveOutName) ? 'Export successful' : 'Nothing exported', description: msg || 'Run a 30 s ECG first, then export again.' });
-
-            console.log('[ECGMonitor] A/B export', { deviceOutName, liveOutName });
-
-
-
-            // Share chooser on Android with the file URI(s)
-
-            try {
-
-                if (deviceShareUrl || liveShareUrl) {
-
-                    toast({ title: 'Opening share…', description: 'Select an app to send the JSON(s)' });
-
-                }
-
-                if (deviceShareUrl) {
-
-                    await Share.share({ title: 'ECG Device JSON', url: deviceShareUrl, dialogTitle: 'Share device JSON' });
-
-                }
-
-                if (liveShareUrl) {
-
-                    await Share.share({ title: 'ECG Live JSON', url: liveShareUrl, dialogTitle: 'Share live JSON' });
-
-                }
-
-            } catch (e) {
-
-                console.warn('share failed', e);
-
-            }
-
-        } catch (e) {
-
-            console.error('exportABToDownloads error', e);
-
-            toast({ title: 'Export failed', description: String(e), variant: 'destructive' });
-
-        }
-
-    };
-
-
-
-    // NEW: Fallback measurement end detection
-
-    useEffect(() => {
-
-        if (isMonitoring && lastEcgDataTime > 0) {
-
-            const checkInactivity = setInterval(() => {
-
-                const now = Date.now();
-
-                const timeSinceLastData = now - lastEcgDataTime;
-
-
-
-                console.log('🔄 [DEBUG] Checking ECG inactivity:', {
-
-                    timeSinceLastData,
-
-                    threshold: 3000,
-
-                    isMonitoring
-
-                });
-
-
-
-                // If no ECG data received for 3 seconds, assume measurement ended
-
-                if (timeSinceLastData > 3000) {
-
-                    console.log('⏰ [DEBUG] ECG measurement timeout detected - no data for 3 seconds');
-
-                    setIsMonitoring(false);
-
-                    setMonitoringStatus('listening');
-
-
-
-                    // Create result from available data
-
-                    const finalResult: ECGRhythm = {
-
-                        id: `ecg_timeout_${Date.now()}`,
-
-                        deviceId: selectedDevice || 'unknown',
-
-                        timestamp: new Date().toISOString(),
-
-                        heartRate: deviceBpm || currentRhythm?.heartRate || lastBpmRef.current || 0, // Remove hardcoded 75 fallback
-
-                        rhythm: 'normal',
-
-                        qrsDuration: 80,
-
-                        qtInterval: 400,
-
-                        prInterval: 160,
-
-                        stSegment: 'normal',
-
-                        tWave: 'normal',
-
-                        pWave: 'normal',
-
-                        ecgData: ecgBufferRef.current.map(d => d.v),
-
-                        unit: 'mV'
-
-                    };
-
-
-
-                    console.log('📊 [DEBUG] Timeout ECG result created:', finalResult);
-
-                    // REMOVED: setEcgResult - will rebuild from scratch
-
-
-
-                    // Force UI update to show final heart rate
-
-                    setCurrentRhythm(prev => prev ? {
-
-                        ...prev,
-
-                        heartRate: finalResult.heartRate,
-
-                        timestamp: new Date().toISOString()
-
-                    } : prev);
-
-                }
-
-            }, 1000); // Check every second
-
-
-
-            return () => clearInterval(checkInactivity);
-
-        }
-
-    }, [isMonitoring, lastEcgDataTime, deviceBpm, currentRhythm?.heartRate, selectedDevice]);
-
-
-
-    // Fetch device connection state from BP system and initialize ECG monitoring
-
-    useEffect(() => {
-
-        const initializeECGFromBPState = async () => {
-
-            if (!wellueSDK || !wellueSDK.getInitialized()) return;
-
-
-
-            try {
-
-                console.log('🔍 [ECG] Checking BP system state to initialize ECG...');
-
-
-
-                // Get connected devices from BP system
-
-                const connectedDevices = await wellueSDK.getConnectedDevices();
-
-                console.log('🔍 [ECG] Connected devices from BP system:', connectedDevices);
-
-
-
-                if (connectedDevices && connectedDevices.length > 0) {
-
-                    const device = connectedDevices[0];
-
-                    console.log('✅ [ECG] Found connected device:', device);
-
-
-
-                    // Set the selected device
-
-                    setSelectedDevice(device.id);
-
-
-
-                    // Device is connected - wait for user to start measurement on device
-                    // Do NOT auto-start - app will detect status 6 when user presses button
-
-                    console.log('🫀 [ECG] Connected device found:', device.name, '- waiting for device-initiated measurement');
-
-                    // Just ensure we're ready to receive status updates
-                    // The app will automatically detect when user starts measurement (status 6)
-                    console.log('🫀 [ECG] Ready to detect device-initiated ECG measurement');
-
-                    // Keep monitoring status as "listening" - will change to "active" when status 6 is detected
-                    // No try-catch needed since we're not calling any async functions
-                } else {
-                    console.log('⚠️ [ECG] No connected devices found in BP system');
-                }
-
-
-
-            } catch (error) {
-
-                console.error('❌ [ECG] Error checking BP system state:', error);
-
-            }
-
-        };
-
-
-
-        // Initialize ECG from BP state when component mounts
-
-        initializeECGFromBPState();
-
-
-
-        // Also check periodically for device connection changes
-
-        const interval = setInterval(initializeECGFromBPState, 5000);
-
-
-
-        return () => clearInterval(interval);
-
-    }, [wellueSDK]);
-
-
-
-    // Sync with BP system status
-
-    const syncWithBPSystem = async () => {
-
-        if (!wellueSDK || !wellueSDK.getInitialized()) return;
-
-
-
-        try {
-
-            console.log('�� [ECG] Syncing with BP system status...');
-
-
-
-            // Get BP status to see if measurement is active
-
-            const bpStatus = wellueSDK.getBPStatus();
-
-            console.log('🔄 [ECG] BP Status:', bpStatus);
-
-
-
-            if (bpStatus && bpStatus.isMeasuring) {
-
-                console.log('✅ [ECG] BP measurement is active - device is connected and measuring');
-
-
-
-                // If BP is measuring, ECG should also be active
-
-                if (!isMonitoring) {
-
-                    console.log('🔄 [ECG] Activating ECG monitoring to match BP state');
-
-                    setIsMonitoring(true);
-
-                    setMonitoringStatus('active');
-
-                }
-
-            } else {
-
-                console.log('ℹ️ [ECG] BP measurement not active');
-
-            }
-
-
-
-            // Get connected devices
-
-            const connectedDevices = await wellueSDK.getConnectedDevices();
-
-            if (connectedDevices && connectedDevices.length > 0) {
-
-                const device = connectedDevices[0];
-
-                if (device.id !== selectedDevice) {
-
-                    console.log('🔄 [ECG] Updating selected device to match BP system:', device.id);
-
-                    setSelectedDevice(device.id);
-
-                }
-
-            }
-
-
-
-        } catch (error) {
-
-            console.error('❌ [ECG] Error syncing with BP system:', error);
-
-        }
-
-    };
-
-
-
-    // Call sync when component mounts
-
-    useEffect(() => {
-
-        syncWithBPSystem();
-
-    }, [wellueSDK]);
-
-
-
-    // Load previous ECG readings from localStorage
-
-    useEffect(() => {
-
-        try {
-
-            const savedRhythms = localStorage.getItem('ecgRhythms');
-
-            if (savedRhythms) {
-
-                const parsedRhythms = JSON.parse(savedRhythms);
-
-                if (Array.isArray(parsedRhythms) && parsedRhythms.length > 0) {
-
-                    console.log('📚 [ECG] Loading', parsedRhythms.length, 'previous ECG readings from localStorage');
-
-                    setRhythms(parsedRhythms);
-
-
-
-                    // Set the most recent as current rhythm if available
-
-                    if (parsedRhythms[0]) {
-
-                        setCurrentRhythm(parsedRhythms[0]);
-
-                        console.log('📚 [ECG] Set current rhythm to most recent reading:', parsedRhythms[0].heartRate, 'BPM');
-
-                    }
-
-                }
-
-            }
-
-        } catch (error) {
-
-            console.error('❌ [ECG] Failed to load previous ECG readings:', error);
-
-        }
-
-    }, []);
-
-
-
-
-    if (isLoading) {
-
-        return (
-
-            <MobileAppContainer>
-
-                <div className="min-h-screen bg-[#0F0F0F] text-white flex items-center justify-center">
-
-                    <div className="flex flex-col items-center gap-4">
-
-                        <Activity className="h-8 w-8 animate-spin text-blue-500" />
-
-                        <p className="text-gray-400">Loading ECG monitor...</p>
-
-                    </div>
-
-                </div>
-
-            </MobileAppContainer>
-
-        );
-
-    }
-
-
+  const DebugPanel = () => {
+    const deviceAge = Date.now() - lastDeviceHeartRateTime;
 
     return (
+      <div className="mt-2 text-xs text-gray-400 space-y-1">
+        <div className="grid grid-cols-4 gap-2">
+          <div>Buffer: {bufferLen} pts</div>
 
-        <MobileAppContainer>
+          <div>Status: {isMonitoring ? "active" : "listening"}</div>
 
-            {/* Inject CSS Animations */}
+          <div>RT msgs: {rtCount}</div>
 
-            <style dangerouslySetInnerHTML={{ __html: ecgLoadingStyles }} />
+          <div>ECG evts: {ecgEvtCount}</div>
+        </div>
 
+        <div className="grid grid-cols-3 gap-2 pt-1 border-t border-gray-600">
+          <div className="text-green-400">Device HR: {deviceBpm} BPM</div>
 
+          <div className="text-blue-400">Calc HR: {lastBpmRef.current} BPM</div>
 
-            <div className="min-h-screen bg-[#0F0F0F] text-white">
+          <div className="text-yellow-400">
+            R-Peaks: {rPeakTimesRef.current.length}
+          </div>
+        </div>
 
-                {/* Header */}
+        <div className="text-xs text-gray-500">
+          Device age: {Math.round(deviceAge / 1000)}s | Recording:{" "}
+          {isRecording ? "🔴" : "⚪"}
+        </div>
+      </div>
+    );
+  };
 
+  // NEW: Start/Stop ECG Recording
 
+  const toggleRecording = () => {
+    if (isRecording) {
+      setIsRecording(false);
 
-                <div className="bg-[#1E1E1E] p-4 border-b border-gray-800" style={{ paddingTop: 'max(1rem, env(safe-area-inset-top))' }}>
+      toast({
+        title: "Recording Stopped 🛑",
 
-                    <div className="flex items-center justify-between">
+        description: `Recorded ${
+          recordingBufferRef.current.length
+        } samples over ${Math.round(
+          (Date.now() - recordingStartTimeRef.current) / 1000
+        )}s`,
 
-                        <button
-                            onClick={handleBack}
-                            className="flex items-center gap-2 px-3 py-2 text-white bg-blue-600 hover:bg-blue-700 transition-colors touch-manipulation rounded-lg"
-                            style={{ minHeight: '40px', minWidth: '70px' }}
-                        >
-                            <ArrowLeft className="h-4 w-4" />
-                            <span className="text-sm">Back</span>
-                        </button>
+        duration: 2000,
+      });
+    } else {
+      setIsRecording(true);
 
-                        <h1 className="text-xl font-semibold">ECG Monitoring</h1>
+      recordingStartTimeRef.current = Date.now();
 
-                        <div className="w-10"></div>
+      recordingBufferRef.current = [...ecgBufferRef.current]; // Start with current buffer
 
+      toast({
+        title: "Recording Started 🔴",
+
+        description: "Capturing ECG waveform for download",
+
+        duration: 2000,
+      });
+    }
+  };
+
+  // FIXED: Get the best heart rate (prioritize device over calculated)
+
+  const getBestHeartRate = () => {
+    const now = Date.now();
+
+    const deviceHeartRateAge = now - lastDeviceHeartRateTime;
+
+    // Debug logging
+
+    console.log("📋 getBestHeartRate:", {
+      deviceBpm: deviceBpm,
+
+      deviceAge: deviceHeartRateAge,
+
+      calcBpm: lastBpmRef.current,
+
+      rhythmBpm: currentRhythm?.heartRate,
+    });
+
+    // PRIORITY 1: Use device heart rate if available and recent (within 30 seconds)
+
+    if (deviceBpm > 0 && deviceHeartRateAge < 30000) {
+      console.log("💚 Using device heart rate:", deviceBpm);
+
+      return deviceBpm;
+    }
+
+    // PRIORITY 2: Use current rhythm heart rate
+
+    if (currentRhythm?.heartRate && currentRhythm.heartRate > 0) {
+      console.log("📊 Using rhythm heart rate:", currentRhythm.heartRate);
+
+      return currentRhythm.heartRate;
+    }
+
+    // PRIORITY 3: Fallback to calculated heart rate
+
+    if (lastBpmRef.current > 0) {
+      console.log("🤖 Using calculated heart rate:", lastBpmRef.current);
+
+      return lastBpmRef.current;
+    }
+
+    console.log("⚠️ No heart rate available");
+
+    return 0;
+  };
+
+  // NEW: Fetch stored device data to compare with real-time data
+
+  const fetchStoredDeviceData = async () => {
+    if (!selectedDevice) {
+      toast({
+        title: "No Device Selected",
+
+        description: "Please connect a device first.",
+
+        variant: "destructive",
+      });
+
+      return;
+    }
+
+    try {
+      console.log("🔍 Fetching stored device data for comparison...");
+
+      // Get list of stored files
+
+      const storedFiles = await wellueSDK.getStoredFiles(selectedDevice);
+
+      console.log("📁 Stored files:", storedFiles);
+
+      if (storedFiles.length === 0) {
+        toast({
+          title: "No Stored Data",
+
+          description: "Device has no stored ECG measurements.",
+
+          variant: "default",
+        });
+
+        return;
+      }
+
+      // Find the most recent ECG file
+
+      const ecgFiles = storedFiles.filter(
+        (file) =>
+          file.fileName?.includes("ECG") ||
+          file.fileName?.includes("ecg") ||
+          file.fileType === 2 // Assuming 2 is ECG file type
+      );
+
+      if (ecgFiles.length === 0) {
+        toast({
+          title: "No ECG Files",
+
+          description: "No stored ECG measurements found.",
+
+          variant: "default",
+        });
+
+        return;
+      }
+
+      // Get the most recent file
+
+      const latestFile = ecgFiles[ecgFiles.length - 1];
+
+      console.log("📄 Latest ECG file:", latestFile);
+
+      // Read the file content
+
+      const fileContent = await wellueSDK.readStoredFile(
+        selectedDevice,
+        latestFile.fileName
+      );
+
+      console.log("📖 File content:", fileContent);
+
+      // Extract the final heart rate from stored data
+
+      let storedHeartRate = 0;
+
+      let storedData = null;
+
+      if (fileContent.fileContent) {
+        try {
+          // Parse the file content to extract heart rate
+
+          const content = fileContent.fileContent;
+
+          console.log("🔍 Analyzing stored file content for heart rate...");
+
+          // Look for heart rate patterns in the content
+
+          const hrMatch =
+            content.match(/heart[_-]?rate[:\s]*(\d+)/i) ||
+            content.match(/hr[:\s]*(\d+)/i) ||
+            content.match(/bpm[:\s]*(\d+)/i) ||
+            content.match(/(\d+)\s*bpm/i);
+
+          if (hrMatch) {
+            storedHeartRate = parseInt(hrMatch[1]);
+
+            console.log("💚 Found stored heart rate:", storedHeartRate, "BPM");
+          }
+
+          // Also look for any numeric values that could be heart rate
+
+          const numbers = content.match(/\b(\d{2,3})\b/g);
+
+          if (numbers && numbers.length > 0) {
+            const possibleHR = numbers
+              .map((n) => parseInt(n))
+              .filter((n) => n >= 40 && n <= 200);
+
+            if (possibleHR.length > 0) {
+              storedHeartRate = possibleHR[0]; // Take first reasonable value
+
+              console.log(
+                "💚 Inferred stored heart rate:",
+                storedHeartRate,
+                "BPM"
+              );
+            }
+          }
+
+          // Store the raw content for analysis
+
+          storedData = {
+            fileName: latestFile.fileName,
+
+            fileType: fileContent.fileType,
+
+            content: content,
+
+            timestamp: new Date().toISOString(),
+          };
+        } catch (parseError) {
+          console.error("❌ Failed to parse stored file content:", parseError);
+        }
+      }
+
+      // Compare stored vs real-time data
+
+      const realTimeHR = getBestHeartRate();
+
+      const deviceHR = deviceBpm;
+
+      const calculatedHR = lastBpmRef.current;
+
+      console.log("📊 HEART RATE COMPARISON:", {
+        storedDeviceHR: storedHeartRate,
+
+        realTimeHR: realTimeHR,
+
+        deviceHR: deviceHR,
+
+        calculatedHR: calculatedHR,
+
+        currentRhythmHR: currentRhythm?.heartRate,
+      });
+
+      // Save the stored data to phone for analysis
+
+      if (storedData) {
+        try {
+          const { Filesystem, Directory } = await import(
+            "@capacitor/filesystem"
+          );
+
+          // Save raw device data
+
+          const deviceDataPath = `device_stored_data_${Date.now()}.json`;
+
+          await Filesystem.writeFile({
+            path: deviceDataPath,
+
+            data: JSON.stringify(storedData, null, 2),
+
+            directory: Directory.Documents,
+          });
+
+          // Save comparison analysis
+
+          const comparisonData = {
+            timestamp: new Date().toISOString(),
+
+            deviceId: selectedDevice,
+
+            comparison: {
+              storedDeviceHR: storedHeartRate,
+
+              realTimeHR: realTimeHR,
+
+              deviceHR: deviceHR,
+
+              calculatedHR: calculatedHR,
+
+              currentRhythmHR: currentRhythm?.heartRate,
+            },
+
+            realTimeData: {
+              ecgBufferLength: ecgBufferRef.current.length,
+
+              recordingBufferLength: recordingBufferRef.current.length,
+
+              lastBpm: lastBpmRef.current,
+
+              deviceBpm: deviceBpm,
+
+              isRecording: isRecording,
+
+              isMonitoring: isMonitoring,
+            },
+
+            analysis: {
+              hasDiscrepancy: Math.abs(storedHeartRate - realTimeHR) > 5,
+
+              discrepancyAmount: Math.abs(storedHeartRate - realTimeHR),
+
+              dataQuality: {
+                storedDataAvailable: storedHeartRate > 0,
+
+                realTimeDataAvailable: realTimeHR > 0,
+
+                deviceDataAvailable: deviceHR > 0,
+              },
+            },
+          };
+
+          const comparisonPath = `ecg_comparison_analysis_${Date.now()}.json`;
+
+          await Filesystem.writeFile({
+            path: comparisonPath,
+
+            data: JSON.stringify(comparisonData, null, 2),
+
+            directory: Directory.Documents,
+          });
+
+          console.log("💾 Saved device data and comparison analysis to phone");
+
+          console.log("📁 Device data saved to:", deviceDataPath);
+
+          console.log("📁 Comparison analysis saved to:", comparisonPath);
+
+          // Show success toast with file paths
+
+          toast({
+            title: "Data Saved Successfully 💾",
+
+            description: `Device data and analysis saved to Documents folder`,
+
+            variant: "default",
+          });
+        } catch (saveError) {
+          console.error("❌ Failed to save data to phone:", saveError);
+
+          toast({
+            title: "Failed to Save Data",
+
+            description: "Could not save device data to phone storage.",
+
+            variant: "destructive",
+          });
+        }
+      }
+
+      // Show comparison toast
+
+      if (storedHeartRate > 0) {
+        toast({
+          title: "Device Data Comparison 📊",
+
+          description: `Stored: ${storedHeartRate} BPM | Real-time: ${realTimeHR} BPM | Device: ${deviceHR} BPM`,
+
+          variant: "default",
+        });
+
+        // If there's a significant discrepancy, log it
+
+        if (Math.abs(storedHeartRate - realTimeHR) > 5) {
+          console.warn("⚠️ HEART RATE DISCREPANCY DETECTED:", {
+            stored: storedHeartRate,
+
+            realTime: realTimeHR,
+
+            difference: Math.abs(storedHeartRate - realTimeHR),
+          });
+
+          // Additional analysis for discrepancy
+
+          console.log("🔍 DISCREPANCY ANALYSIS:", {
+            possibleCauses: [
+              "Real-time data not updating properly",
+
+              "Device data not being captured correctly",
+
+              "Timing issues between device and app",
+
+              "Data processing errors in app",
+            ],
+
+            recommendations: [
+              "Check if deviceBpm state is updating",
+
+              "Verify onECGData callback is working",
+
+              "Check if onECGLifecycle stop event is captured",
+
+              "Compare stored vs real-time data structure",
+            ],
+          });
+        }
+      }
+    } catch (error) {
+      console.error("❌ Failed to fetch stored device data:", error);
+
+      toast({
+        title: "Failed to Fetch Stored Data",
+
+        description: "Could not retrieve device stored measurements.",
+
+        variant: "destructive",
+      });
+    }
+  };
+
+  // NEW: Download ECG waveform as JPEG image
+
+  const downloadCurrentECG = async () => {
+    try {
+      // Request storage permissions properly
+
+      try {
+        const perms = await (Filesystem as any).requestPermissions?.();
+
+        console.log("📁 Storage permissions:", perms);
+      } catch (permError) {
+        console.warn("📁 Permission request failed:", permError);
+      }
+
+      const canvas = canvasRef.current;
+
+      if (!canvas) {
+        toast({
+          title: "No ECG Data",
+
+          description: "No waveform to capture. Start ECG monitoring first.",
+
+          variant: "destructive",
+        });
+
+        return;
+      }
+
+      // Create a high-quality capture canvas with device info
+
+      const captureCanvas = document.createElement("canvas");
+
+      const ctx = captureCanvas.getContext("2d");
+
+      if (!ctx) return;
+
+      // Set high resolution for quality image
+
+      const scale = 2; // 2x resolution for crisp image
+
+      captureCanvas.width = canvas.width * scale;
+
+      captureCanvas.height = (canvas.height + 120) * scale; // Extra space for header
+
+      // Scale context for high DPI
+
+      ctx.scale(scale, scale);
+
+      // Fill background
+
+      ctx.fillStyle = "#0f172a"; // Dark background like the app
+
+      ctx.fillRect(
+        0,
+        0,
+        captureCanvas.width / scale,
+        captureCanvas.height / scale
+      );
+
+      // Add header with device info and timestamp
+
+      ctx.fillStyle = "#ffffff";
+
+      ctx.font = "bold 16px Arial";
+
+      ctx.textAlign = "left";
+
+      ctx.fillText(`ECG Recording - ${selectedDevice || "BP2 Device"}`, 20, 30);
+
+      ctx.font = "14px Arial";
+
+      ctx.fillStyle = "#94a3b8";
+
+      ctx.fillText(`Recorded: ${new Date().toLocaleString()}`, 20, 50);
+
+      ctx.fillText(
+        `Heart Rate: ${getBestHeartRate()} BPM (Device: ${deviceBpm}, Calc: ${
+          lastBpmRef.current
+        })`,
+        20,
+        70
+      );
+
+      const samplesCount =
+        recordingBufferRef.current.length > 0
+          ? recordingBufferRef.current.length
+          : ecgBufferRef.current.length;
+
+      const recordingTime = isRecording
+        ? Math.round((Date.now() - recordingStartTimeRef.current) / 1000)
+        : 0;
+
+      ctx.fillText(
+        `Sample Rate: ${fsRef.current}Hz | Samples: ${samplesCount} ${
+          recordingTime > 0 ? `| Recording: ${recordingTime}s` : ""
+        }`,
+        20,
+        90
+      );
+
+      // Decide whether to draw live view or recorded timeline
+
+      const dataToRender =
+        recordingBufferRef.current.length > ecgBufferRef.current.length
+          ? recordingBufferRef.current
+          : ecgBufferRef.current;
+
+      if (dataToRender.length > 0) {
+        // Create a temporary canvas for the ECG strip
+
+        const tempCanvas = document.createElement("canvas");
+
+        const tempCtx = tempCanvas.getContext("2d");
+
+        if (tempCtx) {
+          tempCanvas.width = canvas.width;
+
+          tempCanvas.height = canvas.height;
+
+          // Render the ECG data to temp canvas
+
+          renderFrame(
+            tempCtx,
+            tempCanvas.width,
+            tempCanvas.height,
+            dataToRender
+          );
+
+          // Draw the temp canvas to capture canvas
+
+          ctx.drawImage(
+            tempCanvas,
+            0,
+            110,
+            canvas.width / dprRef.current,
+            canvas.height / dprRef.current
+          );
+        }
+      } else {
+        // Draw the live canvas if no recorded data
+
+        ctx.drawImage(
+          canvas,
+          0,
+          110,
+          canvas.width / dprRef.current,
+          canvas.height / dprRef.current
+        );
+      }
+
+      // Add footer
+
+      ctx.fillStyle = "#64748b";
+
+      ctx.font = "12px Arial";
+
+      ctx.textAlign = "right";
+
+      ctx.fillText(
+        "Vital Sign Monitor - ECG Lead II",
+        captureCanvas.width / scale - 20,
+        captureCanvas.height / scale - 10
+      );
+
+      // Convert to JPEG blob
+
+      const dataURL = captureCanvas.toDataURL("image/jpeg", 0.9); // High quality JPEG
+
+      const base64Data = dataURL.split(",")[1];
+
+      const now = Date.now();
+
+      const fileName = `ECG_Recording_${now}.jpg`;
+
+      // FIXED: Use browser download as fallback
+
+      let saveSuccess = false;
+
+      let savedLocation = "";
+
+      // Try native file save first
+
+      if (Capacitor.isNativePlatform()) {
+        try {
+          await Filesystem.writeFile({
+            path: fileName,
+
+            data: base64Data,
+
+            directory: Directory.Documents,
+          });
+
+          saveSuccess = true;
+
+          savedLocation = "Documents folder";
+
+          console.log("📁 Native save to Documents:", fileName);
+        } catch (nativeError) {
+          console.warn("📁 Native save failed:", nativeError);
+        }
+      }
+
+      // Fallback to browser download (works on all platforms)
+
+      if (!saveSuccess) {
+        try {
+          const blob = await fetch(`data:image/jpeg;base64,${base64Data}`).then(
+            (r) => r.blob()
+          );
+
+          const url = URL.createObjectURL(blob);
+
+          const a = document.createElement("a");
+
+          a.href = url;
+
+          a.download = fileName;
+
+          document.body.appendChild(a);
+
+          a.click();
+
+          document.body.removeChild(a);
+
+          URL.revokeObjectURL(url);
+
+          saveSuccess = true;
+
+          savedLocation = "Downloads folder";
+
+          console.log("📁 Browser download triggered:", fileName);
+        } catch (browserError) {
+          console.error("📁 Browser download failed:", browserError);
+        }
+      }
+
+      if (!saveSuccess) {
+        throw new Error("Could not save file using any method");
+      }
+
+      console.log("📸 ECG chart image saved:", fileName);
+
+      toast({
+        title: "ECG Chart Downloaded! 📸",
+
+        description: `Saved ${fileName} to ${savedLocation}`,
+
+        duration: 3000,
+      });
+
+      // Also trigger share if possible
+
+      try {
+        await Share.share({
+          title: "ECG Recording",
+
+          text: `ECG Recording from ${new Date().toLocaleString()}`,
+
+          url: dataURL,
+
+          dialogTitle: "Share ECG Chart",
+        });
+      } catch (shareError) {
+        console.log("Share not available:", shareError);
+      }
+    } catch (error) {
+      console.error("❌ Failed to capture ECG chart:", error);
+
+      toast({
+        title: "Download Failed",
+
+        description: "Could not capture ECG chart: " + error.message,
+
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Export latest live + device ECG JSONs to external Downloads for A/B
+
+  const exportABToDownloads = async () => {
+    try {
+      // Ask for storage permissions (Android scoped storage)
+
+      try {
+        await (Filesystem as any).requestPermissions?.();
+      } catch {}
+
+      toast({
+        title: "Exporting…",
+        description: "Preparing live and device JSON files",
+        duration: 1500,
+      });
+
+      let deviceShareUrl: string | null = null;
+
+      let liveShareUrl: string | null = null;
+
+      // Helper: ensure we always have a sharable URI. If getUri fails, write a copy to Cache and retry
+
+      const ensureSharableUri = async (
+        path: string,
+        directory: Directory,
+        dataText?: string
+      ) => {
+        try {
+          const uri = await Filesystem.getUri({ path, directory });
+
+          const u = (uri as any)?.uri || (uri as any);
+
+          if (u) return String(u);
+        } catch {}
+
+        if (dataText) {
+          try {
+            const cacheName =
+              path.split("/").pop() || `share_${Date.now()}.json`;
+
+            await Filesystem.writeFile({
+              path: cacheName,
+              data: dataText,
+              directory: Directory.Cache,
+              encoding: Encoding.UTF8,
+            });
+
+            const uri2 = await Filesystem.getUri({
+              path: cacheName,
+              directory: Directory.Cache,
+            });
+
+            const u2 = (uri2 as any)?.uri || (uri2 as any);
+
+            if (u2) return String(u2);
+          } catch {}
+        }
+
+        return null;
+      };
+
+      // Helpers for decoding and extracting ECG from stored file
+
+      const decodeBase64ToBytes = (b64: string): Uint8Array => {
+        try {
+          const bin = atob(b64);
+
+          const out = new Uint8Array(bin.length);
+
+          for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+
+          return out;
+        } catch {
+          return new Uint8Array();
+        }
+      };
+
+      const readLE16 = (bytes: Uint8Array, pos: number) =>
+        bytes[pos] | (bytes[pos + 1] << 8);
+
+      const findEcgDataOffset = (bytes: Uint8Array): number => {
+        let bestOffset = 0,
+          bestVar = -1;
+
+        const maxLook = Math.min(256, bytes.length - 512);
+
+        for (let off = 0; off <= maxLook; off += 2) {
+          let mean = 0,
+            m2 = 0,
+            count = 0;
+
+          for (let i = off; i < off + 512; i += 2) {
+            const v = readLE16(bytes, i);
+
+            count++;
+
+            const d = v - mean;
+            mean += d / count;
+            m2 += d * (v - mean);
+          }
+
+          const variance = count > 1 ? m2 / (count - 1) : 0;
+
+          if (variance > bestVar) {
+            bestVar = variance;
+            bestOffset = off;
+          }
+        }
+
+        return bestOffset;
+      };
+
+      const int16ToBase64LE = (arr: Int16Array): string => {
+        const u8 = new Uint8Array(arr.length * 2);
+
+        for (let i = 0; i < arr.length; i++) {
+          const v = arr[i];
+
+          u8[2 * i] = v & 0xff;
+
+          u8[2 * i + 1] = (v >> 8) & 0xff;
+        }
+
+        let s = "";
+
+        for (let i = 0; i < u8.length; i++) s += String.fromCharCode(u8[i]);
+
+        try {
+          return btoa(s);
+        } catch {
+          const chunk = 8192;
+          let out = "";
+
+          for (let i = 0; i < s.length; i += chunk)
+            out += btoa(s.slice(i, i + chunk));
+
+          return out;
+        }
+      };
+
+      // 1) Device record → build JSON → write to Downloads
+
+      let deviceOutName: string | null = null;
+
+      try {
+        const devId = selectedDevice || devices[0]?.id;
+
+        if (devId) {
+          const files = await wellueSDK.getStoredFiles(devId);
+
+          const last =
+            (files || []).at(-1)?.fileName || ((files || []).at(-1) as any);
+
+          if (last) {
+            const res: any = await wellueSDK.readStoredFile(
+              devId,
+              String(last)
+            );
+
+            let waveformCounts: number[] = Array.isArray(res?.waveformCounts)
+              ? res.waveformCounts
+              : [];
+
+            let savedBinBase64: string | null = null;
+
+            let sr: number = Number(res?.sampleRate) || 125;
+
+            let durSec: number =
+              Number(res?.recordingTimeSec || res?.measureTimeSec) || 30;
+
+            const expected = Math.max(1, Math.round(sr * durSec));
+
+            if (
+              (!waveformCounts || waveformCounts.length === 0) &&
+              typeof (res as any)?.fileContent === "string"
+            ) {
+              try {
+                const bytes = decodeBase64ToBytes(
+                  (res as any).fileContent as string
+                );
+
+                let off = findEcgDataOffset(bytes);
+
+                const availSamples = Math.floor((bytes.length - off) / 2);
+
+                const take = Math.min(expected, availSamples);
+
+                const arr = new Int16Array(take);
+
+                for (let i = 0; i < take; i++)
+                  arr[i] = readLE16(bytes, off + i * 2);
+
+                // Use raw counts directly; extractor may remove control words, but stored files should be clean
+
+                waveformCounts = Array.from(arr);
+
+                // Save a .bin alongside
+
+                savedBinBase64 = int16ToBase64LE(arr);
+              } catch (e) {
+                console.warn("decode stored file failed", e);
+              }
+            }
+
+            const payload = {
+              measurement_id: String(last),
+
+              start_time: new Date().toISOString(),
+
+              duration_ms:
+                (res?.recordingTimeSec ?? res?.measureTimeSec ?? 30) * 1000,
+
+              sample_rate_hz: sr || 125,
+
+              mv_per_count: res?.mvPerCount ?? 0.003098,
+
+              waveform_counts: waveformCounts || [],
+            };
+
+            deviceOutName = `Documents/bp2_device_${Date.now()}.json`;
+
+            await Filesystem.writeFile({
+              path: deviceOutName,
+
+              data: JSON.stringify(payload),
+
+              directory: Directory.ExternalStorage,
+
+              encoding: Encoding.UTF8,
+            });
+
+            // If we have binary waveform, write .bin and a sidecar JSON
+
+            if (savedBinBase64) {
+              const base = `Documents/bp2_device_${Date.now()}`;
+
+              const binName = `${base}.bin`;
+
+              const metaName = `${base}.meta.json`;
+
+              try {
+                await Filesystem.writeFile({
+                  path: binName,
+                  data: savedBinBase64,
+                  directory: Directory.ExternalStorage,
+                  encoding: "base64" as any,
+                });
+
+                await Filesystem.writeFile({
+                  path: metaName,
+                  data: JSON.stringify({
+                    measurement_id: payload.measurement_id,
+
+                    sample_rate_hz: payload.sample_rate_hz,
+
+                    mv_per_count: payload.mv_per_count,
+
+                    duration_ms: payload.duration_ms,
+
+                    format: "int16le",
+
+                    samples: waveformCounts.length,
+                  }),
+                  directory: Directory.ExternalStorage,
+                  encoding: Encoding.UTF8,
+                });
+
+                console.log(
+                  "[A/B] device BIN saved",
+                  binName,
+                  "with sidecar",
+                  metaName
+                );
+              } catch (e) {
+                console.warn("failed writing bin/meta", e);
+              }
+            }
+
+            // Also save an internal copy for adb run-as retrieval
+
+            try {
+              const internalName = `bp2_device_${Date.now()}_app.json`;
+
+              await Filesystem.writeFile({
+                path: internalName,
+                data: JSON.stringify(payload),
+                directory: Directory.Documents,
+                encoding: Encoding.UTF8,
+              });
+
+              console.log("[A/B] device JSON internal copy", internalName);
+            } catch {}
+
+            deviceShareUrl = await ensureSharableUri(
+              deviceOutName,
+              Directory.ExternalStorage,
+              JSON.stringify(payload)
+            );
+
+            console.log("[A/B] device JSON saved", deviceShareUrl);
+          }
+        }
+      } catch (e) {
+        console.warn("device export failed", e);
+      }
+
+      // 2) Live record: prefer in-memory capture of latest run; otherwise copy latest saved live JSON from Documents
+
+      let liveOutName: string | null = null;
+
+      try {
+        if (
+          captureCountsRef.current.length > 0 &&
+          captureStartedAtRef.current
+        ) {
+          const fsHz = fsRef.current || 125;
+
+          const counts = captureCountsRef.current.slice();
+
+          const payload = {
+            measurement_id: `live_${Date.now()}`,
+
+            start_time: captureStartedAtRef.current,
+
+            duration_ms: Math.round((counts.length / Math.max(1, fsHz)) * 1000),
+
+            sample_rate_hz: fsHz,
+
+            mv_per_count: lastMvPerCountRef.current || 0.003098,
+
+            waveform_counts: counts,
+          };
+
+          liveOutName = `Documents/bp2_live_${Date.now()}.json`;
+
+          await Filesystem.writeFile({
+            path: liveOutName,
+
+            data: JSON.stringify(payload),
+
+            directory: Directory.ExternalStorage,
+
+            encoding: Encoding.UTF8,
+          });
+
+          // Also save an internal copy for adb run-as retrieval
+
+          try {
+            const internalName = `bp2_live_${Date.now()}_app.json`;
+
+            await Filesystem.writeFile({
+              path: internalName,
+              data: JSON.stringify(payload),
+              directory: Directory.Documents,
+              encoding: Encoding.UTF8,
+            });
+
+            console.log("[A/B] live JSON internal copy", internalName);
+          } catch {}
+
+          liveShareUrl = await ensureSharableUri(
+            liveOutName,
+            Directory.ExternalStorage,
+            JSON.stringify(payload)
+          );
+
+          console.log("[A/B] live JSON saved", liveShareUrl);
+        } else {
+          // Try to copy the last saved live JSON from Documents to Downloads
+
+          try {
+            const entries: any = await Filesystem.readdir({
+              path: "",
+              directory: Directory.Documents,
+            });
+
+            const names: string[] = (entries?.files || entries || [])
+              .map((x: any) => x.name || x)
+              .filter((n: string) => typeof n === "string");
+
+            const liveNames = names
+              .filter(
+                (n: string) => n.startsWith("bp2_live_") && n.endsWith(".json")
+              )
+              .sort();
+
+            const lastLive = liveNames.at(-1);
+
+            if (lastLive) {
+              const data = await Filesystem.readFile({
+                path: lastLive,
+                directory: Directory.Documents,
+                encoding: Encoding.UTF8,
+              });
+
+              const txt = (data as any)?.data || (data as any);
+
+              liveOutName = `Documents/${lastLive}`;
+
+              await Filesystem.writeFile({
+                path: liveOutName,
+                data: txt,
+                directory: Directory.ExternalStorage,
+                encoding: Encoding.UTF8,
+              });
+
+              liveShareUrl = await ensureSharableUri(
+                liveOutName,
+                Directory.ExternalStorage,
+                txt as string
+              );
+
+              console.log("[A/B] copied live JSON saved", liveShareUrl);
+            }
+          } catch (e) {
+            /* ignore */
+          }
+        }
+      } catch (e) {
+        console.warn("live export failed", e);
+      }
+
+      const msg = `Exported${deviceOutName ? " device→" + deviceOutName : ""}${
+        liveOutName ? " live→" + liveOutName : ""
+      }`;
+
+      toast({
+        title:
+          deviceOutName || liveOutName
+            ? "Export successful"
+            : "Nothing exported",
+        description: msg || "Run a 30 s ECG first, then export again.",
+      });
+
+      console.log("[ECGMonitor] A/B export", { deviceOutName, liveOutName });
+
+      // Share chooser on Android with the file URI(s)
+
+      try {
+        if (deviceShareUrl || liveShareUrl) {
+          toast({
+            title: "Opening share…",
+            description: "Select an app to send the JSON(s)",
+          });
+        }
+
+        if (deviceShareUrl) {
+          await Share.share({
+            title: "ECG Device JSON",
+            url: deviceShareUrl,
+            dialogTitle: "Share device JSON",
+          });
+        }
+
+        if (liveShareUrl) {
+          await Share.share({
+            title: "ECG Live JSON",
+            url: liveShareUrl,
+            dialogTitle: "Share live JSON",
+          });
+        }
+      } catch (e) {
+        console.warn("share failed", e);
+      }
+    } catch (e) {
+      console.error("exportABToDownloads error", e);
+
+      toast({
+        title: "Export failed",
+        description: String(e),
+        variant: "destructive",
+      });
+    }
+  };
+
+  // NEW: Fallback measurement end detection
+
+  useEffect(() => {
+    if (isMonitoring && lastEcgDataTime > 0) {
+      const checkInactivity = setInterval(() => {
+        const now = Date.now();
+
+        const timeSinceLastData = now - lastEcgDataTime;
+
+        console.log("🔄 [DEBUG] Checking ECG inactivity:", {
+          timeSinceLastData,
+
+          threshold: 3000,
+
+          isMonitoring,
+        });
+
+        // If no ECG data received for 3 seconds, assume measurement ended
+
+        if (timeSinceLastData > 3000) {
+          console.log(
+            "⏰ [DEBUG] ECG measurement timeout detected - no data for 3 seconds"
+          );
+
+          setIsMonitoring(false);
+
+          setMonitoringStatus("listening");
+
+          // Create result from available data
+
+          const finalResult: ECGRhythm = {
+            id: `ecg_timeout_${Date.now()}`,
+
+            deviceId: selectedDevice || "unknown",
+
+            timestamp: new Date().toISOString(),
+
+            heartRate:
+              deviceBpm || currentRhythm?.heartRate || lastBpmRef.current || 0, // Remove hardcoded 75 fallback
+
+            rhythm: "normal",
+
+            qrsDuration: 80,
+
+            qtInterval: 400,
+
+            prInterval: 160,
+
+            stSegment: "normal",
+
+            tWave: "normal",
+
+            pWave: "normal",
+
+            ecgData: ecgBufferRef.current.map((d) => d.v),
+
+            unit: "mV",
+          };
+
+          console.log("📊 [DEBUG] Timeout ECG result created:", finalResult);
+
+          // REMOVED: setEcgResult - will rebuild from scratch
+
+          // Force UI update to show final heart rate
+
+          setCurrentRhythm((prev) =>
+            prev
+              ? {
+                  ...prev,
+
+                  heartRate: finalResult.heartRate,
+
+                  timestamp: new Date().toISOString(),
+                }
+              : prev
+          );
+        }
+      }, 1000); // Check every second
+
+      return () => clearInterval(checkInactivity);
+    }
+  }, [
+    isMonitoring,
+    lastEcgDataTime,
+    deviceBpm,
+    currentRhythm?.heartRate,
+    selectedDevice,
+  ]);
+
+  // Fetch device connection state from BP system and initialize ECG monitoring
+
+  useEffect(() => {
+    const initializeECGFromBPState = async () => {
+      if (!wellueSDK || !wellueSDK.getInitialized()) return;
+
+      try {
+        console.log("🔍 [ECG] Checking BP system state to initialize ECG...");
+
+        // Get connected devices from BP system
+
+        const connectedDevices = await wellueSDK.getConnectedDevices();
+
+        console.log(
+          "🔍 [ECG] Connected devices from BP system:",
+          connectedDevices
+        );
+
+        if (connectedDevices && connectedDevices.length > 0) {
+          const device = connectedDevices[0];
+
+          console.log("✅ [ECG] Found connected device:", device);
+
+          // Set the selected device
+
+          setSelectedDevice(device.id);
+
+          // Device is connected - wait for user to start measurement on device
+          // Do NOT auto-start - app will detect status 6 when user presses button
+
+          console.log(
+            "🫀 [ECG] Connected device found:",
+            device.name,
+            "- waiting for device-initiated measurement"
+          );
+
+          // Just ensure we're ready to receive status updates
+          // The app will automatically detect when user starts measurement (status 6)
+          console.log(
+            "🫀 [ECG] Ready to detect device-initiated ECG measurement"
+          );
+
+          // Keep monitoring status as "listening" - will change to "active" when status 6 is detected
+          // No try-catch needed since we're not calling any async functions
+        } else {
+          console.log("⚠️ [ECG] No connected devices found in BP system");
+        }
+      } catch (error) {
+        console.error("❌ [ECG] Error checking BP system state:", error);
+      }
+    };
+
+    // Initialize ECG from BP state when component mounts
+
+    initializeECGFromBPState();
+
+    // Also check periodically for device connection changes
+
+    const interval = setInterval(initializeECGFromBPState, 5000);
+
+    return () => clearInterval(interval);
+  }, [wellueSDK]);
+
+  // Sync with BP system status
+
+  const syncWithBPSystem = async () => {
+    if (!wellueSDK || !wellueSDK.getInitialized()) return;
+
+    try {
+      console.log("�� [ECG] Syncing with BP system status...");
+
+      // Get BP status to see if measurement is active
+
+      const bpStatus = wellueSDK.getBPStatus();
+
+      console.log("🔄 [ECG] BP Status:", bpStatus);
+
+      if (bpStatus && bpStatus.isMeasuring) {
+        console.log(
+          "✅ [ECG] BP measurement is active - device is connected and measuring"
+        );
+
+        // If BP is measuring, ECG should also be active
+
+        if (!isMonitoring) {
+          console.log("🔄 [ECG] Activating ECG monitoring to match BP state");
+
+          setIsMonitoring(true);
+
+          setMonitoringStatus("active");
+        }
+      } else {
+        console.log("ℹ️ [ECG] BP measurement not active");
+      }
+
+      // Get connected devices
+
+      const connectedDevices = await wellueSDK.getConnectedDevices();
+
+      if (connectedDevices && connectedDevices.length > 0) {
+        const device = connectedDevices[0];
+
+        if (device.id !== selectedDevice) {
+          console.log(
+            "🔄 [ECG] Updating selected device to match BP system:",
+            device.id
+          );
+
+          setSelectedDevice(device.id);
+        }
+      }
+    } catch (error) {
+      console.error("❌ [ECG] Error syncing with BP system:", error);
+    }
+  };
+
+  // Call sync when component mounts
+
+  useEffect(() => {
+    syncWithBPSystem();
+  }, [wellueSDK]);
+
+  // Load previous ECG readings from localStorage
+
+  useEffect(() => {
+    try {
+      const savedRhythms = localStorage.getItem("ecgRhythms");
+
+      if (savedRhythms) {
+        const parsedRhythms = JSON.parse(savedRhythms);
+
+        if (Array.isArray(parsedRhythms) && parsedRhythms.length > 0) {
+          console.log(
+            "📚 [ECG] Loading",
+            parsedRhythms.length,
+            "previous ECG readings from localStorage"
+          );
+
+          setRhythms(parsedRhythms);
+
+          // Set the most recent as current rhythm if available
+
+          if (parsedRhythms[0]) {
+            setCurrentRhythm(parsedRhythms[0]);
+
+            console.log(
+              "📚 [ECG] Set current rhythm to most recent reading:",
+              parsedRhythms[0].heartRate,
+              "BPM"
+            );
+          }
+        }
+      }
+    } catch (error) {
+      console.error("❌ [ECG] Failed to load previous ECG readings:", error);
+    }
+  }, []);
+
+  if (isLoading) {
+    return (
+      <MobileAppContainer>
+        <div className="min-h-screen bg-[#0F0F0F] text-white flex items-center justify-center">
+          <div className="flex flex-col items-center gap-4">
+            <Activity className="h-8 w-8 animate-spin text-blue-500" />
+
+            <p className="text-gray-400">Loading ECG monitor...</p>
+          </div>
+        </div>
+      </MobileAppContainer>
+    );
+  }
+
+  return (
+    <MobileAppContainer>
+      {/* Inject CSS Animations */}
+
+      <style dangerouslySetInnerHTML={{ __html: ecgLoadingStyles }} />
+
+      <div className="min-h-screen bg-[#0F0F0F] text-white">
+        {/* Header */}
+
+        <div
+          className="bg-[#1E1E1E] p-4 border-b border-gray-800"
+          style={{ paddingTop: "max(1rem, env(safe-area-inset-top))" }}
+        >
+          <div className="flex items-center justify-between">
+            <button
+              onClick={handleBack}
+              className="flex items-center gap-2 px-3 py-2 text-white bg-blue-600 hover:bg-blue-700 transition-colors touch-manipulation rounded-lg"
+              style={{ minHeight: "40px", minWidth: "70px" }}
+            >
+              <ArrowLeft className="h-4 w-4" />
+              <span className="text-sm">Back</span>
+            </button>
+
+            <h1 className="text-xl font-semibold">ECG Monitoring</h1>
+
+            <div className="w-10"></div>
+          </div>
+        </div>
+
+        {/* Content */}
+
+        <div className="p-4">
+          {/* Connected Device Card - New BP UI Style */}
+
+          {devices.length > 0 && selectedDevice && (
+            <div className="mb-4">
+              <div
+                className="rounded-2xl p-4 mb-4"
+                style={{
+                  background: "rgba(17,24,39,0.6)",
+
+                  backdropFilter: "blur(10px)",
+
+                  border: "1px solid rgba(55,65,81,0.3)",
+                }}
+              >
+                <div className="flex items-center justify-between mb-3">
+                  {/* Left: ECG icon */}
+
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-full bg-green-500 flex items-center justify-center">
+                      <ActivityIcon className="h-6 w-6 text-white" />
                     </div>
 
-                </div>
-
-
-
-                {/* Content */}
-
-                <div className="p-4">
-
-                    
-
-
-
-
-
-                    {/* Connected Device Card - New BP UI Style */}
-
-                    {devices.length > 0 && selectedDevice && (
-
-                        <div className="mb-4">
-
-                            <div
-
-                                className="rounded-2xl p-4 mb-4"
-
-                                style={{
-
-                                    background: 'rgba(17,24,39,0.6)',
-
-                                    backdropFilter: 'blur(10px)',
-
-                                    border: '1px solid rgba(55,65,81,0.3)'
-
-                                }}
-
-                            >
-
-                                <div className="flex items-center justify-between mb-3">
-
-                                    {/* Left: ECG icon */}
-
-                                    <div className="flex items-center gap-3">
-
-                                        <div className="w-12 h-12 rounded-full bg-green-500 flex items-center justify-center">
-
-                                            <ActivityIcon className="h-6 w-6 text-white" />
-
-                                        </div>
-
-                                        <div>
-
-                                            <h3 className="text-lg font-bold text-white" style={{ fontSize: '18px' }}>
-
-                                                {devices.find(d => d.id === selectedDevice)?.name || 'BP2 3049'}
-
-                                            </h3>
-
-                                            <p className="text-sm text-gray-400">ECG Monitor</p>
-
-                                        </div>
-
-                                    </div>
-
-
-
-                                    {/* Right: Status and timestamp */}
-
-                                    <div className="text-right">
-
-                                        <div
-
-                                            className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium mb-2"
-
-                                            style={{
-
-                                                background: 'rgba(34,197,94,0.2)',
-
-                                                color: '#22c55e',
-
-                                                height: '22px',
-
-                                                borderRadius: '11px'
-
-                                            }}
-
-                                        >
-
-                                            Connected
-
-                                        </div>
-
-                                        <div className="text-sm text-gray-400">
-
-                                            {devices.find(d => d.id === selectedDevice)?.connectedAtFormatted || new Date().toLocaleDateString()}
-
-                                        </div>
-
-                                        <div className="text-sm text-gray-400">
-
-                                            Duration: {devices.find(d => d.id === selectedDevice)?.connectionDurationFormatted || '0s'}
-
-                                        </div>
-
-                                    </div>
-
-                                </div>
-
-
-
-                                {/* Status Bar - Inside device card */}
-
-                                <div className="flex items-center gap-2">
-
-                                    <div className={`w-2 h-2 rounded-full ${isMonitoring ? 'bg-green-400 animate-pulse' : 'bg-yellow-400'}`}></div>
-
-                                    <span className="text-sm text-gray-400" style={{ fontSize: '13px' }}>
-
-                                        Receiving live ECG… • Buffer: {bufferLen} pts • Status: {isMonitoring ? 'active' : 'listening'} • RT msgs: {rtCount} • ECG evts: {ecgEvtCount}
-
-                                    </span>
-
-                                </div>
-
-                            </div>
-
-                        </div>
-
-                    )}
-
-
-
-                    {/* Live ECG Waveform Panel - New BP UI Style */}
-
+                    <div>
+                      <h3
+                        className="text-lg font-bold text-white"
+                        style={{ fontSize: "18px" }}
+                      >
+                        {devices.find((d) => d.id === selectedDevice)?.name ||
+                          "BP2 3049"}
+                      </h3>
+
+                      <p className="text-sm text-gray-400">ECG Monitor</p>
+                    </div>
+                  </div>
+
+                  {/* Right: Status and timestamp */}
+
+                  <div className="text-right">
                     <div
+                      className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium mb-2"
+                      style={{
+                        background: "rgba(34,197,94,0.2)",
 
-                        className="rounded-2xl p-4 mb-4"
+                        color: "#22c55e",
 
-                        style={{
+                        height: "22px",
 
-                            background: 'rgba(17,24,39,0.6)',
-
-                            backdropFilter: 'blur(10px)',
-
-                            border: '1px solid rgba(55,65,81,0.3)',
-
-                            boxShadow: '0 0 20px rgba(0,0,0,0.3)'
-
-                        }}
-
+                        borderRadius: "11px",
+                      }}
                     >
-
-                        <div className="flex items-center justify-between mb-4">
-
-                            <h2 className="text-base font-medium text-white" style={{ fontSize: '16px' }}>ECG Measurement</h2>
-
-                            <div className="flex items-center gap-2">
-
-                                <span className="text-sm text-gray-400">Status:</span>
-
-                                <div className={`px-2 py-1 rounded-full text-xs font-medium ${isMonitoring
-
-                                    ? 'bg-green-500/20 text-green-400 border border-green-500/30'
-
-                                    : 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
-
-                                    }`}>
-
-                                    {isMonitoring ? 'Measuring' : 'Ready'}
-
-                                </div>
-
-                            </div>
-
-                        </div>
-
-
-
-                        {/* ECG Loading Animation */}
-
-                        <div
-
-                            className="rounded-xl overflow-hidden relative bg-[#0A0A0A] p-6"
-
-                            style={{
-
-                                height: '200px',
-
-                                minHeight: '180px',
-
-                                borderRadius: '16px'
-
-                            }}
-
-                        >
-
-                            {isMonitoring ? (
-
-                                /* Measurement Phase - Show Animation */
-
-                                <div className="text-center h-full flex flex-col justify-center">
-
-                                    <div className="text-lg text-green-400 font-semibold mb-4">Measuring ECG...</div>
-
-
-
-                                    {/* Animated ECG Pulse Points */}
-
-                                    <div className="cWrapper">
-
-                                        <div className="cPoint p1"></div>
-
-                                        <div className="cPoint p2"></div>
-
-                                        <div className="cPoint p3"></div>
-
-                                        <div className="cPoint p4"></div>
-
-                                        <div className="cPoint p5"></div>
-
-                                    </div>
-
-
-
-                                    {/* Status Text */}
-
-                                    <div className="text-sm text-gray-400 mt-4">
-
-                                        Please keep your hands on the device
-
-                                    </div>
-
-                                </div>
-
-                            ) : (
-
-                                /* Idle Phase - Show Ready State */
-
-                                <div className="text-center h-full flex flex-col justify-center">
-
-                                    <div className="text-lg text-blue-400 font-semibold mb-4">Ready for ECG</div>
-
-                                    <div className="text-6xl mb-4">💚</div>
-
-                                    <div className="text-sm text-gray-400">
-
-                                        Device will automatically start measurement
-
-                                    </div>
-
-                                </div>
-
-                            )}
-
-                        </div>
-
-
-
-                        {/* Measuring text animation */}
-
-                        {isMonitoring && (
-
-                            <div className="text-center mt-3">
-
-                                <div className="text-green-400 text-lg font-semibold mb-1">Measuring...</div>
-
-                                <div className="text-green-300 text-sm opacity-80">ECG in progress</div>
-
-                            </div>
-
-                        )}
-
+                      Connected
                     </div>
 
+                    <div className="text-sm text-gray-400">
+                      {devices.find((d) => d.id === selectedDevice)
+                        ?.connectedAtFormatted ||
+                        new Date().toLocaleDateString()}
+                    </div>
 
-
-
-
-
-
-                    {/* Loading State for ECG Chart - Only show if not already loaded */}
-                    {/* Final ECG Result Display Section - Shows Completed Measurement Results */}
-                    {ecgResult && isMeasurementCompleted && (
-                        <div
-                            className="rounded-2xl p-4 mb-4"
-                            style={{
-                                background: 'rgba(17,24,39,0.6)',
-                                backdropFilter: 'blur(10px)',
-                                border: '1px solid rgba(55,65,81,0.3)',
-                                boxShadow: '0 0 20px rgba(0,0,0,0.3)'
-                            }}
-                        >
-                            <div className="flex items-center justify-between mb-4">
-                                <h2 className="text-base font-medium text-white flex items-center gap-2">
-                                    <ActivityIcon className="h-5 w-5" />
-                                    ECG Result
-                                </h2>
-                                <div className="flex items-center gap-2">
-                                    <div className="w-3 h-3 rounded-full bg-blue-400"></div>
-                                    <span className="text-sm text-blue-400 font-medium">Completed</span>
-                                    </div>
-                                </div>
-                                
-                            {/* Result Values */}
-                            <div className="grid grid-cols-2 gap-4 mb-4">
-                                <div className="bg-slate-700/30 rounded-lg p-4">
-                                    <div className="text-2xl font-bold text-blue-400">
-                                        {ecgResult.heartRate > 0 ? ecgResult.heartRate : '—'}
-                                </div>
-                                    <div className="text-xs text-gray-400">Heart Rate (BPM)</div>
-                            </div>
-                                <div className="bg-slate-700/30 rounded-lg p-4">
-                                    <div className="text-lg font-bold text-white capitalize">
-                                        {ecgResult.rhythm}
-                        </div>
-                                    <div className="text-xs text-gray-400">Rhythm</div>
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-4 mb-4">
-                                <div className="bg-slate-700/30 rounded-lg p-4">
-                                    <div className="text-lg font-semibold text-white">
-                                        {ecgResult.qrsDuration > 0 ? `${ecgResult.qrsDuration} ms` : '—'}
-                                    </div>
-                                    <div className="text-xs text-gray-400">QRS Duration</div>
-                                </div>
-                                <div className="bg-slate-700/30 rounded-lg p-4">
-                                    <div className="text-sm font-semibold text-gray-300">
-                                        {measurementCompletionTime ? new Date(measurementCompletionTime).toLocaleString() : (ecgResult.timestamp ? new Date(ecgResult.timestamp).toLocaleString() : '—')}
-                                    </div>
-                                    <div className="text-xs text-gray-400">Timestamp</div>
-                                </div>
-                            </div>
-                            
-                            {/* ✅ ECG Waveform Chart */}
-                            {permanentEcgData && (
-                                <div className="mt-4">
-                                    <EcgChartWithControls ecgData={permanentEcgData} />
-                                </div>
-                            )}
-                        </div>
-                    )}
-
-                    {/* Previous ECG Readings Section */}
-                    {previousECGReadings.length > 0 && (
-                        <div
-                            className="rounded-2xl p-4 mb-4"
-                            style={{
-                                background: 'rgba(17,24,39,0.6)',
-                                backdropFilter: 'blur(10px)',
-                                border: '1px solid rgba(55,65,81,0.3)',
-                                boxShadow: '0 0 20px rgba(0,0,0,0.3)'
-                            }}
-                        >
-                            <div className="flex items-center justify-between mb-4">
-                                <h2 className="text-base font-medium text-white flex items-center gap-2">
-                                    <ActivityIcon className="h-5 w-5" />
-                                    Previous Readings
-                                </h2>
-                                <span className="text-sm text-gray-400">
-                                    {previousECGReadings.length} {previousECGReadings.length === 1 ? 'reading' : 'readings'}
-                                </span>
-                            </div>
-
-                            {/* Previous Readings List */}
-                            <div className="space-y-3">
-                                {previousECGReadings.map((reading, index) => {
-                                    // Convert reading's ecgData to chart format if available
-                                    const handleShowChart = () => {
-                                        if (reading.ecgData && reading.ecgData.length > 0) {
-                                            const rawSamples = reading.ecgData; // Raw Int16 samples
-                                            const scaleUvPerLsb = 3.098; // BP2 scale factor (μV/LSB)
-                                            const sampleRate = 125; // BP2 sample rate (Hz)
-                                            const mvPerCount = scaleUvPerLsb / 1000; // Convert μV/LSB to mV/LSB
-                                            
-                                            // Convert Int16 to mV Float32Array
-                                            const samplesArray = new Float32Array(rawSamples.length);
-                                            for (let i = 0; i < rawSamples.length; i++) {
-                                                samplesArray[i] = rawSamples[i] * mvPerCount;
-                                            }
-                                            
-                                            const chartData = {
-                                                s: samplesArray, // Now in mV (Float32Array)
-                                                sr: sampleRate,
-                                                scale: 1.0 // Already in mV, no conversion needed
-                                            };
-                                            
-                                            setSelectedPreviousReadingChart({
-                                                ecgData: chartData,
-                                                readingId: reading.id || `reading_${index}`
-                                            });
-                                        }
-                                    };
-                                    
-                                    return (
-                                        <div
-                                            key={reading.id || index}
-                                            className="bg-slate-700/30 rounded-lg p-4 border border-slate-600/30"
-                                        >
-                                            <div className="grid grid-cols-2 gap-4">
-                                                <div>
-                                                    <div className="text-xl font-bold text-blue-400">
-                                                        {reading.heartRate > 0 ? reading.heartRate : '—'}
-                                                    </div>
-                                                    <div className="text-xs text-gray-400">Heart Rate (BPM)</div>
-                                                </div>
-                                                <div>
-                                                    <div className="text-lg font-bold text-white capitalize">
-                                                        {reading.rhythm}
-                                                    </div>
-                                                    <div className="text-xs text-gray-400">Rhythm</div>
-                                                </div>
-                                            </div>
-                                            <div className="grid grid-cols-2 gap-4 mt-3">
-                                                <div>
-                                                    <div className="text-sm font-semibold text-white">
-                                                        {reading.qrsDuration > 0 ? `${reading.qrsDuration} ms` : '—'}
-                                                    </div>
-                                                    <div className="text-xs text-gray-400">QRS Duration</div>
-                                                </div>
-                                                <div>
-                                                    <div className="text-sm font-semibold text-gray-300">
-                                                        {reading.timestamp ? new Date(reading.timestamp).toLocaleString() : '—'}
-                                                    </div>
-                                                    <div className="text-xs text-gray-400">Timestamp</div>
-                                                </div>
-                                            </div>
-                                            
-                                            {/* Show Chart Button - Always show if reading exists */}
-                                            <div className="mt-4">
-                                                <button
-                                                    onClick={handleShowChart}
-                                                    disabled={!reading.ecgData || reading.ecgData.length === 0}
-                                                    className={`w-full px-4 py-2 text-white rounded-lg transition-all duration-300 border shadow-lg flex items-center justify-center gap-2 ${
-                                                        reading.ecgData && reading.ecgData.length > 0
-                                                            ? 'bg-green-500/80 hover:bg-green-400/90 border-green-400/30'
-                                                            : 'bg-gray-500/50 border-gray-400/30 cursor-not-allowed opacity-50'
-                                                    }`}
-                                                >
-                                                    <ActivityIcon className="h-4 w-4" />
-                                                    Show Chart
-                                                </button>
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        </div>
-                    )}
-
-                    {/* 🚀 REMOVED: Redundant Current Rhythm Analysis section - consolidated into Live ECG Data */}
-
-                    {/* Previous Reading Chart Overlay - Uses separate full-screen component */}
-                    {selectedPreviousReadingChart && (
-                        <EcgFullScreenChart 
-                            ecgData={selectedPreviousReadingChart.ecgData}
-                            onClose={() => setSelectedPreviousReadingChart(null)}
-                        />
-                    )}
-
-
+                    <div className="text-sm text-gray-400">
+                      Duration:{" "}
+                      {devices.find((d) => d.id === selectedDevice)
+                        ?.connectionDurationFormatted || "0s"}
+                    </div>
+                  </div>
                 </div>
 
+                {/* Status Bar - Inside device card */}
+
+                <div className="flex items-center gap-2">
+                  <div
+                    className={`w-2 h-2 rounded-full ${
+                      isMonitoring
+                        ? "bg-green-400 animate-pulse"
+                        : "bg-yellow-400"
+                    }`}
+                  ></div>
+
+                  <span
+                    className="text-sm text-gray-400"
+                    style={{ fontSize: "13px" }}
+                  >
+                    Receiving live ECG… • Buffer: {bufferLen} pts • Status:{" "}
+                    {isMonitoring ? "active" : "listening"} • RT msgs: {rtCount}{" "}
+                    • ECG evts: {ecgEvtCount}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Live ECG Waveform Panel - New BP UI Style */}
+
+          <div
+            className="rounded-2xl p-4 mb-4"
+            style={{
+              background: "rgba(17,24,39,0.6)",
+
+              backdropFilter: "blur(10px)",
+
+              border: "1px solid rgba(55,65,81,0.3)",
+
+              boxShadow: "0 0 20px rgba(0,0,0,0.3)",
+            }}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h2
+                className="text-base font-medium text-white"
+                style={{ fontSize: "16px" }}
+              >
+                ECG Measurement
+              </h2>
+
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-400">Status:</span>
+
+                <div
+                  className={`px-2 py-1 rounded-full text-xs font-medium ${
+                    isMonitoring
+                      ? "bg-green-500/20 text-green-400 border border-green-500/30"
+                      : "bg-blue-500/20 text-blue-400 border border-blue-500/30"
+                  }`}
+                >
+                  {isMonitoring ? "Measuring" : "Ready"}
+                </div>
+              </div>
             </div>
 
-        </MobileAppContainer>
+            {/* ECG Loading Animation */}
 
-    );
+            <div
+              className="rounded-xl overflow-hidden relative bg-[#0A0A0A] p-6"
+              style={{
+                height: "200px",
 
+                minHeight: "180px",
+
+                borderRadius: "16px",
+              }}
+            >
+              {isMonitoring ? (
+                /* Measurement Phase - Show Animation */
+
+                <div className="text-center h-full flex flex-col justify-center">
+                  <div className="text-lg text-green-400 font-semibold mb-4">
+                    Measuring ECG...
+                  </div>
+
+                  {/* Animated ECG Pulse Points */}
+
+                  <div className="cWrapper">
+                    <div className="cPoint p1"></div>
+
+                    <div className="cPoint p2"></div>
+
+                    <div className="cPoint p3"></div>
+
+                    <div className="cPoint p4"></div>
+
+                    <div className="cPoint p5"></div>
+                  </div>
+
+                  {/* Status Text */}
+
+                  <div className="text-sm text-gray-400 mt-4">
+                    Please keep your hands on the device
+                  </div>
+                </div>
+              ) : (
+                /* Idle Phase - Show Ready State */
+
+                <div className="text-center h-full flex flex-col justify-center">
+                  <div className="text-lg text-blue-400 font-semibold mb-4">
+                    Ready for ECG
+                  </div>
+
+                  <div className="text-6xl mb-4">💚</div>
+
+                  <div className="text-sm text-gray-400">
+                    Device will automatically start measurement
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Measuring text animation */}
+
+            {isMonitoring && (
+              <div className="text-center mt-3">
+                <div className="text-green-400 text-lg font-semibold mb-1">
+                  Measuring...
+                </div>
+
+                <div className="text-green-300 text-sm opacity-80">
+                  ECG in progress
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Loading State for ECG Chart - Only show if not already loaded */}
+          {/* Final ECG Result Display Section - Shows Completed Measurement Results */}
+          {ecgResult && isMeasurementCompleted && (
+            <div
+              className="rounded-2xl p-4 mb-4"
+              style={{
+                background: "rgba(17,24,39,0.6)",
+                backdropFilter: "blur(10px)",
+                border: "1px solid rgba(55,65,81,0.3)",
+                boxShadow: "0 0 20px rgba(0,0,0,0.3)",
+              }}
+            >
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-base font-medium text-white flex items-center gap-2">
+                  <ActivityIcon className="h-5 w-5" />
+                  ECG Result
+                </h2>
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-blue-400"></div>
+                  <span className="text-sm text-blue-400 font-medium">
+                    Completed
+                  </span>
+                </div>
+              </div>
+
+              {/* Result Values */}
+              <div className="grid grid-cols-2 gap-4 mb-4">
+                <div className="bg-slate-700/30 rounded-lg p-4">
+                  <div className="text-2xl font-bold text-blue-400">
+                    {ecgResult.heartRate > 0 ? ecgResult.heartRate : "—"}
+                  </div>
+                  <div className="text-xs text-gray-400">Heart Rate (BPM)</div>
+                </div>
+                <div className="bg-slate-700/30 rounded-lg p-4">
+                  <div className="text-lg font-bold text-white capitalize">
+                    {ecgResult.rhythm}
+                  </div>
+                  <div className="text-xs text-gray-400">Rhythm</div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 mb-4">
+                <div className="bg-slate-700/30 rounded-lg p-4">
+                  <div className="text-lg font-semibold text-white">
+                    {ecgResult.qrsDuration > 0
+                      ? `${ecgResult.qrsDuration} ms`
+                      : "—"}
+                  </div>
+                  <div className="text-xs text-gray-400">QRS Duration</div>
+                </div>
+                <div className="bg-slate-700/30 rounded-lg p-4">
+                  <div className="text-sm font-semibold text-gray-300">
+                    {measurementCompletionTime
+                      ? new Date(measurementCompletionTime).toLocaleString()
+                      : ecgResult.timestamp
+                      ? new Date(ecgResult.timestamp).toLocaleString()
+                      : "—"}
+                  </div>
+                  <div className="text-xs text-gray-400">Timestamp</div>
+                </div>
+              </div>
+
+              {/* ✅ ECG Waveform Chart */}
+              {permanentEcgData && (
+                <div className="mt-4">
+                  <EcgChartWithControls ecgData={permanentEcgData} />
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Previous ECG Readings Section */}
+          {previousECGReadings.length > 0 && (
+            <div
+              className="rounded-2xl p-4 mb-4"
+              style={{
+                background: "rgba(17,24,39,0.6)",
+                backdropFilter: "blur(10px)",
+                border: "1px solid rgba(55,65,81,0.3)",
+                boxShadow: "0 0 20px rgba(0,0,0,0.3)",
+              }}
+            >
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-base font-medium text-white flex items-center gap-2">
+                  <ActivityIcon className="h-5 w-5" />
+                  Previous Readings
+                </h2>
+                <span className="text-sm text-gray-400">
+                  {previousECGReadings.length}{" "}
+                  {previousECGReadings.length === 1 ? "reading" : "readings"}
+                </span>
+              </div>
+
+              {/* Previous Readings List */}
+              <div className="space-y-3">
+                {previousECGReadings.map((reading, index) => {
+                  // Convert reading's ecgData to chart format if available
+                  const handleShowChart = () => {
+                    if (reading.ecgData && reading.ecgData.length > 0) {
+                      const rawSamples = reading.ecgData; // Raw Int16 samples
+                      const scaleUvPerLsb = 3.098; // BP2 scale factor (μV/LSB)
+                      const sampleRate = 125; // BP2 sample rate (Hz)
+                      const mvPerCount = scaleUvPerLsb / 1000; // Convert μV/LSB to mV/LSB
+
+                      // Convert Int16 to mV Float32Array
+                      const samplesArray = new Float32Array(rawSamples.length);
+                      for (let i = 0; i < rawSamples.length; i++) {
+                        samplesArray[i] = rawSamples[i] * mvPerCount;
+                      }
+
+                      const chartData = {
+                        s: samplesArray, // Now in mV (Float32Array)
+                        sr: sampleRate,
+                        scale: 1.0, // Already in mV, no conversion needed
+                      };
+
+                      setSelectedPreviousReadingChart({
+                        ecgData: chartData,
+                        readingId: reading.id || `reading_${index}`,
+                      });
+                    }
+                  };
+
+                  return (
+                    <div
+                      key={reading.id || index}
+                      className="bg-slate-700/30 rounded-lg p-4 border border-slate-600/30"
+                    >
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <div className="text-xl font-bold text-blue-400">
+                            {reading.heartRate > 0 ? reading.heartRate : "—"}
+                          </div>
+                          <div className="text-xs text-gray-400">
+                            Heart Rate (BPM)
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-lg font-bold text-white capitalize">
+                            {reading.rhythm}
+                          </div>
+                          <div className="text-xs text-gray-400">Rhythm</div>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4 mt-3">
+                        <div>
+                          <div className="text-sm font-semibold text-white">
+                            {reading.qrsDuration > 0
+                              ? `${reading.qrsDuration} ms`
+                              : "—"}
+                          </div>
+                          <div className="text-xs text-gray-400">
+                            QRS Duration
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-sm font-semibold text-gray-300">
+                            {reading.timestamp
+                              ? new Date(reading.timestamp).toLocaleString()
+                              : "—"}
+                          </div>
+                          <div className="text-xs text-gray-400">Timestamp</div>
+                        </div>
+                      </div>
+
+                      {/* Show Chart Button - Always show if reading exists */}
+                      <div className="mt-4">
+                        <button
+                          onClick={handleShowChart}
+                          disabled={
+                            !reading.ecgData || reading.ecgData.length === 0
+                          }
+                          className={`w-full px-4 py-2 text-white rounded-lg transition-all duration-300 border shadow-lg flex items-center justify-center gap-2 ${
+                            reading.ecgData && reading.ecgData.length > 0
+                              ? "bg-green-500/80 hover:bg-green-400/90 border-green-400/30"
+                              : "bg-gray-500/50 border-gray-400/30 cursor-not-allowed opacity-50"
+                          }`}
+                        >
+                          <ActivityIcon className="h-4 w-4" />
+                          Show Chart
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* 🚀 REMOVED: Redundant Current Rhythm Analysis section - consolidated into Live ECG Data */}
+
+          {/* Previous Reading Chart Overlay - Uses separate full-screen component */}
+          {selectedPreviousReadingChart && (
+            <EcgFullScreenChart
+              ecgData={selectedPreviousReadingChart.ecgData}
+              onClose={() => setSelectedPreviousReadingChart(null)}
+            />
+          )}
+        </div>
+      </div>
+    </MobileAppContainer>
+  );
 };
 
-
-
-export default ECGMonitor; 
+export default ECGMonitor;

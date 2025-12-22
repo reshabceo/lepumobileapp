@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Shield, Lock, Eye, FileText, Users, Globe, Database, Mail, Heart, User } from 'lucide-react';
+import { ArrowLeft, Shield, Lock, Eye, FileText, Users, Globe, Database, Mail, Heart, User, AlertTriangle } from 'lucide-react';
 
 const PrivacyPolicy = () => {
   const navigate = useNavigate();
@@ -294,6 +294,33 @@ const PrivacyPolicy = () => {
             <p className="text-sm text-emerald-200/80 leading-relaxed">
               This Privacy Policy complies with the requirements of both the Apple App Store and Google Play Store. We are committed to transparency about our data practices and protecting your privacy in accordance with applicable laws, including GDPR, CCPA, and HIPAA where applicable.
             </p>
+          </div>
+
+          {/* Related Links */}
+          <div className="backdrop-blur-md bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-6">
+            <h2 className="text-xl font-semibold text-white mb-4">Related Information</h2>
+            <div className="space-y-3">
+              <button
+                onClick={() => navigate('/medical-disclaimer')}
+                className="w-full text-left p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg hover:bg-yellow-500/20 transition-colors flex items-center gap-3"
+              >
+                <AlertTriangle className="h-5 w-5 text-yellow-400" />
+                <div>
+                  <p className="text-white font-semibold">Medical Disclaimer</p>
+                  <p className="text-emerald-200/80 text-xs">Important information about medical device usage and limitations</p>
+                </div>
+              </button>
+              <button
+                onClick={() => navigate('/support')}
+                className="w-full text-left p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-lg hover:bg-emerald-500/20 transition-colors flex items-center gap-3"
+              >
+                <FileText className="h-5 w-5 text-emerald-400" />
+                <div>
+                  <p className="text-white font-semibold">Support & Help</p>
+                  <p className="text-emerald-200/80 text-xs">Get help with the app and find answers to common questions</p>
+                </div>
+              </button>
+            </div>
           </div>
         </div>
       </div>
