@@ -36,13 +36,6 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
-	<key>UISupportedInterfaceOrientations~ipad</key>
-	<array>
-		<string>UIInterfaceOrientationPortrait</string>
-		<string>UIInterfaceOrientationPortraitUpsideDown</string>
-		<string>UIInterfaceOrientationLandscapeLeft</string>
-		<string>UIInterfaceOrientationLandscapeRight</string>
-	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
 	<key>NSBluetoothAlwaysUsageDescription</key>
@@ -55,6 +48,8 @@
 	<string>This app needs permission to save photos to your photo library when you capture medical documents.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>This app needs camera access to capture photos of medical reports and documents for upload.</string>
+	<key>NSUserTrackingUsageDescription</key>
+	<string>This app does not track users across apps or websites. If any analytics are used, they are only for app performance monitoring and crash reporting to improve the app experience.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>bluetooth-central</string>

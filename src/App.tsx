@@ -42,6 +42,7 @@ import { BackButtonHandler } from "./components/BackButtonHandler";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import ContactUs from "./pages/ContactUs";
 import Support from "./pages/Support";
+import MedicalDisclaimer from "./pages/MedicalDisclaimer";
 
 const queryClient = new QueryClient();
 
@@ -231,6 +232,11 @@ const App = () => (
               <Route path="/support" element={
                 <ProtectedRoute requireAuth={false}>
                   <Support />
+                </ProtectedRoute>
+              } />
+              <Route path="/medical-disclaimer" element={
+                <ProtectedRoute requireAuth={false}>
+                  <MedicalDisclaimer />
                 </ProtectedRoute>
               } />
 
