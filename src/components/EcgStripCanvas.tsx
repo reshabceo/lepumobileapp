@@ -84,13 +84,25 @@ export default function EcgStripCanvas({
     const pxPerMmX = pxPerMm;
     const pxPerMmY = pxPerMm;
     
-    // ✅ MATCH WEB PORTAL: Convert all samples to mV first
+    // ✅ FIX: Convert all samples to mV first and calculate proper baseline
     // Web portal: values = waveformData.map(c => c * mvPerCount) where mvPerCount = 0.003098
     const mvSamples = Array.from(rowData).map(sample => convertToMv(sample));
-    const minMv = Math.min(...mvSamples);
-    const maxMv = Math.max(...mvSamples);
-    const midMv = (minMv + maxMv) / 2; // Baseline (midpoint) - matches web portal
-    const ampMv = Math.max(0.5, maxMv - minMv); // Amplitude range - matches web portal
+    
+    // ✅ CRITICAL FIX: Calculate DC offset (mean) as true baseline, not min/max midpoint
+    // ECG baseline should be the actual DC offset (mean), not the midpoint between peaks
+    const sumMv = mvSamples.reduce((sum, v) => sum + v, 0);
+    const meanMv = sumMv / mvSamples.length; // True DC offset (baseline)
+    
+    // Remove DC offset to center waveform around zero
+    const dcRemovedSamples = mvSamples.map(v => v - meanMv);
+    
+    // Calculate amplitude range from DC-removed samples
+    const minMv = Math.min(...dcRemovedSamples);
+    const maxMv = Math.max(...dcRemovedSamples);
+    const ampMv = Math.max(0.5, maxMv - minMv); // Amplitude range
+    
+    // Baseline is now zero (after DC removal)
+    const baselineMv = 0;
     
     // Calculate scaling factors
     const timeScale = width / (secondsPerRow * sampleRate); // Full width, no margins
@@ -163,15 +175,16 @@ export default function EcgStripCanvas({
     ctx.lineWidth = 2.0;
     ctx.beginPath();
 
-    // ✅ MATCH WEB PORTAL EXACTLY: Use same normalization formula
-    // Web portal: y = cssH * 0.5 - ((values[i] - mid) / amp) * (cssH * 0.4)
-    // Mobile: y = rowY + (rowHeight / 2) - ((sampleMv - midMv) / ampMv) * (rowHeight * 0.4)
+    // ✅ FIX: Use DC-removed samples for proper baseline display
+    // ECG waveform should oscillate around zero baseline (isoelectric line)
     let firstPoint = true;
     for (let i = 0; i < rowData.length; i++) {
       const x = i * timeScale;
       const sampleMv = convertToMv(rowData[i]);
-      // ✅ EXACT WEB PORTAL FORMULA: Normalize by amplitude, then scale
-      const normalized = (sampleMv - midMv) / ampMv; // Range: [-1, 1]
+      // Remove DC offset to center around zero baseline
+      const dcRemovedMv = sampleMv - meanMv;
+      // Normalize by amplitude, then scale
+      const normalized = dcRemovedMv / ampMv; // Range: approximately [-1, 1]
       const y = rowY + (rowHeight / 2) - (normalized * rowHeightScale);
 
       if (firstPoint) {
@@ -194,11 +207,12 @@ export default function EcgStripCanvas({
       ctx.fillText(`${i}s`, x + 2, rowY + rowHeight + 15);
     }
 
-    // Amplitude labels
+    // Amplitude labels (using DC-removed amplitude)
     ctx.textAlign = 'right';
-    ctx.fillText(`${maxMv.toFixed(1)}mV`, 10, rowY + 15);
-    ctx.fillText(`0mV`, 10, rowY + (rowHeight / 2) + 5);
-    ctx.fillText(`-${maxMv.toFixed(1)}mV`, 10, rowY + rowHeight - 5);
+    const maxAmplitudeMv = Math.max(Math.abs(minMv), Math.abs(maxMv));
+    ctx.fillText(`+${maxAmplitudeMv.toFixed(1)}mV`, 10, rowY + 15);
+    ctx.fillText(`0mV (baseline)`, 10, rowY + (rowHeight / 2) + 5);
+    ctx.fillText(`-${maxAmplitudeMv.toFixed(1)}mV`, 10, rowY + rowHeight - 5);
 
     // Row info
     ctx.textAlign = 'left';

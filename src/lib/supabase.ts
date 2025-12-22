@@ -2,8 +2,9 @@ import { createClient } from '@supabase/supabase-js'
 import { Capacitor, CapacitorHttp } from '@capacitor/core'
 
 // Get environment variables
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+// Export Supabase credentials for direct REST uploads when needed (e.g., native file uploads)
+export const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+export const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 
 // Validate environment variables
 if (!supabaseUrl || !supabaseAnonKey) {
@@ -26,6 +27,21 @@ const nativeFetch: typeof fetch = async (input: RequestInfo | URL, init?: Reques
   const req = isReqObj ? (input as Request) : undefined
   const url = isReqObj ? req!.url : String(input)
   const method = (init?.method || req?.method || 'GET').toUpperCase()
+
+  // Check if this is a file upload (FormData or Blob/File)
+  const isFileUpload = init?.body instanceof FormData || 
+                       init?.body instanceof Blob || 
+                       init?.body instanceof File ||
+                       req?.body instanceof FormData ||
+                       req?.body instanceof Blob ||
+                       req?.body instanceof File
+
+  // For file uploads on native platforms, use default fetch (Supabase handles it internally)
+  // CapacitorHttp doesn't handle FormData/File uploads well, so fallback to default fetch
+  if (isFileUpload) {
+    console.log('📤 File upload detected - using default fetch for native platform');
+    return fetch(input, init);
+  }
 
   // Normalize headers to a plain object
   const headerEntries = new Headers(init?.headers || req?.headers)
