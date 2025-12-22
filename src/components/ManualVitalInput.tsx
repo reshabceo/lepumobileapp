@@ -11,9 +11,11 @@ import {
   Activity,
   Save,
   Loader2,
-  CheckCircle2
+  CheckCircle2,
+  ArrowLeft
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 
 interface VitalInput {
@@ -26,6 +28,7 @@ interface VitalInput {
 }
 
 export const ManualVitalInput = () => {
+  const navigate = useNavigate();
   const { toast } = useToast();
   const [submitting, setSubmitting] = useState(false);
   const [vitals, setVitals] = useState<VitalInput>({
@@ -296,13 +299,29 @@ export const ManualVitalInput = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-950 via-green-900 to-emerald-950 p-6">
-      <div className="max-w-2xl mx-auto">
-        {/* Header */}
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold text-white mb-2">Manual Vital Input</h1>
-          <p className="text-emerald-200/80">Enter your health readings manually - Basic Plan</p>
+    <div className="min-h-screen bg-gradient-to-br from-emerald-950 via-green-900 to-emerald-950">
+      {/* Header with Back Button */}
+      <div className="bg-slate-800/50 backdrop-blur-sm border-b border-slate-700 sticky top-0 z-10">
+        <div className="relative flex items-center justify-between p-4" style={{ paddingTop: 'max(1rem, env(safe-area-inset-top))' }}>
+          <button
+            onClick={() => navigate(-1)}
+            className="flex items-center gap-2 px-3 py-2 text-white bg-blue-600 hover:bg-blue-700 transition-colors touch-manipulation rounded-lg"
+            style={{ minHeight: '40px', minWidth: '70px' }}
+          >
+            <ArrowLeft className="h-4 w-4" />
+            <span className="text-sm">Back</span>
+          </button>
+          <h1 className="absolute left-1/2 transform -translate-x-1/2 text-xl font-semibold text-white">Manual Vital Input</h1>
+          <div className="w-16" />
         </div>
+      </div>
+
+      <div className="p-6">
+        <div className="max-w-2xl mx-auto">
+          {/* Subtitle */}
+          <div className="mb-6 mt-4">
+            <p className="text-emerald-200/80 text-center">Enter your health readings manually - Basic Plan</p>
+          </div>
 
         {/* Info Card */}
         <Card className="bg-blue-500/10 border-blue-500/30 mb-6">
@@ -456,6 +475,7 @@ export const ManualVitalInput = () => {
             </CardContent>
           </Card>
         </form>
+        </div>
       </div>
     </div>
   );

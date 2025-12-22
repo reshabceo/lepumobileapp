@@ -4,9 +4,13 @@ import { ArrowLeft, FilePlus2, Search, Upload, Camera, ChevronDown } from 'lucid
 import { useNavigate } from 'react-router-dom';
 import { MobileAppContainer } from '../components/MobileAppContainer';
 import { useToast } from '../hooks/use-toast';
-import { supabase, db } from '@/lib/supabase';
+import { supabase, db, supabaseUrl } from '@/lib/supabase';
 import { useRealTimeVitals } from '@/hooks/useRealTimeVitals';
 import { useAuth } from '@/contexts/AuthContext';
+import { Camera as CapacitorCamera, CameraResultType, CameraSource } from '@capacitor/camera';
+import { App } from '@capacitor/app';
+import { Capacitor } from '@capacitor/core';
+import { Network } from '@capacitor/network';
 
 // Main Add Report Component
 export default function AddReports() {
@@ -22,8 +26,10 @@ export default function AddReports() {
   const [doctorName, setDoctorName] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [selectingFile, setSelectingFile] = useState(false);
   const [patientProfile, setPatientProfile] = useState<any>(null);
   const [profileLoading, setProfileLoading] = useState(true);
+  const [uploadProgress, setUploadProgress] = useState(0);
 
   // Fetch patient profile directly on mount
   useEffect(() => {
@@ -89,53 +95,334 @@ export default function AddReports() {
   };
 
   const handleFileUpload = () => {
-    fileInputRef.current?.click();
-  };
-
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      setSelectedFile(file);
-      toast({
-        title: "File Selected",
-        description: `${file.name} is ready to upload`,
-      });
-    }
-  };
-
-  const handleTakePhoto = async () => {
     try {
-      // Check if the browser supports camera access
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        toast({
-          title: "Camera Not Supported",
-          description: "Camera access is not supported in this browser",
-          variant: "destructive",
-        });
-        return;
+      // Reset file input to allow selecting the same file again
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
       }
-
-      // Request camera permission
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      setSelectingFile(true);
+      fileInputRef.current?.click();
       
-      // Stop the stream immediately (we're just checking permission)
-      stream.getTracks().forEach(track => track.stop());
-      
-      toast({
-        title: "Camera Ready",
-        description: "Camera access granted. Photo capture functionality would be implemented here.",
-      });
+      // Reset selecting state after a short delay (file picker opens)
+      setTimeout(() => {
+        setSelectingFile(false);
+      }, 500);
     } catch (error) {
+      console.error('Error opening file picker:', error);
+      setSelectingFile(false);
       toast({
-        title: "Camera Access Denied",
-        description: "Please allow camera access to take photos",
+        title: "Error",
+        description: "Failed to open file picker. Please try again.",
         variant: "destructive",
       });
     }
   };
 
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    try {
+      setSelectingFile(false);
+      const file = event.target.files?.[0];
+      
+      if (!file) {
+        console.log('No file selected');
+        return;
+      }
+
+      // Stricter limits for Android
+      const maxSize = Capacitor.isNativePlatform() 
+        ? 20 * 1024 * 1024 // 20MB for native
+        : 50 * 1024 * 1024; // 50MB for web
+      
+      if (file.size > maxSize) {
+        toast({
+          title: "File Too Large",
+          description: `Maximum file size is ${maxSize / (1024 * 1024)}MB on mobile. Your file is ${(file.size / (1024 * 1024)).toFixed(2)}MB`,
+          variant: "destructive",
+        });
+        // Reset file input
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
+        setSelectedFile(null);
+        return;
+      }
+
+      // Validate file type
+      const allowedTypes = [
+        'image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp',
+        'application/pdf',
+        'application/msword',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+      ];
+      
+      const fileExtension = file.name.split('.').pop()?.toLowerCase();
+      const allowedExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'pdf', 'doc', 'docx'];
+      
+      if (!allowedTypes.includes(file.type) && !allowedExtensions.includes(fileExtension || '')) {
+        toast({
+          title: "Invalid File Type",
+          description: "Please select an image (JPG, PNG, GIF) or document (PDF, DOC, DOCX)",
+          variant: "destructive",
+        });
+        // Reset file input
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
+        setSelectedFile(null);
+        return;
+      }
+
+      // File is valid, set it
+      setSelectedFile(file);
+      toast({
+        title: "File Selected",
+        description: `${file.name} (${(file.size / (1024 * 1024)).toFixed(2)}MB) is ready to upload`,
+      });
+    } catch (error) {
+      console.error('Error handling file selection:', error);
+      setSelectingFile(false);
+      toast({
+        title: "Error",
+        description: "Failed to process selected file. Please try again.",
+        variant: "destructive",
+      });
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+      setSelectedFile(null);
+    }
+  };
+
+  const handleTakePhoto = async () => {
+    try {
+      // Check if we're on a native platform (iOS/Android)
+      if (Capacitor.isNativePlatform()) {
+        try {
+          // Use Capacitor Camera plugin for native platforms
+          const image = await CapacitorCamera.getPhoto({
+            quality: 90,
+            allowEditing: false,
+            resultType: CameraResultType.DataUrl,
+            source: CameraSource.Camera,
+          });
+
+          if (image.dataUrl) {
+            // Convert data URL to File object
+            const response = await fetch(image.dataUrl);
+            const blob = await response.blob();
+            const fileName = `photo_${Date.now()}.jpg`;
+            const file = new File([blob], fileName, { type: 'image/jpeg' });
+            
+            setSelectedFile(file);
+            toast({
+              title: "Photo Captured",
+              description: "Photo is ready to upload",
+            });
+          }
+        } catch (cameraError: any) {
+          console.error('Camera error:', cameraError);
+          
+          // Check if permission was denied
+          if (cameraError.message?.includes('permission') || 
+              cameraError.message?.includes('denied') ||
+              cameraError.code === 'PERMISSION_DENIED') {
+            // Show dialog to open settings
+            const shouldOpenSettings = window.confirm(
+              'Camera permission is required to take photos. Would you like to open app settings to grant permission?'
+            );
+            
+            if (shouldOpenSettings) {
+              try {
+                // Open app settings using platform-specific URL schemes
+                if (Capacitor.getPlatform() === 'ios') {
+                  // iOS: Try to open app settings
+                  try {
+                    window.location.href = 'app-settings:';
+                  } catch {
+                    // If that doesn't work, show instructions
+                    toast({
+                      title: "Open Settings",
+                      description: "Please go to Settings > Monitraq > Camera and enable access",
+                      variant: "default",
+                    });
+                  }
+                } else if (Capacitor.getPlatform() === 'android') {
+                  // Android: Try to open app info in settings
+                  try {
+                    // Use Android intent URL to open app settings
+                    window.open('intent:#Intent;action=android.settings.APPLICATION_DETAILS_SETTINGS;data=package:com.monitraq.app;end', '_system');
+                  } catch {
+                    // Fallback: show instructions
+                    toast({
+                      title: "Open Settings",
+                      description: "Please go to Settings > Apps > Monitraq > Permissions > Camera and enable it",
+                      variant: "default",
+                    });
+                  }
+                } else {
+                  // Web or other platform
+                  toast({
+                    title: "Camera Permission Required",
+                    description: "Please allow camera access in your browser settings",
+                    variant: "default",
+                  });
+                }
+              } catch (settingsError) {
+                // Final fallback: show instructions
+                toast({
+                  title: "Open Settings Manually",
+                  description: "Please go to your device Settings > Apps > Monitraq > Permissions and enable Camera",
+                  variant: "default",
+                });
+              }
+            }
+            
+            toast({
+              title: "Camera Permission Required",
+              description: "Please grant camera permission in app settings",
+              variant: "destructive",
+            });
+          } else {
+            toast({
+              title: "Camera Error",
+              description: cameraError.message || "Failed to capture photo. Please try again.",
+              variant: "destructive",
+            });
+          }
+        }
+      } else {
+        // Web platform - use browser API with better error handling
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          toast({
+            title: "Camera Not Supported",
+            description: "Camera access is not supported in this browser",
+            variant: "destructive",
+          });
+          return;
+        }
+
+        try {
+          // Request camera permission
+          const stream = await navigator.mediaDevices.getUserMedia({ 
+            video: { 
+              facingMode: 'environment' // Prefer back camera on mobile
+            } 
+          });
+          
+          // Create video element to capture frame
+          const video = document.createElement('video');
+          video.srcObject = stream;
+          video.play();
+          
+          // Wait for video to be ready
+          await new Promise((resolve) => {
+            video.onloadedmetadata = () => {
+              video.width = video.videoWidth;
+              video.height = video.videoHeight;
+              resolve(true);
+            };
+          });
+
+          // Create canvas to capture image
+          const canvas = document.createElement('canvas');
+          canvas.width = video.videoWidth;
+          canvas.height = video.videoHeight;
+          const ctx = canvas.getContext('2d');
+          ctx?.drawImage(video, 0, 0);
+          
+          // Stop the stream
+          stream.getTracks().forEach(track => track.stop());
+          
+          // Convert canvas to blob and create file
+          canvas.toBlob((blob) => {
+            if (blob) {
+              const fileName = `photo_${Date.now()}.jpg`;
+              const file = new File([blob], fileName, { type: 'image/jpeg' });
+              setSelectedFile(file);
+              toast({
+                title: "Photo Captured",
+                description: "Photo is ready to upload",
+              });
+            }
+          }, 'image/jpeg', 0.9);
+        } catch (webError: any) {
+          console.error('Web camera error:', webError);
+          
+          if (webError.name === 'NotAllowedError' || webError.name === 'PermissionDeniedError') {
+            toast({
+              title: "Camera Permission Denied",
+              description: "Please allow camera access in your browser settings and try again",
+              variant: "destructive",
+            });
+          } else if (webError.name === 'NotFoundError' || webError.name === 'DevicesNotFoundError') {
+            toast({
+              title: "No Camera Found",
+              description: "No camera device was found on your device",
+              variant: "destructive",
+            });
+          } else {
+            toast({
+              title: "Camera Error",
+              description: webError.message || "Failed to access camera. Please try again.",
+              variant: "destructive",
+            });
+          }
+        }
+      }
+    } catch (error: any) {
+      console.error('Unexpected camera error:', error);
+      toast({
+        title: "Camera Error",
+        description: error.message || "An unexpected error occurred. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Network status check helper
+  const checkNetworkStatus = async () => {
+    try {
+      const status = await Network.getStatus();
+      console.log('🌐 Network status:', status);
+      
+      if (!status.connected) {
+        toast({
+          title: "No Internet Connection",
+          description: "Please check your connection and try again",
+          variant: "destructive",
+        });
+        return false;
+      }
+      
+      if (status.connectionType === 'cellular') {
+        toast({
+          title: "Using Mobile Data",
+          description: "Large files may take longer on mobile data",
+          variant: "default",
+        });
+      }
+      
+      return true;
+    } catch (error) {
+      console.error('Error checking network status:', error);
+      // Continue anyway if network check fails
+      return true;
+    }
+  };
+
   // Upload logic extracted to avoid duplication
   const performUpload = async (profile: any) => {
+    // Validate inputs again before upload
+    if (!selectedFile) {
+      toast({
+        title: "No File Selected",
+        description: "Please select a file to upload",
+        variant: "destructive",
+      });
+      return false;
+    }
+
     if (!profile.assigned_doctor_id) {
       toast({
         title: "No Assigned Doctor",
@@ -146,70 +433,200 @@ export default function AddReports() {
     }
 
     setUploading(true);
+    setUploadProgress(0);
+
+    // Declare progress interval at function scope so it can be cleared in finally
+    let progressInterval: NodeJS.Timeout | null = null;
 
     try {
-      // Upload file to Supabase Storage
-      const fileExt = selectedFile!.name.split('.').pop();
-      const fileName = `${profile.id}/${Date.now()}.${fileExt}`;
+      console.log('📤 Starting file upload...', {
+        fileName: selectedFile.name,
+        fileSize: selectedFile.size,
+        fileType: selectedFile.type,
+        platform: Capacitor.getPlatform(),
+        isNative: Capacitor.isNativePlatform(),
+      });
 
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('patient-reports')
-        .upload(fileName, selectedFile!);
+      // Generate file name with patient ID prefix
+      const fileExt = selectedFile.name.split('.').pop()?.toLowerCase() || 'jpg';
+      const timestamp = Date.now();
+      const randomId = Math.random().toString(36).substring(7);
+      const fileName = `${profile.id}/report_${timestamp}_${randomId}.${fileExt}`;
 
-      if (uploadError) {
-        console.error('File upload error:', uploadError);
+      try {
+        // Use Supabase Storage client API (works better on native platforms)
+        console.log('🚀 Uploading to Supabase Storage...');
+        
+        // Start progress simulation
+        progressInterval = setInterval(() => {
+          setUploadProgress((prev) => {
+            // Gradually increase progress, but don't go above 90% until upload completes
+            if (prev < 90) {
+              return Math.min(prev + 5, 90);
+            }
+            return prev;
+          });
+        }, 500);
+        
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('patient-reports')
+          .upload(fileName, selectedFile, {
+            cacheControl: '3600',
+            upsert: false,
+            contentType: selectedFile.type || 'application/octet-stream',
+          });
+
+        // Clear progress interval once upload completes
+        if (progressInterval) {
+          clearInterval(progressInterval);
+          progressInterval = null;
+        }
+
+        if (uploadError) {
+          console.error('❌ Upload error:', uploadError);
+          
+          let errorMessage = uploadError.message || 'Upload failed';
+          
+          // Provide user-friendly error messages
+          if (errorMessage.includes('timeout') || errorMessage.includes('Network request failed')) {
+            errorMessage = "Upload took too long. Check your internet connection and try again.";
+          } else if (errorMessage.includes('Failed to fetch') || errorMessage.includes('Network error')) {
+            errorMessage = "Network connection issue. Please check your internet and try again.";
+          } else if (errorMessage.includes('413') || errorMessage.includes('too large') || errorMessage.includes('Payload too large')) {
+            errorMessage = "File is too large. Maximum size is 20MB on mobile.";
+          } else if (errorMessage.includes('JWT') || errorMessage.includes('token') || errorMessage.includes('auth')) {
+            errorMessage = "Authentication error. Please sign in again.";
+          } else if (errorMessage.includes('duplicate') || errorMessage.includes('already exists')) {
+            // Retry with a new filename if duplicate
+            const retryFileName = `${profile.id}/report_${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
+            console.log('🔄 Retrying with new filename:', retryFileName);
+            
+            const { data: retryData, error: retryError } = await supabase.storage
+              .from('patient-reports')
+              .upload(retryFileName, selectedFile, {
+                cacheControl: '3600',
+                upsert: false,
+                contentType: selectedFile.type || 'application/octet-stream',
+              });
+
+            if (retryError) {
+              throw retryError;
+            }
+            
+            // Use retry filename for database entry
+            const finalFileName = retryFileName;
+            const { error: insertError } = await supabase
+              .from('patient_reports')
+              .insert({
+                patient_id: profile.id,
+                doctor_id: profile.assigned_doctor_id,
+                title: `${reportName} (by Dr. ${doctorName})`,
+                description: `Uploaded by patient. Consulted with: ${doctorName}`,
+                report_type: reportType,
+                file_url: finalFileName,
+                file_name: selectedFile.name,
+                file_size: selectedFile.size,
+                mime_type: selectedFile.type,
+                uploaded_by_patient: true,
+              });
+
+            if (insertError) {
+              console.error('❌ Database error:', insertError);
+              throw insertError;
+            }
+
+            setUploadProgress(100);
+            toast({
+              title: "Success!",
+              description: "Report uploaded successfully",
+            });
+
+            setTimeout(() => navigate('/reports'), 1000);
+            return true;
+          }
+
+          throw new Error(errorMessage);
+        }
+
+        console.log('✅ File uploaded successfully:', uploadData);
+
+        // Save to database
+        const { error: insertError } = await supabase
+          .from('patient_reports')
+          .insert({
+            patient_id: profile.id,
+            doctor_id: profile.assigned_doctor_id,
+            title: `${reportName} (by Dr. ${doctorName})`,
+            description: `Uploaded by patient. Consulted with: ${doctorName}`,
+            report_type: reportType,
+            file_url: fileName,
+            file_name: selectedFile.name,
+            file_size: selectedFile.size,
+            mime_type: selectedFile.type,
+            uploaded_by_patient: true,
+          });
+
+        if (insertError) {
+          console.error('❌ Database error:', insertError);
+          throw insertError;
+        }
+
+        setUploadProgress(100);
+        toast({
+          title: "Success!",
+          description: "Report uploaded successfully",
+        });
+
+        setTimeout(() => navigate('/reports'), 1000);
+        return true;
+
+      } catch (uploadError: any) {
+        // Clear progress interval on error
+        if (progressInterval) {
+          clearInterval(progressInterval);
+          progressInterval = null;
+        }
+        
+        console.error('❌ Upload failed:', uploadError);
+        
+        let errorMessage = uploadError.message || 'Upload failed';
+        
+        // Provide user-friendly messages
+        if (errorMessage.includes('timeout') || errorMessage.includes('Network request failed')) {
+          errorMessage = "Upload took too long. Check your internet connection and try again.";
+        } else if (errorMessage.includes('Failed to fetch') || errorMessage.includes('Network error')) {
+          errorMessage = "Network connection issue. Please check your internet and try again.";
+        } else if (errorMessage.includes('413') || errorMessage.includes('too large') || errorMessage.includes('Payload too large')) {
+          errorMessage = "File is too large. Maximum size is 20MB on mobile.";
+        } else if (errorMessage.includes('JWT') || errorMessage.includes('token') || errorMessage.includes('auth')) {
+          errorMessage = "Authentication error. Please sign in again.";
+        }
+
         toast({
           title: "Upload Failed",
-          description: "Failed to upload file: " + uploadError.message,
+          description: errorMessage,
           variant: "destructive",
+          duration: 7000,
         });
         return false;
       }
 
-      const insertData = {
-        patient_id: profile.id,
-        doctor_id: profile.assigned_doctor_id,
-        title: `${reportName} (by Dr. ${doctorName})`,
-        description: `Uploaded by patient. Consulted with: ${doctorName}`,
-        report_type: reportType,
-        file_url: fileName,
-        file_name: selectedFile!.name,
-        file_size: selectedFile!.size,
-        mime_type: selectedFile!.type,
-        uploaded_by_patient: true
-      };
-      
-      const { error: insertError } = await supabase
-        .from('patient_reports')
-        .insert(insertData);
-
-      if (insertError) {
-        console.error('Database insert error:', insertError);
-        toast({
-          title: "Save Failed",
-          description: "Failed to save report: " + insertError.message,
-          variant: "destructive",
-        });
-        return false;
-      }
-
+    } catch (error: any) {
+      console.error('❌ Unexpected error:', error);
       toast({
-        title: "Report Saved",
-        description: "Your medical report has been saved successfully",
-      });
-      
-      navigate('/reports');
-      return true;
-    } catch (error) {
-      console.error('Upload error:', error);
-      toast({
-        title: "Upload Failed",
-        description: "An unexpected error occurred. Please try again.",
+        title: "Error",
+        description: error.message || "An unexpected error occurred. Please try again.",
         variant: "destructive",
       });
       return false;
     } finally {
+      // Clear progress interval if still running
+      if (progressInterval) {
+        clearInterval(progressInterval);
+      }
+      // Ensure uploading state is always reset
       setUploading(false);
+      setUploadProgress(0);
     }
   };
 
@@ -233,6 +650,10 @@ export default function AddReports() {
       });
       return;
     }
+
+    // Check network before upload
+    const isConnected = await checkNetworkStatus();
+    if (!isConnected) return;
 
     // Get profile - try state first, then fetch if needed
     let profileToUse = patientProfile;
@@ -331,7 +752,32 @@ export default function AddReports() {
                   </div>
                   <p className="text-gray-300">Upload your medical report</p>
                   {selectedFile && (
-                    <p className="text-teal-300 text-sm mt-2">Selected: {selectedFile.name}</p>
+                    <div className="mt-3 p-3 bg-teal-500/10 border border-teal-500/30 rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-teal-300 text-sm font-medium truncate">{selectedFile.name}</p>
+                          <p className="text-teal-400/70 text-xs mt-1">
+                            {(selectedFile.size / (1024 * 1024)).toFixed(2)} MB • {selectedFile.type || 'Unknown type'}
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => {
+                            setSelectedFile(null);
+                            if (fileInputRef.current) {
+                              fileInputRef.current.value = '';
+                            }
+                            toast({
+                              title: "File Removed",
+                              description: "You can select a different file",
+                            });
+                          }}
+                          className="ml-2 p-1 text-red-400 hover:text-red-300 transition-colors"
+                          title="Remove file"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    </div>
                   )}
                 </div>
 
@@ -341,6 +787,10 @@ export default function AddReports() {
               type="file"
               accept="image/*,.pdf,.doc,.docx"
               onChange={handleFileChange}
+              onClick={(e) => {
+                // Reset value to allow selecting the same file again
+                (e.target as HTMLInputElement).value = '';
+              }}
               className="hidden"
             />
 
@@ -348,14 +798,25 @@ export default function AddReports() {
             <div className="space-y-3 mb-8">
               <button 
                 onClick={handleFileUpload}
-                className="w-full bg-[#30363D] text-gray-200 font-semibold py-3 rounded-lg flex items-center justify-center space-x-2 hover:bg-[#3C444C] transition-colors"
+                disabled={selectingFile || uploading}
+                className="w-full bg-[#30363D] text-gray-200 font-semibold py-3 rounded-lg flex items-center justify-center space-x-2 hover:bg-[#3C444C] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <Upload size={20} />
-                <span>Upload from Files</span>
+                {selectingFile ? (
+                  <>
+                    <div className="w-5 h-5 border-2 border-gray-200/30 border-t-gray-200 rounded-full animate-spin"></div>
+                    <span>Opening file picker...</span>
+                  </>
+                ) : (
+                  <>
+                    <Upload size={20} />
+                    <span>Upload from Files</span>
+                  </>
+                )}
               </button>
               <button 
                 onClick={handleTakePhoto}
-                className="w-full bg-[#30363D] text-gray-200 font-semibold py-3 rounded-lg flex items-center justify-center space-x-2 hover:bg-[#3C444C] transition-colors"
+                disabled={selectingFile || uploading}
+                className="w-full bg-[#30363D] text-gray-200 font-semibold py-3 rounded-lg flex items-center justify-center space-x-2 hover:bg-[#3C444C] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Camera size={20} />
                 <span>Take Photo</span>
@@ -410,6 +871,22 @@ export default function AddReports() {
                     <p className="text-xs text-gray-500 mt-1">Name of the doctor who provided this report (will be visible to your assigned doctor)</p>
                   </div>
                 </form>
+
+                {/* Upload Progress Indicator */}
+                {uploading && (
+                  <div className="mt-4">
+                    <div className="flex justify-between text-sm text-gray-400 mb-1">
+                      <span>Uploading...</span>
+                      <span>{uploadProgress}%</span>
+                    </div>
+                    <div className="w-full bg-gray-700 rounded-full h-2">
+                      <div 
+                        className="bg-teal-500 h-2 rounded-full transition-all duration-300"
+                        style={{ width: `${uploadProgress}%` }}
+                      ></div>
+                    </div>
+                  </div>
+                )}
               </>
             )}
           </main>
