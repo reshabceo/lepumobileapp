@@ -43,6 +43,8 @@ import PrivacyPolicy from "./pages/PrivacyPolicy";
 import ContactUs from "./pages/ContactUs";
 import Support from "./pages/Support";
 import MedicalDisclaimer from "./pages/MedicalDisclaimer";
+import RadiologistAuth from "./pages/RadiologistAuth";
+import RadiologistDashboard from "./pages/RadiologistDashboard";
 
 const queryClient = new QueryClient();
 
@@ -237,6 +239,18 @@ const App = () => (
               <Route path="/medical-disclaimer" element={
                 <ProtectedRoute requireAuth={false}>
                   <MedicalDisclaimer />
+                </ProtectedRoute>
+              } />
+
+              {/* Radiologist Routes */}
+              <Route path="/radiologist-auth" element={
+                <ProtectedRoute requireAuth={false}>
+                  <RadiologistAuth />
+                </ProtectedRoute>
+              } />
+              <Route path="/radiologist-dashboard" element={
+                <ProtectedRoute>
+                  <RadiologistDashboard />
                 </ProtectedRoute>
               } />
 
