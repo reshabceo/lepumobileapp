@@ -226,3 +226,9 @@ export const PatientVitalsHistory = () => {
   );
 };
 
+
+
+
+
+
+

@@ -10,7 +10,9 @@ export default defineConfig(({ mode }) => ({
     port: 8080,
   },
   plugins: [
-    react(),
+    react({
+      jsxRuntime: 'automatic',
+    }),
     mode === 'development' &&
     componentTagger(),
   ].filter(Boolean),
@@ -18,8 +20,24 @@ export default defineConfig(({ mode }) => ({
     alias: {
       "@": path.resolve(__dirname, "./src"),
     },
+    dedupe: ["react", "react-dom"],
   },
   optimizeDeps: {
-    include: ['jspdf'],
+    include: [
+      'jspdf',
+      'react',
+      'react-dom',
+      'react/jsx-runtime',
+      '@radix-ui/react-tooltip',
+    ],
+    esbuildOptions: {
+      resolveExtensions: ['.jsx', '.js', '.ts', '.tsx'],
+    },
+  },
+  build: {
+    commonjsOptions: {
+      include: [/node_modules/],
+      transformMixedEsModules: true,
+    },
   },
 }));
