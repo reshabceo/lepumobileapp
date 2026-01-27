@@ -33,8 +33,10 @@
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
-		<string>UIInterfaceOrientationLandscapeLeft</string>
-		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+	<key>UISupportedInterfaceOrientations~ipad</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
@@ -49,7 +51,7 @@
 	<key>NSCameraUsageDescription</key>
 	<string>This app needs camera access to capture photos of medical reports and documents for upload.</string>
 	<key>NSUserTrackingUsageDescription</key>
-	<string>This app does not track users across apps or websites. If any analytics are used, they are only for app performance monitoring and crash reporting to improve the app experience.</string>
+	<string>This app uses analytics for app performance monitoring and crash reporting only. We do not track you across apps or websites for advertising purposes.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>bluetooth-central</string>
