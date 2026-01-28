@@ -85,45 +85,81 @@ export const PatientWebRTCInterface: React.FC<PatientWebRTCInterfaceProps> = ({
     await declineCall();
   };
 
-  // Show incoming call screen
+  // Show incoming call screen - FULL SCREEN OVERLAY
   if (incomingCall && !activeCall) {
     return (
-      <div className="fixed inset-0 z-50 bg-gradient-to-br from-blue-600 to-blue-800 flex flex-col items-center justify-center p-6">
-        <div className="text-center text-white mb-8">
-          <div className="w-32 h-32 rounded-full bg-white/20 mx-auto mb-6 flex items-center justify-center animate-pulse">
-            <User className="w-16 h-16" />
+      <div className="fixed inset-0 z-[99999] bg-gradient-to-br from-blue-600 via-blue-700 to-purple-800 flex flex-col items-center justify-center p-6 animate-in fade-in duration-300" style={{ zIndex: 99999 }}>
+        {/* Animated background pulse */}
+        <div className="absolute inset-0 bg-gradient-to-br from-blue-500/20 to-purple-500/20 animate-pulse" />
+        
+        <div className="relative z-10 text-center text-white mb-12">
+          {/* Call Type Icon */}
+          <div className="w-40 h-40 rounded-full bg-white/20 backdrop-blur-md mx-auto mb-8 flex items-center justify-center animate-pulse border-4 border-white/30">
+            {incomingCall.callType === 'video' ? (
+              <Video className="w-20 h-20 text-white" />
+            ) : (
+              <Phone className="w-20 h-20 text-white" />
+            )}
           </div>
-          <h1 className="text-3xl font-bold mb-2">{incomingCall.doctorName}</h1>
-          <p className="text-xl text-blue-100">
-            Incoming {incomingCall.callType} call
-          </p>
+          
+          {/* Caller Name */}
+          <h1 className="text-4xl font-bold mb-4 drop-shadow-lg">{incomingCall.doctorName}</h1>
+          
+          {/* Call Type Badge */}
+          <div className="inline-flex items-center gap-2 bg-white/20 backdrop-blur-md px-6 py-3 rounded-full mb-6">
+            {incomingCall.callType === 'video' ? (
+              <>
+                <Video className="w-5 h-5" />
+                <span className="text-xl font-semibold">Video Call</span>
+              </>
+            ) : (
+              <>
+                <Phone className="w-5 h-5" />
+                <span className="text-xl font-semibold">Audio Call</span>
+              </>
+            )}
+          </div>
+          
+          {/* Status Text */}
+          <p className="text-lg text-blue-100 animate-pulse">Incoming Call...</p>
         </div>
 
-        <div className="flex space-x-6 mt-8">
+        {/* Action Buttons */}
+        <div className="relative z-10 flex items-center gap-8 mt-8">
+          {/* Reject Button */}
           <Button
             size="lg"
             variant="destructive"
-            className="rounded-full w-20 h-20 p-0 bg-red-500 hover:bg-red-600"
+            className="rounded-full w-24 h-24 p-0 bg-red-600 hover:bg-red-700 shadow-2xl border-4 border-white/30 animate-in zoom-in duration-300"
             onClick={handleDeclineCall}
           >
-            <X className="w-8 h-8" />
+            <X className="w-10 h-10" />
           </Button>
+          
+          {/* Accept Button */}
           <Button
             size="lg"
-            className="rounded-full w-20 h-20 p-0 bg-green-500 hover:bg-green-600"
+            className="rounded-full w-24 h-24 p-0 bg-green-600 hover:bg-green-700 shadow-2xl border-4 border-white/30 animate-in zoom-in duration-300 delay-100"
             onClick={handleAcceptCall}
           >
-            <Phone className="w-8 h-8" />
+            <Phone className="w-10 h-10" />
           </Button>
+        </div>
+        
+        {/* Call Type Indicator at Bottom */}
+        <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 text-white/80 text-sm">
+          {incomingCall.callType === 'video' 
+            ? '📹 Camera and microphone will be used'
+            : '🎤 Only microphone will be used'}
         </div>
       </div>
     );
   }
 
-  // Show active call screen
+  // Show active call screen - FULL SCREEN OVERLAY
   if (activeCall) {
     return (
-      <div className="fixed inset-0 z-50 bg-gray-900">
+      <div className="fixed inset-0 z-[99999] bg-gray-900" style={{ zIndex: 99999 }}>
         {/* Remote Video (Main) */}
         <div className="absolute inset-0">
           {remoteStream ? (
