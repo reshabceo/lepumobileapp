@@ -30,6 +30,8 @@ import EcgDemo from "./pages/EcgDemo";
 import VideoCallPage from "./pages/VideoCall";
 import WaitingForDoctor from "./pages/WaitingForDoctor";
 import { GlobalVideoCallNotification } from "./components/GlobalVideoCallNotification";
+import PatientIncomingCallOverlay from "./components/PatientIncomingCallOverlay";
+import GlobalPatientWebRTC from "./components/GlobalPatientWebRTC";
 import { AppointmentBookingPage } from "./pages/AppointmentBookingPage";
 import { ChatSupport } from "./components/ChatSupport";
 import AIDoctorPage from "./pages/AIDoctorPage";
@@ -45,6 +47,7 @@ import Support from "./pages/Support";
 import MedicalDisclaimer from "./pages/MedicalDisclaimer";
 import RadiologistAuth from "./pages/RadiologistAuth";
 import RadiologistDashboard from "./pages/RadiologistDashboard";
+import RecommendationsDashboard from "./pages/RecommendationsDashboard";
 
 const queryClient = new QueryClient();
 
@@ -66,6 +69,8 @@ const App = () => (
           <BrowserRouter>
             <BackButtonHandler />
             <GlobalVideoCallNotification />
+            <PatientIncomingCallOverlay />
+            <GlobalPatientWebRTC />
             <ChatSupportOnDashboard />
             <Routes>
               {/* Public routes */}
@@ -194,6 +199,11 @@ const App = () => (
               <Route path="/vitals-history" element={
                 <ProtectedRoute>
                   <PatientVitalsHistory />
+                </ProtectedRoute>
+              } />
+              <Route path="/recommendations" element={
+                <ProtectedRoute>
+                  <RecommendationsDashboard />
                 </ProtectedRoute>
               } />
               <Route path="/profile" element={

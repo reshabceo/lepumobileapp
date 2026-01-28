@@ -1,0 +1,21 @@
+# Copy this file to .env and fill in your values
+# File: .env
+
+# Supabase Configuration
+VITE_SUPABASE_URL=https://xktewvqzmbkhnrbwtxjb.supabase.co
+VITE_SUPABASE_ANON_KEY=your_supabase_anon_key_here
+VITE_SUPABASE_PROJECT_ID=xktewvqzmbkhnrbwtxjb
+VITE_SUPABASE_PUBLISHABLE_KEY=your_supabase_publishable_key_here
+
+# WebRTC Configuration
+VITE_WEBRTC_SERVER_URL=wss://web-m4g9.onrender.com
+
+# Twilio TURN Server Configuration (for better call quality behind NATs/firewalls)
+VITE_TWILIO_ACCOUNT_SID=your_twilio_account_sid_here
+VITE_TWILIO_AUTH_TOKEN=your_twilio_auth_token_here
+
+# Agora Configuration (if using video calls)
+VITE_AGORA_APP_ID=your_agora_app_id_here
+
+# Environment
+VITE_USE_HTTPS=false

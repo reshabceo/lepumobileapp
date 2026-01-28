@@ -1,7 +1,18 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import * as CallLogsService from '@/services/callLogs';
 
 export interface WebRTCConfig {
   iceServers: RTCIceServer[];
+}
+
+export interface CallMetadata {
+  callId: string;
+  doctorId: string;
+  patientId: string;
+  callType: 'audio' | 'video';
+  callMode: 'scheduled' | 'emergency' | 'instant';
+  appointmentId?: string;
+  userRole: 'doctor' | 'patient';
 }
 
 export interface WebRTCConnection {
@@ -12,27 +23,32 @@ export interface WebRTCConnection {
   isAudioEnabled: boolean;
   isVideoEnabled: boolean;
   connectionState: RTCPeerConnectionState;
+  callMetadata: CallMetadata | null;
 }
 
 export interface UseWebRTCReturn extends WebRTCConnection {
   initializeMedia: (video: boolean, audio: boolean) => Promise<boolean>;
+  initializeCall: (metadata: CallMetadata) => Promise<boolean>;
   createOffer: () => Promise<RTCSessionDescriptionInit | null>;
   createAnswer: (offer: RTCSessionDescriptionInit) => Promise<RTCSessionDescriptionInit | null>;
   setRemoteDescription: (description: RTCSessionDescriptionInit) => Promise<void>;
   addIceCandidate: (candidate: RTCIceCandidateInit) => Promise<void>;
   toggleAudio: () => void;
   toggleVideo: () => void;
-  cleanup: () => void;
+  cleanup: (reason?: string) => void;
   onIceCandidate: (callback: (candidate: RTCIceCandidate) => void) => void;
   onTrack: (callback: (stream: MediaStream) => void) => void;
 }
 
+// Initialize ICE servers with Twilio TURN as backup
+let DEFAULT_ICE_SERVERS: RTCIceServer[] = [
+  { urls: 'stun:stun.l.google.com:19302' },
+  { urls: 'stun:stun1.l.google.com:19302' },
+  { urls: 'stun:stun2.l.google.com:19302' }
+];
+
 const DEFAULT_CONFIG: WebRTCConfig = {
-  iceServers: [
-    { urls: 'stun:stun.l.google.com:19302' },
-    { urls: 'stun:stun1.l.google.com:19302' },
-    { urls: 'stun:stun2.l.google.com:19302' }
-  ]
+  iceServers: DEFAULT_ICE_SERVERS
 };
 
 export const useWebRTC = (config: WebRTCConfig = DEFAULT_CONFIG): UseWebRTCReturn => {
@@ -43,15 +59,29 @@ export const useWebRTC = (config: WebRTCConfig = DEFAULT_CONFIG): UseWebRTCRetur
   const [isAudioEnabled, setIsAudioEnabled] = useState(true);
   const [isVideoEnabled, setIsVideoEnabled] = useState(true);
   const [connectionState, setConnectionState] = useState<RTCPeerConnectionState>('new');
+  const [callMetadata, setCallMetadata] = useState<CallMetadata | null>(null);
 
   const iceCandidateCallbackRef = useRef<((candidate: RTCIceCandidate) => void) | null>(null);
   const trackCallbackRef = useRef<((stream: MediaStream) => void) | null>(null);
+  const callLogInitialized = useRef(false);
 
-  // Initialize peer connection
-  const initializePeerConnection = useCallback(() => {
-    console.log('[WebRTC] 🔗 Initializing peer connection...');
+  // Initialize peer connection with Twilio TURN backup
+  const initializePeerConnection = useCallback(async () => {
+    console.log('[WebRTC] 🔗 Initializing peer connection with Twilio TURN backup...');
     
-    const pc = new RTCPeerConnection(config);
+    // Dynamically import getICEServers
+    const { getICEServers } = await import('@/config/webrtc');
+    const iceServers = await getICEServers();
+    
+    const configWithTurn = {
+      ...config,
+      iceServers,
+      iceCandidatePoolSize: 10
+    };
+    
+    console.log('[WebRTC] ICE Servers configured:', iceServers.length, 'servers');
+    
+    const pc = new RTCPeerConnection(configWithTurn);
 
     pc.onicecandidate = (event) => {
       if (event.candidate) {
@@ -76,23 +106,90 @@ export const useWebRTC = (config: WebRTCConfig = DEFAULT_CONFIG): UseWebRTCRetur
 
     pc.oniceconnectionstatechange = () => {
       console.log('[WebRTC] 📡 ICE connection state:', pc.iceConnectionState);
-      if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') {
-        setIsConnected(true);
-      } else if (pc.iceConnectionState === 'disconnected') {
-        setIsConnected(false);
-      } else if (pc.iceConnectionState === 'failed') {
-        setIsConnected(false);
+      
+      // Update call log with connection state
+      if (callLogInitialized.current && callMetadata) {
+        if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') {
+          CallLogsService.updateCallStatus(callMetadata.callId, {
+            status: 'connected',
+            iceConnectionState: pc.iceConnectionState
+          });
+          setIsConnected(true);
+        } else if (pc.iceConnectionState === 'disconnected') {
+          CallLogsService.incrementReconnectionAttempt(callMetadata.callId);
+          setIsConnected(false);
+        } else if (pc.iceConnectionState === 'failed') {
+          CallLogsService.failCall(callMetadata.callId, 'ICE connection failed');
+          setIsConnected(false);
+        }
+      } else {
+        // Fallback if no call metadata
+        if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') {
+          setIsConnected(true);
+        } else if (pc.iceConnectionState === 'disconnected') {
+          setIsConnected(false);
+        } else if (pc.iceConnectionState === 'failed') {
+          setIsConnected(false);
+        }
       }
     };
 
     pc.onconnectionstatechange = () => {
       console.log('[WebRTC] 🔌 Connection state:', pc.connectionState);
       setConnectionState(pc.connectionState);
+      
+      // Update call log with peer connection state
+      if (callLogInitialized.current && callMetadata) {
+        CallLogsService.updateCallStatus(callMetadata.callId, {
+          peerConnectionState: pc.connectionState
+        });
+      }
     };
 
     setPeerConnection(pc);
     return pc;
   }, [config]);
+
+  // Initialize call with metadata and logging
+  const initializeCall = useCallback(async (metadata: CallMetadata): Promise<boolean> => {
+    try {
+      console.log('[WebRTC] 🎬 Initializing call with metadata:', metadata);
+      
+      // Store metadata
+      setCallMetadata(metadata);
+      
+      // Initialize call log in database
+      const result = await CallLogsService.initializeCallLog({
+        callId: metadata.callId,
+        appointmentId: metadata.appointmentId,
+        doctorId: metadata.doctorId,
+        patientId: metadata.patientId,
+        callType: metadata.callType,
+        callMode: metadata.callMode,
+        clientInfo: {
+          userAgent: navigator.userAgent,
+          platform: navigator.platform
+        },
+        networkInfo: {
+          effectiveType: (navigator as any).connection?.effectiveType || 'unknown'
+        }
+      });
+      
+      if (result.success) {
+        callLogInitialized.current = true;
+        console.log('[WebRTC] ✅ Call log initialized in database');
+        return true;
+      } else {
+        console.error('[WebRTC] ❌ Failed to initialize call log:', result.error);
+        // Continue anyway - don't block call if logging fails
+        return true;
+      }
+    } catch (error) {
+      console.error('[WebRTC] ❌ Error initializing call:', error);
+      // Continue anyway - don't block call if logging fails
+      return true;
+    }
+  }, []);
 
   // Initialize media (camera and microphone)
   const initializeMedia = useCallback(async (video: boolean = true, audio: boolean = true): Promise<boolean> => {
@@ -243,8 +340,19 @@ export const useWebRTC = (config: WebRTCConfig = DEFAULT_CONFIG): UseWebRTCRetur
   }, [localStream]);
 
   // Cleanup
-  const cleanup = useCallback(() => {
+  const cleanup = useCallback((reason?: string) => {
     console.log('[WebRTC] 🧹 Cleaning up WebRTC connection...');
+
+    // Log call end to database
+    if (callLogInitialized.current && callMetadata) {
+      const endedBy = callMetadata.userRole; // 'doctor' or 'patient'
+      CallLogsService.endCall(
+        callMetadata.callId,
+        endedBy,
+        reason || 'Call ended by user'
+      );
+      console.log('[WebRTC] 📝 Call end logged to database');
+    }
 
     if (localStream) {
       localStream.getTracks().forEach(track => {
@@ -263,7 +371,9 @@ export const useWebRTC = (config: WebRTCConfig = DEFAULT_CONFIG): UseWebRTCRetur
     setRemoteStream(null);
     setIsConnected(false);
     setConnectionState('closed');
-  }, [localStream, peerConnection]);
+    setCallMetadata(null);
+    callLogInitialized.current = false;
+  }, [localStream, peerConnection, callMetadata]);
 
   // Set callbacks
   const onIceCandidate = useCallback((callback: (candidate: RTCIceCandidate) => void) => {
@@ -293,6 +403,8 @@ export const useWebRTC = (config: WebRTCConfig = DEFAULT_CONFIG): UseWebRTCRetur
     isAudioEnabled,
     isVideoEnabled,
     connectionState,
+    callMetadata,
+    initializeCall,
     initializeMedia,
     createOffer,
     createAnswer,
