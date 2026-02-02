@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { auth, db, supabase } from '@/lib/supabase';
+import { auth, db, supabase, isDoctorByAuthId } from '@/lib/supabase';
 import { User, Session } from '@supabase/supabase-js';
 
 interface AuthContextType {
@@ -56,9 +56,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       try {
         const { user, error } = await auth.getCurrentUser();
         if (user && !error) {
-          setUser(user);
-          setSession(session);
-          console.log('🔍 Auth Debug - Initial user loaded:', user.email);
+          const isDoctor = await isDoctorByAuthId(user.id);
+          if (isDoctor) {
+            console.log('🚫 Patient app: doctor detected on init - signing out');
+            await supabase.auth.signOut();
+            setUser(null);
+            setSession(null);
+          } else {
+            const { data: { session: currentSession } } = await supabase.auth.getSession();
+            setUser(user);
+            setSession(currentSession ?? null);
+            console.log('🔍 Auth Debug - Initial user loaded:', user.email);
+          }
         } else if (error) {
           // Handle specific auth errors gracefully
           if (error.message && error.message.includes('Auth session missing')) {
@@ -142,9 +151,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         
         // Normal sign-in (password login) - only if user is confirmed
         if (session.user.email_confirmed_at) {
-          console.log('🔐 Normal sign-in detected (confirmed user)');
-          setSession(session);
-          setUser(session.user);
+          const isDoctor = await isDoctorByAuthId(session.user.id);
+          if (isDoctor) {
+            console.log('🚫 Patient app: doctor tried to sign in - signing out');
+            await supabase.auth.signOut();
+            setSession(null);
+            setUser(null);
+          } else {
+            console.log('🔐 Normal sign-in detected (confirmed user)');
+            setSession(session);
+            setUser(session.user);
+          }
         } else {
           console.log('⚠️ Unconfirmed user trying to sign in - ignoring');
         }
@@ -172,6 +189,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }
 
       if (data.user) {
+        const isDoctor = await isDoctorByAuthId(data.user.id);
+        if (isDoctor) {
+          console.log('🚫 Patient app: doctor login blocked - signing out');
+          await supabase.auth.signOut();
+          const err = new Error('This app is for patients only. Doctors must use the doctor portal.');
+          (err as Error & { code?: string }).code = 'DOCTOR_NOT_ALLOWED';
+          throw err;
+        }
         setUser(data.user);
         setSession(data.session);
         console.log('✅ Supabase login successful:', data.user.email);

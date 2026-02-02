@@ -86,6 +86,7 @@ export default function DicomUploader({ onUploadComplete }: DicomUploaderProps) 
         .insert({
           id: studyId,
           study_instance_uid: `upload-${studyId}`,
+          patient_id: patient.id,
           patient_ref_id: patient.id,
           uploaded_by: user.id,
           uploaded_by_type: 'patient',
