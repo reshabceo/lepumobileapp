@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
+import { payAndFulfil } from '@/lib/payment';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -80,6 +81,7 @@ export default function RequestRadiologistModal({
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       toast.error('Not authenticated');
+      setSubmitting(false);
       return;
     }
 
@@ -91,39 +93,53 @@ export default function RequestRadiologistModal({
 
     if (!patient) {
       toast.error('Patient profile not found');
+      setSubmitting(false);
       return;
     }
 
     const selectedRad = radiologists.find(r => r.id === selectedRadiologist);
-
-    const { error } = await supabase
-      .from('radiologist_requests')
-      .insert({
-        patient_id: patient.id,
-        radiologist_id: selectedRadiologist,
-        study_id: studyId,
-        ...formData,
-        quoted_fee: selectedRad?.report_fee || 0,
-        status: 'assigned'
-      });
-
-    setSubmitting(false);
-
-    if (error) {
-      toast.error('Failed to submit request');
+    const quotedFee = selectedRad?.report_fee ?? 0;
+    // report_fee is in rupees; Razorpay expects paise
+    const amountPaise = Math.round(Number(quotedFee) * 100);
+    if (amountPaise < 100) {
+      toast.error('Invalid radiologist fee');
+      setSubmitting(false);
       return;
     }
 
-    toast.success('Request sent successfully!');
-    onOpenChange(false);
-    setSelectedRadiologist(null);
-    setFormData({
-      request_type: 'report',
-      priority: 'normal',
-      symptoms: '',
-      clinical_history: '',
-      specific_questions: ''
-    });
+    const requestPayload = {
+      patient_id: patient.id,
+      radiologist_id: selectedRadiologist,
+      study_id: studyId,
+      ...formData,
+      quoted_fee: quotedFee,
+      status: 'assigned'
+    };
+
+    try {
+      await payAndFulfil({
+        type: 'radiologist_review',
+        amount_paise: amountPaise,
+        metadata: { request: requestPayload },
+        onSuccess: () => {
+          toast.success('Request sent successfully! Radiologist will review your study.');
+          onOpenChange(false);
+          setSelectedRadiologist(null);
+          setFormData({
+            request_type: 'report',
+            priority: 'normal',
+            symptoms: '',
+            clinical_history: '',
+            specific_questions: ''
+          });
+        },
+        onError: (err) => toast.error(err.message || 'Payment or request failed'),
+      });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Failed');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -299,8 +315,16 @@ export default function RequestRadiologistModal({
             onClick={handleSubmit}
             disabled={!selectedRadiologist || submitting}
           >
-            <Send className="mr-1 h-3 w-3" />
-            Send Request
+            {submitting ? (
+              <>Opening payment...</>
+            ) : (
+              <>
+                <Send className="mr-1 h-3 w-3" />
+                Pay & Request {selectedRadiologist && radiologists.find(r => r.id === selectedRadiologist) && (
+                  <span className="ml-1">(₹{radiologists.find(r => r.id === selectedRadiologist)!.report_fee})</span>
+                )}
+              </>
+            )}
           </Button>
         </div>
       </DialogContent>

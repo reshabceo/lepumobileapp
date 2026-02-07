@@ -875,6 +875,12 @@ app.get('/api/glucose/:deviceId/history', (req, res) => {
     });
 });
 
+// Payment (Razorpay) routes - create order, verify, prices
+const paymentController = require('./controllers/paymentController');
+app.get('/api/payments/prices', paymentController.getPrices);
+app.post('/api/payments/create-order', paymentController.createOrder);
+app.post('/api/payments/verify', paymentController.verifyPayment);
+
 // LepuDemo Routes
 // Get all LepuDemo device models
 app.get('/api/lepu/models', (req, res) => {

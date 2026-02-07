@@ -222,9 +222,6 @@ export const RecommendationsDashboard: React.FC = () => {
                   <span className="text-xs px-2 py-1 rounded-full bg-gray-700 text-gray-300">
                     {selectedRec.recommendation_type}
                   </span>
-                  <span className="text-xs px-2 py-1 rounded-full bg-gray-700 text-gray-300">
-                    From: {selectedRec.source.replace('_', ' ')}
-                  </span>
                 </div>
               </div>
             </div>
