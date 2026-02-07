@@ -5,8 +5,11 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { FileText, Clock, CheckCircle, Eye, Microscope, ArrowLeft, AlertCircle } from 'lucide-react';
+import { FileText, Clock, CheckCircle, Eye, Microscope, ArrowLeft, AlertCircle, Settings, DollarSign } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 interface RadiologistRequest {
@@ -33,6 +36,8 @@ export default function RadiologistDashboard() {
   const [requests, setRequests] = useState<RadiologistRequest[]>([]);
   const [activeTab, setActiveTab] = useState('pending');
   const [loading, setLoading] = useState(true);
+  const [showSettings, setShowSettings] = useState(false);
+  const [reportFee, setReportFee] = useState('');
 
   useEffect(() => {
     fetchRadiologistProfile();
@@ -64,7 +69,34 @@ export default function RadiologistDashboard() {
       .eq('auth_user_id', user.id)
       .single();
 
-    if (data) setRadiologist(data);
+    if (data) {
+      setRadiologist(data);
+      setReportFee(data.report_fee?.toString() || '');
+    }
+  };
+
+  const updateReportFee = async () => {
+    if (!radiologist) return;
+
+    const fee = parseFloat(reportFee);
+    if (isNaN(fee) || fee < 1) {
+      toast.error('Please enter a valid fee (minimum ₹1)');
+      return;
+    }
+
+    const { error } = await supabase
+      .from('radiologists')
+      .update({ report_fee: fee })
+      .eq('id', radiologist.id);
+
+    if (error) {
+      toast.error('Failed to update fee');
+      return;
+    }
+
+    toast.success('Report fee updated successfully!');
+    setRadiologist({ ...radiologist, report_fee: fee });
+    setShowSettings(false);
   };
 
   const fetchRequests = async () => {
@@ -137,14 +169,19 @@ export default function RadiologistDashboard() {
               <h1 className="text-lg font-bold">Radiologist</h1>
               {radiologist && (
                 <p className="text-xs text-muted-foreground">
-                  Dr. {radiologist.full_name}
+                  Dr. {radiologist.full_name} • Fee: ₹{radiologist.report_fee || 0}
                 </p>
               )}
             </div>
           </div>
-          <Button variant="ghost" size="sm" onClick={handleLogout}>
-            Logout
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="ghost" size="sm" onClick={() => setShowSettings(true)}>
+              <Settings className="h-4 w-4" />
+            </Button>
+            <Button variant="ghost" size="sm" onClick={handleLogout}>
+              Logout
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -296,6 +333,47 @@ export default function RadiologistDashboard() {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Settings Dialog */}
+      <Dialog open={showSettings} onOpenChange={setShowSettings}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Profile Settings</DialogTitle>
+            <DialogDescription>
+              Update your report review fee. Patients will pay this amount to request your services.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="report_fee">Report Review Fee (₹)</Label>
+              <div className="flex items-center gap-2">
+                <DollarSign className="h-4 w-4 text-muted-foreground" />
+                <Input
+                  id="report_fee"
+                  type="number"
+                  min="1"
+                  step="0.01"
+                  value={reportFee}
+                  onChange={(e) => setReportFee(e.target.value)}
+                  placeholder="500"
+                  className="flex-1"
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                This is the fee patients will pay to request a report review from you.
+              </p>
+            </div>
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" onClick={() => setShowSettings(false)}>
+                Cancel
+              </Button>
+              <Button onClick={updateReportFee}>
+                Save Changes
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { Siren, Phone, AlertTriangle } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { payAndFulfil } from '@/lib/payment';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { EmergencyDoctorSelection } from './EmergencyDoctorSelection';
+import { EmergencyWaitingMonitor } from './EmergencyWaitingMonitor';
 
 interface EmergencyButtonProps {
     size?: 'sm' | 'md' | 'lg';
@@ -17,6 +19,8 @@ export const EmergencyButton: React.FC<EmergencyButtonProps> = ({
     const [isTriggering, setIsTriggering] = useState(false);
     const [showConfirm, setShowConfirm] = useState(false);
     const [showAlternativeDoctors, setShowAlternativeDoctors] = useState(false);
+    const [showWaitingMonitor, setShowWaitingMonitor] = useState(false);
+    const [currentAppointmentId, setCurrentAppointmentId] = useState<string | null>(null);
     const [patientData, setPatientData] = useState<{
         id: string;
         assigned_doctor_id: string | null;
@@ -139,53 +143,121 @@ export const EmergencyButton: React.FC<EmergencyButtonProps> = ({
 
     const triggerEmergencyAlert = async (patientId: string, doctorId: string) => {
         try {
-            // Get patient name
-            const { data: patientProfile } = await supabase
-                .from('patients')
-                .select('full_name')
-                .eq('id', patientId)
+            // Get doctor's emergency fee
+            const { data: doctor, error: docError } = await supabase
+                .from('doctors')
+                .select('consultation_fee, emergency_fee')
+                .eq('id', doctorId)
                 .single();
 
-            // Create emergency alert
-            const { error: alertError } = await supabase
-                .from('emergency_alerts')
-                .insert({
-                    patient_id: patientId,
-                    doctor_id: doctorId,
-                    alert_type: 'patient_triggered',
-                    severity: 'critical',
-                    title: '🚨 PATIENT EMERGENCY ALERT',
-                    description: `Emergency alert triggered by ${patientProfile?.full_name || 'Patient'}. Immediate attention required!`,
-                    vital_signs_data: null,
-                    is_resolved: false,
-                    call_initiated: false,
-                    ems_dispatched: false,
-                    hospital_notified: false
+            if (docError || !doctor) {
+                toast({
+                    title: "Error",
+                    description: "Could not load doctor information.",
+                    variant: "destructive",
                 });
-
-            if (alertError) {
-                console.error('Error creating alert:', alertError);
                 setIsTriggering(false);
-                throw alertError;
+                return;
             }
 
-            toast({
-                title: "🚨 Emergency Alert Sent!",
-                description: "Your doctor has been notified immediately and will respond as soon as possible.",
-                variant: "default",
-                duration: 5000,
-            });
+            const feeRupees = doctor.emergency_fee ?? doctor.consultation_fee;
+            const amountPaise = feeRupees != null ? Math.round(Number(feeRupees) * 100) : 0;
+            
+            if (amountPaise < 100) {
+                toast({
+                    title: "Fee Not Set",
+                    description: "Your doctor has not set an emergency fee. Please contact them directly.",
+                    variant: "destructive",
+                });
+                setIsTriggering(false);
+                return;
+            }
 
-            setShowConfirm(false);
-            setIsTriggering(false);
+            const now = new Date();
+            const appointmentDate = now.toISOString().split('T')[0];
+            const appointmentTime = now.toTimeString().split(' ')[0];
+
+            const appointmentPayload = {
+                doctor_id: doctorId,
+                patient_id: patientId,
+                appointment_date: appointmentDate,
+                appointment_time: appointmentTime,
+                duration_minutes: 30,
+                status: 'scheduled',
+                appointment_type: 'emergency',
+                call_mode: 'video',
+                reason: 'Emergency - patient triggered alert',
+                patient_notes: 'Emergency case - immediate attention required'
+            };
+
+            const alertPayload = {
+                patient_id: patientId,
+                doctor_id: doctorId,
+                alert_type: 'patient_triggered',
+                severity: 'critical',
+                title: '🚨 PATIENT EMERGENCY ALERT',
+                description: 'Emergency alert triggered by patient. Immediate attention required!',
+                is_resolved: false,
+                call_initiated: false,
+                ems_dispatched: false,
+                hospital_notified: false
+            };
+
+            await payAndFulfil({
+                type: 'emergency',
+                amount_paise: amountPaise,
+                metadata: { 
+                    appointment: appointmentPayload, 
+                    alert: alertPayload,
+                    amount_paise: amountPaise 
+                },
+                onSuccess: async () => {
+                    // Get the created appointment ID
+                    const { data: appointments } = await supabase
+                        .from('appointments')
+                        .select('id')
+                        .eq('patient_id', patientId)
+                        .eq('doctor_id', doctorId)
+                        .eq('appointment_type', 'emergency')
+                        .order('created_at', { ascending: false })
+                        .limit(1);
+
+                    if (appointments && appointments.length > 0) {
+                        setCurrentAppointmentId(appointments[0].id);
+                        setPatientData({
+                            id: patientId,
+                            assigned_doctor_id: doctorId,
+                            assigned_doctor_specialty: null
+                        });
+                        setShowConfirm(false);
+                        setShowWaitingMonitor(true);
+                    } else {
+                        toast({
+                            title: "🚨 Emergency Alert Sent!",
+                            description: "Your doctor has been notified and payment confirmed.",
+                            variant: "default",
+                            duration: 5000,
+                        });
+                        setShowConfirm(false);
+                    }
+                },
+                onError: (err) => {
+                    toast({
+                        title: "Payment Failed",
+                        description: err.message || "Please try again or call emergency services.",
+                        variant: "destructive",
+                    });
+                },
+            });
         } catch (error) {
             console.error('Emergency alert error:', error);
-            setIsTriggering(false);
             toast({
-                title: "Failed to Send Alert",
+                title: "Failed to Process Emergency",
                 description: error instanceof Error ? error.message : "Please try again or call your doctor directly.",
                 variant: "destructive",
             });
+        } finally {
+            setIsTriggering(false);
         }
     };
 
@@ -198,6 +270,29 @@ export const EmergencyButton: React.FC<EmergencyButtonProps> = ({
     const handleEmergencyClick = () => {
         setShowConfirm(true);
     };
+
+    if (showWaitingMonitor && patientData && currentAppointmentId) {
+        return (
+            <EmergencyWaitingMonitor
+                appointmentId={currentAppointmentId}
+                doctorId={patientData.assigned_doctor_id!}
+                patientId={patientData.id}
+                specialty={patientData.assigned_doctor_specialty || 'General Medicine'}
+                onDoctorResponded={() => {
+                    setShowWaitingMonitor(false);
+                    toast({
+                        title: "Doctor Responding!",
+                        description: "Your doctor is now attending to your emergency.",
+                        variant: "default",
+                    });
+                }}
+                onCancel={() => {
+                    setShowWaitingMonitor(false);
+                    setCurrentAppointmentId(null);
+                }}
+            />
+        );
+    }
 
     if (showAlternativeDoctors && patientData) {
         return (

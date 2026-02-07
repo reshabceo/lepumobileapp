@@ -204,15 +204,6 @@ export const PatientVitalsHistory = () => {
                             <span>{format(parseISO(vital.reading_timestamp), 'h:mm a')}</span>
                           </div>
                         </div>
-                        <div className="mt-2">
-                          <span className={`text-xs px-2 py-1 rounded-full ${
-                            vital.source === 'manual' 
-                              ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
-                              : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                          }`}>
-                            {vital.source === 'manual' ? 'Manual Entry' : 'Device Reading'}
-                          </span>
-                        </div>
                       </div>
                     </div>
                   </div>

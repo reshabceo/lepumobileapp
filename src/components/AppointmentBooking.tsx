@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import { payAndFulfil } from '@/lib/payment';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -36,6 +37,9 @@ interface AlternativeDoctor {
   phone_number: string;
   is_available_now: boolean;
   next_available_time: string | null;
+  video_consultation_fee: number | null;
+  audio_consultation_fee: number | null;
+  consultation_fee: number | null;
 }
 
 interface DoctorInfo {
@@ -43,6 +47,10 @@ interface DoctorInfo {
   full_name: string;
   specialty: string;
   is_available: boolean;
+  /** Consultation fee in rupees (from doctor). Used for video/audio pay amount. */
+  consultation_fee: number | null;
+  video_consultation_fee?: number | null;
+  audio_consultation_fee?: number | null;
 }
 
 export const AppointmentBooking = () => {
@@ -63,10 +71,13 @@ export const AppointmentBooking = () => {
   const [alternativeDoctors, setAlternativeDoctors] = useState<AlternativeDoctor[]>([]);
   const [loadingAlternatives, setLoadingAlternatives] = useState(false);
   const [patientId, setPatientId] = useState<string | null>(null);
+  const [patientReports, setPatientReports] = useState<any[]>([]);
+  const [selectedReportIds, setSelectedReportIds] = useState<string[]>([]);
 
   useEffect(() => {
     loadDoctorId();
     loadMyAppointments();
+    loadPatientReports();
   }, [user]);
 
   useEffect(() => {
@@ -79,7 +90,7 @@ export const AppointmentBooking = () => {
     try {
       const { data: patient, error } = await supabase
         .from('patients')
-        .select('id, assigned_doctor_id, assigned_doctor:doctors!patients_assigned_doctor_id_fkey(id, full_name, specialty)')
+        .select('id, assigned_doctor_id, assigned_doctor:doctors!patients_assigned_doctor_id_fkey(id, full_name, specialty, consultation_fee, video_consultation_fee, audio_consultation_fee)')
         .eq('auth_user_id', user?.id)
         .single();
 
@@ -93,7 +104,10 @@ export const AppointmentBooking = () => {
           id: doctor.id,
           full_name: doctor.full_name,
           specialty: doctor.specialty,
-          is_available: false // Will be checked when loading slots
+          is_available: false,
+          consultation_fee: doctor.consultation_fee ?? null,
+          video_consultation_fee: doctor.video_consultation_fee ?? null,
+          audio_consultation_fee: doctor.audio_consultation_fee ?? null,
         });
       }
     } catch (error: any) {
@@ -144,14 +158,45 @@ export const AppointmentBooking = () => {
 
     try {
       setLoadingAlternatives(true);
-      const { data, error } = await supabase.rpc('find_available_emergency_doctors', {
+      const { data: doctors, error } = await supabase.rpc('find_available_emergency_doctors', {
         p_patient_id: patientId,
         p_required_specialty: doctorInfo.specialty || null,
         p_limit: 5
       });
 
       if (error) throw error;
-      setAlternativeDoctors(data || []);
+
+      // Fetch pricing for each doctor
+      if (doctors && doctors.length > 0) {
+        const doctorIds = doctors.map((d: any) => d.doctor_id);
+        const { data: pricingData } = await supabase
+          .from('doctors')
+          .select('id, video_consultation_fee, audio_consultation_fee, consultation_fee')
+          .in('id', doctorIds);
+
+        const pricingMap = new Map(
+          pricingData?.map(d => [
+            d.id, 
+            { 
+              video_consultation_fee: d.video_consultation_fee,
+              audio_consultation_fee: d.audio_consultation_fee,
+              consultation_fee: d.consultation_fee 
+            }
+          ]) || []
+        );
+
+        const doctorsWithPricing = doctors.map((doc: any) => ({
+          ...doc,
+          video_consultation_fee: pricingMap.get(doc.doctor_id)?.video_consultation_fee,
+          audio_consultation_fee: pricingMap.get(doc.doctor_id)?.audio_consultation_fee,
+          consultation_fee: pricingMap.get(doc.doctor_id)?.consultation_fee
+        }));
+
+        setAlternativeDoctors(doctorsWithPricing);
+      } else {
+        setAlternativeDoctors([]);
+      }
+      
       setShowAlternativeDoctors(true);
     } catch (error: any) {
       console.error('Error loading alternative doctors:', error);
@@ -178,6 +223,30 @@ export const AppointmentBooking = () => {
         .single();
 
       if (patientError) throw patientError;
+
+      // Get alternative doctor pricing
+      const { data: altDoctor, error: altDocError } = await supabase
+        .from('doctors')
+        .select('consultation_fee, video_consultation_fee, audio_consultation_fee')
+        .eq('id', alternativeDoctorId)
+        .single();
+
+      if (altDocError || !altDoctor) {
+        toast.error('Could not load doctor information');
+        setLoading(false);
+        return;
+      }
+
+      const videoFee = altDoctor.video_consultation_fee ?? altDoctor.consultation_fee;
+      const audioFee = altDoctor.audio_consultation_fee ?? altDoctor.consultation_fee;
+      const feeRupees = callMode === 'video' ? videoFee : audioFee;
+      const amountPaise = feeRupees != null ? Math.round(Number(feeRupees) * 100) : 0;
+      
+      if (amountPaise < 100) {
+        toast.error('This doctor has not set a consultation fee. Please try another doctor.');
+        setLoading(false);
+        return;
+      }
 
       // Get next available slot for alternative doctor
       const now = new Date();
@@ -211,33 +280,38 @@ export const AppointmentBooking = () => {
         }
       }
 
-      // Create appointment with alternative doctor
-      const { error: insertError } = await supabase
-        .from('appointments')
-        .insert({
-          doctor_id: alternativeDoctorId,
-          patient_id: patient.id,
-          appointment_date: appointmentDate,
-          appointment_time: appointmentTime,
-          duration_minutes: 30,
-          status: 'scheduled',
-          appointment_type: 'regular',
-          call_mode: callMode,
-          reason: `Original doctor unavailable. ${reason.trim()}`,
-          patient_notes: `Booked with alternative doctor due to assigned doctor unavailability`
-        });
+      const appointmentPayload = {
+        doctor_id: alternativeDoctorId,
+        patient_id: patient.id,
+        appointment_date: appointmentDate,
+        appointment_time: appointmentTime,
+        duration_minutes: 30,
+        status: 'scheduled',
+        appointment_type: 'regular',
+        call_mode: callMode,
+        reason: `Original doctor unavailable. ${reason.trim()}`,
+        patient_notes: `Booked with alternative doctor due to assigned doctor unavailability`,
+        attached_report_ids: selectedReportIds
+      };
 
-      if (insertError) throw insertError;
+      const paymentType = callMode === 'video' ? 'appointment_video' : 'appointment_audio';
 
-      toast.success('Appointment booked with alternative doctor!', {
-        description: `Your appointment is scheduled for ${format(parseISO(`${appointmentDate}T${appointmentTime}`), 'EEEE, MMMM d, yyyy at h:mm a')}`
+      await payAndFulfil({
+        type: paymentType,
+        amount_paise: amountPaise,
+        metadata: { appointment: appointmentPayload },
+        onSuccess: () => {
+          toast.success('Appointment booked with alternative doctor!', {
+            description: `Your appointment is scheduled for ${format(parseISO(`${appointmentDate}T${appointmentTime}`), 'EEEE, MMMM d, yyyy at h:mm a')}`
+          });
+          setSelectedSlot(null);
+          setReason('');
+          setSelectedReportIds([]);
+          setShowAlternativeDoctors(false);
+          loadMyAppointments();
+        },
+        onError: (err) => toast.error(err.message || 'Payment or booking failed'),
       });
-
-      // Reset form
-      setSelectedSlot(null);
-      setReason('');
-      setShowAlternativeDoctors(false);
-      loadMyAppointments();
     } catch (error: any) {
       console.error('Error booking with alternative doctor:', error);
       toast.error(error.message || 'Failed to book appointment');
@@ -273,6 +347,32 @@ export const AppointmentBooking = () => {
     }
   };
 
+  const loadPatientReports = async () => {
+    if (!user) return;
+
+    try {
+      const { data: patient, error: patientError } = await supabase
+        .from('patients')
+        .select('id')
+        .eq('auth_user_id', user.id)
+        .single();
+
+      if (patientError) throw patientError;
+
+      const { data: reports, error: reportsError } = await supabase
+        .from('patient_reports')
+        .select('id, title, report_type, created_at')
+        .eq('patient_id', patient.id)
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+      if (reportsError) throw reportsError;
+      setPatientReports(reports || []);
+    } catch (error: any) {
+      console.error('Error loading patient reports:', error);
+    }
+  };
+
   const handleBookAppointment = async () => {
     if (!selectedSlot || !reason.trim() || !doctorId || !user) {
       toast.error('Please select a time slot and provide a reason');
@@ -282,7 +382,6 @@ export const AppointmentBooking = () => {
     try {
       setLoading(true);
 
-      // Get patient ID
       const { data: patient, error: patientError } = await supabase
         .from('patients')
         .select('id')
@@ -291,10 +390,8 @@ export const AppointmentBooking = () => {
 
       if (patientError) throw patientError;
 
-      // Parse the selected slot
       const [startTime] = selectedSlot.split(' - ');
 
-      // Check for conflicts
       const { data: conflictCheck, error: conflictError } = await supabase.rpc(
         'check_appointment_conflict',
         {
@@ -306,43 +403,56 @@ export const AppointmentBooking = () => {
         }
       );
 
-      if (conflictError) {
-        console.warn('Conflict check error:', conflictError);
-      }
-
+      if (conflictError) console.warn('Conflict check error:', conflictError);
       if (conflictCheck) {
         toast.error('This time slot is no longer available. Please select another time.');
         loadAvailableSlots();
+        setLoading(false);
         return;
       }
 
-      // Create appointment
-      const { error: insertError } = await supabase
-        .from('appointments')
-        .insert({
-          doctor_id: doctorId,
-          patient_id: patient.id,
-          appointment_date: selectedDate,
-          appointment_time: startTime,
-          duration_minutes: 30,
-          status: 'scheduled',
-          appointment_type: 'regular',
-          call_mode: callMode,
-          reason: reason.trim(),
-          patient_notes: null
-        });
+      const appointmentPayload = {
+        doctor_id: doctorId,
+        patient_id: patient.id,
+        appointment_date: selectedDate,
+        appointment_time: startTime,
+        duration_minutes: 30,
+        status: 'scheduled',
+        appointment_type: 'regular',
+        call_mode: callMode,
+        reason: reason.trim(),
+        patient_notes: null,
+        attached_report_ids: selectedReportIds
+      };
 
-      if (insertError) throw insertError;
+      const videoFee = doctorInfo?.video_consultation_fee ?? doctorInfo?.consultation_fee;
+      const audioFee = doctorInfo?.audio_consultation_fee ?? doctorInfo?.consultation_fee;
+      const feeRupees = callMode === 'video' ? videoFee : audioFee;
+      const amountPaise = feeRupees != null ? Math.round(Number(feeRupees) * 100) : 0;
+      if (amountPaise < 100) {
+        toast.error('Doctor has not set a consultation fee. Please contact your doctor.');
+        setLoading(false);
+        return;
+      }
 
-      toast.success('Appointment booked successfully!', {
-        description: `Your appointment is scheduled for ${format(parseISO(`${selectedDate}T${startTime}`), 'EEEE, MMMM d, yyyy at h:mm a')}`
+      const paymentType = callMode === 'video' ? 'appointment_video' : 'appointment_audio';
+
+      await payAndFulfil({
+        type: paymentType,
+        amount_paise: amountPaise,
+        metadata: { appointment: appointmentPayload },
+        onSuccess: () => {
+          toast.success('Appointment booked successfully!', {
+            description: `Your appointment is scheduled for ${format(parseISO(`${selectedDate}T${startTime}`), 'EEEE, MMMM d, yyyy at h:mm a')}`
+          });
+          setSelectedSlot(null);
+          setReason('');
+          setSelectedReportIds([]);
+          loadAvailableSlots();
+          loadMyAppointments();
+        },
+        onError: (err) => toast.error(err.message || 'Payment or booking failed'),
       });
-
-      // Reset form
-      setSelectedSlot(null);
-      setReason('');
-      loadAvailableSlots();
-      loadMyAppointments();
     } catch (error: any) {
       console.error('Error booking appointment:', error);
       toast.error(error.message || 'Failed to book appointment');
@@ -462,7 +572,7 @@ export const AppointmentBooking = () => {
 
           {/* Call Mode Selection */}
           <div className="space-y-2">
-            <Label className="text-emerald-200">Call Type</Label>
+            <Label className="text-emerald-200">Call Type (pay to confirm)</Label>
             <div className="grid grid-cols-2 gap-3">
               <button
                 type="button"
@@ -478,7 +588,11 @@ export const AppointmentBooking = () => {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
                   </svg>
                   <span className="font-medium">Video Call</span>
-                  <span className="text-xs opacity-70">Audio + Video</span>
+                  <span className="text-xs opacity-70">
+                    {doctorInfo?.video_consultation_fee != null || doctorInfo?.consultation_fee != null
+                      ? `₹${doctorInfo?.video_consultation_fee ?? doctorInfo?.consultation_fee ?? '—'} • Audio + Video`
+                      : 'Set by doctor • Audio + Video'}
+                  </span>
                 </div>
               </button>
               <button
@@ -495,7 +609,11 @@ export const AppointmentBooking = () => {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
                   </svg>
                   <span className="font-medium">Audio Call</span>
-                  <span className="text-xs opacity-70">Audio Only</span>
+                  <span className="text-xs opacity-70">
+                    {doctorInfo?.audio_consultation_fee != null || doctorInfo?.consultation_fee != null
+                      ? `₹${doctorInfo?.audio_consultation_fee ?? doctorInfo?.consultation_fee ?? '—'} • Audio Only`
+                      : 'Set by doctor • Audio Only'}
+                  </span>
                 </div>
               </button>
             </div>
@@ -619,6 +737,11 @@ export const AppointmentBooking = () => {
                               <span>Next available: {format(parseISO(`2000-01-01T${doctor.next_available_time}`), 'h:mm a')}</span>
                             </div>
                           )}
+                          <div className="flex items-center gap-3 text-xs text-emerald-300/90 font-semibold mt-2">
+                            <span>Video: ₹{doctor.video_consultation_fee ?? doctor.consultation_fee ?? '—'}</span>
+                            <span>•</span>
+                            <span>Audio: ₹{doctor.audio_consultation_fee ?? doctor.consultation_fee ?? '—'}</span>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -632,7 +755,19 @@ export const AppointmentBooking = () => {
                           : 'border-emerald-500/30 text-emerald-300 hover:bg-emerald-600/20'
                       }`}
                     >
-                      {loading ? 'Booking...' : doctor.is_available_now ? 'Book Now' : 'Book Next Available'}
+                      {loading ? (
+                        <>
+                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                          Opening payment...
+                        </>
+                      ) : (() => {
+                        const fee = callMode === 'video' 
+                          ? (doctor.video_consultation_fee ?? doctor.consultation_fee)
+                          : (doctor.audio_consultation_fee ?? doctor.consultation_fee);
+                        return doctor.is_available_now 
+                          ? `Pay & Book Now ${fee ? `(₹${fee})` : ''}` 
+                          : `Pay & Book Next Available ${fee ? `(₹${fee})` : ''}`;
+                      })()}
                     </Button>
                   </div>
                 ))}
@@ -694,6 +829,43 @@ export const AppointmentBooking = () => {
             />
           </div>
 
+          {/* Attach Reports Section */}
+          {patientReports.length > 0 && (
+            <div className="space-y-2">
+              <Label className="text-emerald-200">Attach Medical Reports (Optional)</Label>
+              <div className="bg-emerald-950/40 border border-emerald-500/30 rounded-lg p-3 max-h-48 overflow-y-auto">
+                {patientReports.map((report) => (
+                  <label
+                    key={report.id}
+                    className="flex items-center gap-3 p-2 rounded hover:bg-emerald-600/10 cursor-pointer"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedReportIds.includes(report.id)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedReportIds([...selectedReportIds, report.id]);
+                        } else {
+                          setSelectedReportIds(selectedReportIds.filter(id => id !== report.id));
+                        }
+                      }}
+                      className="w-4 h-4 rounded border-emerald-500/50 bg-emerald-950/60 text-emerald-500 focus:ring-emerald-500/50"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-emerald-100 truncate">{report.title}</p>
+                      <p className="text-xs text-emerald-300/60">
+                        {report.report_type} • {format(parseISO(report.created_at), 'MMM d, yyyy')}
+                      </p>
+                    </div>
+                  </label>
+                ))}
+              </div>
+              <p className="text-xs text-emerald-300/60">
+                Selected reports will be shared with the doctor for review
+              </p>
+            </div>
+          )}
+
           <Button
             onClick={handleBookAppointment}
             disabled={!selectedSlot || !reason.trim() || loading}
@@ -702,11 +874,12 @@ export const AppointmentBooking = () => {
             {loading ? (
               <>
                 <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
-                Booking...
+                Opening payment...
               </>
-            ) : (
-              'Book Appointment'
-            )}
+            ) : (() => {
+              const v = callMode === 'video' ? (doctorInfo?.video_consultation_fee ?? doctorInfo?.consultation_fee) : (doctorInfo?.audio_consultation_fee ?? doctorInfo?.consultation_fee);
+              return v != null ? `Pay & Book (₹${v})` : 'Pay & Book';
+            })()}
           </Button>
 
           <div className="bg-gradient-to-br from-blue-900/20 to-indigo-900/10 border border-blue-500/20 rounded-xl p-4">
