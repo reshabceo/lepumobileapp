@@ -7,7 +7,7 @@ import { supabaseUrl, supabaseAnonKey } from '@/lib/supabase';
 
 const FUNCTIONS_BASE = `${supabaseUrl.replace(/\/$/, '')}/functions/v1`;
 
-export type PaymentType = 'appointment_video' | 'appointment_audio' | 'radiologist_review' | 'emergency';
+export type PaymentType = 'appointment_video' | 'appointment_audio' | 'radiologist_review' | 'emergency' | 'ai_doctor_text' | 'ai_doctor_voice';
 
 export interface PricesResponse {
   success: boolean;
@@ -116,6 +116,30 @@ export interface CheckoutOptions {
   onError?: (err: Error) => void;
 }
 
+export interface AIDoctorPricing {
+  price_text_paise: number;
+  price_voice_paise: number;
+  currency: string;
+}
+
+/**
+ * Fetch AI Doctor pricing from Supabase (admin-configured).
+ */
+export async function fetchAIDoctorPricing(): Promise<AIDoctorPricing> {
+  const { supabase } = await import('@/lib/supabase');
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase as any)
+    .from('ai_doctor_pricing')
+    .select('price_text_paise, price_voice_paise, currency')
+    .eq('is_active', true)
+    .single();
+
+  if (error || !data) {
+    return { price_text_paise: 10000, price_voice_paise: 15000, currency: 'INR' };
+  }
+  return data as AIDoctorPricing;
+}
+
 /**
  * Create order, open Razorpay Checkout, on success verify and call onSuccess.
  */
@@ -141,7 +165,12 @@ export async function payAndFulfil(options: CheckoutOptions): Promise<void> {
       currency: order.currency,
       order_id: order.order_id,
       name: 'Monitraq',
-      description: type === 'appointment_video' ? 'Video consultation' : type === 'appointment_audio' ? 'Audio consultation' : type === 'radiologist_review' ? 'Radiologist report review' : 'Emergency consultation',
+      description: type === 'appointment_video' ? 'Video consultation'
+        : type === 'appointment_audio' ? 'Audio consultation'
+        : type === 'radiologist_review' ? 'Radiologist report review'
+        : type === 'ai_doctor_text' ? 'AI Doctor – Text consultation (24h)'
+        : type === 'ai_doctor_voice' ? 'AI Doctor – Voice consultation (24h)'
+        : 'Emergency consultation',
       handler: async (response: { razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string }) => {
         try {
           await verifyPayment({

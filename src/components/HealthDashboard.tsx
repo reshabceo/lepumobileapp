@@ -32,6 +32,7 @@ import {
   Edit3,
   Pill,
   Target,
+  Receipt,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
@@ -1250,6 +1251,13 @@ export const HealthDashboard = () => {
             )}
             <FileCheck size={20} className="text-cyan-400" />
             <span className="text-xs">Claims</span>
+          </button>
+          <button
+            onClick={() => navigate("/invoices")}
+            className="bg-amber-900/60 backdrop-blur-sm hover:bg-amber-800/70 text-white font-bold py-4 rounded-xl flex flex-col items-center justify-center gap-1 transition-all duration-200 hover:scale-105 active:scale-95 border border-amber-400/40 hover:border-amber-400/60"
+          >
+            <Receipt size={20} className="text-amber-400" />
+            <span className="text-xs">Invoices</span>
           </button>
           <button
             onClick={() => navigate("/prescriptions")}

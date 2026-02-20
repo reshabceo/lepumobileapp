@@ -146,7 +146,7 @@ export const EmergencyButton: React.FC<EmergencyButtonProps> = ({
             // Get doctor's emergency fee
             const { data: doctor, error: docError } = await supabase
                 .from('doctors')
-                .select('consultation_fee, emergency_fee')
+                .select('full_name, consultation_fee, emergency_fee')
                 .eq('id', doctorId)
                 .single();
 
@@ -209,7 +209,8 @@ export const EmergencyButton: React.FC<EmergencyButtonProps> = ({
                 metadata: { 
                     appointment: appointmentPayload, 
                     alert: alertPayload,
-                    amount_paise: amountPaise 
+                    amount_paise: amountPaise,
+                    doctor_name: doctor.full_name || null
                 },
                 onSuccess: async () => {
                     // Get the created appointment ID

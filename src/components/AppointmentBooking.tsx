@@ -227,7 +227,7 @@ export const AppointmentBooking = () => {
       // Get alternative doctor pricing
       const { data: altDoctor, error: altDocError } = await supabase
         .from('doctors')
-        .select('consultation_fee, video_consultation_fee, audio_consultation_fee')
+        .select('full_name, consultation_fee, video_consultation_fee, audio_consultation_fee')
         .eq('id', alternativeDoctorId)
         .single();
 
@@ -299,7 +299,7 @@ export const AppointmentBooking = () => {
       await payAndFulfil({
         type: paymentType,
         amount_paise: amountPaise,
-        metadata: { appointment: appointmentPayload },
+        metadata: { appointment: appointmentPayload, amount_paise: amountPaise, doctor_name: altDoctor.full_name || null },
         onSuccess: () => {
           toast.success('Appointment booked with alternative doctor!', {
             description: `Your appointment is scheduled for ${format(parseISO(`${appointmentDate}T${appointmentTime}`), 'EEEE, MMMM d, yyyy at h:mm a')}`
@@ -440,7 +440,7 @@ export const AppointmentBooking = () => {
       await payAndFulfil({
         type: paymentType,
         amount_paise: amountPaise,
-        metadata: { appointment: appointmentPayload },
+        metadata: { appointment: appointmentPayload, amount_paise: amountPaise, doctor_name: doctorInfo?.full_name || null },
         onSuccess: () => {
           toast.success('Appointment booked successfully!', {
             description: `Your appointment is scheduled for ${format(parseISO(`${selectedDate}T${startTime}`), 'EEEE, MMMM d, yyyy at h:mm a')}`

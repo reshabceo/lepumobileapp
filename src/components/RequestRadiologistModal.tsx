@@ -120,7 +120,7 @@ export default function RequestRadiologistModal({
       await payAndFulfil({
         type: 'radiologist_review',
         amount_paise: amountPaise,
-        metadata: { request: requestPayload },
+        metadata: { request: requestPayload, amount_paise: amountPaise, patient_id: patient.id },
         onSuccess: () => {
           toast.success('Request sent successfully! Radiologist will review your study.');
           onOpenChange(false);

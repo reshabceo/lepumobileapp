@@ -35,6 +35,7 @@ import GlobalPatientWebRTC from "./components/GlobalPatientWebRTC";
 import { AppointmentBookingPage } from "./pages/AppointmentBookingPage";
 import { ChatSupport } from "./components/ChatSupport";
 import AIDoctorPage from "./pages/AIDoctorPage";
+import InvoicesPage from "./pages/InvoicesPage";
 import PatientInsuranceClaims from "./components/PatientInsuranceClaims";
 import { ManualVitalInput } from "./components/ManualVitalInput";
 import { PatientPrescriptions } from "./components/PatientPrescriptions";
@@ -179,6 +180,11 @@ const App = () => (
               <Route path="/ai-doctor" element={
                 <ProtectedRoute>
                   <AIDoctorPage />
+                </ProtectedRoute>
+              } />
+              <Route path="/invoices" element={
+                <ProtectedRoute>
+                  <InvoicesPage />
                 </ProtectedRoute>
               } />
               <Route path="/insurance-claims" element={
