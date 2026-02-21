@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">AliveCor Testisohjelma</string>
+    <string name="title_recording_list">Tallenteet</string>
+    <string name="title_recording_detail">Tallenteen tiedot</string>
+
+    <string name="about_title">Tietoja</string>
+    <string name="about_alivecor_kit">SDK AliveCorKit: %1$s</string>
+    <string name="about_powered_by_alivecor">Ohjelmisto ja palvelut tarjoavat AliveCor</string>
+    <string name="start_default_flow">Aloita oletusvirta</string>
+    <string name="start_custom_flow">Aloita mukautettu virta</string>
+    <string name="view_all_recorded_ecgs">Näytä kaikki tallennetut EKG:t</string>
+    <string name="view_last_recorded_ecg">Näytä viimeisin tallennettu EKG</string>
+    <string name="test_ekganalyzer">Testaa EkgAnalyzer</string>
+    <string name="about">Tietoja</string>
+
+    <string name="alerts">Ilmoitukset</string>
+    <string name="general">Oletusvirran asetukset:</string>
+    <string name="settings">Asetukset</string>
+    <string name="device">Laite</string>
+    <string name="kardia_mobile">Kardia Mobile</string>
+    <string name="kardia_card">Kardia Card</string>
+    <string name="triangle">Kolmio</string>
+    <string name="omron_complete">Omron Complete</string>
+    <string name="leads_configuration">Johtojen kokoonpano</string>
+    <string name="single_lead">Yksi johto</string>
+    <string name="six_lead">Kuusi johtoa</string>
+    <string name="on">Päällä</string>
+    <string name="off">Pois päältä</string>
+    <string name="filter_enhanced">Parannettu</string>
+    <string name="filter_original">Alkuperäinen</string>
+    <string name="kardia_v1">Bundle Test V1</string>
+    <string name="kardia_v2">Bundle Test V2</string>
+    <string name="duration">Tallennusaika</string>
+</resources>
