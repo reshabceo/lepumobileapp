@@ -1177,7 +1177,7 @@ export const HealthDashboard = () => {
               </div>
             </button>
 
-            {/* ECG Monitor Button */}
+            {/* ECG Monitor Button (BP2) */}
             <button
               onClick={() => navigate("/ecg-monitor")}
               className="bg-purple-900/60 backdrop-blur-sm hover:bg-purple-800/70 text-white p-6 rounded-2xl flex flex-col items-center justify-center gap-3 transition-all duration-300 hover:scale-105 active:scale-95 border border-purple-400/40 hover:border-purple-400/60"
@@ -1186,7 +1186,21 @@ export const HealthDashboard = () => {
               <div className="text-center">
                 <h3 className="font-bold text-lg text-white">ECG Monitor</h3>
                 <p className="text-xs text-gray-400">
-                  Heart Activity
+                  BP2 Single‑Lead ECG
+                </p>
+              </div>
+            </button>
+
+            {/* 6-Channel ECG (AliveCor) */}
+            <button
+              onClick={() => navigate("/kardia-6l-ecg")}
+              className="bg-indigo-900/60 backdrop-blur-sm hover:bg-indigo-800/70 text-white p-6 rounded-2xl flex flex-col items-center justify-center gap-3 transition-all duration-300 hover:scale-105 active:scale-95 border border-indigo-400/40 hover:border-indigo-400/60"
+            >
+              <Monitor className="h-8 w-8 text-indigo-400" />
+              <div className="text-center">
+                <h3 className="font-bold text-lg text-white">6-Channel ECG</h3>
+                <p className="text-xs text-gray-400">
+                  KardiaMobile 6L
                 </p>
               </div>
             </button>

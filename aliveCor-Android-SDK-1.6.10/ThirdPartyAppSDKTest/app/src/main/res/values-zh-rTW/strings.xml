@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">AliveCor 測試應用程式</string>
+    <string name="title_recording_list">錄音</string>
+    <string name="title_recording_detail">錄音詳情</string>
+
+    <string name="about_title">關於</string>
+    <string name="about_alivecor_kit">SDK AliveCorKit: %1$s</string>
+    <string name="about_powered_by_alivecor">由 AliveCor 提供支援的軟體和服務</string>
+    <string name="start_default_flow">啟動預設流程</string>
+    <string name="start_custom_flow">啟動自訂流程</string>
+    <string name="view_all_recorded_ecgs">查看所有錄製的 ECG</string>
+    <string name="view_last_recorded_ecg">查看最後錄製的 ECG</string>
+    <string name="test_ekganalyzer">測試 EkgAnalyzer</string>
+    <string name="about">關於</string>
+
+    <string name="alerts">警報</string>
+    <string name="general">預設流程設定：</string>
+    <string name="settings">設定</string>
+    <string name="device">設備</string>
+    <string name="kardia_mobile">Kardia Mobile</string>
+    <string name="kardia_card">Kardia Card</string>
+    <string name="triangle">三角形</string>
+    <string name="omron_complete">Omron Complete</string>
+    <string name="leads_configuration">電極配置</string>
+    <string name="single_lead">單電極</string>
+    <string name="six_lead">六電極</string>
+    <string name="on">開啟</string>
+    <string name="off">關閉</string>
+    <string name="filter_enhanced">增強版</string>
+    <string name="filter_original">原始版</string>
+    <string name="kardia_v1">Bundle 測試 V1</string>
+    <string name="kardia_v2">Bundle 測試 V2</string>
+    <string name="duration">錄音時間</string>
+
+    <string name="key_device" translatable="false">key_device</string>
+    <string name="key_duration" translatable="false">key_duration</string>
+    <string name="key_mains_filter" translatable="false">key_mains_filter</string>
+    <string name="key_leads" translatable="false">key_leads</string>
+    <string name="key_lock_leads" translatable="false">key_lock_leads</string>
+    <string name="key_filter" translatable="false">key_filter</string>
+    <string name="key_kardia" translatable="false">key_kardia</string>
+
+    <string name="sec_30" translatable="false">30秒</string>
+    <string name="min_1" translatable="false">1分鐘</string>
+    <string name="min_2" translatable="false">2分鐘</string>
+    <string name="min_3" translatable="false">3分鐘</string>
+    <string name="min_4" translatable="false">4分鐘</string>
+    <string name="min_5" translatable="false">5分鐘</string>
+    <string name="mains_filter">主電源過濾器</string>
+    <string name="default_filter">預設</string>
+
+</resources>

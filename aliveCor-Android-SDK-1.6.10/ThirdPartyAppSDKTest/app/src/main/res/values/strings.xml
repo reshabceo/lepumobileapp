@@ -1,0 +1,81 @@
+<resources>
+    <string name="app_name">AliveCor Test Application</string>
+    <string name="title_recording_list">Recordings</string>
+    <string name="title_recording_detail">Recording Detail</string>
+
+    <string name="about_title">About</string>
+    <string name="about_alivecor_kit">SDK AliveCorKit: %1$s</string>
+    <string name="about_powered_by_alivecor">Software &amp; Services powered by AliveCor</string>
+    <string name="start_default_flow">Start Default Flow</string>
+    <string name="start_custom_flow">Start Custom Flow</string>
+    <string name="view_all_recorded_ecgs">View All Recorded ECGs</string>
+    <string name="view_last_recorded_ecg">View Last-Recorded ECG</string>
+    <string name="test_ekganalyzer">Test EkgAnalyzer</string>
+    <string name="about">About</string>
+
+    <string name="alerts">Alerts</string>
+    <string name="general">Default flow settings:</string>
+    <string name="settings">Settings</string>
+    <string name="device">Device</string>
+    <string name="kardia_mobile">Kardia Mobile</string>
+    <string name="kardia_card">Kardia Card</string>
+    <string name="triangle">Triangle</string>
+    <string name="omron_complete">Omron Complete</string>
+    <string name="leads_configuration">Leads Configuration</string>
+    <string name="single_lead">Single Lead</string>
+    <string name="six_lead">Six Lead</string>
+    <string name="on">On</string>
+    <string name="off">Off</string>
+    <string name="filter_enhanced">Enhanced</string>
+    <string name="filter_original">Original</string>
+    <string name="kardia_v1">Bundle Test V1</string>
+    <string name="kardia_v2">Bundle Test V2</string>
+    <string name="duration">Recording Duration</string>
+
+    <string name="key_device" translatable="false">key_device</string>
+    <string name="key_duration" translatable="false">key_duration</string>
+    <string name="key_mains_filter" translatable="false">key_mains_filter</string>
+    <string name="key_leads" translatable="false">key_leads</string>
+    <string name="key_lock_leads" translatable="false">key_lock_leads</string>
+    <string name="key_filter" translatable="false">key_filter</string>
+    <string name="key_kardia" translatable="false">key_kardia</string>
+    <string name="key_slip_result_screen" translatable="false">key_slip_result_screen</string>
+    <string name="key_about_eu_screen" translatable="false">key_about_eu_screen</string>
+
+    <string name="sec_30" translatable="false">30 sec</string>
+    <string name="min_1" translatable="false">1 min</string>
+    <string name="min_2" translatable="false">2 min</string>
+    <string name="min_3" translatable="false">3 min</string>
+    <string name="min_4" translatable="false">4 min</string>
+    <string name="min_5" translatable="false">5 min</string>
+    <string name="mains_filter">Mains filter</string>
+    <string name="default_filter">Default</string>
+
+    <string-array name="devices">
+        <item>@string/triangle</item>
+        <item>@string/kardia_mobile</item>
+        <item>@string/omron_complete</item>
+        <item>@string/kardia_card</item>
+    </string-array>
+
+    <string-array name="leads">
+        <item>@string/single_lead</item>
+        <item>@string/six_lead</item>
+    </string-array>
+
+    <string-array name="filter_values">
+        <item>@string/default_filter</item>
+        <item>50</item>
+        <item>60</item>
+    </string-array>
+
+    <string-array name="duration_values">
+        <item>@string/sec_30</item>
+        <item>@string/min_1</item>
+        <item>@string/min_2</item>
+        <item>@string/min_3</item>
+        <item>@string/min_4</item>
+        <item>@string/min_5</item>
+    </string-array>
+
+</resources>
