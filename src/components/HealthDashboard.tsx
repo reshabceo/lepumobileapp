@@ -31,6 +31,8 @@ import {
   FileCheck,
   Edit3,
   Pill,
+  Target,
+  Receipt,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
@@ -41,6 +43,7 @@ import { useRealTimeVitals } from "@/hooks/useRealTimeVitals";
 import { DoctorInfoCard } from "./DoctorInfoCard";
 import { EmergencyButton } from "./EmergencyButton";
 import { useInsuranceClaimsNotifications } from "@/hooks/useInsuranceClaimsNotifications";
+import { useHealthRecommendationsNotifications } from "@/hooks/useHealthRecommendationsNotifications";
 
 // Icon mapping for different health metrics
 const getMetricIcon = (name: string) => {
@@ -188,6 +191,9 @@ export const HealthDashboard = () => {
   
   // Insurance claims notifications
   const { unreadCount: claimsUnreadCount, markAsRead: markClaimsAsRead } = useInsuranceClaimsNotifications();
+  
+  // Health recommendations notifications
+  const { unreadCount: recommendationsUnreadCount, markAsRead: markRecommendationsAsRead } = useHealthRecommendationsNotifications();
 
   // Safety timeout - force stop loading after 5 seconds (much faster)
   useEffect(() => {
@@ -1261,11 +1267,33 @@ export const HealthDashboard = () => {
             <span className="text-xs">Claims</span>
           </button>
           <button
+            onClick={() => navigate("/invoices")}
+            className="bg-amber-900/60 backdrop-blur-sm hover:bg-amber-800/70 text-white font-bold py-4 rounded-xl flex flex-col items-center justify-center gap-1 transition-all duration-200 hover:scale-105 active:scale-95 border border-amber-400/40 hover:border-amber-400/60"
+          >
+            <Receipt size={20} className="text-amber-400" />
+            <span className="text-xs">Invoices</span>
+          </button>
+          <button
             onClick={() => navigate("/prescriptions")}
             className="bg-purple-900/60 backdrop-blur-sm hover:bg-purple-800/70 text-white font-bold py-4 rounded-xl flex flex-col items-center justify-center gap-1 transition-all duration-200 hover:scale-105 active:scale-95 border border-purple-400/40 hover:border-purple-400/60"
           >
             <Pill size={20} className="text-purple-400" />
             <span className="text-xs">Rx</span>
+          </button>
+          <button
+            onClick={() => {
+              markRecommendationsAsRead();
+              navigate("/recommendations");
+            }}
+            className="bg-emerald-900/60 backdrop-blur-sm hover:bg-emerald-800/70 text-white font-bold py-4 rounded-xl flex flex-col items-center justify-center gap-1 transition-all duration-200 hover:scale-105 active:scale-95 border border-emerald-400/40 hover:border-emerald-400/60 relative"
+          >
+            {recommendationsUnreadCount > 0 && (
+              <div className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center animate-pulse">
+                {recommendationsUnreadCount}
+              </div>
+            )}
+            <Target size={20} className="text-emerald-400" />
+            <span className="text-xs">Health Plan</span>
           </button>
         </div>
 

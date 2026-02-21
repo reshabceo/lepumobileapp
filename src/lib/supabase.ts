@@ -252,6 +252,24 @@ export const auth = {
   }
 }
 
+// Check if an auth user is a doctor (patient app must block doctors)
+export const isDoctorByAuthId = async (authUserId: string): Promise<boolean> => {
+  try {
+    const { data, error } = await supabase
+      .from('doctors')
+      .select('id')
+      .eq('auth_user_id', authUserId)
+      .maybeSingle();
+    if (error) {
+      console.warn('❌ isDoctor check error:', error);
+      return false; // on error, allow through (don't block)
+    }
+    return !!data;
+  } catch {
+    return false;
+  }
+};
+
 // Database helper functions
 export const db = {
   // Get patient profile - OPTIMIZED for speed

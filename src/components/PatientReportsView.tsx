@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { FileText, Download, Calendar, User, ArrowLeft, Upload, Stethoscope, Plus, Loader2, FileDown } from 'lucide-react';
+import { FileText, Download, Calendar, User, ArrowLeft, Upload, Stethoscope, Plus, Loader2, FileDown, Image, Send } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { supabase, db } from '@/lib/supabase';
 import { useRealTimeVitals } from '@/hooks/useRealTimeVitals';
@@ -9,6 +9,8 @@ import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
 import { Share } from '@capacitor/share';
 import { Capacitor } from '@capacitor/core';
 import html2pdf from 'html2pdf.js';
+import DicomUploader from './DicomUploader';
+import RequestRadiologistModal from './RequestRadiologistModal';
 
 interface PatientReport {
     id: string;
@@ -24,6 +26,14 @@ interface PatientReport {
     sent_to_patient?: boolean;
     analysis_data?: any;
     analysis_status?: 'pending' | 'processing' | 'completed' | 'failed';
+}
+
+interface DicomStudy {
+    id: string;
+    modality: string | null;
+    body_part_examined: string | null;
+    study_date: string | null;
+    created_at: string;
 }
 
 const generateReportHTML = (analysisData: any, reportTitle: string): string => {
@@ -478,9 +488,13 @@ const PatientReportsView: React.FC = () => {
     const { patientProfile: hookProfile, loading: hookLoading } = useRealTimeVitals();
     const [patientProfile, setPatientProfile] = useState<any>(null);
     const [reports, setReports] = useState<PatientReport[]>([]);
+    const [dicomStudies, setDicomStudies] = useState<DicomStudy[]>([]);
+    const [dicomLoading, setDicomLoading] = useState(false);
     const [loading, setLoading] = useState(true);
     const [profileLoading, setProfileLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState<'from-doctor' | 'my-uploads'>('from-doctor');
+    const [activeTab, setActiveTab] = useState<'from-doctor' | 'my-uploads' | 'dicom'>('from-doctor');
+    const [requestRadiologistOpen, setRequestRadiologistOpen] = useState(false);
+    const [selectedStudyForRequest, setSelectedStudyForRequest] = useState<DicomStudy | null>(null);
     const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
     // 🚀 OPTIMIZED: Fetch profile with instant cache + direct fetch
@@ -546,6 +560,33 @@ const PatientReportsView: React.FC = () => {
             fetchReports();
         }
     }, [patientProfile]);
+
+    const fetchDicomStudies = async () => {
+        if (!patientProfile) return;
+        setDicomLoading(true);
+        try {
+            const { data, error } = await supabase
+                .from('dicom_studies')
+                .select('id, modality, body_part_examined, study_date, created_at')
+                .eq('patient_id', patientProfile.id)
+                .order('created_at', { ascending: false });
+            if (error) {
+                console.error('Error fetching DICOM studies:', error);
+            } else {
+                setDicomStudies(data || []);
+            }
+        } catch (err) {
+            console.error('Error:', err);
+        } finally {
+            setDicomLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        if (patientProfile && activeTab === 'dicom') {
+            fetchDicomStudies();
+        }
+    }, [patientProfile, activeTab]);
 
     const fetchReports = async () => {
         if (!patientProfile) return;
@@ -855,28 +896,91 @@ const PatientReportsView: React.FC = () => {
                 <div className="flex bg-gray-800/50 rounded-lg p-1 mb-6">
                     <button
                         onClick={() => setActiveTab('from-doctor')}
-                        className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-md transition-all duration-200 ${activeTab === 'from-doctor'
+                        className={`flex-1 flex items-center justify-center gap-1.5 py-3 px-2 rounded-md transition-all duration-200 text-sm ${activeTab === 'from-doctor'
                             ? 'bg-blue-600 text-white shadow-lg'
                             : 'text-gray-400 hover:text-white hover:bg-gray-700/50'
                             }`}
                     >
-                        <Stethoscope className="h-4 w-4" />
-                        <span className="font-medium">From Doctor</span>
+                        <Stethoscope className="h-4 w-4 flex-shrink-0" />
+                        <span className="font-medium truncate">From Doctor</span>
                     </button>
                     <button
                         onClick={() => setActiveTab('my-uploads')}
-                        className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-md transition-all duration-200 ${activeTab === 'my-uploads'
+                        className={`flex-1 flex items-center justify-center gap-1.5 py-3 px-2 rounded-md transition-all duration-200 text-sm ${activeTab === 'my-uploads'
                             ? 'bg-blue-600 text-white shadow-lg'
                             : 'text-gray-400 hover:text-white hover:bg-gray-700/50'
                             }`}
                     >
-                        <Upload className="h-4 w-4" />
-                        <span className="font-medium">My Uploads</span>
+                        <Upload className="h-4 w-4 flex-shrink-0" />
+                        <span className="font-medium truncate">My Uploads</span>
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('dicom')}
+                        className={`flex-1 flex items-center justify-center gap-1.5 py-3 px-2 rounded-md transition-all duration-200 text-sm ${activeTab === 'dicom'
+                            ? 'bg-blue-600 text-white shadow-lg'
+                            : 'text-gray-400 hover:text-white hover:bg-gray-700/50'
+                            }`}
+                    >
+                        <Image className="h-4 w-4 flex-shrink-0" />
+                        <span className="font-medium truncate">DICOM</span>
                     </button>
                 </div>
 
-                {/* Loading State */}
-                {loading && (
+                {/* DICOM Tab: Upload + list + Request radiologist */}
+                {activeTab === 'dicom' && (
+                    <div className="space-y-6 mb-20">
+                        <DicomUploader
+                            onUploadComplete={(studyId) => {
+                                fetchDicomStudies();
+                            }}
+                        />
+                        {dicomLoading && (
+                            <div className="text-center py-6">
+                                <Loader2 className="h-8 w-8 animate-spin text-blue-500 mx-auto" />
+                                <p className="text-gray-400 mt-2">Loading DICOM studies...</p>
+                            </div>
+                        )}
+                        {!dicomLoading && dicomStudies.length > 0 && (
+                            <div>
+                                <h3 className="text-sm font-semibold text-gray-300 mb-3">Your DICOM studies</h3>
+                                <p className="text-xs text-gray-500 mb-3">Request a radiologist to review any study.</p>
+                                <div className="space-y-3">
+                                    {dicomStudies.map((study) => (
+                                        <div
+                                            key={study.id}
+                                            className="bg-[#1A1A1A] border border-gray-800 rounded-xl p-4 flex items-center justify-between gap-3"
+                                        >
+                                            <div className="flex-1 min-w-0">
+                                                <p className="font-medium text-white truncate">
+                                                    {study.modality || 'Imaging'} {study.body_part_examined ? `• ${study.body_part_examined}` : ''}
+                                                </p>
+                                                <p className="text-xs text-gray-500 mt-0.5">
+                                                    {study.study_date ? new Date(study.study_date).toLocaleDateString() : new Date(study.created_at).toLocaleDateString()}
+                                                </p>
+                                            </div>
+                                            <button
+                                                onClick={() => {
+                                                    setSelectedStudyForRequest(study);
+                                                    setRequestRadiologistOpen(true);
+                                                }}
+                                                className="flex items-center gap-2 bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded-lg text-sm font-medium shrink-0"
+                                            >
+                                                <Send className="h-4 w-4" />
+                                                Request radiologist
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                        {!dicomLoading && dicomStudies.length === 0 && (
+                            <p className="text-sm text-gray-500 text-center py-4">Upload a DICOM or ZIP file above, then request a radiologist review.</p>
+                        )}
+                    </div>
+                )}
+
+                {/* Loading State (reports tabs) */}
+                {activeTab !== 'dicom' && loading && (
                     <div className="text-center py-8">
                         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto"></div>
                         <p className="text-gray-400 mt-2">Loading reports...</p>
@@ -884,7 +988,7 @@ const PatientReportsView: React.FC = () => {
                 )}
 
                 {/* No Reports */}
-                {!loading && filteredReports.length === 0 && (
+                {activeTab !== 'dicom' && !loading && filteredReports.length === 0 && (
                     <div className="text-center py-12">
                         <FileText className="h-16 w-16 text-gray-600 mx-auto mb-4" />
                         <h3 className="text-lg font-semibold text-gray-300 mb-2">
@@ -908,7 +1012,7 @@ const PatientReportsView: React.FC = () => {
                 )}
 
                 {/* Reports List */}
-                {!loading && filteredReports.length > 0 && (
+                {activeTab !== 'dicom' && !loading && filteredReports.length > 0 && (
                     <div className="space-y-4 mb-20">
                         {filteredReports.map((report) => (
                             <div
@@ -994,6 +1098,22 @@ const PatientReportsView: React.FC = () => {
                         <Plus className="h-5 w-5" />
                         <span>Upload New Report</span>
                     </button>
+                )}
+
+                {/* Request Radiologist Modal (DICOM tab) */}
+                {selectedStudyForRequest && (
+                    <RequestRadiologistModal
+                        open={requestRadiologistOpen}
+                        onOpenChange={(open) => {
+                            setRequestRadiologistOpen(open);
+                            if (!open) setSelectedStudyForRequest(null);
+                        }}
+                        studyId={selectedStudyForRequest.id}
+                        studyInfo={{
+                            modality: selectedStudyForRequest.modality || 'Imaging',
+                            body_part_examined: selectedStudyForRequest.body_part_examined || '—'
+                        }}
+                    />
                 )}
             </div>
         </div>

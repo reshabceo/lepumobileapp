@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
+import { payAndFulfil } from '@/lib/payment';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
@@ -16,6 +17,8 @@ interface AlternativeDoctor {
   phone_number: string;
   is_available_now: boolean;
   next_available_time: string | null;
+  emergency_fee: number | null;
+  consultation_fee: number | null;
 }
 
 interface EmergencyDoctorSelectionProps {
@@ -24,6 +27,7 @@ interface EmergencyDoctorSelectionProps {
   requiredSpecialty: string;
   onDoctorSelected: (doctorId: string) => void;
   onCancel: () => void;
+  useExistingPayment?: boolean; // If true, use existing payment session instead of charging again
 }
 
 export const EmergencyDoctorSelection = ({
@@ -31,27 +35,69 @@ export const EmergencyDoctorSelection = ({
   assignedDoctorId,
   requiredSpecialty,
   onDoctorSelected,
-  onCancel
+  onCancel,
+  useExistingPayment = false
 }: EmergencyDoctorSelectionProps) => {
   const [alternativeDoctors, setAlternativeDoctors] = useState<AlternativeDoctor[]>([]);
   const [loading, setLoading] = useState(true);
   const [bookingDoctorId, setBookingDoctorId] = useState<string | null>(null);
+  const [paymentSession, setPaymentSession] = useState<any>(null);
 
   useEffect(() => {
     loadAlternativeDoctors();
-  }, [patientId, requiredSpecialty]);
+    if (useExistingPayment) {
+      loadPaymentSession();
+    }
+  }, [patientId, requiredSpecialty, useExistingPayment]);
+
+  const loadPaymentSession = async () => {
+    try {
+      const { data, error } = await supabase.rpc('get_active_emergency_session', {
+        p_patient_id: patientId
+      });
+
+      if (error) throw error;
+      if (data && data.length > 0) {
+        setPaymentSession(data[0]);
+      }
+    } catch (error: any) {
+      console.error('Error loading payment session:', error);
+    }
+  };
 
   const loadAlternativeDoctors = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase.rpc('find_available_emergency_doctors', {
+      const { data: doctors, error } = await supabase.rpc('find_available_emergency_doctors', {
         p_patient_id: patientId,
         p_required_specialty: requiredSpecialty || null, // Pass null if no specialty
         p_limit: 5
       });
 
       if (error) throw error;
-      setAlternativeDoctors(data || []);
+
+      // Fetch pricing for each doctor
+      if (doctors && doctors.length > 0) {
+        const doctorIds = doctors.map((d: any) => d.doctor_id);
+        const { data: pricingData } = await supabase
+          .from('doctors')
+          .select('id, emergency_fee, consultation_fee')
+          .in('id', doctorIds);
+
+        const pricingMap = new Map(
+          pricingData?.map(d => [d.id, { emergency_fee: d.emergency_fee, consultation_fee: d.consultation_fee }]) || []
+        );
+
+        const doctorsWithPricing = doctors.map((doc: any) => ({
+          ...doc,
+          emergency_fee: pricingMap.get(doc.doctor_id)?.emergency_fee,
+          consultation_fee: pricingMap.get(doc.doctor_id)?.consultation_fee
+        }));
+
+        setAlternativeDoctors(doctorsWithPricing);
+      } else {
+        setAlternativeDoctors([]);
+      }
     } catch (error: any) {
       console.error('Error loading alternative doctors:', error);
       toast.error('Failed to load available doctors');
@@ -63,48 +109,100 @@ export const EmergencyDoctorSelection = ({
   const handleBookEmergencyAppointment = async (doctorId: string) => {
     try {
       setBookingDoctorId(doctorId);
-      
-      // Create emergency appointment for right now
+
       const now = new Date();
       const appointmentDate = format(now, 'yyyy-MM-dd');
       const appointmentTime = format(now, 'HH:mm:ss');
 
-      const { error } = await supabase
-        .from('appointments')
-        .insert({
-          doctor_id: doctorId,
-          patient_id: patientId,
-          appointment_date: appointmentDate,
-          appointment_time: appointmentTime,
-          duration_minutes: 30,
-          status: 'scheduled',
-          appointment_type: 'emergency',
-          reason: 'Emergency appointment - assigned doctor unavailable',
-          patient_notes: 'Emergency case - patient needs immediate attention'
+      const appointmentPayload = {
+        doctor_id: doctorId,
+        patient_id: patientId,
+        appointment_date: appointmentDate,
+        appointment_time: appointmentTime,
+        duration_minutes: 30,
+        status: 'scheduled',
+        appointment_type: 'emergency',
+        reason: 'Emergency appointment - assigned doctor unavailable',
+        patient_notes: 'Emergency case - patient needs immediate attention'
+      };
+
+      const alertPayload = {
+        patient_id: patientId,
+        doctor_id: doctorId,
+        alert_type: 'patient_triggered',
+        severity: 'high',
+        title: 'Emergency Appointment Booked',
+        description: `Emergency appointment booked with alternative doctor due to assigned doctor unavailability`
+      };
+
+      // If using existing payment, book directly
+      if (useExistingPayment && paymentSession) {
+        // Update payment session with new doctor
+        await supabase
+          .from('emergency_payment_sessions')
+          .update({
+            attempted_doctor_ids: [...(paymentSession.attempted_doctor_ids || []), doctorId]
+          })
+          .eq('session_id', paymentSession.session_id);
+
+        // Create appointment
+        const { error: appErr } = await supabase.from('appointments').insert({
+          ...appointmentPayload,
+          payment_session_id: paymentSession.session_id
         });
 
-      if (error) throw error;
+        if (appErr) throw appErr;
 
-      // Also create emergency alert
-      await supabase
-        .from('emergency_alerts')
-        .insert({
-          patient_id: patientId,
-          doctor_id: doctorId,
-          alert_type: 'patient_triggered',
-          severity: 'high',
-          title: 'Emergency Appointment Booked',
-          description: `Emergency appointment booked with alternative doctor due to assigned doctor unavailability`
+        // Create alert
+        await supabase.from('emergency_alerts').insert(alertPayload);
+
+        toast.success('Switched to alternative doctor successfully!', {
+          description: 'The new doctor has been notified. No additional payment required!'
         });
+        onDoctorSelected(doctorId);
+      } else {
+        // Regular payment flow
+        const { data: doctor, error: docError } = await supabase
+          .from('doctors')
+          .select('consultation_fee, emergency_fee')
+          .eq('id', doctorId)
+          .single();
 
-      toast.success('Emergency appointment booked successfully!', {
-        description: 'The doctor has been notified and will respond immediately.'
-      });
+        if (docError || !doctor) {
+          toast.error('Could not load doctor fee');
+          setBookingDoctorId(null);
+          return;
+        }
 
-      onDoctorSelected(doctorId);
+        const feeRupees = doctor.emergency_fee ?? doctor.consultation_fee;
+        const amountPaise = feeRupees != null ? Math.round(Number(feeRupees) * 100) : 0;
+        if (amountPaise < 100) {
+          toast.error('This doctor has not set an emergency fee. Please contact support.');
+          setBookingDoctorId(null);
+          return;
+        }
+
+        await payAndFulfil({
+          type: 'emergency',
+          amount_paise: amountPaise,
+          metadata: { 
+              appointment: appointmentPayload, 
+              alert: alertPayload,
+              amount_paise: amountPaise 
+          },
+          onSuccess: () => {
+            toast.success('Emergency appointment booked successfully!', {
+              description: 'The doctor has been notified and will respond immediately.'
+            });
+            onDoctorSelected(doctorId);
+          },
+          onError: (err) => toast.error(err.message || 'Payment or booking failed'),
+        });
+      }
     } catch (error: any) {
       console.error('Error booking emergency appointment:', error);
       toast.error(error.message || 'Failed to book emergency appointment');
+    } finally {
       setBookingDoctorId(null);
     }
   };
@@ -207,6 +305,11 @@ export const EmergencyDoctorSelection = ({
                       <span>Next available: {format(parseISO(`2000-01-01T${doctor.next_available_time}`), 'h:mm a')}</span>
                     </div>
                   )}
+                  {(doctor.emergency_fee || doctor.consultation_fee) && (
+                    <div className="flex items-center gap-2 text-green-600 dark:text-green-400 font-semibold">
+                      <span>Emergency Fee: ₹{doctor.emergency_fee ?? doctor.consultation_fee}</span>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -220,13 +323,18 @@ export const EmergencyDoctorSelection = ({
               {bookingDoctorId === doctor.doctor_id ? (
                 <>
                   <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
-                  Booking...
+                  {useExistingPayment ? 'Switching doctor...' : 'Opening payment...'}
                 </>
-              ) : doctor.is_available_now ? (
-                'Book Emergency Appointment Now'
-              ) : (
-                'Book for Next Available Time'
-              )}
+              ) : useExistingPayment ? (
+                doctor.is_available_now 
+                  ? '✅ Book Emergency Now (No Extra Charge)'
+                  : '✅ Book for Next Available (No Extra Charge)'
+              ) : (() => {
+                const fee = doctor.emergency_fee ?? doctor.consultation_fee;
+                return doctor.is_available_now 
+                  ? `Pay & Book Emergency Now ${fee ? `(₹${fee})` : ''}`
+                  : `Pay & Book for Next Available ${fee ? `(₹${fee})` : ''}`;
+              })()}
             </Button>
           </div>
         ))}
