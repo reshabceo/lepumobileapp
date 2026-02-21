@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { ArrowLeft, FilePlus2, Search, Upload, Camera, ChevronDown } from 'lucide-react';
+import { ArrowLeft, FilePlus2, Search, Upload, Camera, ChevronDown, FolderArchive } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { MobileAppContainer } from '../components/MobileAppContainer';
 import { useToast } from '../hooks/use-toast';
@@ -20,11 +20,15 @@ export default function AddReports() {
   const { patientProfile: hookProfile } = useRealTimeVitals();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const dicomFileInputRef = useRef<HTMLInputElement>(null);
+
   // State for form inputs
   const [reportType, setReportType] = useState('');
   const [reportName, setReportName] = useState('');
   const [doctorName, setDoctorName] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [selectedDicomFiles, setSelectedDicomFiles] = useState<File[]>([]);
+  const [isDicomUpload, setIsDicomUpload] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [selectingFile, setSelectingFile] = useState(false);
   const [patientProfile, setPatientProfile] = useState<any>(null);
@@ -96,42 +100,126 @@ export default function AddReports() {
 
   const handleFileUpload = () => {
     try {
-      // Reset file input to allow selecting the same file again
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
+      if (fileInputRef.current) fileInputRef.current.value = '';
       setSelectingFile(true);
       fileInputRef.current?.click();
-
-      // Reset selecting state after a short delay (file picker opens)
-      setTimeout(() => {
-        setSelectingFile(false);
-      }, 500);
+      setTimeout(() => setSelectingFile(false), 500);
     } catch (error) {
       console.error('Error opening file picker:', error);
       setSelectingFile(false);
-      toast({
-        title: "Error",
-        description: "Failed to open file picker. Please try again.",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: "Failed to open file picker.", variant: "destructive" });
     }
+  };
+
+  const handleDicomOrZipUpload = () => {
+    try {
+      if (dicomFileInputRef.current) dicomFileInputRef.current.value = '';
+      setSelectingFile(true);
+      dicomFileInputRef.current?.click();
+      setTimeout(() => setSelectingFile(false), 500);
+    } catch (error) {
+      console.error('Error opening file picker:', error);
+      setSelectingFile(false);
+      toast({ title: "Error", description: "Failed to open file picker.", variant: "destructive" });
+    }
+  };
+
+  const handleDicomFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setSelectingFile(false);
+    const files = event.target.files ? Array.from(event.target.files) : [];
+    if (files.length === 0) return;
+    const maxSize = Capacitor.isNativePlatform() ? 20 * 1024 * 1024 : 50 * 1024 * 1024;
+    const totalSize = files.reduce((s, f) => s + f.size, 0);
+    if (totalSize > maxSize) {
+      toast({ title: "Too Large", description: `Total ${(totalSize / (1024 * 1024)).toFixed(2)}MB exceeds ${maxSize / (1024 * 1024)}MB`, variant: "destructive" });
+      if (dicomFileInputRef.current) dicomFileInputRef.current.value = '';
+      return;
+    }
+    const allZipOrDcm = files.every(f => {
+      const n = f.name.toLowerCase();
+      return n.endsWith('.zip') || n.endsWith('.dcm') || n.endsWith('.dicom');
+    });
+    if (!allZipOrDcm) {
+      toast({ title: "Invalid", description: "Select only ZIP or DCM (.dcm) files.", variant: "destructive" });
+      if (dicomFileInputRef.current) dicomFileInputRef.current.value = '';
+      return;
+    }
+    setIsDicomUpload(true);
+    setSelectedDicomFiles(files);
+    setSelectedFile(files.length === 1 ? files[0] : null);
+    toast({
+      title: "DICOM / ZIP selected",
+      description: files.length === 1 ? `${files[0].name}` : `${files.length} files (e.g. folder of DCM). Request radiologist from Reports → DICOM.`,
+    });
+    if (dicomFileInputRef.current) dicomFileInputRef.current.value = '';
+  };
+
+  const isDicomOrZip = (f: File) => {
+    const ext = f.name.split('.').pop()?.toLowerCase();
+    return ext === 'zip' || ext === 'dcm' || ext === 'dicom' || f.type === 'application/zip';
   };
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     try {
       setSelectingFile(false);
-      const file = event.target.files?.[0];
+      const files = event.target.files ? Array.from(event.target.files) : [];
 
-      if (!file) {
+      if (files.length === 0) {
         console.log('No file selected');
         return;
       }
 
-      // Stricter limits for Android
       const maxSize = Capacitor.isNativePlatform()
         ? 20 * 1024 * 1024 // 20MB for native
         : 50 * 1024 * 1024; // 50MB for web
+
+      // DICOM path: single ZIP, single DCM, or multiple DCM (folder)
+      const singleFile = files.length === 1 ? files[0] : null;
+      const allDcm = files.length > 0 && files.every(f => f.name.toLowerCase().endsWith('.dcm') || f.name.toLowerCase().endsWith('.dicom'));
+      const singleZipOrDcm = singleFile && (singleFile.name.toLowerCase().endsWith('.zip') || singleFile.name.toLowerCase().endsWith('.dcm') || singleFile.name.toLowerCase().endsWith('.dicom'));
+
+      if (singleZipOrDcm || (files.length > 1 && allDcm)) {
+        const toCheck = singleFile ? [singleFile] : files;
+        const totalSize = toCheck.reduce((s, f) => s + f.size, 0);
+        if (totalSize > maxSize) {
+          toast({
+            title: "Too Large",
+            description: `Total size ${(totalSize / (1024 * 1024)).toFixed(2)}MB exceeds ${maxSize / (1024 * 1024)}MB limit`,
+            variant: "destructive",
+          });
+          if (fileInputRef.current) fileInputRef.current.value = '';
+          setSelectedFile(null);
+          setSelectedDicomFiles([]);
+          setIsDicomUpload(false);
+          return;
+        }
+        setIsDicomUpload(true);
+        setSelectedFile(singleFile || null);
+        setSelectedDicomFiles(singleFile ? [singleFile] : files);
+        toast({
+          title: "DICOM / ZIP Selected",
+          description: files.length === 1
+            ? `${files[0].name} — will be added to imaging. Request radiologist from Reports → DICOM.`
+            : `${files.length} DCM files — one study. Request radiologist from Reports → DICOM.`,
+        });
+        if (fileInputRef.current) fileInputRef.current.value = '';
+        return;
+      }
+
+      // Single file for regular report
+      const file = files[0];
+      if (files.length > 1) {
+        toast({
+          title: "One file for reports",
+          description: "For regular reports use one file. For DICOM use ZIP or multiple .dcm files.",
+          variant: "default",
+        });
+        if (fileInputRef.current) fileInputRef.current.value = '';
+        return;
+      }
+
+      setIsDicomUpload(false);
+      setSelectedDicomFiles([]);
 
       if (file.size > maxSize) {
         toast({
@@ -139,45 +227,37 @@ export default function AddReports() {
           description: `Maximum file size is ${maxSize / (1024 * 1024)}MB on mobile. Your file is ${(file.size / (1024 * 1024)).toFixed(2)}MB`,
           variant: "destructive",
         });
-        // Reset file input
-        if (fileInputRef.current) {
-          fileInputRef.current.value = '';
-        }
+        if (fileInputRef.current) fileInputRef.current.value = '';
         setSelectedFile(null);
         return;
       }
 
-      // Validate file type
       const allowedTypes = [
         'image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp',
         'application/pdf',
         'application/msword',
         'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
       ];
-
       const fileExtension = file.name.split('.').pop()?.toLowerCase();
       const allowedExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'pdf', 'doc', 'docx'];
 
       if (!allowedTypes.includes(file.type) && !allowedExtensions.includes(fileExtension || '')) {
         toast({
           title: "Invalid File Type",
-          description: "Please select an image (JPG, PNG, GIF) or document (PDF, DOC, DOCX)",
+          description: "Use images (JPG, PNG), documents (PDF, DOC), or for imaging use ZIP / DICOM via the DICOM button below.",
           variant: "destructive",
         });
-        // Reset file input
-        if (fileInputRef.current) {
-          fileInputRef.current.value = '';
-        }
+        if (fileInputRef.current) fileInputRef.current.value = '';
         setSelectedFile(null);
         return;
       }
 
-      // File is valid, set it
       setSelectedFile(file);
       toast({
         title: "File Selected",
         description: `${file.name} (${(file.size / (1024 * 1024)).toFixed(2)}MB) is ready to upload`,
       });
+      if (fileInputRef.current) fileInputRef.current.value = '';
     } catch (error) {
       console.error('Error handling file selection:', error);
       setSelectingFile(false);
@@ -186,11 +266,10 @@ export default function AddReports() {
         description: "Failed to process selected file. Please try again.",
         variant: "destructive",
       });
-      // Reset file input
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
+      if (fileInputRef.current) fileInputRef.current.value = '';
       setSelectedFile(null);
+      setSelectedDicomFiles([]);
+      setIsDicomUpload(false);
     }
   };
 
@@ -415,14 +494,70 @@ export default function AddReports() {
 
   // Upload logic extracted to avoid duplication
   const performUpload = async (profile: any) => {
-    // Validate inputs again before upload
-    if (!selectedFile) {
-      toast({
-        title: "No File Selected",
-        description: "Please select a file to upload",
-        variant: "destructive",
-      });
+    const filesToUse = isDicomUpload ? selectedDicomFiles : (selectedFile ? [selectedFile] : []);
+    if (filesToUse.length === 0) {
+      toast({ title: "No File Selected", description: "Please select a file to upload", variant: "destructive" });
       return false;
+    }
+
+    // DICOM / ZIP path: upload to dicom-files and dicom_studies
+    if (isDicomUpload) {
+      setUploading(true);
+      setUploadProgress(0);
+      const studyId = crypto.randomUUID();
+      const isZip = filesToUse.length === 1 && (filesToUse[0].name.toLowerCase().endsWith('.zip') || filesToUse[0].type === 'application/zip');
+      try {
+        setUploadProgress(20);
+        if (isZip) {
+          const { error: uploadError } = await supabase.storage
+            .from('dicom-files')
+            .upload(`studies/${studyId}/original/${filesToUse[0].name}`, filesToUse[0], { cacheControl: '3600', upsert: false });
+          if (uploadError) throw uploadError;
+        } else {
+          for (let i = 0; i < filesToUse.length; i++) {
+            const f = filesToUse[i];
+            const seriesId = crypto.randomUUID();
+            const path = `studies/${studyId}/${seriesId}/${f.name}`;
+            const { error: uploadError } = await supabase.storage.from('dicom-files').upload(path, f, { cacheControl: '3600', upsert: false });
+            if (uploadError) throw uploadError;
+            setUploadProgress(20 + Math.round((60 * (i + 1)) / filesToUse.length));
+          }
+        }
+        setUploadProgress(80);
+        const { error: dbError } = await supabase.from('dicom_studies').insert({
+          id: studyId,
+          study_instance_uid: `upload-${studyId}`,
+          patient_id: profile.id,
+          patient_ref_id: profile.id,
+          uploaded_by: user!.id,
+          uploaded_by_type: 'patient',
+          status: 'staged',
+          is_zip_upload: isZip,
+          zip_file_path: isZip && filesToUse[0] ? `studies/${studyId}/original/${filesToUse[0].name}` : null,
+          zip_file_size: isZip && filesToUse[0] ? filesToUse[0].size : null,
+          zip_extracted: false,
+          description: filesToUse.length === 1 ? `Upload: ${filesToUse[0].name}` : `${filesToUse.length} DICOM files`,
+          patient_name: profile.id,
+        });
+        if (dbError) throw dbError;
+        setUploadProgress(100);
+        toast({
+          title: "DICOM uploaded",
+          description: "Go to Reports → DICOM tab to request a radiologist review.",
+        });
+        setSelectedDicomFiles([]);
+        setSelectedFile(null);
+        setIsDicomUpload(false);
+        setTimeout(() => navigate('/reports'), 1500);
+        return true;
+      } catch (err: any) {
+        console.error('DICOM upload error:', err);
+        toast({ title: "Upload failed", description: err.message || "DICOM upload failed.", variant: "destructive" });
+        return false;
+      } finally {
+        setUploading(false);
+        setUploadProgress(0);
+      }
     }
 
     if (!profile.assigned_doctor_id) {
@@ -633,14 +768,26 @@ export default function AddReports() {
   };
 
   const handleSave = async () => {
-    // Validate required fields
-    if (!reportType || !reportName || !doctorName || !selectedFile) {
-      toast({
-        title: "Missing Information",
-        description: "Please fill in all required fields and select a file",
-        variant: "destructive",
-      });
-      return;
+    // DICOM path: only require DICOM files selected
+    if (isDicomUpload) {
+      if (selectedDicomFiles.length === 0) {
+        toast({
+          title: "No DICOM Selected",
+          description: "Use «Upload DICOM / ZIP or Folder» and select a ZIP or .dcm files",
+          variant: "destructive",
+        });
+        return;
+      }
+    } else {
+      // Regular report: require form fields and single file
+      if (!reportType || !reportName || !doctorName || !selectedFile) {
+        toast({
+          title: "Missing Information",
+          description: "Please fill in all required fields and select a file",
+          variant: "destructive",
+        });
+        return;
+      }
     }
 
     // Wait for profile to load if still loading
@@ -753,21 +900,37 @@ export default function AddReports() {
                     </div>
                   </div>
                   <p className="text-gray-300">Upload your medical report</p>
-                  {selectedFile && (
+                  {(selectedFile || selectedDicomFiles.length > 0) && (
                     <div className="mt-3 p-3 bg-teal-500/10 border border-teal-500/30 rounded-lg">
                       <div className="flex items-center justify-between">
                         <div className="flex-1 min-w-0">
-                          <p className="text-teal-300 text-sm font-medium truncate">{selectedFile.name}</p>
-                          <p className="text-teal-400/70 text-xs mt-1">
-                            {(selectedFile.size / (1024 * 1024)).toFixed(2)} MB • {selectedFile.type || 'Unknown type'}
-                          </p>
+                          {isDicomUpload && selectedDicomFiles.length > 0 ? (
+                            <>
+                              <p className="text-teal-300 text-sm font-medium">
+                                {selectedDicomFiles.length === 1
+                                  ? selectedDicomFiles[0].name
+                                  : `${selectedDicomFiles.length} DCM files (imaging study)`}
+                              </p>
+                              <p className="text-teal-400/70 text-xs mt-1">
+                                {(selectedDicomFiles.reduce((s, f) => s + f.size, 0) / (1024 * 1024)).toFixed(2)} MB total • DICOM
+                              </p>
+                            </>
+                          ) : (
+                            <>
+                              <p className="text-teal-300 text-sm font-medium truncate">{selectedFile?.name}</p>
+                              <p className="text-teal-400/70 text-xs mt-1">
+                                {selectedFile && (selectedFile.size / (1024 * 1024)).toFixed(2)} MB • {selectedFile?.type || 'Unknown type'}
+                              </p>
+                            </>
+                          )}
                         </div>
                         <button
                           onClick={() => {
                             setSelectedFile(null);
-                            if (fileInputRef.current) {
-                              fileInputRef.current.value = '';
-                            }
+                            setSelectedDicomFiles([]);
+                            setIsDicomUpload(false);
+                            if (fileInputRef.current) fileInputRef.current.value = '';
+                            if (dicomFileInputRef.current) dicomFileInputRef.current.value = '';
                             toast({
                               title: "File Removed",
                               description: "You can select a different file",
@@ -783,21 +946,32 @@ export default function AddReports() {
                   )}
                 </div>
 
-                {/* Hidden file input */}
+                {/* Hidden file input - regular reports (single file) */}
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept="image/*,.pdf,.doc,.docx"
+                  accept="image/*,.pdf,.doc,.docx,.zip,.dcm,.dicom"
                   onChange={handleFileChange}
                   onClick={(e) => {
-                    // Reset value to allow selecting the same file again
+                    (e.target as HTMLInputElement).value = '';
+                  }}
+                  className="hidden"
+                />
+                {/* Hidden file input - DICOM: ZIP or multiple .dcm (folder) */}
+                <input
+                  ref={dicomFileInputRef}
+                  type="file"
+                  accept=".zip,.dcm,.dicom"
+                  multiple
+                  onChange={handleDicomFileChange}
+                  onClick={(e) => {
                     (e.target as HTMLInputElement).value = '';
                   }}
                   className="hidden"
                 />
 
                 {/* Upload Buttons */}
-                <div className="space-y-3 mb-8">
+                <div className="space-y-3 mb-4">
                   <button
                     onClick={handleFileUpload}
                     disabled={selectingFile || uploading}
@@ -816,6 +990,14 @@ export default function AddReports() {
                     )}
                   </button>
                   <button
+                    onClick={handleDicomOrZipUpload}
+                    disabled={selectingFile || uploading}
+                    className="w-full bg-teal-500/20 text-teal-300 font-semibold py-3 rounded-lg flex items-center justify-center space-x-2 border border-teal-500/40 hover:bg-teal-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <FolderArchive size={20} />
+                    <span>Upload DICOM / ZIP or Folder</span>
+                  </button>
+                  <button
                     onClick={handleTakePhoto}
                     disabled={selectingFile || uploading}
                     className="w-full bg-[#30363D] text-gray-200 font-semibold py-3 rounded-lg flex items-center justify-center space-x-2 hover:bg-[#3C444C] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
@@ -824,6 +1006,9 @@ export default function AddReports() {
                     <span>Take Photo</span>
                   </button>
                 </div>
+                <p className="text-xs text-gray-500 mb-6">
+                  Imaging studies: upload a <strong>ZIP</strong> or select multiple <strong>.dcm</strong> files (e.g. folder of DICOM). Then go to Reports → DICOM to request a radiologist review.
+                </p>
 
                 {/* Form */}
                 <form className="space-y-4">
@@ -912,6 +1097,8 @@ export default function AddReports() {
                 </div>
               ) : !patientProfile ? (
                 'Profile Not Available'
+              ) : isDicomUpload && selectedDicomFiles.length > 0 ? (
+                'Upload DICOM Study'
               ) : (
                 'Save Report'
               )}

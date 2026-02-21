@@ -38,8 +38,8 @@ const VideoCallPage: React.FC = () => {
 
   const handleCallEnd = () => {
     console.log('[VideoCall] Call ended, navigating to dashboard')
-    navigate('/dashboard')
-  }
+          navigate('/dashboard')
+        }
 
   if (!patientId) {
     return (
