@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Application de test AliveCor</string>
+    <string name="title_recording_list">Enregistrements</string>
+    <string name="title_recording_detail">Détails de lenregistrement</string>
+
+    <string name="about_title">À propos</string>
+    <string name="about_alivecor_kit">SDK AliveCorKit : %1$s</string>
+    <string name="about_powered_by_alivecor">Logiciel et services fournis par AliveCor</string>
+    <string name="start_default_flow">Démarrer le flux par défaut</string>
+    <string name="start_custom_flow">Démarrer un flux personnalisé</string>
+    <string name="view_all_recorded_ecgs">Voir tous les ECG enregistrés</string>
+    <string name="view_last_recorded_ecg">Voir le dernier ECG enregistré</string>
+    <string name="test_ekganalyzer">Tester EkgAnalyzer</string>
+    <string name="about">À propos</string>
+
+    <string name="alerts">Alertes</string>
+    <string name="general">Paramètres du flux par défaut :</string>
+    <string name="settings">Paramètres</string>
+    <string name="device">Appareil</string>
+    <string name="kardia_mobile">Kardia Mobile</string>
+    <string name="kardia_card">Kardia Card</string>
+    <string name="triangle">Triangle</string>
+    <string name="omron_complete">Omron Complete</string>
+    <string name="leads_configuration">Configuration des électrodes</string>
+    <string name="single_lead">Électrode unique</string>
+    <string name="six_lead">Six électrodes</string>
+    <string name="on">Activé</string>
+    <string name="off">Désactivé</string>
+    <string name="filter_enhanced">Amélioré</string>
+    <string name="filter_original">Original</string>
+    <string name="kardia_v1">Test de bundle V1</string>
+    <string name="kardia_v2">Test de bundle V2</string>
+    <string name="duration">Durée denregistrement</string>
+
+    <string name="key_device" translatable="false">key_device</string>
+    <string name="key_duration" translatable="false">key_duration</string>
+    <string name="key_mains_filter" translatable="false">key_mains_filter</string>
+    <string name="key_leads" translatable="false">key_leads</string>
+    <string name="key_lock_leads" translatable="false">key_lock_leads</string>
+    <string name="key_filter" translatable="false">key_filter</string>
+    <string name="key_kardia" translatable="false">key_kardia</string>
+
+    <string name="sec_30" translatable="false">30 sec</string>
+    <string name="min_1" translatable="false">1 min</string>
+    <string name="min_2" translatable="false">2 min</string>
+    <string name="min_3" translatable="false">3 min</string>
+    <string name="min_4" translatable="false">4 min</string>
+    <string name="min_5" translatable="false">5 min</string>
+    <string name="mains_filter">Filtre secteur</string>
+    <string name="default_filter">Par défaut</string>
+
+</resources>

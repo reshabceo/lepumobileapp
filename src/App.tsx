@@ -45,6 +45,7 @@ import Support from "./pages/Support";
 import MedicalDisclaimer from "./pages/MedicalDisclaimer";
 import RadiologistAuth from "./pages/RadiologistAuth";
 import RadiologistDashboard from "./pages/RadiologistDashboard";
+import KardiaSixLeadECG from "./pages/KardiaSixLeadECG";
 
 const queryClient = new QueryClient();
 
@@ -114,6 +115,11 @@ const App = () => (
               <Route path="/ecg-monitor" element={
                 <ProtectedRoute>
                   <ECGMonitor />
+                </ProtectedRoute>
+              } />
+              <Route path="/kardia-6l-ecg" element={
+                <ProtectedRoute>
+                  <KardiaSixLeadECG />
                 </ProtectedRoute>
               } />
               <Route path="/ecg-results" element={
