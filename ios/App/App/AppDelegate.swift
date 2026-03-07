@@ -1,6 +1,5 @@
 import UIKit
 import Capacitor
-import AppTrackingTransparency
 
 @UIApplicationMain
 class AppDelegate: UIResponder, UIApplicationDelegate {
@@ -49,36 +48,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
     func applicationDidBecomeActive(_ application: UIApplication) {
         // Restart any tasks that were paused (or not yet started) while the application was inactive. If the application was previously in the background, optionally refresh the user interface.
-        
-        // App Tracking Transparency: Request permission if tracking is enabled
-        // IMPORTANT: Only request tracking authorization if your app actually tracks users across apps/websites
-        // If your app only collects crash/performance data for internal use, you should NOT request tracking permission
-        // and should update App Store Connect privacy settings to indicate "No" for tracking.
-        //
-        // If you DO track users (e.g., for advertising), uncomment the code below:
-        /*
-        if #available(iOS 14, *) {
-            // Only request if tracking authorization status is not determined
-            if ATTrackingManager.trackingAuthorizationStatus == .notDetermined {
-                ATTrackingManager.requestTrackingAuthorization { status in
-                    DispatchQueue.main.async {
-                        switch status {
-                        case .authorized:
-                            print("✅ Tracking authorization granted")
-                        case .denied:
-                            print("❌ Tracking authorization denied")
-                        case .restricted:
-                            print("⚠️ Tracking authorization restricted")
-                        case .notDetermined:
-                            print("❓ Tracking authorization not determined")
-                        @unknown default:
-                            print("❓ Unknown tracking authorization status")
-                        }
-                    }
-                }
-            }
-        }
-        */
     }
 
     func applicationWillTerminate(_ application: UIApplication) {
