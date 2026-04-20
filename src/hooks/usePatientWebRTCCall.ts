@@ -44,6 +44,7 @@ const WS_URL = getWebRTCServerURL();
 export const usePatientWebRTCCall = (patientId: string | null): UsePatientWebRTCCallReturn => {
   const [incomingCall, setIncomingCall] = useState<IncomingCall | null>(null);
   const [activeCall, setActiveCall] = useState<ActiveCall | null>(null);
+  const activeCallRef = useRef<ActiveCall | null>(null);
   const socketRef = useRef<WebSocket | null>(null);
   const pendingIceCandidatesRef = useRef<RTCIceCandidateInit[]>([]);
   const reconnectAttemptRef = useRef<number>(0);
@@ -66,27 +67,10 @@ export const usePatientWebRTCCall = (patientId: string | null): UsePatientWebRTC
     onTrack
   } = useWebRTC();
 
-  // Check for existing call on mount (reconnection support)
+  // Keep ref in sync with state for use in callbacks
   useEffect(() => {
-    if (!patientId) return;
-    
-    const savedCall = localStorage.getItem('webrtc_active_call');
-    if (savedCall) {
-      try {
-        const callData = JSON.parse(savedCall);
-        console.log('[Patient WebRTC] 🔄 Found saved call, attempting reconnection...', callData);
-        
-        setActiveCall({
-          ...callData,
-          canReconnect: true,
-          status: 'ringing'
-        });
-      } catch (error) {
-        console.error('[Patient WebRTC] Failed to parse saved call:', error);
-        localStorage.removeItem('webrtc_active_call');
-      }
-    }
-  }, [patientId]);
+    activeCallRef.current = activeCall;
+  }, [activeCall]);
 
   // Initialize WebSocket connection
   useEffect(() => {
@@ -97,30 +81,41 @@ export const usePatientWebRTCCall = (patientId: string | null): UsePatientWebRTC
     socketRef.current = ws;
 
     ws.onopen = () => {
-      console.log('[Patient WebRTC] ✅ WebSocket connected');
-      // Login to signaling server
+      console.log('[Patient WebRTC] WebSocket connected');
       ws.send(JSON.stringify({
         type: 'LOGIN',
         userId: `patient_${patientId}`,
         userType: 'patient',
-        userName: 'Patient' // You can get actual name from context
+        userName: 'Patient'
       }));
       
-      // Check if we need to reconnect to an existing call
       const savedCall = localStorage.getItem('webrtc_active_call');
-      if (savedCall && activeCall?.canReconnect) {
+      if (savedCall) {
         try {
           const callData = JSON.parse(savedCall);
-          console.log('[Patient WebRTC] 🔄 Attempting to reconnect to call:', callData.id);
+          console.log('[Patient WebRTC] Found saved call, sending PATIENT_READY:', callData.id);
           
-          // Request reconnection data from server
+          const reconnectCall: ActiveCall = {
+            id: callData.id,
+            doctorId: callData.doctorId,
+            doctorName: callData.doctorName,
+            callType: callData.callType || 'video',
+            status: 'ringing',
+            canReconnect: true,
+            startedAt: new Date(callData.startedAt || Date.now())
+          };
+          activeCallRef.current = reconnectCall;
+          setActiveCall(reconnectCall);
+          
+          // Send PATIENT_READY: server will both forward to doctor AND send stored offer
           ws.send(JSON.stringify({
-            type: 'RECONNECT',
-            userId: `patient_${patientId}`,
+            type: 'PATIENT_READY',
+            from: `patient_${patientId}`,
+            to: `doctor_${callData.doctorId}`,
             callId: callData.id
           }));
         } catch (error) {
-          console.error('[Patient WebRTC] Failed to reconnect:', error);
+          console.error('[Patient WebRTC] Failed to parse saved call:', error);
           localStorage.removeItem('webrtc_active_call');
         }
       }
@@ -136,33 +131,65 @@ export const usePatientWebRTCCall = (patientId: string | null): UsePatientWebRTC
             console.log('[Patient WebRTC] ✅ Logged in to signaling server');
             break;
 
-          case 'OFFER':
-            // Incoming call from doctor
-            console.log('[Patient WebRTC] 📞 Incoming call from doctor');
+          case 'OFFER': {
+            console.log('[Patient WebRTC] Incoming OFFER from doctor');
+            const doctorId = data.from?.replace('doctor_', '') || '';
+            const callType = data.callType || 'video';
+            
+            // If patient already accepted (on call page with active call), auto-answer
+            const existingCall = activeCallRef.current;
+            if (existingCall) {
+              console.log('[Patient WebRTC] Already on call page, auto-answering OFFER');
+              try {
+                const isVideoCall = callType === 'video';
+                await initializeMedia(isVideoCall, true);
+                
+                const answer = await createAnswer(data.offer);
+                if (answer && socketRef.current?.readyState === WebSocket.OPEN) {
+                  socketRef.current.send(JSON.stringify({
+                    type: 'ANSWER',
+                    from: `patient_${patientId}`,
+                    to: data.from,
+                    answer,
+                    callId: data.callId
+                  }));
+                  console.log('[Patient WebRTC] Auto-answer sent to doctor');
+                  
+                  setActiveCall(prev => {
+                    const updated = prev ? { ...prev, status: 'connected' as const, canReconnect: false } : null;
+                    activeCallRef.current = updated;
+                    return updated;
+                  });
+                  toast.success('Connected to call');
+                }
+              } catch (err) {
+                console.error('[Patient WebRTC] Error auto-answering:', err);
+              }
+              break;
+            }
+            
+            // Otherwise, this is a fresh incoming call notification
             const newIncomingCall = {
               id: data.callId,
-              doctorId: data.from.replace('doctor_', ''),
+              doctorId,
               doctorName: data.doctorName || 'Doctor',
-              callType: data.callType || 'video',
+              callType,
               offer: data.offer
             };
             
             setIncomingCall(newIncomingCall);
             
-            // Save to localStorage for reconnection
             localStorage.setItem('webrtc_active_call', JSON.stringify({
               id: data.callId,
-              doctorId: newIncomingCall.doctorId,
+              doctorId,
               doctorName: newIncomingCall.doctorName,
-              callType: newIncomingCall.callType,
+              callType,
               status: 'ringing',
               startedAt: new Date().toISOString()
             }));
             
-            // Show notification
-            toast.info(`Incoming ${data.callType} call from ${data.doctorName || 'Doctor'}`);
+            toast.info(`Incoming ${callType} call from ${data.doctorName || 'Doctor'}`);
             
-            // Update call status in database
             if (data.callId) {
               await supabase
                 .from('video_calls')
@@ -170,55 +197,58 @@ export const usePatientWebRTCCall = (patientId: string | null): UsePatientWebRTC
                 .eq('id', data.callId);
             }
             break;
+          }
 
-          case 'RECONNECT_DATA':
-            // Handle reconnection data
-            console.log('[Patient WebRTC] 🔄 Received reconnection data');
-            if (data.call && activeCall?.canReconnect) {
-              // Reinitialize media
+          case 'RECONNECT_DATA': {
+            console.log('[Patient WebRTC] Received reconnection data');
+            if (data.call) {
+              const savedCall = localStorage.getItem('webrtc_active_call');
+              const callData = savedCall ? JSON.parse(savedCall) : null;
+              const doctorIdFromSaved = callData?.doctorId;
+
               const isVideoCall = data.call.callType === 'video';
               await initializeMedia(isVideoCall, true);
               
-              // Recreate the answer
               if (data.call.offer) {
                 const answer = await createAnswer(data.call.offer);
                 if (answer && socketRef.current?.readyState === WebSocket.OPEN) {
                   socketRef.current.send(JSON.stringify({
                     type: 'ANSWER',
                     from: `patient_${patientId}`,
-                    to: `doctor_${activeCall.doctorId}`,
+                    to: `doctor_${doctorIdFromSaved}`,
                     answer,
-                    callId: activeCall.id
+                    callId: data.callId
                   }));
+                  console.log('[Patient WebRTC] Answer sent from RECONNECT_DATA');
                 }
               }
               
-              // Add stored ICE candidates
               if (data.call.candidates) {
                 for (const candidate of data.call.candidates) {
                   await addIceCandidate(candidate);
                 }
               }
               
-              setActiveCall(prev => prev ? { ...prev, status: 'connected', canReconnect: false } : null);
-              toast.success('Reconnected to call');
+              setActiveCall(prev => {
+                const updated = prev ? { ...prev, status: 'connected' as const, canReconnect: false } : null;
+                activeCallRef.current = updated;
+                return updated;
+              });
+              toast.success('Connected to call');
             }
             break;
+          }
 
           case 'RECONNECT_FAILED':
-            console.log('[Patient WebRTC] ❌ Reconnection failed');
-            localStorage.removeItem('webrtc_active_call');
-            setActiveCall(null);
-            toast.error('Could not reconnect to call');
+            console.log('[Patient WebRTC] Reconnection failed, waiting for fresh OFFER');
             break;
 
           case 'ICE':
-            // Received ICE candidate
             if (data.candidate) {
-              if (activeCall?.status === 'connected') {
+              const callNow = activeCallRef.current;
+              if (callNow?.status === 'connected') {
                 await addIceCandidate(data.candidate);
               } else {
-                // Store for later if call not yet connected
                 pendingIceCandidatesRef.current.push(data.candidate);
               }
             }
@@ -263,20 +293,22 @@ export const usePatientWebRTCCall = (patientId: string | null): UsePatientWebRTC
     };
   }, [patientId]);
 
-  // Setup ICE candidate handler
+  // Setup ICE candidate handler (use ref to avoid stale closure)
   useEffect(() => {
     onIceCandidate((candidate) => {
-      if (socketRef.current?.readyState === WebSocket.OPEN && activeCall) {
-        console.log('[Patient WebRTC] 📤 Sending ICE candidate to doctor');
+      const call = activeCallRef.current;
+      if (socketRef.current?.readyState === WebSocket.OPEN && call) {
+        console.log('[Patient WebRTC] Sending ICE candidate to doctor');
         socketRef.current.send(JSON.stringify({
           type: 'ICE',
           from: `patient_${patientId}`,
-          to: `doctor_${activeCall.doctorId}`,
-          candidate: candidate.toJSON()
+          to: `doctor_${call.doctorId}`,
+          candidate: candidate.toJSON(),
+          callId: call.id
         }));
       }
     });
-  }, [onIceCandidate, activeCall, patientId]);
+  }, [onIceCandidate, patientId]);
 
   // Setup track handler
   useEffect(() => {

@@ -40,8 +40,10 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>This app needs microphone access to communicate with KardiaMobile ECG devices using ultrasound technology for recording heart rhythms.</string>
 	<key>NSBluetoothAlwaysUsageDescription</key>
-	<string>This app needs Bluetooth access to connect and communicate with BP2 medical devices for blood pressure and ECG monitoring.</string>
+	<string>This app needs Bluetooth access to connect and communicate with medical devices for blood pressure and ECG monitoring.</string>
 	<key>NSBluetoothPeripheralUsageDescription</key>
 	<string>This app needs Bluetooth access to connect and communicate with BP2 medical devices for blood pressure and ECG monitoring.</string>
 	<key>NSPhotoLibraryUsageDescription</key>

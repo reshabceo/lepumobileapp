@@ -14,6 +14,7 @@ import com.getcapacitor.BridgeActivity;
 import com.getcapacitor.Plugin;
 import com.priti.wellue.WelluePlugin;
 import com.priti.app.plugins.Bp2Plugin;
+import com.priti.app.plugins.AliveCorPlugin;
 import java.util.ArrayList;
 
 public class MainActivity extends BridgeActivity {
@@ -40,6 +41,13 @@ public class MainActivity extends BridgeActivity {
             Log.d(TAG, "✅ Bp2Plugin added to initialPlugins");
         } catch (Exception e) {
             Log.e(TAG, "❌ Failed to add Bp2Plugin: " + e.getMessage(), e);
+        }
+
+        try {
+            initialPlugins.add(AliveCorPlugin.class);
+            Log.d(TAG, "✅ AliveCorPlugin added to initialPlugins");
+        } catch (Exception e) {
+            Log.e(TAG, "❌ Failed to add AliveCorPlugin: " + e.getMessage(), e);
         }
         
         // NOW call super.onCreate() - bridge will be created with our plugins included

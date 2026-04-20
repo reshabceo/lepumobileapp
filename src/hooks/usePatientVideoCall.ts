@@ -59,15 +59,34 @@ export function usePatientVideoCall(authUserId?: string | null): UsePatientVideo
   const loadLatestCall = useCallback(async (): Promise<PatientVideoCall | null> => {
     try {
       if (!patientId) return null
-      const { data, error } = await supabase
+
+      // Prefer pending calls over accepted (pending = new incoming call notification)
+      let { data, error } = await supabase
         .from('video_calls')
         .select('id, doctor_id, patient_id, channel_name, call_type, status, initiated_at, accepted_at, ended_at, doctor_token, patient_token')
         .eq('patient_id', patientId)
-        .in('status', ['pending','accepted'])
+        .eq('status', 'pending')
         .order('initiated_at', { ascending: false })
         .limit(1)
+
+      // If no pending call, check for accepted
+      if (!data?.length) {
+        const res = await supabase
+          .from('video_calls')
+          .select('id, doctor_id, patient_id, channel_name, call_type, status, initiated_at, accepted_at, ended_at, doctor_token, patient_token')
+          .eq('patient_id', patientId)
+          .eq('status', 'accepted')
+          .order('initiated_at', { ascending: false })
+          .limit(1)
+        data = res.data
+        error = res.error
+      }
+
       const row = data?.[0]
-      if (error || !row) return null
+      if (error || !row) {
+        setCurrentCall(null)
+        return null
+      }
       const call: PatientVideoCall = {
         id: row.id,
         doctor_id: row.doctor_id,
@@ -84,6 +103,21 @@ export function usePatientVideoCall(authUserId?: string | null): UsePatientVideo
       setCurrentCall(call)
       return call
     } catch { return null }
+  }, [patientId])
+
+  // Auto-expire stale pending/accepted calls older than 2 minutes
+  useEffect(() => {
+    if (!patientId) return
+    const cleanup = async () => {
+      const twoMinAgo = new Date(Date.now() - 2 * 60 * 1000).toISOString()
+      await supabase
+        .from('video_calls')
+        .update({ status: 'missed' })
+        .eq('patient_id', patientId)
+        .in('status', ['pending', 'accepted'])
+        .lt('initiated_at', twoMinAgo)
+    }
+    cleanup().catch(() => {})
   }, [patientId])
 
   // Subscribe to video_calls changes for this patient

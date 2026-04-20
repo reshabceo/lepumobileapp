@@ -30,8 +30,6 @@ import EcgDemo from "./pages/EcgDemo";
 import VideoCallPage from "./pages/VideoCall";
 import WaitingForDoctor from "./pages/WaitingForDoctor";
 import { GlobalVideoCallNotification } from "./components/GlobalVideoCallNotification";
-import PatientIncomingCallOverlay from "./components/PatientIncomingCallOverlay";
-import GlobalPatientWebRTC from "./components/GlobalPatientWebRTC";
 import { AppointmentBookingPage } from "./pages/AppointmentBookingPage";
 import { ChatSupport } from "./components/ChatSupport";
 import AIDoctorPage from "./pages/AIDoctorPage";
@@ -70,8 +68,6 @@ const App = () => (
           <BrowserRouter>
             <BackButtonHandler />
             <GlobalVideoCallNotification />
-            <PatientIncomingCallOverlay />
-            <GlobalPatientWebRTC />
             <ChatSupportOnDashboard />
             <Routes>
               {/* Public routes */}
