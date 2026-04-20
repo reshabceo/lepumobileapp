@@ -149,6 +149,89 @@ export async function storeEcgRecording(ecgData: {
     }
 }
 
+// --- AliveCor / Kardia SDK integration ---
+
+const ALIVECOR_BACKEND_URL =
+  import.meta.env.VITE_ALIVECOR_BACKEND_URL || 'http://localhost:8000';
+
+/** Use either waveform_mv (single strip / interleaved) or waveform_leads (I–aVF object). */
+export interface AliveCorEcgData {
+  patient_id: string;
+  device_id?: string;
+  waveform_mv?: number[];
+  /** Per-lead mV samples; use null for gaps. Keys: I, II, III, aVR, aVL, aVF */
+  waveform_leads?: Record<string, (number | null)[]>;
+  sample_rate: number;
+  /** Required for waveform_mv; optional for waveform_leads (derived from length / sample_rate) */
+  duration_seconds?: number;
+  heart_rate?: number;
+  quality_score?: number;
+  determination?: string;
+  modifier?: string;
+  algorithm_package?: string;
+  lead_config?: 'single' | 'six';
+  device_type?: string;
+  is_inverted?: boolean;
+  raw_sdk_response?: Record<string, unknown>;
+  notes?: string;
+}
+
+async function aliveCorFetch(path: string, body: Record<string, unknown>) {
+  const { data: sessionData } = await supabase.auth.getSession();
+  const accessToken = sessionData.session?.access_token;
+  if (!accessToken) throw new Error('Not authenticated');
+
+  const res = await fetch(`${ALIVECOR_BACKEND_URL}${path}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    const errBody = await res.json().catch(() => ({})) as { error?: string; detail?: string | string[] };
+    const msg =
+      errBody.error ||
+      (Array.isArray(errBody.detail) ? errBody.detail.join(', ') : errBody.detail) ||
+      `AliveCor backend error ${res.status}`;
+    throw new Error(msg);
+  }
+  return res.json();
+}
+
+/**
+ * Request a Kardia SDK JWT via the AliveCor backend proxy.
+ * The backend forwards the request to the kardia-auth-server container.
+ */
+export async function getAliveCorToken(patientId: string): Promise<string> {
+  const result = await aliveCorFetch('/api/alivecor/token', { patientId });
+  return result.jwt;
+}
+
+/**
+ * Store an AliveCor ECG recording through the backend, which writes to
+ * ecg_recordings, alivecor_recordings, and vital_signs in Supabase.
+ */
+export async function storeAliveCorRecording(
+  data: AliveCorEcgData
+): Promise<{ id: string }> {
+  const hasMv = data.waveform_mv && data.waveform_mv.length > 0
+  const hasLeads =
+    data.waveform_leads && Object.keys(data.waveform_leads).length > 0
+  if (!hasMv && !hasLeads) {
+    throw new Error('AliveCor ECG: provide waveform_mv or waveform_leads')
+  }
+  if (hasMv && hasLeads) {
+    throw new Error('AliveCor ECG: use only one of waveform_mv or waveform_leads')
+  }
+  if (hasMv && (data.duration_seconds == null || data.duration_seconds <= 0)) {
+    throw new Error('AliveCor ECG: duration_seconds required when using waveform_mv')
+  }
+  return aliveCorFetch('/api/alivecor/ecg', data as unknown as Record<string, unknown>)
+}
+
 // Auth helper functions
 export const auth = {
   // Sign up

@@ -52,6 +52,7 @@ const DEFAULT_CONFIG: WebRTCConfig = {
 };
 
 export const useWebRTC = (config: WebRTCConfig = DEFAULT_CONFIG): UseWebRTCReturn => {
+  const pcRef = useRef<RTCPeerConnection | null>(null);
   const [peerConnection, setPeerConnection] = useState<RTCPeerConnection | null>(null);
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
@@ -65,90 +66,55 @@ export const useWebRTC = (config: WebRTCConfig = DEFAULT_CONFIG): UseWebRTCRetur
   const trackCallbackRef = useRef<((stream: MediaStream) => void) | null>(null);
   const callLogInitialized = useRef(false);
 
-  // Initialize peer connection with Twilio TURN backup
-  const initializePeerConnection = useCallback(async () => {
-    console.log('[WebRTC] 🔗 Initializing peer connection with Twilio TURN backup...');
-    
-    // Dynamically import getICEServers
-    const { getICEServers } = await import('@/config/webrtc');
-    const iceServers = await getICEServers();
-    
-    const configWithTurn = {
-      ...config,
-      iceServers,
-      iceCandidatePoolSize: 10
-    };
-    
-    console.log('[WebRTC] ICE Servers configured:', iceServers.length, 'servers');
-    
-    const pc = new RTCPeerConnection(configWithTurn);
-
+  const setupPcHandlers = useCallback((pc: RTCPeerConnection) => {
     pc.onicecandidate = (event) => {
       if (event.candidate) {
-        console.log('[WebRTC] 📡 ICE candidate generated:', event.candidate.type);
+        console.log('[WebRTC] ICE candidate generated:', event.candidate.type);
         if (iceCandidateCallbackRef.current) {
           iceCandidateCallbackRef.current(event.candidate);
         }
-      } else {
-        console.log('[WebRTC] ✅ ICE gathering complete');
       }
     };
 
     pc.ontrack = (event) => {
-      console.log('[WebRTC] 📺 Remote track received:', event.track.kind);
+      console.log('[WebRTC] Remote track received:', event.track.kind);
       const stream = event.streams[0];
       setRemoteStream(stream);
-      
       if (trackCallbackRef.current) {
         trackCallbackRef.current(stream);
       }
     };
 
     pc.oniceconnectionstatechange = () => {
-      console.log('[WebRTC] 📡 ICE connection state:', pc.iceConnectionState);
-      
-      // Update call log with connection state
-      if (callLogInitialized.current && callMetadata) {
-        if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') {
-          CallLogsService.updateCallStatus(callMetadata.callId, {
-            status: 'connected',
-            iceConnectionState: pc.iceConnectionState
-          });
-          setIsConnected(true);
-        } else if (pc.iceConnectionState === 'disconnected') {
-          CallLogsService.incrementReconnectionAttempt(callMetadata.callId);
-          setIsConnected(false);
-        } else if (pc.iceConnectionState === 'failed') {
-          CallLogsService.failCall(callMetadata.callId, 'ICE connection failed');
-          setIsConnected(false);
-        }
-      } else {
-        // Fallback if no call metadata
-        if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') {
-          setIsConnected(true);
-        } else if (pc.iceConnectionState === 'disconnected') {
-          setIsConnected(false);
-        } else if (pc.iceConnectionState === 'failed') {
-          setIsConnected(false);
-        }
+      console.log('[WebRTC] ICE connection state:', pc.iceConnectionState);
+      if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') {
+        setIsConnected(true);
+      } else if (pc.iceConnectionState === 'disconnected' || pc.iceConnectionState === 'failed') {
+        setIsConnected(false);
       }
     };
 
     pc.onconnectionstatechange = () => {
-      console.log('[WebRTC] 🔌 Connection state:', pc.connectionState);
+      console.log('[WebRTC] Connection state:', pc.connectionState);
       setConnectionState(pc.connectionState);
-      
-      // Update call log with peer connection state
-      if (callLogInitialized.current && callMetadata) {
-        CallLogsService.updateCallStatus(callMetadata.callId, {
-          peerConnectionState: pc.connectionState
-        });
-      }
     };
+  }, []);
 
+  // Get or create peer connection synchronously (STUN-only for speed)
+  const getOrCreatePc = useCallback((): RTCPeerConnection => {
+    if (pcRef.current && pcRef.current.signalingState !== 'closed') {
+      return pcRef.current;
+    }
+    console.log('[WebRTC] Creating peer connection (STUN-only)...');
+    const pc = new RTCPeerConnection({
+      iceServers: DEFAULT_ICE_SERVERS,
+      iceCandidatePoolSize: 10
+    });
+    setupPcHandlers(pc);
+    pcRef.current = pc;
     setPeerConnection(pc);
     return pc;
-  }, [config]);
+  }, [setupPcHandlers]);
 
   // Initialize call with metadata and logging
   const initializeCall = useCallback(async (metadata: CallMetadata): Promise<boolean> => {
@@ -194,7 +160,7 @@ export const useWebRTC = (config: WebRTCConfig = DEFAULT_CONFIG): UseWebRTCRetur
   // Initialize media (camera and microphone)
   const initializeMedia = useCallback(async (video: boolean = true, audio: boolean = true): Promise<boolean> => {
     try {
-      console.log('[WebRTC] 🎥 Requesting media access...', { video, audio });
+      console.log('[WebRTC] Requesting media access...', { video, audio });
       
       const stream = await navigator.mediaDevices.getUserMedia({
         video: video ? {
@@ -209,7 +175,7 @@ export const useWebRTC = (config: WebRTCConfig = DEFAULT_CONFIG): UseWebRTCRetur
         } : false
       });
 
-      console.log('[WebRTC] ✅ Media stream obtained:', {
+      console.log('[WebRTC] Media stream obtained:', {
         videoTracks: stream.getVideoTracks().length,
         audioTracks: stream.getAudioTracks().length
       });
@@ -218,102 +184,79 @@ export const useWebRTC = (config: WebRTCConfig = DEFAULT_CONFIG): UseWebRTCRetur
       setIsAudioEnabled(audio);
       setIsVideoEnabled(video);
 
-      // Add tracks to peer connection if it exists
-      if (peerConnection) {
-        stream.getTracks().forEach(track => {
-          peerConnection.addTrack(track, stream);
-          console.log('[WebRTC] ➕ Track added to peer connection:', track.kind);
-        });
-      }
+      const pc = getOrCreatePc();
+      stream.getTracks().forEach(track => {
+        pc.addTrack(track, stream);
+        console.log('[WebRTC] Track added to peer connection:', track.kind);
+      });
 
       return true;
     } catch (error) {
-      console.error('[WebRTC] ❌ Error accessing media:', error);
+      console.error('[WebRTC] Error accessing media:', error);
       return false;
     }
-  }, [peerConnection]);
+  }, [getOrCreatePc]);
 
   // Create an offer
   const createOffer = useCallback(async (): Promise<RTCSessionDescriptionInit | null> => {
-    if (!peerConnection) {
-      console.error('[WebRTC] ❌ No peer connection available');
-      return null;
-    }
-
     try {
-      console.log('[WebRTC] 📤 Creating offer...');
-      const offer = await peerConnection.createOffer({
+      const pc = getOrCreatePc();
+      console.log('[WebRTC] Creating offer...');
+      const offer = await pc.createOffer({
         offerToReceiveAudio: true,
         offerToReceiveVideo: true
       });
-
-      await peerConnection.setLocalDescription(offer);
-      console.log('[WebRTC] ✅ Offer created and set as local description');
-
+      await pc.setLocalDescription(offer);
+      console.log('[WebRTC] Offer created and set as local description');
       return offer;
     } catch (error) {
-      console.error('[WebRTC] ❌ Error creating offer:', error);
+      console.error('[WebRTC] Error creating offer:', error);
       return null;
     }
-  }, [peerConnection]);
+  }, [getOrCreatePc]);
 
   // Create an answer
   const createAnswer = useCallback(async (offer: RTCSessionDescriptionInit): Promise<RTCSessionDescriptionInit | null> => {
-    if (!peerConnection) {
-      console.error('[WebRTC] ❌ No peer connection available');
-      return null;
-    }
-
     try {
-      console.log('[WebRTC] 📥 Setting remote description (offer)...');
-      await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
-
-      console.log('[WebRTC] 📤 Creating answer...');
-      const answer = await peerConnection.createAnswer({
+      const pc = getOrCreatePc();
+      console.log('[WebRTC] Setting remote description (offer)...');
+      await pc.setRemoteDescription(new RTCSessionDescription(offer));
+      console.log('[WebRTC] Creating answer...');
+      const answer = await pc.createAnswer({
         offerToReceiveAudio: true,
         offerToReceiveVideo: true
       });
-
-      await peerConnection.setLocalDescription(answer);
-      console.log('[WebRTC] ✅ Answer created and set as local description');
-
+      await pc.setLocalDescription(answer);
+      console.log('[WebRTC] Answer created and set as local description');
       return answer;
     } catch (error) {
-      console.error('[WebRTC] ❌ Error creating answer:', error);
+      console.error('[WebRTC] Error creating answer:', error);
       return null;
     }
-  }, [peerConnection]);
+  }, [getOrCreatePc]);
 
   // Set remote description
   const setRemoteDescription = useCallback(async (description: RTCSessionDescriptionInit): Promise<void> => {
-    if (!peerConnection) {
-      console.error('[WebRTC] ❌ No peer connection available');
-      return;
-    }
-
     try {
-      console.log('[WebRTC] 📥 Setting remote description...');
-      await peerConnection.setRemoteDescription(new RTCSessionDescription(description));
-      console.log('[WebRTC] ✅ Remote description set');
+      const pc = getOrCreatePc();
+      console.log('[WebRTC] Setting remote description...');
+      await pc.setRemoteDescription(new RTCSessionDescription(description));
+      console.log('[WebRTC] Remote description set');
     } catch (error) {
-      console.error('[WebRTC] ❌ Error setting remote description:', error);
+      console.error('[WebRTC] Error setting remote description:', error);
     }
-  }, [peerConnection]);
+  }, [getOrCreatePc]);
 
   // Add ICE candidate
   const addIceCandidate = useCallback(async (candidate: RTCIceCandidateInit): Promise<void> => {
-    if (!peerConnection) {
-      console.error('[WebRTC] ❌ No peer connection available for ICE candidate');
-      return;
-    }
-
     try {
-      await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
-      console.log('[WebRTC] ✅ ICE candidate added');
+      const pc = getOrCreatePc();
+      await pc.addIceCandidate(new RTCIceCandidate(candidate));
+      console.log('[WebRTC] ICE candidate added');
     } catch (error) {
-      console.error('[WebRTC] ❌ Error adding ICE candidate:', error);
+      console.error('[WebRTC] Error adding ICE candidate:', error);
     }
-  }, [peerConnection]);
+  }, [getOrCreatePc]);
 
   // Toggle audio
   const toggleAudio = useCallback(() => {
@@ -341,30 +284,25 @@ export const useWebRTC = (config: WebRTCConfig = DEFAULT_CONFIG): UseWebRTCRetur
 
   // Cleanup
   const cleanup = useCallback((reason?: string) => {
-    console.log('[WebRTC] 🧹 Cleaning up WebRTC connection...');
+    console.log('[WebRTC] Cleaning up WebRTC connection...');
 
-    // Log call end to database
     if (callLogInitialized.current && callMetadata) {
-      const endedBy = callMetadata.userRole; // 'doctor' or 'patient'
+      const endedBy = callMetadata.userRole;
       CallLogsService.endCall(
         callMetadata.callId,
         endedBy,
         reason || 'Call ended by user'
       );
-      console.log('[WebRTC] 📝 Call end logged to database');
     }
 
     if (localStream) {
-      localStream.getTracks().forEach(track => {
-        track.stop();
-        console.log('[WebRTC] ⏹️  Stopped track:', track.kind);
-      });
+      localStream.getTracks().forEach(track => track.stop());
       setLocalStream(null);
     }
 
-    if (peerConnection) {
-      peerConnection.close();
-      console.log('[WebRTC] 🔌 Peer connection closed');
+    if (pcRef.current) {
+      pcRef.current.close();
+      pcRef.current = null;
       setPeerConnection(null);
     }
 
@@ -373,7 +311,7 @@ export const useWebRTC = (config: WebRTCConfig = DEFAULT_CONFIG): UseWebRTCRetur
     setConnectionState('closed');
     setCallMetadata(null);
     callLogInitialized.current = false;
-  }, [localStream, peerConnection, callMetadata]);
+  }, [localStream, callMetadata]);
 
   // Set callbacks
   const onIceCandidate = useCallback((callback: (candidate: RTCIceCandidate) => void) => {
@@ -384,13 +322,13 @@ export const useWebRTC = (config: WebRTCConfig = DEFAULT_CONFIG): UseWebRTCRetur
     trackCallbackRef.current = callback;
   }, []);
 
-  // Initialize peer connection on mount
+  // Create peer connection eagerly on mount
   useEffect(() => {
-    const pc = initializePeerConnection();
-    
+    getOrCreatePc();
     return () => {
-      if (pc) {
-        pc.close();
+      if (pcRef.current) {
+        pcRef.current.close();
+        pcRef.current = null;
       }
     };
   }, []);

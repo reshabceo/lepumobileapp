@@ -16,6 +16,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         
         // Reference 1: Direct class reference
         _ = WellueSDK.self
+        _ = AliveCorPlugin.self
         
         // Reference 2: Type metadata access
         let pluginType = type(of: WellueSDK.self)
