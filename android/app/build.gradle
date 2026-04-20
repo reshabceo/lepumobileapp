@@ -1,7 +1,7 @@
 apply plugin: 'com.android.application'
 
 android {
-    namespace "com.priti.app"
+    namespace "com.monitraq.mobile"
     compileSdk rootProject.ext.compileSdkVersion
     
     compileOptions {
@@ -10,7 +10,6 @@ android {
     }
     
     defaultConfig {
-        applicationId "com.priti.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 2
@@ -25,10 +24,35 @@ android {
             ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+
+    flavorDimensions "environment"
+    productFlavors {
+        production {
+            dimension "environment"
+            applicationId "com.monitraq.mobile"
+        }
+        staging {
+            dimension "environment"
+            applicationId "com.monitraq.mobile.staging"
+        }
+    }
+    signingConfigs {
+        debug {
+            storeFile file('debug.keystore')
+            storePassword 'android'
+            keyAlias 'androiddebugkey'
+            keyPassword 'android'
+        }
+    }
+
     buildTypes {
+        debug {
+            signingConfig signingConfigs.debug
+        }
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            signingConfig signingConfigs.debug
         }
     }
 }

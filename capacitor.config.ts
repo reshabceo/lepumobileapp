@@ -4,7 +4,7 @@ type IOSConfig = CapacitorConfig['ios'] & { packageClassList?: string[] };
 type ExtendedCapacitorConfig = CapacitorConfig & { ios?: IOSConfig; packageClassList?: string[] };
 
 const config: ExtendedCapacitorConfig = {
-  appId: 'com.priti.app',
+  appId: 'com.monitraq.mobile',
   appName: 'Monitraq',
   webDir: 'dist',
   plugins: {
@@ -31,6 +31,8 @@ const config: ExtendedCapacitorConfig = {
     scheme: "App",
     packageClassList: [
       'WellueSDK',
+      'Bp2',
+      'AliveCorSDK',
       'BluetoothLe',
       'FilesystemPlugin',
       'ScreenOrientationPlugin',
@@ -39,6 +41,8 @@ const config: ExtendedCapacitorConfig = {
   },
   packageClassList: [
     'WellueSDK',
+    'Bp2',
+    'AliveCorSDK',
     'BluetoothLe',
     'FilesystemPlugin',
     'ScreenOrientationPlugin',

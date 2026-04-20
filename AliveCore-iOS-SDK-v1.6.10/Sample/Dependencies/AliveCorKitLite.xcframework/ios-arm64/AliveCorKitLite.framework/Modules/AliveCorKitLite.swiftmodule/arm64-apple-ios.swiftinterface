@@ -1,0 +1,716 @@
+// swift-interface-format-version: 1.0
+// swift-compiler-version: Apple Swift version 6.0.3 effective-5.10 (swiftlang-6.0.3.1.10 clang-1600.0.30.1)
+// swift-module-flags: -target arm64-apple-ios15.0 -enable-objc-interop -enable-library-evolution -swift-version 5 -enforce-exclusivity=checked -O -enable-bare-slash-regex -module-name AliveCorKitLite
+// swift-module-flags-ignorable: -no-verify-emitted-module-interface
+@_exported import AliveCorKitLite
+import CoreData
+import CoreGraphics
+import Foundation
+import Swift
+import SwiftUI
+import UIKit
+import _Concurrency
+import _StringProcessing
+import _SwiftConcurrencyShims
+@objc extension Foundation.NSError {
+  @objc public static let sdkDomain: Swift.String
+  @objc public enum ACKCode : Swift.Int {
+    case unknown = 1000
+    case missingToken = 1001
+    case dateFormat = 1002
+    case events = 1003
+    case api = 1004
+    case ecgRecording = 1005
+    case invalidToken = 1006
+    case invalidDevice = 1007
+    case deviceNotFound = 1008
+    public init?(rawValue: Swift.Int)
+    public typealias RawValue = Swift.Int
+    public var rawValue: Swift.Int {
+      get
+    }
+  }
+  @objc dynamic public class func missingTokenError() -> Foundation.NSError
+  @objc dynamic public class func dateFormatError() -> Foundation.NSError
+  @objc dynamic public class func eventsError() -> Foundation.NSError
+  @objc dynamic public class func unknownError() -> Foundation.NSError
+  @objc dynamic public class func apiError(path: Swift.String, code: Swift.Int) -> Foundation.NSError
+  @objc dynamic public class func ecgRecordingError() -> Foundation.NSError
+  @objc dynamic public class func invalidTokenError() -> Foundation.NSError
+  @objc dynamic public class func invalidDeviceError(_ status: Swift.String, _ serialNumber: Swift.String) -> Foundation.NSError
+  @objc dynamic public class func deviceNotFoundError() -> Foundation.NSError
+}
+@_inheritsConvenienceInitializers @objc(TeamPatientSetting) public class TeamPatientSetting : CoreData.NSManagedObject {
+  @objc override dynamic public init(entity: CoreData.NSEntityDescription, insertInto context: CoreData.NSManagedObjectContext?)
+  @objc deinit
+}
+@objc @_hasMissingDesignatedInitializers public class TeamPatientSettingModel : ObjectiveC.NSObject, Swift.Codable {
+  final public let id: Swift.String?
+  final public let teamId: Swift.String?
+  final public let name: Swift.String?
+  final public let isVisible: Swift.Bool?
+  final public let createdAt: Foundation.Date?
+  final public let updatedAt: Foundation.Date?
+  required public init(from decoder: any Swift.Decoder) throws
+  public func encode(to encoder: any Swift.Encoder) throws
+  @objc deinit
+}
+public typealias ACKManagerKardiaCoreRefreshTokenClosure = (_ completionHandler: @escaping (_ accessToken: Swift.String?, _ error: (any Swift.Error)?) -> Swift.Void) -> Swift.Void
+@_inheritsConvenienceInitializers @_hasMissingDesignatedInitializers @objc public class ACKManagerKardiaCore : ObjectiveC.NSObject {
+  @objc public enum ServerType : Swift.Int {
+    case staging, production
+    public init?(rawValue: Swift.Int)
+    public typealias RawValue = Swift.Int
+    public var rawValue: Swift.Int {
+      get
+    }
+  }
+  @objc public static var sharedInstance: AliveCorKitLite.ACKManagerKardiaCore
+  @objc public var defaultLanguageType: AliveCorKitLite.ACKLanguageType? {
+    @objc get
+    @objc set
+  }
+  @objc public var accessToken: Swift.String? {
+    @objc get
+  }
+  @objc public var isViewTutorialVisible: Swift.Bool {
+    @objc get
+    @objc set
+  }
+  @objc public var appName: Swift.String? {
+    get
+  }
+  @objc final public let ecgFilesDirectory: Swift.String?
+  @objc public var localConfiguration: AliveCorKitLite.ACKConfiguration? {
+    @objc get
+  }
+  @objc public var links: AliveCorKitLite.ACKWebLinks?
+  @objc public var serverType: AliveCorKitLite.ACKManagerKardiaCore.ServerType {
+    get
+  }
+  @objc deinit
+}
+extension AliveCorKitLite.ACKManagerKardiaCore {
+  @objc dynamic public var version: Swift.String? {
+    @objc get
+  }
+  @objc dynamic public var buildNumber: Swift.String? {
+    @objc get
+  }
+  @objc dynamic public func configureWith(accessToken: Swift.String, serverType: AliveCorKitLite.ACKManagerKardiaCore.ServerType, refreshTokenClosure: @escaping AliveCorKitLite.ACKManagerKardiaCoreRefreshTokenClosure)
+  @objc dynamic public func updateAccessToken(_ accessToken: Swift.String)
+  @objc dynamic public func algorithmPackageForCurrentKAI() -> Swift.String
+  @objc dynamic public func isKAIV2enabled() -> Swift.Bool
+  @objc dynamic public func refreshConfigurationFromServer(completion: ((Foundation.NSError?, AliveCorKitLite.ACKConfiguration?) -> Swift.Void)?)
+  @objc dynamic public func refreshConfigurationFromServer(with token: Swift.String, completion: ((Foundation.NSError?, AliveCorKitLite.ACKConfiguration?) -> Swift.Void)?)
+  @objc dynamic public func forgetDevice()
+  @objc dynamic public func supportedDevices() -> [AliveCorKitLite.ACKDeviceType]
+  @objc dynamic public func isValidConfiguration() -> Swift.Bool
+  @objc dynamic public func deleteAccessToken()
+}
+@_inheritsConvenienceInitializers @objc(EcgRecord) public class EcgRecord : CoreData.NSManagedObject {
+  @objc override dynamic public init(entity: CoreData.NSEntityDescription, insertInto context: CoreData.NSManagedObjectContext?)
+  @objc deinit
+}
+@objc @_hasMissingDesignatedInitializers public class EntitlementModel : ObjectiveC.NSObject, Swift.Codable {
+  final public let desc: Swift.String?
+  final public let entitlementId: Swift.Int?
+  final public let name: Swift.String?
+  required public init(from decoder: any Swift.Decoder) throws
+  public func encode(to encoder: any Swift.Encoder) throws
+  @objc deinit
+}
+public protocol KeyChainQuery {
+  var query: [Swift.String : Any]? { get }
+}
+public struct TokenQuery {
+}
+extension AliveCorKitLite.TokenQuery : AliveCorKitLite.KeyChainQuery {
+  public var query: [Swift.String : Any]? {
+    get
+  }
+}
+@objc @_hasMissingDesignatedInitializers public class PhysicianModel : ObjectiveC.NSObject, Swift.Codable {
+  final public let avatarUrl: Swift.String?
+  final public let email: Swift.String?
+  final public let firstName: Swift.String?
+  final public let physicianId: Swift.String?
+  final public let lastName: Swift.String?
+  required public init(from decoder: any Swift.Decoder) throws
+  public func encode(to encoder: any Swift.Encoder) throws
+  @objc deinit
+}
+@_inheritsConvenienceInitializers @objc(Device) public class Device : CoreData.NSManagedObject {
+  @objc override dynamic public init(entity: CoreData.NSEntityDescription, insertInto context: CoreData.NSManagedObjectContext?)
+  @objc deinit
+}
+@_hasMissingDesignatedInitializers @objc public class DeviceModel : ObjectiveC.NSObject, Swift.Codable {
+  final public let checkInDurationSeconds: Swift.Int?
+  final public let durationSeconds: Swift.Int?
+  final public let id: Swift.String?
+  final public let name: Swift.String?
+  final public let planId: Swift.String?
+  final public let recordingLimit: Swift.Int?
+  final public let recordingsTaken: Swift.Int?
+  final public let registeredAt: Foundation.Date?
+  @objc final public let status: Swift.String?
+  final public let teamId: Swift.String?
+  @objc final public let serialNumber: Swift.String?
+  final public let expiry: Foundation.Date?
+  required public init(from decoder: any Swift.Decoder) throws
+  public func encode(to encoder: any Swift.Encoder) throws
+  @objc public var isActive: Swift.Bool {
+    @objc get
+  }
+  @objc public var isStale: Swift.Bool {
+    @objc get
+  }
+  @objc override dynamic public var description: Swift.String {
+    @objc get
+  }
+  @objc deinit
+}
+extension AliveCorKitLite.Feature {
+  @objc override dynamic public var description: Swift.String {
+    @objc get
+  }
+}
+@_inheritsConvenienceInitializers @objc(Feature) public class Feature : CoreData.NSManagedObject {
+  @objc override dynamic public init(entity: CoreData.NSEntityDescription, insertInto context: CoreData.NSManagedObjectContext?)
+  @objc deinit
+}
+public enum ValidationError : Swift.Error {
+  case invalidClaim(Swift.String)
+  case expired
+  case nonce
+}
+extension Foundation.DateFormatter {
+  @objc public static let rfc3339WithSubSecondsDateFormatter: Foundation.DateFormatter
+  @objc public static let rfc3339DateFormatter: Foundation.DateFormatter
+}
+extension Foundation.Date {
+  public func toRfc3339WithSubSecondsString() -> Swift.String
+  public func toRfc3339String() -> Swift.String
+  public static func dateFromRfc3339String(_ string: Swift.String) -> Foundation.Date?
+}
+@_inheritsConvenienceInitializers @objc public class ACInternalUtils : ObjectiveC.NSObject {
+  @objc public static var defaultLanguageType: AliveCorKitLite.ACKLanguageType?
+  @objc override dynamic public init()
+  @objc deinit
+}
+@objc @_hasMissingDesignatedInitializers public class ActivityLevelRecordModel : ObjectiveC.NSObject, Swift.Codable {
+  public var activityId: Swift.String?
+  public var note: Swift.String?
+  public var name: Swift.String?
+  @objc public init(activityId: Swift.String?, name: Swift.String?, note: Swift.String?)
+  required public init(from decoder: any Swift.Decoder) throws
+  public func encode(to encoder: any Swift.Encoder) throws
+  @objc deinit
+}
+public struct IDTokenValidation {
+  public let issuer: Swift.String
+  public let audience: Swift.String
+  public init(issuer: Swift.String, audience: Swift.String)
+  public func validate(_ jwt: any AliveCorKitLite.JWT, nonce: Swift.String? = nil) -> AliveCorKitLite.ValidationError?
+}
+@objc @_hasMissingDesignatedInitializers public class ActivityLevelModel : ObjectiveC.NSObject, Swift.Codable {
+  final public let activityId: Swift.String?
+  final public let name: Swift.String?
+  public var order: Swift.Int?
+  final public let hidden: Swift.Bool?
+  required public init(from decoder: any Swift.Decoder) throws
+  public func encode(to encoder: any Swift.Encoder) throws
+  @objc deinit
+}
+extension AliveCorKitLite.Device {
+  @objc override dynamic public var description: Swift.String {
+    @objc get
+  }
+}
+@_hasMissingDesignatedInitializers @objc public class ACKConfiguration : ObjectiveC.NSObject, Swift.Codable {
+  @objc public var expirationDate: Foundation.Date?
+  @objc public var features: [AliveCorKitLite.FeatureModel]?
+  required public init(from decoder: any Swift.Decoder) throws
+  public func encode(to encoder: any Swift.Encoder) throws
+  @objc public var supportedDevices: [AliveCorKitLite.ACKDeviceType] {
+    @objc get
+  }
+  @objc public var isStale: Swift.Bool {
+    @objc get
+  }
+  @objc public var algVersionType: AliveCorKitLite.ACKAlgorithmVersion {
+    @objc get
+  }
+  @objc public var hasExpired: Swift.Bool {
+    @objc get
+  }
+  @objc override dynamic public var description: Swift.String {
+    @objc get
+  }
+  @objc deinit
+}
+@objc @_hasMissingDesignatedInitializers public class PatientModel : ObjectiveC.NSObject, Swift.Codable {
+  final public let dateOfBirth: Foundation.Date?
+  final public let email: Swift.String?
+  final public let firstName: Swift.String?
+  final public let lastName: Swift.String?
+  final public let physician: AliveCorKitLite.PhysicianModel?
+  final public let sex: Swift.Int16?
+  final public let customFields: [AliveCorKitLite.PatientCustomFieldModel]?
+  final public let subjectId: Swift.String?
+  final public let studyId: Swift.String?
+  final public let siteIdentificationNumber: Swift.String?
+  final public let mrn: Swift.String?
+  final public let phoneNumber: Swift.String?
+  public var isDateOfBirthVisible: Swift.Bool
+  public var isEmailVisible: Swift.Bool
+  public var isFirstNameVisible: Swift.Bool
+  public var isLastNameVisible: Swift.Bool
+  public var isSexVisible: Swift.Bool
+  public var isPhysicianVisible: Swift.Bool
+  public var isSubjectIdVisible: Swift.Bool
+  public var isStudyIdVisible: Swift.Bool
+  public var isSiteIdVisible: Swift.Bool
+  public var isMRNVisible: Swift.Bool
+  public var isPhoneNumberVisible: Swift.Bool
+  required public init(from decoder: any Swift.Decoder) throws
+  public func encode(to encoder: any Swift.Encoder) throws
+  @objc deinit
+}
+@objc public class PatientCustomFieldModel : ObjectiveC.NSObject, Swift.Codable, Foundation.NSSecureCoding {
+  @objc public static var supportsSecureCoding: Swift.Bool
+  public var name: Swift.String?
+  public var value: Swift.String?
+  @objc public func encode(with coder: Foundation.NSCoder)
+  @objc required public init?(coder: Foundation.NSCoder)
+  @objc override dynamic public var description: Swift.String {
+    @objc get
+  }
+  @objc deinit
+  public func encode(to encoder: any Swift.Encoder) throws
+  required public init(from decoder: any Swift.Decoder) throws
+}
+extension Swift.CodingUserInfoKey {
+  public static let moc: Swift.CodingUserInfoKey?
+}
+extension AliveCorKitLite.TeamPatientSetting {
+  @objc override dynamic public var description: Swift.String {
+    @objc get
+  }
+}
+public func decode(jwt: Swift.String) throws -> any AliveCorKitLite.JWT
+public struct Claim {
+  public var rawValue: Any? {
+    get
+  }
+  public var string: Swift.String? {
+    get
+  }
+  public var boolean: Swift.Bool? {
+    get
+  }
+  public var double: Swift.Double? {
+    get
+  }
+  public var integer: Swift.Int? {
+    get
+  }
+  public var date: Foundation.Date? {
+    get
+  }
+  public var array: [Swift.String]? {
+    get
+  }
+}
+public protocol JWT {
+  var header: [Swift.String : Any] { get }
+  var body: [Swift.String : Any] { get }
+  var signature: Swift.String? { get }
+  var string: Swift.String { get }
+  var expiresAt: Foundation.Date? { get }
+  var issuer: Swift.String? { get }
+  var subject: Swift.String? { get }
+  var audience: [Swift.String]? { get }
+  var issuedAt: Foundation.Date? { get }
+  var notBefore: Foundation.Date? { get }
+  var identifier: Swift.String? { get }
+  var expired: Swift.Bool { get }
+}
+extension AliveCorKitLite.JWT {
+  public func claim(name: Swift.String) -> AliveCorKitLite.Claim
+}
+@objc @_inheritsConvenienceInitializers public class ACKEventBridge : ObjectiveC.NSObject {
+  @objc public class func recording() -> Foundation.NSString
+  @objc public class func evaluation() -> Foundation.NSString
+  @objc override dynamic public init()
+  @objc deinit
+}
+extension AliveCorKitLite.EcgRecord {
+  @nonobjc public class func fetchRequest() -> CoreData.NSFetchRequest<AliveCorKitLite.EcgRecord>
+  @objc @NSManaged dynamic public var atcEnhancedFilePath: Swift.String? {
+    @objc get
+    @objc set
+  }
+  @objc @NSManaged dynamic public var atcOriginalFilePath: Swift.String? {
+    @objc get
+    @objc set
+  }
+  @objc @NSManaged dynamic public var bpm: Swift.Int32 {
+    @objc get
+    @objc set
+  }
+  @objc @NSManaged dynamic public var clientId: Swift.String? {
+    @objc get
+    @objc set
+  }
+  @objc @NSManaged dynamic public var device: Swift.String? {
+    @objc get
+    @objc set
+  }
+  @objc @NSManaged dynamic public var errorMessage: Swift.String? {
+    @objc get
+    @objc set
+  }
+  @objc @NSManaged dynamic public var isInverted: Swift.Bool {
+    @objc get
+    @objc set
+  }
+  @objc @NSManaged dynamic public var kaiResult: Swift.String? {
+    @objc get
+    @objc set
+  }
+  @objc @NSManaged dynamic public var kaiVersion: Swift.String? {
+    @objc get
+    @objc set
+  }
+  @objc @NSManaged dynamic public var leadsConfig: Swift.Int16 {
+    @objc get
+    @objc set
+  }
+  @objc @NSManaged dynamic public var needsUpload: Swift.Bool {
+    @objc get
+    @objc set
+  }
+  @objc @NSManaged dynamic public var needsUploadActivity: Swift.Bool {
+    @objc get
+    @objc set
+  }
+  @objc @NSManaged dynamic public var needsUploadSymptoms: Swift.Bool {
+    @objc get
+    @objc set
+  }
+  @objc @NSManaged dynamic public var publicId: Swift.String? {
+    @objc get
+    @objc set
+  }
+  @objc @NSManaged dynamic public var recordedAtISO8601: Foundation.Date? {
+    @objc get
+    @objc set
+  }
+  @objc @NSManaged dynamic public var requestQt: Swift.Bool {
+    @objc get
+    @objc set
+  }
+  @objc @NSManaged dynamic public var timeZoneOffset: Swift.Int32 {
+    @objc get
+    @objc set
+  }
+  @objc @NSManaged dynamic public var algorithmPackage: Swift.String? {
+    @objc get
+    @objc set
+  }
+  @objc @NSManaged dynamic public var deviceSerialNumber: Swift.String? {
+    @objc get
+    @objc set
+  }
+  @objc @NSManaged dynamic public var symptoms: Foundation.NSSet? {
+    @objc get
+    @objc set
+  }
+}
+extension AliveCorKitLite.EcgRecord {
+  @objc(addSymptoms:) @NSManaged dynamic public func addToSymptoms(_ values: Foundation.NSSet)
+  @objc(removeSymptoms:) @NSManaged dynamic public func removeFromSymptoms(_ values: Foundation.NSSet)
+}
+extension AliveCorKitLite.EcgRecord {
+  public static var entityName: Swift.String {
+    get
+  }
+}
+@_hasMissingDesignatedInitializers @objc public class FeatureModel : ObjectiveC.NSObject, Swift.Codable {
+  @objc final public let featureName: Swift.String?
+  @objc final public let publicId: Swift.String?
+  @objc final public let createdAt: Foundation.Date?
+  required public init(from decoder: any Swift.Decoder) throws
+  public func encode(to encoder: any Swift.Encoder) throws
+  @objc override dynamic public var description: Swift.String {
+    @objc get
+  }
+  @objc deinit
+}
+@_hasMissingDesignatedInitializers @objc(ACKAlgorithmDeterminationsViewController) @_Concurrency.MainActor @preconcurrency public class ACKAlgorithmDeterminationsViewController : UIKit.UIViewController {
+  @objc @_Concurrency.MainActor @preconcurrency public init(algorithmPackage: Swift.String?)
+  @_Concurrency.MainActor @preconcurrency @objc override dynamic public func viewDidLoad()
+  @_Concurrency.MainActor @preconcurrency @objc override dynamic public func viewWillAppear(_ animated: Swift.Bool)
+  @_Concurrency.MainActor @preconcurrency @objc override dynamic public func viewWillDisappear(_ animated: Swift.Bool)
+  @objc deinit
+}
+@objc @_hasMissingDesignatedInitializers public class ConnectionModel : ObjectiveC.NSObject, Swift.Codable {
+  final public let templateDuration: Swift.Int?
+  final public let entitlements: [AliveCorKitLite.EntitlementModel]?
+  final public let expiresAt: Foundation.Date?
+  final public let participantId: Swift.String?
+  final public let startTime: Foundation.Date?
+  final public let templateNote: Swift.String?
+  final public let showRecordingResult: Swift.Bool?
+  final public let displayBpmDuringRecording: Swift.Bool?
+  final public let allowedDevicesList: [Swift.String]?
+  final public let ecgRecordingDuration: Swift.Int?
+  final public let showKiwiRecordingSentMsg: Swift.Bool?
+  final public let showInvestigationUseText: Swift.Bool?
+  final public let displaySymptoms: Swift.Bool?
+  final public let displayActivities: Swift.Bool?
+  final public let enableSymptoms: Swift.Bool?
+  final public let enableActivities: Swift.Bool?
+  final public let hideConfirmPatientDetailScreen: Swift.Bool?
+  final public let hideMonitoringInstructions: Swift.Bool?
+  final public let hideNeedSupport: Swift.Bool?
+  final public let displayEkgResultScreen: Swift.String?
+  public var displayEkgResultScreenType: AliveCorKitLite.ACKResultScreenType {
+    get
+  }
+  final public let algVersion: Swift.String?
+  public var algVersionType: AliveCorKitLite.ACKAlgorithmVersion? {
+    get
+  }
+  final public let deviceLead: Swift.String?
+  public var deviceLeadType: AliveCorKitLite.ACKLeadsConfig? {
+    get
+  }
+  public var allowedDeviceTypes: [AliveCorKitLite.ACKDeviceType]? {
+    get
+  }
+  required public init(from decoder: any Swift.Decoder) throws
+  public func encode(to encoder: any Swift.Encoder) throws
+  @objc override dynamic public var description: Swift.String {
+    @objc get
+  }
+  @objc deinit
+}
+@objc @_hasMissingDesignatedInitializers public class SymptomRecordModel : ObjectiveC.NSObject, Swift.Codable {
+  public var symptomId: Swift.String?
+  public var name: Swift.String?
+  public var note: Swift.String?
+  @objc public init(symptomId: Swift.String?, name: Swift.String?, note: Swift.String?)
+  required public init(from decoder: any Swift.Decoder) throws
+  public func encode(to encoder: any Swift.Encoder) throws
+  @objc deinit
+}
+extension AliveCorKitLite.Feature {
+  @nonobjc public class func fetchRequest() -> CoreData.NSFetchRequest<AliveCorKitLite.Feature>
+  @objc @NSManaged dynamic public var createdAt: Foundation.Date? {
+    @objc get
+    @objc set
+  }
+  @objc @NSManaged dynamic public var featureName: Swift.String? {
+    @objc get
+    @objc set
+  }
+  @objc @NSManaged dynamic public var publicId: Swift.String? {
+    @objc get
+    @objc set
+  }
+  @objc @NSManaged dynamic public var configuration: AliveCorKitLite.Configuration? {
+    @objc get
+    @objc set
+  }
+}
+public enum DecodeError : Foundation.LocalizedError {
+  case invalidBase64Url(Swift.String)
+  case invalidJSON(Swift.String)
+  case invalidPartCount(Swift.String, Swift.Int)
+  public var localizedDescription: Swift.String {
+    get
+  }
+}
+@objc @_hasMissingDesignatedInitializers public class TeamModel : ObjectiveC.NSObject, Swift.Codable {
+  final public let email: Swift.String?
+  final public let name: Swift.String?
+  final public let phoneNumber: Swift.String?
+  final public let website: Swift.String?
+  final public let avatarURL: Swift.String?
+  final public let isDeviceTutorialsEnabled: Swift.Bool?
+  required public init(from decoder: any Swift.Decoder) throws
+  public func encode(to encoder: any Swift.Encoder) throws
+  @objc deinit
+}
+@objc @_hasMissingDesignatedInitializers public class SymptomModel : ObjectiveC.NSObject, Swift.Codable {
+  final public let symptomId: Swift.String?
+  final public let name: Swift.String?
+  final public let createdAt: Foundation.Date?
+  public var order: Swift.Int?
+  final public let symptomKey: Swift.String?
+  required public init(from decoder: any Swift.Decoder) throws
+  public func encode(to encoder: any Swift.Encoder) throws
+  @objc deinit
+}
+@_hasMissingDesignatedInitializers @objc @_Concurrency.MainActor @preconcurrency public class ACKAboutViewController : UIKit.UIViewController {
+  @objc @_Concurrency.MainActor @preconcurrency public init(isEU: Swift.Bool)
+  @_Concurrency.MainActor @preconcurrency @objc override dynamic public func viewDidLoad()
+  @_Concurrency.MainActor @preconcurrency @objc override dynamic public func viewWillAppear(_ animated: Swift.Bool)
+  @objc deinit
+}
+extension AliveCorKitLite.TeamPatientSetting {
+  @nonobjc public class func fetchRequest() -> CoreData.NSFetchRequest<AliveCorKitLite.TeamPatientSetting>
+  @objc @NSManaged dynamic public var id: Swift.String? {
+    @objc get
+    @objc set
+  }
+  @objc @NSManaged dynamic public var teamId: Swift.String? {
+    @objc get
+    @objc set
+  }
+  @objc @NSManaged dynamic public var name: Swift.String? {
+    @objc get
+    @objc set
+  }
+  @objc @NSManaged dynamic public var isVisible: Swift.Bool {
+    @objc get
+    @objc set
+  }
+  @objc @NSManaged dynamic public var createdAt: Foundation.Date? {
+    @objc get
+    @objc set
+  }
+  @objc @NSManaged dynamic public var updatedAt: Foundation.Date? {
+    @objc get
+    @objc set
+  }
+}
+extension AliveCorKitLite.Device {
+  @nonobjc public class func fetchRequest() -> CoreData.NSFetchRequest<AliveCorKitLite.Device>
+  @objc @NSManaged dynamic public var checkInDurationSeconds: Foundation.NSNumber? {
+    @objc get
+    @objc set
+  }
+  @objc @NSManaged dynamic public var durationSeconds: Foundation.NSNumber? {
+    @objc get
+    @objc set
+  }
+  @objc @NSManaged dynamic public var expiry: Foundation.Date? {
+    @objc get
+    @objc set
+  }
+  @objc @NSManaged dynamic public var id: Swift.String? {
+    @objc get
+    @objc set
+  }
+  @objc @NSManaged dynamic public var name: Swift.String? {
+    @objc get
+    @objc set
+  }
+  @objc @NSManaged dynamic public var planId: Swift.String? {
+    @objc get
+    @objc set
+  }
+  @objc @NSManaged dynamic public var recordingLimit: Foundation.NSNumber? {
+    @objc get
+    @objc set
+  }
+  @objc @NSManaged dynamic public var recordingsTaken: Foundation.NSNumber? {
+    @objc get
+    @objc set
+  }
+  @objc @NSManaged dynamic public var registeredAt: Foundation.Date? {
+    @objc get
+    @objc set
+  }
+  @objc @NSManaged dynamic public var serialNumber: Swift.String? {
+    @objc get
+    @objc set
+  }
+  @objc @NSManaged dynamic public var status: Swift.String? {
+    @objc get
+    @objc set
+  }
+  @objc @NSManaged dynamic public var teamId: Swift.String? {
+    @objc get
+    @objc set
+  }
+  @objc @NSManaged dynamic public var lastUpdateDate: Foundation.Date? {
+    @objc get
+    @objc set
+  }
+}
+@_inheritsConvenienceInitializers @objc public class FontLoader : ObjectiveC.NSObject {
+  @objc public static func registerFonts()
+  @objc override dynamic public init()
+  @objc deinit
+}
+extension AliveCorKitLite.Configuration {
+  @nonobjc public class func fetchRequest() -> CoreData.NSFetchRequest<AliveCorKitLite.Configuration>
+  @objc @NSManaged dynamic public var algVersion: Swift.String? {
+    @objc get
+    @objc set
+  }
+  @objc @NSManaged dynamic public var clientId: Swift.String? {
+    @objc get
+    @objc set
+  }
+  @objc @NSManaged dynamic public var expirationDate: Foundation.Date? {
+    @objc get
+    @objc set
+  }
+  @objc @NSManaged dynamic public var lastUpdateDate: Foundation.Date? {
+    @objc get
+    @objc set
+  }
+  @objc @NSManaged dynamic public var phoneHomeFrequency: Foundation.NSNumber? {
+    @objc get
+    @objc set
+  }
+  @objc @NSManaged dynamic public var features: Foundation.NSSet? {
+    @objc get
+    @objc set
+  }
+}
+extension AliveCorKitLite.Configuration {
+  @objc(addFeaturesObject:) @NSManaged dynamic public func addToFeatures(_ value: AliveCorKitLite.Feature)
+  @objc(removeFeaturesObject:) @NSManaged dynamic public func removeFromFeatures(_ value: AliveCorKitLite.Feature)
+  @objc(addFeatures:) @NSManaged dynamic public func addToFeatures(_ values: Foundation.NSSet)
+  @objc(removeFeatures:) @NSManaged dynamic public func removeFromFeatures(_ values: Foundation.NSSet)
+}
+extension AliveCorKitLite.Configuration {
+  @objc override dynamic public var description: Swift.String {
+    @objc get
+  }
+}
+@_hasMissingDesignatedInitializers @objc(A0JWT) public class _JWT : ObjectiveC.NSObject {
+  @objc public var header: [Swift.String : Any] {
+    @objc get
+  }
+  @objc public var body: [Swift.String : Any] {
+    @objc get
+  }
+  @objc public var signature: Swift.String? {
+    @objc get
+  }
+  @objc public var expiresAt: Foundation.Date? {
+    @objc get
+  }
+  @objc public var expired: Swift.Bool {
+    @objc get
+  }
+  @objc public class func decode(jwt jwtValue: Swift.String) throws -> AliveCorKitLite._JWT
+  @objc deinit
+}
+@_inheritsConvenienceInitializers @objc(Configuration) public class Configuration : CoreData.NSManagedObject {
+  @objc override dynamic public init(entity: CoreData.NSEntityDescription, insertInto context: CoreData.NSManagedObjectContext?)
+  @objc deinit
+}
+extension Foundation.NSError.ACKCode : Swift.Equatable {}
+extension Foundation.NSError.ACKCode : Swift.Hashable {}
+extension Foundation.NSError.ACKCode : Swift.RawRepresentable {}
+extension AliveCorKitLite.ACKManagerKardiaCore.ServerType : Swift.Equatable {}
+extension AliveCorKitLite.ACKManagerKardiaCore.ServerType : Swift.Hashable {}
+extension AliveCorKitLite.ACKManagerKardiaCore.ServerType : Swift.RawRepresentable {}

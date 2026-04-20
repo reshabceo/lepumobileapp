@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <declare-styleable name="RhythmStripView">
+        <attr name="alwaysSingleLead" format="boolean"/>
+        <attr name="traceStrokeWidth" format="dimension" />
+        <attr name="traceStrokeColor" format="color" />
+        <attr name="majorColorGrid" format="color" />
+        <attr name="minorColorGrid" format="color" />
+        <attr name="graphScale" format="float" />
+        <attr name="displayMode" format="enum">
+            <enum name="preview" value="0"/>
+            <enum name="full" value="1"/>
+        </attr>
+    </declare-styleable>
+</resources>

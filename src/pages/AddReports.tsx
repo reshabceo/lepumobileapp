@@ -19,8 +19,9 @@ export default function AddReports() {
   const { user } = useAuth();
   const { patientProfile: hookProfile } = useRealTimeVitals();
   const fileInputRef = useRef<HTMLInputElement>(null);
+
   const dicomFileInputRef = useRef<HTMLInputElement>(null);
-  
+
   // State for form inputs
   const [reportType, setReportType] = useState('');
   const [reportName, setReportName] = useState('');
@@ -45,7 +46,7 @@ export default function AddReports() {
       try {
         setProfileLoading(true);
         console.log('🔍 Fetching patient profile for user:', user.id);
-        
+
         // Try hook first (might be faster if already loaded)
         if (hookProfile) {
           console.log('✅ Using profile from hook');
@@ -162,13 +163,13 @@ export default function AddReports() {
     try {
       setSelectingFile(false);
       const files = event.target.files ? Array.from(event.target.files) : [];
-      
+
       if (files.length === 0) {
         console.log('No file selected');
         return;
       }
 
-      const maxSize = Capacitor.isNativePlatform() 
+      const maxSize = Capacitor.isNativePlatform()
         ? 20 * 1024 * 1024 // 20MB for native
         : 50 * 1024 * 1024; // 50MB for web
 
@@ -239,7 +240,7 @@ export default function AddReports() {
       ];
       const fileExtension = file.name.split('.').pop()?.toLowerCase();
       const allowedExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'pdf', 'doc', 'docx'];
-      
+
       if (!allowedTypes.includes(file.type) && !allowedExtensions.includes(fileExtension || '')) {
         toast({
           title: "Invalid File Type",
@@ -291,7 +292,7 @@ export default function AddReports() {
             const blob = await response.blob();
             const fileName = `photo_${Date.now()}.jpg`;
             const file = new File([blob], fileName, { type: 'image/jpeg' });
-            
+
             setSelectedFile(file);
             toast({
               title: "Photo Captured",
@@ -300,16 +301,16 @@ export default function AddReports() {
           }
         } catch (cameraError: any) {
           console.error('Camera error:', cameraError);
-          
+
           // Check if permission was denied
-          if (cameraError.message?.includes('permission') || 
-              cameraError.message?.includes('denied') ||
-              cameraError.code === 'PERMISSION_DENIED') {
+          if (cameraError.message?.includes('permission') ||
+            cameraError.message?.includes('denied') ||
+            cameraError.code === 'PERMISSION_DENIED') {
             // Show dialog to open settings
             const shouldOpenSettings = window.confirm(
               'Camera permission is required to take photos. Would you like to open app settings to grant permission?'
             );
-            
+
             if (shouldOpenSettings) {
               try {
                 // Open app settings using platform-specific URL schemes
@@ -328,8 +329,10 @@ export default function AddReports() {
                 } else if (Capacitor.getPlatform() === 'android') {
                   // Android: Try to open app info in settings
                   try {
-                    // Use Android intent URL to open app settings
-                    window.open('intent:#Intent;action=android.settings.APPLICATION_DETAILS_SETTINGS;data=package:com.monitraq.app;end', '_system');
+                    // Use dynamic package name from App plugin if possible, or fallback to current ID
+                    const appInfo = await App.getInfo();
+                    const packageName = appInfo.id;
+                    window.open(`intent:#Intent;action=android.settings.APPLICATION_DETAILS_SETTINGS;data=package:${packageName};end`, '_system');
                   } catch {
                     // Fallback: show instructions
                     toast({
@@ -355,7 +358,7 @@ export default function AddReports() {
                 });
               }
             }
-            
+
             toast({
               title: "Camera Permission Required",
               description: "Please grant camera permission in app settings",
@@ -382,17 +385,17 @@ export default function AddReports() {
 
         try {
           // Request camera permission
-          const stream = await navigator.mediaDevices.getUserMedia({ 
-            video: { 
+          const stream = await navigator.mediaDevices.getUserMedia({
+            video: {
               facingMode: 'environment' // Prefer back camera on mobile
-            } 
+            }
           });
-          
+
           // Create video element to capture frame
           const video = document.createElement('video');
           video.srcObject = stream;
           video.play();
-          
+
           // Wait for video to be ready
           await new Promise((resolve) => {
             video.onloadedmetadata = () => {
@@ -408,10 +411,10 @@ export default function AddReports() {
           canvas.height = video.videoHeight;
           const ctx = canvas.getContext('2d');
           ctx?.drawImage(video, 0, 0);
-          
+
           // Stop the stream
           stream.getTracks().forEach(track => track.stop());
-          
+
           // Convert canvas to blob and create file
           canvas.toBlob((blob) => {
             if (blob) {
@@ -426,7 +429,7 @@ export default function AddReports() {
           }, 'image/jpeg', 0.9);
         } catch (webError: any) {
           console.error('Web camera error:', webError);
-          
+
           if (webError.name === 'NotAllowedError' || webError.name === 'PermissionDeniedError') {
             toast({
               title: "Camera Permission Denied",
@@ -463,7 +466,7 @@ export default function AddReports() {
     try {
       const status = await Network.getStatus();
       console.log('🌐 Network status:', status);
-      
+
       if (!status.connected) {
         toast({
           title: "No Internet Connection",
@@ -472,7 +475,7 @@ export default function AddReports() {
         });
         return false;
       }
-      
+
       if (status.connectionType === 'cellular') {
         toast({
           title: "Using Mobile Data",
@@ -480,7 +483,7 @@ export default function AddReports() {
           variant: "default",
         });
       }
-      
+
       return true;
     } catch (error) {
       console.error('Error checking network status:', error);
@@ -590,7 +593,7 @@ export default function AddReports() {
       try {
         // Use Supabase Storage client API (works better on native platforms)
         console.log('🚀 Uploading to Supabase Storage...');
-        
+
         // Start progress simulation
         progressInterval = setInterval(() => {
           setUploadProgress((prev) => {
@@ -601,7 +604,7 @@ export default function AddReports() {
             return prev;
           });
         }, 500);
-        
+
         const { data: uploadData, error: uploadError } = await supabase.storage
           .from('patient-reports')
           .upload(fileName, selectedFile, {
@@ -618,9 +621,9 @@ export default function AddReports() {
 
         if (uploadError) {
           console.error('❌ Upload error:', uploadError);
-          
+
           let errorMessage = uploadError.message || 'Upload failed';
-          
+
           // Provide user-friendly error messages
           if (errorMessage.includes('timeout') || errorMessage.includes('Network request failed')) {
             errorMessage = "Upload took too long. Check your internet connection and try again.";
@@ -634,7 +637,7 @@ export default function AddReports() {
             // Retry with a new filename if duplicate
             const retryFileName = `${profile.id}/report_${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
             console.log('🔄 Retrying with new filename:', retryFileName);
-            
+
             const { data: retryData, error: retryError } = await supabase.storage
               .from('patient-reports')
               .upload(retryFileName, selectedFile, {
@@ -646,7 +649,7 @@ export default function AddReports() {
             if (retryError) {
               throw retryError;
             }
-            
+
             // Use retry filename for database entry
             const finalFileName = retryFileName;
             const { error: insertError } = await supabase
@@ -720,11 +723,11 @@ export default function AddReports() {
           clearInterval(progressInterval);
           progressInterval = null;
         }
-        
+
         console.error('❌ Upload failed:', uploadError);
-        
+
         let errorMessage = uploadError.message || 'Upload failed';
-        
+
         // Provide user-friendly messages
         if (errorMessage.includes('timeout') || errorMessage.includes('Network request failed')) {
           errorMessage = "Upload took too long. Check your internet connection and try again.";
@@ -803,7 +806,7 @@ export default function AddReports() {
 
     // Get profile - try state first, then fetch if needed
     let profileToUse = patientProfile;
-    
+
     if (!profileToUse) {
       // Try fetching one more time before showing error
       console.log('🔄 Profile not found, attempting direct fetch...');
@@ -836,10 +839,10 @@ export default function AddReports() {
     <MobileAppContainer>
       <div className="bg-[#161B22] min-h-screen text-white font-inter">
         <div className="max-w-sm mx-auto min-h-screen bg-[#1C2128] flex flex-col relative">
-          
+
           {/* Status Bar Spacing */}
           <div className="h-6"></div>
-          
+
           {/* Header */}
           <header className="flex items-center justify-between p-4 border-b border-gray-700 flex-shrink-0">
             <div className="flex items-center">
@@ -892,9 +895,9 @@ export default function AddReports() {
               <>
                 <div className="text-center mb-6">
                   <div className="inline-block bg-teal-500/20 p-4 rounded-full mb-3">
-                      <div className="bg-teal-500/40 p-3 rounded-full">
-                          <FilePlus2 className="text-teal-300" size={28} />
-                      </div>
+                    <div className="bg-teal-500/40 p-3 rounded-full">
+                      <FilePlus2 className="text-teal-300" size={28} />
+                    </div>
                   </div>
                   <p className="text-gray-300">Upload your medical report</p>
                   {(selectedFile || selectedDicomFiles.length > 0) && (
@@ -943,69 +946,69 @@ export default function AddReports() {
                   )}
                 </div>
 
-            {/* Hidden file input - regular reports (single file) */}
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*,.pdf,.doc,.docx,.zip,.dcm,.dicom"
-              onChange={handleFileChange}
-              onClick={(e) => {
-                (e.target as HTMLInputElement).value = '';
-              }}
-              className="hidden"
-            />
-            {/* Hidden file input - DICOM: ZIP or multiple .dcm (folder) */}
-            <input
-              ref={dicomFileInputRef}
-              type="file"
-              accept=".zip,.dcm,.dicom"
-              multiple
-              onChange={handleDicomFileChange}
-              onClick={(e) => {
-                (e.target as HTMLInputElement).value = '';
-              }}
-              className="hidden"
-            />
+                {/* Hidden file input - regular reports (single file) */}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*,.pdf,.doc,.docx,.zip,.dcm,.dicom"
+                  onChange={handleFileChange}
+                  onClick={(e) => {
+                    (e.target as HTMLInputElement).value = '';
+                  }}
+                  className="hidden"
+                />
+                {/* Hidden file input - DICOM: ZIP or multiple .dcm (folder) */}
+                <input
+                  ref={dicomFileInputRef}
+                  type="file"
+                  accept=".zip,.dcm,.dicom"
+                  multiple
+                  onChange={handleDicomFileChange}
+                  onClick={(e) => {
+                    (e.target as HTMLInputElement).value = '';
+                  }}
+                  className="hidden"
+                />
 
-            {/* Upload Buttons */}
-            <div className="space-y-3 mb-4">
-              <button 
-                onClick={handleFileUpload}
-                disabled={selectingFile || uploading}
-                className="w-full bg-[#30363D] text-gray-200 font-semibold py-3 rounded-lg flex items-center justify-center space-x-2 hover:bg-[#3C444C] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {selectingFile ? (
-                  <>
-                    <div className="w-5 h-5 border-2 border-gray-200/30 border-t-gray-200 rounded-full animate-spin"></div>
-                    <span>Opening file picker...</span>
-                  </>
-                ) : (
-                  <>
-                    <Upload size={20} />
-                    <span>Upload from Files</span>
-                  </>
-                )}
-              </button>
-              <button 
-                onClick={handleDicomOrZipUpload}
-                disabled={selectingFile || uploading}
-                className="w-full bg-teal-500/20 text-teal-300 font-semibold py-3 rounded-lg flex items-center justify-center space-x-2 border border-teal-500/40 hover:bg-teal-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <FolderArchive size={20} />
-                <span>Upload DICOM / ZIP or Folder</span>
-              </button>
-              <button 
-                onClick={handleTakePhoto}
-                disabled={selectingFile || uploading}
-                className="w-full bg-[#30363D] text-gray-200 font-semibold py-3 rounded-lg flex items-center justify-center space-x-2 hover:bg-[#3C444C] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <Camera size={20} />
-                <span>Take Photo</span>
-              </button>
-            </div>
-            <p className="text-xs text-gray-500 mb-6">
-              Imaging studies: upload a <strong>ZIP</strong> or select multiple <strong>.dcm</strong> files (e.g. folder of DICOM). Then go to Reports → DICOM to request a radiologist review.
-            </p>
+                {/* Upload Buttons */}
+                <div className="space-y-3 mb-4">
+                  <button
+                    onClick={handleFileUpload}
+                    disabled={selectingFile || uploading}
+                    className="w-full bg-[#30363D] text-gray-200 font-semibold py-3 rounded-lg flex items-center justify-center space-x-2 hover:bg-[#3C444C] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {selectingFile ? (
+                      <>
+                        <div className="w-5 h-5 border-2 border-gray-200/30 border-t-gray-200 rounded-full animate-spin"></div>
+                        <span>Opening file picker...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Upload size={20} />
+                        <span>Upload from Files</span>
+                      </>
+                    )}
+                  </button>
+                  <button
+                    onClick={handleDicomOrZipUpload}
+                    disabled={selectingFile || uploading}
+                    className="w-full bg-teal-500/20 text-teal-300 font-semibold py-3 rounded-lg flex items-center justify-center space-x-2 border border-teal-500/40 hover:bg-teal-500/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <FolderArchive size={20} />
+                    <span>Upload DICOM / ZIP or Folder</span>
+                  </button>
+                  <button
+                    onClick={handleTakePhoto}
+                    disabled={selectingFile || uploading}
+                    className="w-full bg-[#30363D] text-gray-200 font-semibold py-3 rounded-lg flex items-center justify-center space-x-2 hover:bg-[#3C444C] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <Camera size={20} />
+                    <span>Take Photo</span>
+                  </button>
+                </div>
+                <p className="text-xs text-gray-500 mb-6">
+                  Imaging studies: upload a <strong>ZIP</strong> or select multiple <strong>.dcm</strong> files (e.g. folder of DICOM). Then go to Reports → DICOM to request a radiologist review.
+                </p>
 
                 {/* Form */}
                 <form className="space-y-4">
@@ -1031,7 +1034,7 @@ export default function AddReports() {
                       <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={20} />
                     </div>
                   </div>
-                  
+
                   <div>
                     <label className="text-sm font-medium text-gray-400 mb-2 block">Report Name *</label>
                     <input
@@ -1064,7 +1067,7 @@ export default function AddReports() {
                       <span>{uploadProgress}%</span>
                     </div>
                     <div className="w-full bg-gray-700 rounded-full h-2">
-                      <div 
+                      <div
                         className="bg-teal-500 h-2 rounded-full transition-all duration-300"
                         style={{ width: `${uploadProgress}%` }}
                       ></div>
@@ -1077,7 +1080,7 @@ export default function AddReports() {
 
           {/* Save Button Footer */}
           <footer className="p-4 flex-shrink-0">
-            <button 
+            <button
               onClick={handleSave}
               disabled={uploading || profileLoading || !patientProfile}
               className="w-full bg-teal-500 text-white font-bold py-3 rounded-lg hover:bg-teal-600 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-[#1C2128] focus:ring-teal-500 disabled:opacity-50 disabled:cursor-not-allowed"
