@@ -166,9 +166,28 @@ export const PatientPrescriptions = () => {
     }
 
     try {
+      const [hours, minutes] = newReminderTime.split(':').map((s) => s.trim());
+      const h = parseInt(hours, 10);
+      const m = parseInt(minutes, 10);
+      if (Number.isNaN(h) || Number.isNaN(m)) {
+        toast.error('Please use HH:MM format');
+        return;
+      }
+
+      const now = new Date();
+      const nextReminder = new Date();
+      nextReminder.setHours(h, m, 0, 0);
+      if (nextReminder <= now) {
+        nextReminder.setDate(nextReminder.getDate() + 1);
+      }
+
       const { error } = await supabase
         .from('medication_reminders')
-        .update({ reminder_time: newReminderTime })
+        .update({
+          reminder_time: newReminderTime,
+          next_reminder_at: nextReminder.toISOString(),
+          is_sent: false,
+        })
         .eq('id', reminderId);
 
       if (error) {
@@ -180,7 +199,7 @@ export const PatientPrescriptions = () => {
       // Update local state
       setReminders(reminders.map(r => 
         r.id === reminderId 
-          ? { ...r, reminder_time: newReminderTime }
+          ? { ...r, reminder_time: newReminderTime, next_reminder_at: nextReminder.toISOString(), is_sent: false }
           : r
       ));
 
