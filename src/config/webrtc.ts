@@ -1,75 +1,80 @@
 // WebRTC Server Configuration
+import { supabase } from '@/lib/supabase';
 
-// Use the deployed Render server
-export const WEBRTC_SERVER_URL = import.meta.env.VITE_WEBRTC_SERVER_URL || 'wss://web-m4g9.onrender.com';
+export const WEBRTC_SERVER_URL =
+  import.meta.env.VITE_WEBRTC_SERVER_URL || 'wss://web-m4g9.onrender.com';
 
-// Development fallback
 export const WEBRTC_SERVER_URL_DEV = 'ws://localhost:3000';
 
-// Get the appropriate URL based on environment
 export const getWebRTCServerURL = () => {
-  // In production, always use the Render deployed server
   if (import.meta.env.PROD) {
     return 'wss://web-m4g9.onrender.com';
   }
-
-  // In development, use env variable or fallback to Render
   return import.meta.env.VITE_WEBRTC_SERVER_URL || 'wss://web-m4g9.onrender.com';
 };
 
-// Twilio TURN Server Configuration
-// Credentials should be set in environment variables for security
-export const TWILIO_CONFIG = {
-  accountSid: import.meta.env.VITE_TWILIO_ACCOUNT_SID || '',
-  authToken: import.meta.env.VITE_TWILIO_AUTH_TOKEN || ''
-};
-
-// Get Twilio TURN server credentials
-export const getTwilioTurnCredentials = async () => {
+/** Twilio TURN credentials are issued by Supabase Edge Function (server-side Twilio secret). */
+export const getTwilioTurnCredentials = async (): Promise<
+  RTCIceServer[] | null
+> => {
   try {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    if (!session?.access_token) {
+      return null;
+    }
+
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+    if (!supabaseUrl || !anonKey) {
+      console.warn('Supabase URL/anon key missing; cannot fetch TURN credentials');
+      return null;
+    }
+
     const response = await fetch(
-      `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_CONFIG.accountSid}/Tokens.json`,
+      `${supabaseUrl.replace(/\/$/, '')}/functions/v1/twilio-turn-credentials`,
       {
         method: 'POST',
         headers: {
-          'Authorization': 'Basic ' + btoa(`${TWILIO_CONFIG.accountSid}:${TWILIO_CONFIG.authToken}`),
-          'Content-Type': 'application/x-www-form-urlencoded'
-        }
+          Authorization: `Bearer ${session.access_token}`,
+          apikey: anonKey,
+          'Content-Type': 'application/json',
+        },
       }
     );
 
     if (!response.ok) {
-      throw new Error('Failed to get Twilio TURN credentials');
+      const errText = await response.text().catch(() => '');
+      console.error('TURN credentials request failed:', response.status, errText);
+      return null;
     }
 
     const data = await response.json();
-    return data.ice_servers;
+    const servers = data.ice_servers;
+    return Array.isArray(servers) ? servers : null;
   } catch (error) {
     console.error('Error getting Twilio TURN credentials:', error);
     return null;
   }
 };
 
-// Default ICE servers configuration (STUN + TURN)
 export const getICEServers = async (): Promise<RTCIceServer[]> => {
   const iceServers: RTCIceServer[] = [
-    // Google STUN servers (free, public)
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
     { urls: 'stun:stun2.l.google.com:19302' },
     { urls: 'stun:stun3.l.google.com:19302' },
-    { urls: 'stun:stun4.l.google.com:19302' }
+    { urls: 'stun:stun4.l.google.com:19302' },
   ];
 
-  // Try to get Twilio TURN servers as backup
   try {
     const twilioServers = await getTwilioTurnCredentials();
-    if (twilioServers && Array.isArray(twilioServers)) {
-      console.log('✅ Twilio TURN servers added as backup');
+    if (twilioServers && twilioServers.length > 0) {
       iceServers.push(...twilioServers);
     }
   } catch (error) {
-    console.warn('⚠️ Could not add Twilio TURN servers, using STUN only:', error);
+    console.warn('Could not add Twilio TURN servers:', error);
   }
 
   return iceServers;

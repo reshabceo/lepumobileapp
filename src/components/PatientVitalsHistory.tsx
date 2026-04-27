@@ -2,8 +2,19 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { toast } from 'sonner';
-import { Heart, Activity, Droplets, Thermometer, Wind, ArrowLeft, Calendar, Clock } from 'lucide-react';
+import { Heart, Activity, Droplets, Thermometer, Wind, ArrowLeft, Calendar, Clock, List, LineChart as LineChartIcon } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ReferenceLine,
+  ResponsiveContainer,
+} from 'recharts';
 
 interface VitalReading {
   id: string;
@@ -19,6 +30,7 @@ export const PatientVitalsHistory = () => {
   const [vitals, setVitals] = useState<VitalReading[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<string>('all');
+  const [viewMode, setViewMode] = useState<'list' | 'trend'>('list');
 
   useEffect(() => {
     fetchVitals();
@@ -118,6 +130,49 @@ export const PatientVitalsHistory = () => {
 
   const measurementTypes = ['all', ...Array.from(new Set(vitals.map(v => v.measurement_type)))];
 
+  const extractNumericSeries = (type: string) => {
+    const rows = vitals.filter((v) => v.measurement_type === type);
+    const out: { t: string; v: number; v2?: number; label: string }[] = [];
+    for (const vital of rows) {
+      const ts = vital.reading_timestamp;
+      const d = vital.data || {};
+      if (type === 'blood_pressure' && d.systolic != null && d.diastolic != null) {
+        out.push({
+          t: ts,
+          v: Number(d.systolic),
+          v2: Number(d.diastolic),
+          label: `${d.systolic}/${d.diastolic}`,
+        });
+      } else if (type === 'heart_rate') {
+        const hr = d.pulseRate ?? d.heartRate;
+        if (hr != null) out.push({ t: ts, v: Number(hr), label: String(hr) });
+      } else if (type === 'spo2') {
+        const o = d.oxygenSaturation ?? d.spo2;
+        if (o != null) out.push({ t: ts, v: Number(o), label: String(o) });
+      } else if (type === 'temperature' && d.temperature != null) {
+        out.push({ t: ts, v: Number(d.temperature), label: String(d.temperature) });
+      } else if (type === 'blood_glucose' && d.glucose != null) {
+        out.push({ t: ts, v: Number(d.glucose), label: String(d.glucose) });
+      }
+    }
+    return out.sort((a, b) => new Date(a.t).getTime() - new Date(b.t).getTime());
+  };
+
+  const normalRangeFor = (type: string): { lo?: number; hi?: number } => {
+    switch (type) {
+      case 'heart_rate':
+        return { lo: 60, hi: 100 };
+      case 'spo2':
+        return { lo: 95, hi: undefined };
+      case 'blood_pressure':
+        return { lo: 90, hi: 140 };
+      case 'temperature':
+        return { lo: 36.1, hi: 37.2 };
+      default:
+        return {};
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-emerald-900 to-slate-900 flex items-center justify-center">
@@ -152,7 +207,34 @@ export const PatientVitalsHistory = () => {
           </div>
 
           {/* Filter Buttons */}
-          <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
+          <div className="flex flex-col gap-3 mb-6">
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setViewMode('list')}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold ${
+                  viewMode === 'list'
+                    ? 'bg-emerald-600 text-white'
+                    : 'bg-white/10 text-emerald-200'
+                }`}
+              >
+                <List className="w-4 h-4" />
+                List
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode('trend')}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold ${
+                  viewMode === 'trend'
+                    ? 'bg-emerald-600 text-white'
+                    : 'bg-white/10 text-emerald-200'
+                }`}
+              >
+                <LineChartIcon className="w-4 h-4" />
+                Trend
+              </button>
+            </div>
+            <div className="flex gap-2 overflow-x-auto pb-2">
             {measurementTypes.map((type) => (
               <button
                 key={type}
@@ -166,16 +248,62 @@ export const PatientVitalsHistory = () => {
                 {type === 'all' ? 'All' : formatMeasurementType(type)}
               </button>
             ))}
+            </div>
           </div>
 
+          {viewMode === 'trend' && filter !== 'all' && (() => {
+            const series = extractNumericSeries(filter);
+            const { lo, hi } = normalRangeFor(filter);
+            if (series.length === 0) {
+              return (
+                <div className="glass-card p-8 rounded-xl border border-emerald-500/30 text-center text-emerald-200/70">
+                  No numeric points for this vital type yet.
+                </div>
+              );
+            }
+            const chartData = series.map((r) => ({
+              ...r,
+              timeLabel: format(parseISO(r.t), 'MMM d HH:mm'),
+            }));
+            return (
+              <div className="glass-card p-4 rounded-xl border border-emerald-500/30 mb-6" style={{ height: 320 }}>
+                <h2 className="text-white font-semibold mb-2">{formatMeasurementType(filter)}</h2>
+                <ResponsiveContainer width="100%" height="90%">
+                  <LineChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                    <XAxis dataKey="timeLabel" tick={{ fill: '#94a3b8', fontSize: 10 }} />
+                    <YAxis tick={{ fill: '#94a3b8', fontSize: 10 }} domain={['auto', 'auto']} />
+                    <Tooltip
+                      contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #334155' }}
+                      labelStyle={{ color: '#e2e8f0' }}
+                    />
+                    <Legend />
+                    {lo != null && <ReferenceLine y={lo} stroke="#38bdf8" strokeDasharray="4 4" label={{ value: 'Low ref', fill: '#7dd3fc' }} />}
+                    {hi != null && <ReferenceLine y={hi} stroke="#f472b6" strokeDasharray="4 4" label={{ value: 'High ref', fill: '#f9a8d4' }} />}
+                    <Line type="monotone" dataKey="v" name={filter === 'blood_pressure' ? 'Systolic' : 'Value'} stroke="#34d399" dot={false} strokeWidth={2} />
+                    {filter === 'blood_pressure' && (
+                      <Line type="monotone" dataKey="v2" name="Diastolic" stroke="#a78bfa" dot={false} strokeWidth={2} />
+                    )}
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            );
+          })()}
+
+          {viewMode === 'trend' && filter === 'all' && (
+            <div className="glass-card p-6 rounded-xl border border-amber-500/30 text-amber-100 mb-6">
+              Select a vital type above to view its trend chart.
+            </div>
+          )}
+
           {/* Vitals List */}
-          {filteredVitals.length === 0 ? (
+          {viewMode === 'list' && filteredVitals.length === 0 ? (
             <div className="glass-card p-8 rounded-xl border border-emerald-500/30 bg-emerald-500/10 text-center">
               <Activity className="w-16 h-16 text-emerald-400/50 mx-auto mb-4" />
               <p className="text-emerald-200/60 text-lg">No vital signs recorded yet</p>
               <p className="text-emerald-200/40 text-sm mt-2">Start submitting your vitals to track your health</p>
             </div>
-          ) : (
+          ) : viewMode === 'list' ? (
             <div className="space-y-3">
               {filteredVitals.map((vital) => (
                 <div
@@ -210,7 +338,7 @@ export const PatientVitalsHistory = () => {
                 </div>
               ))}
             </div>
-          )}
+          ) : null}
         </div>
       </div>
     </div>

@@ -4,6 +4,7 @@ import {
   getAliveCorToken,
   storeAliveCorRecording,
   supabase,
+  triggerEcgAiAnalysis,
 } from '@/lib/supabase';
 import { buildAliveCorIngestPayload } from '@/lib/aliveCorKardia';
 import { AliveCor } from '@/plugins/alivecor';
@@ -68,7 +69,10 @@ export const AliveCorEcgCard: React.FC = () => {
         mainsFilter: 50,
       });
       const payload = buildAliveCorIngestPayload(patientId, result);
-      await storeAliveCorRecording(payload);
+      const stored = await storeAliveCorRecording(payload);
+      if (stored?.id) {
+        triggerEcgAiAnalysis(stored.id);
+      }
       toast({
         title: 'ECG saved',
         description: 'Your Kardia recording is available in the doctor dashboard.',

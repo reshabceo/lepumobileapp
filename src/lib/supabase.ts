@@ -232,6 +232,177 @@ export async function storeAliveCorRecording(
   return aliveCorFetch('/api/alivecor/ecg', data as unknown as Record<string, unknown>)
 }
 
+const ECG_AI_ANALYZE_URL =
+  import.meta.env.VITE_ECG_AI_ANALYZE_URL || 'https://backend-m101.onrender.com'
+
+function buildEcgCsvFromMvJson(
+  mv: unknown,
+  sampleRate: number
+): { csv: string; filename: string } | null {
+  if (Array.isArray(mv) && mv.length > 0) {
+    const lines = ['t,value']
+    for (let i = 0; i < mv.length; i++) {
+      const t = (i / Math.max(sampleRate, 1)).toFixed(6)
+      lines.push(`${t},${Number(mv[i])}`)
+    }
+    return { csv: lines.join('\n'), filename: 'ecg_strip.csv' }
+  }
+  if (mv && typeof mv === 'object' && !Array.isArray(mv)) {
+    const leads = mv as Record<string, (number | null)[]>
+    const keys = Object.keys(leads).filter(
+      (k) => Array.isArray(leads[k]) && leads[k]!.length > 0
+    )
+    if (keys.length === 0) return null
+    const n = Math.min(...keys.map((k) => leads[k]!.length))
+    const header = keys.join(',')
+    const rows = [header]
+    for (let i = 0; i < n; i++) {
+      rows.push(keys.map((k) => leads[k]![i] ?? '').join(','))
+    }
+    return { csv: rows.join('\n'), filename: 'ecg_multilead.csv' }
+  }
+  return null
+}
+
+function isAbnormalEcgPrediction(pred: { label?: string; details?: unknown }, rawText: string): boolean {
+  const lbl = (pred?.label || '').toLowerCase()
+  if (lbl.includes('abnormal') || lbl.includes('af')) return true
+  const t = rawText.toLowerCase()
+  const keys = [
+    'abnormal',
+    'arrhythm',
+    'afib',
+    'atrial fibrillation',
+    'vt ',
+    'ventricular tachycardia',
+    'st elevation',
+    'ischemia',
+    'infarct',
+    'heart block',
+    'long qt',
+    'brugada',
+  ]
+  return keys.some((k) => t.includes(k))
+}
+
+/**
+ * After a Kardia recording is stored, run ECG AI on the backend and persist results.
+ * Notifies the assigned doctor when findings are abnormal (fire-and-forget).
+ */
+export function triggerEcgAiAnalysis(recordingId: string): void {
+  void (async () => {
+    try {
+      const { data: rec, error: recErr } = await supabase
+        .from('ecg_recordings')
+        .select('id, patient_id, mv_data_json, sample_rate, duration_seconds')
+        .eq('id', recordingId)
+        .maybeSingle()
+
+      if (recErr || !rec?.mv_data_json) {
+        console.warn('[ECG AI] skip: no recording or mv_data_json', recErr)
+        return
+      }
+
+      const built = buildEcgCsvFromMvJson(rec.mv_data_json, rec.sample_rate || 500)
+      if (!built) {
+        console.warn('[ECG AI] skip: could not build CSV from recording')
+        return
+      }
+
+      const blob = new Blob([built.csv], { type: 'text/csv' })
+      const form = new FormData()
+      form.append('file', blob, built.filename)
+
+      const res = await fetch(`${ECG_AI_ANALYZE_URL.replace(/\/$/, '')}/analyze`, {
+        method: 'POST',
+        body: form,
+      })
+      if (!res.ok) {
+        const txt = await res.text().catch(() => '')
+        console.error('[ECG AI] analyze failed', res.status, txt)
+        return
+      }
+
+      const json = (await res.json()) as {
+        meta?: Record<string, unknown>
+        features?: Record<string, unknown>
+        prediction?: { label?: string; score?: number; details?: unknown }
+      }
+
+      const openai = (json.features?.openai_analysis || {}) as {
+        raw_text?: string
+        deterministic_summary?: { rhythm?: string }
+      }
+      const rawText = openai.raw_text || ''
+      const pred = json.prediction || {}
+      const abnormal = isAbnormalEcgPrediction(pred, rawText)
+      const rhythmType =
+        (openai.deterministic_summary?.rhythm as string | undefined) ||
+        (typeof pred.details === 'string' ? pred.details : undefined) ||
+        null
+
+      const meta = json.meta || {}
+      const { error: insErr } = await supabase.from('ecg_analyses').insert({
+        recording_id: recordingId,
+        findings: rawText.slice(0, 12000),
+        has_arrhythmia: abnormal,
+        rhythm_type: rhythmType,
+        model_label: pred.label ?? null,
+        model_score: pred.score ?? null,
+        features: json.features as object,
+        sampling_rate_hz: meta.sampling_rate_hz as number | undefined,
+        duration_sec: meta.duration_sec as number | undefined,
+        uploaded_filename: built.filename,
+      })
+
+      if (insErr) {
+        console.error('[ECG AI] ecg_analyses insert failed', insErr)
+      }
+
+      if (!abnormal) return
+
+      const { data: patient } = await supabase
+        .from('patients')
+        .select('id, assigned_doctor_id, full_name')
+        .eq('id', rec.patient_id)
+        .maybeSingle()
+
+      const docId = patient?.assigned_doctor_id
+      if (!docId) return
+
+      const { data: doctor } = await supabase
+        .from('doctors')
+        .select('id, auth_user_id, full_name')
+        .eq('id', docId)
+        .maybeSingle()
+
+      const authUid = doctor?.auth_user_id
+      if (authUid) {
+        const snippet = rawText.slice(0, 500) || 'Abnormal ECG detected on Kardia recording.'
+        await supabase.from('notifications').insert({
+          user_id: authUid,
+          title: 'ECG alert',
+          message: `${patient?.full_name || 'Patient'}: possible abnormal ECG. Review Kardia recording.`,
+          type: 'ecg_alert',
+          is_read: false,
+          data: { recording_id: recordingId, patient_id: rec.patient_id },
+        })
+      }
+
+      await supabase.from('emergency_alerts').insert({
+        patient_id: rec.patient_id,
+        doctor_id: docId,
+        alert_type: 'ecg_abnormal',
+        severity: 'high',
+        title: 'Abnormal ECG (Kardia)',
+        description: (rawText || pred.label || 'Abnormal ECG').toString().slice(0, 2000),
+      })
+    } catch (e) {
+      console.error('[ECG AI] triggerEcgAiAnalysis error', e)
+    }
+  })()
+}
+
 // Auth helper functions
 export const auth = {
   // Sign up
@@ -477,6 +648,19 @@ export const db = {
       .from('vital_signs')
       .insert(dataWithPatientAndDoctor)
       .select()
+
+    if (!error && data?.[0]) {
+      import('@/services/recommendationsService')
+        .then((m) =>
+          m.evaluateThresholdsAfterVitalInsert(patientProfile.id, {
+            measurement_type: data[0].measurement_type,
+            data: data[0].data as Record<string, unknown>,
+          })
+        )
+        .catch(() => {
+          /* non-fatal */
+        })
+    }
 
     return { data, error }
   },

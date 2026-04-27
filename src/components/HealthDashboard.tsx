@@ -44,6 +44,8 @@ import { DoctorInfoCard } from "./DoctorInfoCard";
 import { EmergencyButton } from "./EmergencyButton";
 import { useInsuranceClaimsNotifications } from "@/hooks/useInsuranceClaimsNotifications";
 import { useHealthRecommendationsNotifications } from "@/hooks/useHealthRecommendationsNotifications";
+import { usePatientUnreadMessages } from "@/hooks/usePatientChat";
+import { supabase } from "@/lib/supabase";
 
 // Icon mapping for different health metrics
 const getMetricIcon = (name: string) => {
@@ -188,6 +190,54 @@ export const HealthDashboard = () => {
     getLatestReadings,
     addVitalSign,
   } = useRealTimeVitals();
+
+  const [patientRowId, setPatientRowId] = useState<string | null>(null);
+  const [vitalTriggerBanner, setVitalTriggerBanner] = useState<string | null>(null);
+  const chatUnread = usePatientUnreadMessages(patientRowId);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user || cancelled) return;
+      const { data } = await supabase
+        .from("patients")
+        .select("id")
+        .eq("auth_user_id", user.id)
+        .maybeSingle();
+      if (!cancelled) setPatientRowId(data?.id ?? null);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!patientRowId) {
+      setVitalTriggerBanner(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from("health_recommendations")
+        .select("title, description")
+        .eq("patient_id", patientRowId)
+        .eq("source", "vital_trigger")
+        .eq("status", "active")
+        .limit(3);
+      if (cancelled || !data?.length) {
+        if (!cancelled) setVitalTriggerBanner(null);
+        return;
+      }
+      setVitalTriggerBanner(data.map((r: { title: string }) => r.title).join(" · "));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [patientRowId]);
   
   // Insurance claims notifications
   const { unreadCount: claimsUnreadCount, markAsRead: markClaimsAsRead } = useInsuranceClaimsNotifications();
@@ -744,6 +794,13 @@ export const HealthDashboard = () => {
         {/* Status Bar Spacing */}
         <div className="h-6"></div>
 
+        {vitalTriggerBanner && (
+          <div className="mb-4 rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-amber-100 text-sm">
+            <span className="font-semibold text-amber-200">Vital alert: </span>
+            {vitalTriggerBanner}
+          </div>
+        )}
+
         {/* Dashboard Header with User Profile */}
         <header className="flex items-center justify-between mb-5">
           <div className="flex items-center gap-3">
@@ -1223,6 +1280,19 @@ export const HealthDashboard = () => {
 
         {/* Bottom Action Buttons */}
         <div className="grid grid-cols-2 md:grid-cols-5  gap-3 mb-6">
+          <button
+            type="button"
+            onClick={() => navigate("/patient-messages")}
+            className="bg-slate-800/80 backdrop-blur-sm hover:bg-slate-700/80 text-white font-bold py-4 rounded-xl flex flex-col items-center justify-center gap-1 transition-all duration-200 hover:scale-105 active:scale-95 border border-slate-500/40 hover:border-slate-400/60 relative"
+          >
+            {chatUnread > 0 && (
+              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full h-5 min-w-[1.25rem] px-1 flex items-center justify-center">
+                {chatUnread > 9 ? "9+" : chatUnread}
+              </span>
+            )}
+            <MessageSquare size={20} className="text-slate-300" />
+            <span className="text-xs">Messages</span>
+          </button>
           <button
             onClick={handleViewReports}
             className="bg-purple-900/60 backdrop-blur-sm hover:bg-purple-800/70 text-white font-bold py-4 rounded-xl flex flex-col items-center justify-center gap-1 transition-all duration-200 hover:scale-105 active:scale-95 border border-purple-400/40 hover:border-purple-400/60"

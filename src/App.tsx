@@ -48,6 +48,7 @@ import RadiologistAuth from "./pages/RadiologistAuth";
 import RadiologistDashboard from "./pages/RadiologistDashboard";
 import KardiaSixLeadECG from "./pages/KardiaSixLeadECG";
 import RecommendationsDashboard from "./pages/RecommendationsDashboard";
+import PatientMessages from "./pages/PatientMessages";
 
 const queryClient = new QueryClient();
 
@@ -212,6 +213,11 @@ const App = () => (
               <Route path="/recommendations" element={
                 <ProtectedRoute>
                   <RecommendationsDashboard />
+                </ProtectedRoute>
+              } />
+              <Route path="/patient-messages" element={
+                <ProtectedRoute>
+                  <PatientMessages />
                 </ProtectedRoute>
               } />
               <Route path="/profile" element={

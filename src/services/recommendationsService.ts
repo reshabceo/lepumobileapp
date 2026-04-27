@@ -14,7 +14,8 @@ export type RecommendationType =
   | 'treatment' 
   | 'preventive' 
   | 'monitoring' 
-  | 'behavioral';
+  | 'behavioral'
+  | 'threshold';
 
 export type RecommendationPriority = 'low' | 'medium' | 'high' | 'urgent';
 
@@ -564,6 +565,76 @@ export const createRecommendationsFromAIAnalysis = async (
 // =====================================================
 // VITAL SIGN TRIGGERED RECOMMENDATIONS
 // =====================================================
+
+/** Parse active per-patient threshold config from health_recommendations (description = JSON). */
+export async function evaluateThresholdsAfterVitalInsert(
+  patientId: string,
+  vitalRow: {
+    measurement_type?: string;
+    data?: Record<string, unknown>;
+  }
+): Promise<void> {
+  try {
+    const { data: rows } = await supabase
+      .from('health_recommendations')
+      .select('id, description')
+      .eq('patient_id', patientId)
+      .eq('recommendation_type', 'threshold')
+      .eq('status', 'active')
+      .limit(5);
+
+    if (!rows?.length) return;
+
+    let limits: Record<string, { min?: number; max?: number }> = {};
+    for (const r of rows) {
+      try {
+        const parsed = JSON.parse(r.description || '{}') as Record<
+          string,
+          { min?: number; max?: number }
+        >;
+        limits = { ...limits, ...parsed };
+      } catch {
+        /* skip malformed */
+      }
+    }
+
+    const mt = vitalRow.measurement_type || '';
+    const d = vitalRow.data || {};
+
+    if (mt === 'heart_rate') {
+      const hr = Number(d.pulseRate ?? d.heartRate);
+      if (!Number.isFinite(hr)) return;
+      const max = limits.heart_rate?.max ?? limits.hr?.max;
+      const min = limits.heart_rate?.min ?? limits.hr?.min;
+      if (max != null && hr > max) {
+        await createRecommendationFromVitalTrigger(patientId, 'heart_rate', hr, 'high');
+      }
+      if (min != null && hr < min) {
+        await createRecommendationFromVitalTrigger(patientId, 'heart_rate', hr, 'low');
+      }
+    }
+
+    if (mt === 'spo2') {
+      const o = Number(d.oxygenSaturation ?? d.spo2);
+      if (!Number.isFinite(o)) return;
+      const min = limits.spo2?.min;
+      if (min != null && o < min) {
+        await createRecommendationFromVitalTrigger(patientId, 'spo2', o, 'low');
+      }
+    }
+
+    if (mt === 'blood_pressure') {
+      const sys = Number(d.systolic);
+      if (!Number.isFinite(sys)) return;
+      const max = limits.systolic?.max ?? limits.blood_pressure?.max;
+      if (max != null && sys > max) {
+        await createRecommendationFromVitalTrigger(patientId, 'blood_pressure', sys, 'high');
+      }
+    }
+  } catch (e) {
+    console.warn('evaluateThresholdsAfterVitalInsert', e);
+  }
+}
 
 export const createRecommendationFromVitalTrigger = async (
   patientId: string,

@@ -56,6 +56,7 @@ export const usePatientWebRTCCall = (patientId: string | null): UsePatientWebRTC
     isVideoEnabled,
     connectionState,
     initializeMedia,
+    initializeCall,
     createAnswer,
     createOffer,
     setRemoteDescription,
@@ -520,6 +521,15 @@ export const usePatientWebRTCCall = (patientId: string | null): UsePatientWebRTC
         return;
       }
 
+      await initializeCall({
+        callId: callData.id,
+        doctorId,
+        patientId,
+        callType: 'video',
+        callMode: 'emergency',
+        userRole: 'patient',
+      });
+
       // Create offer
       const offer = await createOffer();
       if (!offer) {
@@ -552,7 +562,7 @@ export const usePatientWebRTCCall = (patientId: string | null): UsePatientWebRTC
       console.error('[Patient WebRTC] ❌ Error initiating emergency call:', error);
       toast.error('Failed to initiate call');
     }
-  }, [patientId, initializeMedia, createOffer]);
+  }, [patientId, initializeMedia, initializeCall, createOffer]);
 
   // DON'T cleanup on unmount - allow reconnection
   // Calls only end when user explicitly clicks end button

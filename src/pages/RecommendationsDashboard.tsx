@@ -38,6 +38,7 @@ const typeIcons: Record<RecommendationType, any> = {
   preventive: AlertCircle,
   monitoring: Activity,
   behavioral: TrendingUp,
+  threshold: Target,
 };
 
 // Priority colors
