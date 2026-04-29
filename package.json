@@ -17,7 +17,9 @@
     "backend:install": "cd backend && npm install",
     "setup": "npm install && npm run backend:install",
     "welcome": "node start.js",
-    "info": "node start.js"
+    "info": "node start.js",
+    "android": "npx cap run android",
+    "sync": "npx cap sync"
   },
   "dependencies": {
     "@capacitor-community/bluetooth-le": "^7.2.0",

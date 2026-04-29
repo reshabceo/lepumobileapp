@@ -1,0 +1,32 @@
+
+> vite_react_shadcn_ts@0.0.0 build
+> vite build
+
+vite v5.4.19 building for production...
+transforming...
+Browserslist: browsers data (caniuse-lite) is 8 months old. Please run:
+  npx update-browserslist-db@latest
+  Why you should do it regularly: https://github.com/browserslist/update-db#readme
+✓ 3594 modules transformed.
+x Build failed in 4.59s
+error during build:
+src/lib/payment.ts (12:9): "getProductId" is not exported by "src/config/iap-products.ts", imported by "src/lib/payment.ts".
+file: /Users/mdsahil/Downloads/lepumobileapp/src/lib/payment.ts:12:9
+
+10: import { Capacitor } from '@capacitor/core';
+11: import { iapService } from '../services/iapService';
+12: import { getProductId } from '../config/iap-products';
+             ^
+13: 
+14: export type PaymentType = 'appointment_video' | 'appointment_audio' | 'radiologist_review' | 'emergency' | 'ai_doctor...
+
+    at getRollupError (file:///Users/mdsahil/Downloads/lepumobileapp/node_modules/rollup/dist/es/shared/parseAst.js:401:41)
+    at error (file:///Users/mdsahil/Downloads/lepumobileapp/node_modules/rollup/dist/es/shared/parseAst.js:397:42)
+    at Module.error (file:///Users/mdsahil/Downloads/lepumobileapp/node_modules/rollup/dist/es/shared/node-entry.js:16875:16)
+    at Module.traceVariable (file:///Users/mdsahil/Downloads/lepumobileapp/node_modules/rollup/dist/es/shared/node-entry.js:17327:29)
+    at ModuleScope.findVariable (file:///Users/mdsahil/Downloads/lepumobileapp/node_modules/rollup/dist/es/shared/node-entry.js:14997:39)
+    at FunctionScope.findVariable (file:///Users/mdsahil/Downloads/lepumobileapp/node_modules/rollup/dist/es/shared/node-entry.js:5620:38)
+    at FunctionBodyScope.findVariable (file:///Users/mdsahil/Downloads/lepumobileapp/node_modules/rollup/dist/es/shared/node-entry.js:5620:38)
+    at TrackingScope.findVariable (file:///Users/mdsahil/Downloads/lepumobileapp/node_modules/rollup/dist/es/shared/node-entry.js:5620:38)
+    at BlockScope.findVariable (file:///Users/mdsahil/Downloads/lepumobileapp/node_modules/rollup/dist/es/shared/node-entry.js:5620:38)
+    at Identifier.bind (file:///Users/mdsahil/Downloads/lepumobileapp/node_modules/rollup/dist/es/shared/node-entry.js:5394:40)

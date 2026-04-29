@@ -29,40 +29,23 @@ allprojects {
     }
 }
 
-// Prefer Java 17 for compilation where applicable
-// Remove '--release' usage to stay compatible with Android Gradle plugin
-
-// Set Java version for all projects
+// Align all projects to Java 21 and JVM target 21 for consistency
 subprojects {
-    afterEvaluate {
+    afterEvaluate { project ->
         if (project.hasProperty('android')) {
-            android {
+            project.android {
                 compileOptions {
-                                            sourceCompatibility JavaVersion.VERSION_17
-                        targetCompatibility JavaVersion.VERSION_17
+                    sourceCompatibility JavaVersion.VERSION_17
+                    targetCompatibility JavaVersion.VERSION_17
+                }
+                
+                // Set JVM target for Kotlin if the plugin is applied
+                if (project.plugins.hasPlugin('kotlin-android') || project.plugins.hasPlugin('org.jetbrains.kotlin.android')) {
+                    kotlinOptions {
+                        jvmTarget = '17'
+                    }
                 }
             }
-        }
-
-        // Align all plugins to Java 21 for consistency
-        if (project.name.contains('capacitor')) {
-            try {
-                if (project.hasProperty('android')) {
-                    android {
-                        compileOptions {
-                            sourceCompatibility JavaVersion.VERSION_21
-                            targetCompatibility JavaVersion.VERSION_21
-                        }
-                    }
-                }
-            } catch (Throwable ignored) { }
-            try {
-                tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach { t ->
-                    if (t.kotlinOptions != null) {
-                        t.kotlinOptions.jvmTarget = '21'
-                    }
-                }
-            } catch (Throwable ignored) { }
         }
     }
 }

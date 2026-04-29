@@ -65,13 +65,15 @@ export const RecommendationsDashboard: React.FC = () => {
   const [filterPriority, setFilterPriority] = useState<'all' | RecommendationPriority>('all');
   const [showCompleted, setShowCompleted] = useState(false);
   const [selectedRec, setSelectedRec] = useState<HealthRecommendation | null>(null);
+  const [activeTab, setActiveTab] = useState<'active' | 'all'>('active');
 
   const {
     activeRecommendations,
     allRecommendations,
+    isLoadingActive,
+    isLoadingAll,
     stats,
-    isLoading,
-    error,
+    error: recommendationsError,
     markAsViewed,
     markAsCompleted,
     dismiss,
@@ -79,8 +81,37 @@ export const RecommendationsDashboard: React.FC = () => {
     refetch,
   } = useRecommendations();
 
-  const { goals, activeGoals, stats: goalStats } = usePatientGoals();
+  const { goals, activeGoals, stats: goalStats, isLoading: isLoadingGoals } = usePatientGoals();
   const { adherence } = useMedicationAdherence();
+
+  const [forceStopLoading, setForceStopLoading] = useState(false);
+  const [timeoutError, setTimeoutError] = useState<string | null>(null);
+
+  const isLoading = (isLoadingActive || (activeTab === 'all' && isLoadingAll) || isLoadingGoals) && !forceStopLoading;
+  const error = recommendationsError || timeoutError;
+
+  // Safety timeout for loading state
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (isLoadingActive || isLoadingAll || isLoadingGoals) {
+      setForceStopLoading(false);
+      setTimeoutError(null);
+      timer = setTimeout(() => {
+        console.warn('⚠️ Recommendations loading timed out');
+        setForceStopLoading(true);
+        setTimeoutError('Loading is taking longer than usual. Please try refreshing.');
+      }, 10000); // 10 second safety limit
+    } else {
+      setForceStopLoading(false);
+    }
+    return () => clearTimeout(timer);
+  }, [isLoadingActive, isLoadingAll, isLoadingGoals]);
+
+  const handleRefresh = () => {
+    setForceStopLoading(false);
+    setTimeoutError(null);
+    refetch();
+  };
 
   // Filter recommendations
   const filteredRecommendations = (showCompleted ? allRecommendations : activeRecommendations).filter(rec => {
@@ -160,9 +191,24 @@ export const RecommendationsDashboard: React.FC = () => {
   if (isLoading) {
     return (
       <div className="bg-[#101010] min-h-screen text-white flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
+        <div className="flex flex-col items-center gap-4 p-6 text-center">
           <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
           <p className="text-gray-400">Loading your recommendations...</p>
+          
+          {forceStopLoading && (
+            <div className="mt-4 flex flex-col items-center gap-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <p className="text-amber-400 text-sm max-w-xs">
+                This is taking longer than expected. 
+              </p>
+              <button 
+                onClick={handleRefresh}
+                className="bg-white/5 hover:bg-white/10 border border-white/10 px-4 py-2 rounded-lg flex items-center gap-2 transition-all"
+              >
+                <RefreshCw className="h-4 w-4" />
+                Retry Connection
+              </button>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -172,15 +218,20 @@ export const RecommendationsDashboard: React.FC = () => {
     return (
       <div className="bg-[#101010] min-h-screen text-white flex items-center justify-center p-4">
         <div className="max-w-sm mx-auto text-center">
-          <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-6">
-            <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-            <h2 className="text-xl font-bold text-red-400 mb-2">Error Loading</h2>
-            <p className="text-gray-300 mb-4">{(error as Error).message}</p>
+          <div className="bg-red-500/10 border border-red-500/20 rounded-2xl p-8">
+            <div className="bg-red-500/20 p-4 rounded-full w-20 h-20 flex items-center justify-center mx-auto mb-6">
+              <AlertCircle className="h-10 w-10 text-red-500" />
+            </div>
+            <h2 className="text-xl font-bold text-red-400 mb-2">Request Timeout</h2>
+            <p className="text-gray-400 mb-6 leading-relaxed">
+              The application is taking longer than usual to load. This might be due to a poor connection or session sync issue.
+            </p>
             <button
-              onClick={() => refetch()}
-              className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg transition-all"
+              onClick={handleRefresh}
+              className="w-full bg-red-500 hover:bg-red-600 text-white font-bold py-3 rounded-xl transition-all shadow-lg shadow-red-500/20 flex items-center justify-center gap-2"
             >
-              Retry
+              <RefreshCw className="h-5 w-5" />
+              Reload App Properly
             </button>
           </div>
         </div>
