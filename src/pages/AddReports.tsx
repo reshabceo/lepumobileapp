@@ -504,20 +504,22 @@ export default function AddReports() {
     if (isDicomUpload) {
       setUploading(true);
       setUploadProgress(0);
-      const studyId = crypto.randomUUID();
+      const studyId = (typeof crypto.randomUUID === 'function') ? crypto.randomUUID() : (Date.now().toString(36) + Math.random().toString(36).substring(2));
       const isZip = filesToUse.length === 1 && (filesToUse[0].name.toLowerCase().endsWith('.zip') || filesToUse[0].type === 'application/zip');
       try {
         setUploadProgress(20);
         if (isZip) {
+          const safeFileName = filesToUse[0].name.replace(/[^a-zA-Z0-9.-]/g, '_');
           const { error: uploadError } = await supabase.storage
             .from('dicom-files')
-            .upload(`studies/${studyId}/original/${filesToUse[0].name}`, filesToUse[0], { cacheControl: '3600', upsert: false });
+            .upload(`studies/${studyId}/original/${safeFileName}`, filesToUse[0], { cacheControl: '3600', upsert: false });
           if (uploadError) throw uploadError;
         } else {
           for (let i = 0; i < filesToUse.length; i++) {
             const f = filesToUse[i];
-            const seriesId = crypto.randomUUID();
-            const path = `studies/${studyId}/${seriesId}/${f.name}`;
+            const seriesId = (typeof crypto.randomUUID === 'function') ? crypto.randomUUID() : (Date.now().toString(36) + Math.random().toString(36).substring(2));
+            const safeFileName = f.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+            const path = `studies/${studyId}/${seriesId}/${safeFileName}`;
             const { error: uploadError } = await supabase.storage.from('dicom-files').upload(path, f, { cacheControl: '3600', upsert: false });
             if (uploadError) throw uploadError;
             setUploadProgress(20 + Math.round((60 * (i + 1)) / filesToUse.length));
@@ -537,7 +539,7 @@ export default function AddReports() {
           zip_file_size: isZip && filesToUse[0] ? filesToUse[0].size : null,
           zip_extracted: false,
           description: filesToUse.length === 1 ? `Upload: ${filesToUse[0].name}` : `${filesToUse.length} DICOM files`,
-          patient_name: profile.id,
+          patient_name: profile.full_name || profile.id,
         });
         if (dbError) throw dbError;
         setUploadProgress(100);

@@ -202,6 +202,19 @@ export const AIDoctorConsult: React.FC = () => {
     loadContext();
   }, [user?.id]);
 
+  // --- Load pricing immediately ---
+  useEffect(() => {
+    const loadPricing = async () => {
+      try {
+        const data = await fetchAIDoctorPricing();
+        setPricing(data);
+      } catch (err) {
+        console.error("Failed to load AI doctor pricing:", err);
+      }
+    };
+    loadPricing();
+  }, []);
+
   // --- Load/create session + previous visit summaries ---
   useEffect(() => {
     const initSession = async () => {
@@ -211,14 +224,10 @@ export const AIDoctorConsult: React.FC = () => {
       }
 
       try {
-        // Fetch pricing in parallel with session
-        const [sessionState, pricingData] = await Promise.all([
-          getOrCreateSession(patientContext.id),
-          fetchAIDoctorPricing(),
-        ]);
+        // Fetch session state
+        const sessionState = await getOrCreateSession(patientContext.id);
 
         const { sessionId: sid, paymentStatus: pStatus, expiresAt, consultMode: paidMode } = sessionState;
-        setPricing(pricingData);
         setSessionId(sid);
         setPaymentStatus(pStatus);
         setSessionExpiresAt(expiresAt);

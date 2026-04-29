@@ -41,45 +41,71 @@ export default function DicomUploader({ onUploadComplete }: DicomUploaderProps) 
 
     setUploading(true);
     setProgress(0);
-    setStatus('Uploading...');
+    setStatus('Preparing upload...');
 
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Not authenticated');
+      if (!user) throw new Error('Not authenticated. Please log in.');
 
-      const { data: patient } = await supabase
+      setStatus('Fetching profile...');
+      const { data: patient, error: patientError } = await supabase
         .from('patients')
-        .select('id')
+        .select('id, full_name')
         .eq('auth_user_id', user.id)
-        .single();
+        .maybeSingle();
 
-      if (!patient) throw new Error('Patient profile not found');
+      if (patientError) throw patientError;
+      if (!patient) throw new Error('Patient profile not found. Please complete your profile first.');
 
-      const studyId = crypto.randomUUID();
-      const isZip = selectedFile.name.endsWith('.zip');
+      // Robust ID generation
+      const generateId = () => {
+        try {
+          if (typeof crypto.randomUUID === 'function') return crypto.randomUUID();
+        } catch (e) { /* fallback */ }
+        return Date.now().toString(36) + Math.random().toString(36).substring(2, 10);
+      };
+
+      const studyId = generateId();
+      const isZip = selectedFile.name.toLowerCase().endsWith('.zip');
+      
+      // Sanitize filename to avoid issues with storage paths
+      const safeFileName = selectedFile.name.replace(/[^a-zA-Z0-9.-]/g, '_');
       
       let filePath: string;
       if (isZip) {
-        filePath = `studies/${studyId}/original/${selectedFile.name}`;
+        filePath = `studies/${studyId}/original/${safeFileName}`;
       } else {
-        const seriesId = crypto.randomUUID();
-        filePath = `studies/${studyId}/${seriesId}/${selectedFile.name}`;
+        const seriesId = generateId();
+        filePath = `studies/${studyId}/${seriesId}/${safeFileName}`;
       }
 
-      setProgress(30);
-      setStatus('Uploading to storage...');
+      setStatus('Processing file...');
+      // Convert to Blob for better compatibility across platforms (especially Mobile)
+      let fileToUpload: Blob | File = selectedFile;
+      
+      try {
+        const arrayBuffer = await selectedFile.arrayBuffer();
+        fileToUpload = new Blob([arrayBuffer], { type: selectedFile.type || 'application/octet-stream' });
+      } catch (err) {
+        console.warn('Failed to convert to Blob, using original file:', err);
+      }
 
+      setStatus('Uploading to cloud storage...');
       const { error: uploadError } = await supabase.storage
         .from('dicom-files')
-        .upload(filePath, selectedFile, {
+        .upload(filePath, fileToUpload, {
           cacheControl: '3600',
-          upsert: false
+          upsert: true,
+          contentType: selectedFile.type || 'application/octet-stream'
         });
 
-      if (uploadError) throw uploadError;
+      if (uploadError) {
+        console.error('Storage upload error:', uploadError);
+        throw new Error(`Cloud storage error: ${uploadError.message}`);
+      }
 
-      setProgress(70);
-      setStatus('Creating database records...');
+      setProgress(80);
+      setStatus('Finalizing study record...');
 
       const { error: dbError } = await supabase
         .from('dicom_studies')
@@ -96,15 +122,18 @@ export default function DicomUploader({ onUploadComplete }: DicomUploaderProps) 
           zip_file_size: isZip ? selectedFile.size : null,
           zip_extracted: false,
           description: `Upload: ${selectedFile.name}`,
-          patient_name: patient.id
+          patient_name: patient.full_name || patient.id
         });
 
-      if (dbError) throw dbError;
+      if (dbError) {
+        console.error('Database insertion error:', dbError);
+        throw new Error(`Database error: ${dbError.message}`);
+      }
 
       setProgress(100);
-      setStatus('Upload complete!');
+      setStatus('Done!');
       
-      toast.success('File uploaded successfully!');
+      toast.success('Study uploaded successfully!');
       
       if (onUploadComplete) {
         onUploadComplete(studyId);
@@ -118,7 +147,7 @@ export default function DicomUploader({ onUploadComplete }: DicomUploaderProps) 
       }, 2000);
 
     } catch (error: any) {
-      console.error('Upload error:', error);
+      console.error('Upload process failed:', error);
       toast.error(error.message || 'Upload failed');
       setUploading(false);
       setProgress(0);

@@ -509,17 +509,26 @@ export const auth = {
 // Check if an auth user is a doctor (patient app must block doctors)
 export const isDoctorByAuthId = async (authUserId: string): Promise<boolean> => {
   try {
-    const { data, error } = await supabase
+    // Add a 3-second timeout to the query to prevent hangs
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Timeout')), 3000)
+    );
+
+    const queryPromise = supabase
       .from('doctors')
       .select('id')
       .eq('auth_user_id', authUserId)
       .maybeSingle();
-    if (error) {
-      console.warn('❌ isDoctor check error:', error);
-      return false; // on error, allow through (don't block)
+
+    const result = await Promise.race([queryPromise, timeoutPromise]) as any;
+    
+    if (result.error) {
+      console.warn('❌ isDoctor check error:', result.error);
+      return false; 
     }
-    return !!data;
-  } catch {
+    return !!result.data;
+  } catch (err) {
+    console.warn('⚠️ isDoctor check timed out or failed, defaulting to patient role');
     return false;
   }
 };
