@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/lib/supabase';
 import {
   getActiveRecommendations,
   getAllRecommendations,
@@ -21,33 +22,97 @@ import {
 export const useRecommendations = (patientId?: string) => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const effectivePatientId = patientId || user?.id;
+  const [resolvedPatientId, setResolvedPatientId] = useState<string | null>(null);
+  const [isResolvingId, setIsResolvingId] = useState(true);
+
+  // Effect to resolve the real patient_id from auth_user_id
+  useEffect(() => {
+    if (!user) {
+      setIsResolvingId(false);
+      return;
+    }
+
+    const resolveId = async () => {
+      // 1. If patientId is explicitly provided, use it
+      if (patientId) {
+        setResolvedPatientId(patientId);
+        setIsResolvingId(false);
+        return;
+      }
+
+      // 2. Try to get from localStorage cache (populated by useRealTimeVitals)
+      const cacheKey = `patient_profile_${user.id}`;
+      const cached = localStorage.getItem(cacheKey);
+      if (cached) {
+        try {
+          const profile = JSON.parse(cached);
+          if (profile.id) {
+            setResolvedPatientId(profile.id);
+            setIsResolvingId(false);
+            // We still continue to verify it below
+          }
+        } catch (e) {
+          console.warn('Failed to parse cached profile for ID resolution', e);
+        }
+      }
+
+      // 3. Direct lookup if not resolved or to ensure accuracy
+      try {
+        const { data, error } = await supabase
+          .from('patients')
+          .select('id')
+          .eq('auth_user_id', user.id)
+          .maybeSingle();
+        
+        if (data?.id) {
+          setResolvedPatientId(data.id);
+        } else {
+          // Fallback to user.id if no patient record found (unlikely for patients)
+          setResolvedPatientId(user.id);
+        }
+      } catch (err) {
+        console.error('Error resolving patient ID:', err);
+        setResolvedPatientId(user.id);
+      } finally {
+        setIsResolvingId(false);
+      }
+    };
+
+    resolveId();
+  }, [user, patientId]);
+
+  const effectivePatientId = resolvedPatientId;
+  const isEnabled = !!effectivePatientId && !isResolvingId;
 
   // Query: Get active recommendations
   const {
     data: activeRecommendations = [],
-    isLoading: isLoadingActive,
+    isLoading: isLoadingActiveRaw,
     error: activeError,
     refetch: refetchActive
   } = useQuery({
     queryKey: ['recommendations', 'active', effectivePatientId],
     queryFn: () => getActiveRecommendations(effectivePatientId!),
-    enabled: !!effectivePatientId,
-    staleTime: 60000, // 1 minute
+    enabled: isEnabled,
+    staleTime: 60000,
   });
 
   // Query: Get all recommendations
   const {
     data: allRecommendations = [],
-    isLoading: isLoadingAll,
+    isLoading: isLoadingAllRaw,
     error: allError,
     refetch: refetchAll
   } = useQuery({
     queryKey: ['recommendations', 'all', effectivePatientId],
     queryFn: () => getAllRecommendations(effectivePatientId!),
-    enabled: !!effectivePatientId,
+    enabled: isEnabled,
     staleTime: 60000,
   });
+
+  // Combine loading states with isResolvingId
+  const isLoadingActive = isLoadingActiveRaw || isResolvingId;
+  const isLoadingAll = isLoadingAllRaw || isResolvingId;
 
   // Query: Get recommendations by type
   const getByType = (type: RecommendationType) => {

@@ -13,7 +13,6 @@ import androidx.core.content.ContextCompat;
 import com.getcapacitor.BridgeActivity;
 import com.monitraq.wellue.WelluePlugin;
 import com.monitraq.mobile.plugins.Bp2Plugin;
-import com.monitraq.mobile.plugins.AliveCorPlugin;
 
 public class MainActivity extends BridgeActivity {
 
@@ -40,13 +39,6 @@ public class MainActivity extends BridgeActivity {
             Log.d(TAG, "✅ Bp2Plugin added to initialPlugins");
         } catch (Exception e) {
             Log.e(TAG, "❌ Failed to add Bp2Plugin: " + e.getMessage(), e);
-        }
-
-        try {
-            initialPlugins.add(AliveCorPlugin.class);
-            Log.d(TAG, "✅ AliveCorPlugin added to initialPlugins");
-        } catch (Exception e) {
-            Log.e(TAG, "❌ Failed to add AliveCorPlugin: " + e.getMessage(), e);
         }
 
         // NOW call super.onCreate() - bridge will be created with our plugins included

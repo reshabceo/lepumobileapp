@@ -52,128 +52,109 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   useEffect(() => {
     // Get initial session
+    // Get initial session
     const initializeAuth = async () => {
+      // Safety timeout: Ensure loading state is eventually released
+      const timeoutId = setTimeout(() => {
+        setIsLoading(current => {
+          if (current) {
+            console.warn('⚠️ Auth initialization timed out - forcing release of loading state');
+            return false;
+          }
+          return current;
+        });
+      }, 8000);
+
       try {
         const { user, error } = await auth.getCurrentUser();
         if (user && !error) {
-          const isDoctor = await isDoctorByAuthId(user.id);
-          if (isDoctor) {
-            console.log('🚫 Patient app: doctor detected on init - signing out');
-            await supabase.auth.signOut();
-            setUser(null);
-            setSession(null);
-          } else {
-            const { data: { session: currentSession } } = await supabase.auth.getSession();
-            setUser(user);
-            setSession(currentSession ?? null);
-            console.log('🔍 Auth Debug - Initial user loaded:', user.email);
-          }
-        } else if (error) {
-          // Handle specific auth errors gracefully
-          if (error.message && error.message.includes('Auth session missing')) {
-            console.log('ℹ️ No active session found (normal on first load)');
-          } else {
-            console.error('❌ Auth initialization error:', error);
-          }
+          const { data: { session: currentSession } } = await supabase.auth.getSession();
+          setUser(user);
+          setSession(currentSession ?? null);
+          console.log('🔍 Auth Debug - Initial user loaded:', user.email);
+          
+          // Check for doctor in background
+          isDoctorByAuthId(user.id).then(async (isDoctor) => {
+            if (isDoctor) {
+              console.log('🚫 Patient app: doctor detected - signing out');
+              await supabase.auth.signOut();
+              setUser(null);
+              setSession(null);
+            }
+          });
+        } else {
           setUser(null);
           setSession(null);
         }
       } catch (error) {
-        // Handle session missing errors gracefully
-        if (error instanceof Error && error.message.includes('Auth session missing')) {
-          console.log('ℹ️ No active session found (normal on first load)');
-        } else {
-          console.error('❌ Auth initialization failed:', error);
-        }
+        console.error('❌ Auth initialization failed:', error);
         setUser(null);
         setSession(null);
       } finally {
+        clearTimeout(timeoutId);
         setIsLoading(false);
       }
     };
 
     initializeAuth();
 
+    // Re-sync session when tab becomes visible (handles tab switching hang)
+    const handleVisibilityChange = async () => {
+      if (document.visibilityState === 'visible') {
+        console.log('👁️ App visible - re-syncing auth session');
+        const { data: { session: currentSession } } = await supabase.auth.getSession();
+        if (currentSession) {
+          setSession(currentSession);
+          setUser(currentSession.user);
+        }
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
     // Listen to auth changes
     const { data: { subscription } } = auth.onAuthStateChange(async (event, session) => {
-      console.log('🔍 Auth Debug - Auth state change:', event, session?.user?.email, 'Confirmed:', session?.user?.email_confirmed_at ? 'YES' : 'NO');
+      console.log('🔍 Auth Debug - Auth state change:', event, session?.user?.email);
 
-      // Check if we're in the middle of signup flow (waiting for OTP verification)
-      const awaitingOTP = localStorage.getItem('awaiting_otp_verification') === 'true';
-      const fromOTPVerification = localStorage.getItem('from_otp_verification') === 'true';
-
-      // Handle SIGNED_UP event - prevent auto-login during signup
-      if (event === 'SIGNED_UP') {
-        console.log('📝 User signed up - waiting for email verification, NOT setting session');
-        // CRITICAL: Sign out immediately if a session was created
-        if (session) {
-          console.log('⚠️ Session detected during SIGNED_UP - signing out');
-          await supabase.auth.signOut();
-        }
-        // Don't set user/session during signup - wait for OTP verification
-        setIsLoading(false);
-        return;
-      }
-
-      // Handle TOKEN_REFRESHED - check if we're in signup flow
-      if (event === 'TOKEN_REFRESHED' && awaitingOTP) {
-        console.log('🔄 Token refreshed during signup flow - ignoring');
-        setIsLoading(false);
-        return;
-      }
-
-      // Handle SIGNED_IN event
-      if (event === 'SIGNED_IN' && session?.user) {
-        // CRITICAL: If user is not confirmed and we're awaiting OTP, don't set session
-        if (!session.user.email_confirmed_at && awaitingOTP) {
-          console.log('📧 Unconfirmed user during signup flow - NOT setting session');
-          // Sign out to prevent any session from being used
-          await supabase.auth.signOut();
-          setIsLoading(false);
-          return;
-        }
-
-        // If we're awaiting OTP verification, don't set session yet
-        if (awaitingOTP) {
-          console.log('📧 Signup flow in progress - OTP verification pending, NOT setting session');
-          await supabase.auth.signOut();
-          setIsLoading(false);
-          return;
-        }
-
-        // If this is from OTP verification in SignupWizard, don't auto-login
-        if (fromOTPVerification) {
-          console.log('📧 OTP verification completed in SignupWizard, NOT auto-logging in');
-          // Don't set user/session, let them log in manually
-          setIsLoading(false);
-          return;
-        }
+      try {
+        const awaitingOTP = localStorage.getItem('awaiting_otp_verification') === 'true';
         
-        // Normal sign-in (password login) - only if user is confirmed
-        if (session.user.email_confirmed_at) {
-          const isDoctor = await isDoctorByAuthId(session.user.id);
-          if (isDoctor) {
-            console.log('🚫 Patient app: doctor tried to sign in - signing out');
-            await supabase.auth.signOut();
-            setSession(null);
-            setUser(null);
-          } else {
-            console.log('🔐 Normal sign-in detected (confirmed user)');
+        if (event === 'SIGNED_UP' || (event === 'SIGNED_IN' && awaitingOTP && !session?.user?.email_confirmed_at)) {
+          if (session) await supabase.auth.signOut();
+          setIsLoading(false);
+          return;
+        }
+
+        if (event === 'SIGNED_IN' && session?.user) {
+          // Optimistically set session if email is confirmed
+          if (session.user.email_confirmed_at) {
             setSession(session);
             setUser(session.user);
+            
+            // Verify role in background
+            isDoctorByAuthId(session.user.id).then(async (isDoctor) => {
+              if (isDoctor) {
+                console.log('🚫 Doctor detected - signing out of patient app');
+                await supabase.auth.signOut();
+                setSession(null);
+                setUser(null);
+              }
+            });
           }
-        } else {
-          console.log('⚠️ Unconfirmed user trying to sign in - ignoring');
+        } else if (event === 'SIGNED_OUT') {
+          setSession(null);
+          setUser(null);
         }
-      } else if (event === 'SIGNED_OUT') {
-        setSession(null);
-        setUser(null);
+      } catch (err) {
+        console.error('❌ Error handling auth state change:', err);
+      } finally {
+        setIsLoading(false);
       }
-
-      setIsLoading(false);
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      subscription.unsubscribe();
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, []);
 
   const login = async (email: string, password: string): Promise<boolean> => {

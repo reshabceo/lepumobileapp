@@ -22,14 +22,11 @@ export const ENV = {
 // Get current environment - FIXED for Vite
 export const getCurrentEnv = () => {
   const mode = import.meta.env.MODE || 'development'
-  console.log('🔍 Environment Debug - Mode:', mode)
   
   if (mode === 'production') {
-    console.log('🔍 Environment Debug - Using PRODUCTION config')
     return ENV.production
   }
   
-  console.log('🔍 Environment Debug - Using DEVELOPMENT config')
   return ENV.development
 }
 

@@ -53,6 +53,7 @@ export const useRealTimeVitals = () => {
             // 🚀 OPTIMIZATION: Check localStorage first for instant load
             const cacheKey = `patient_profile_${user.id}`;
             const cachedProfile = localStorage.getItem(cacheKey);
+            let hasCache = false;
             
             if (cachedProfile) {
                 try {
@@ -64,26 +65,30 @@ export const useRealTimeVitals = () => {
                         console.log('✅ Using cached profile (instant load)');
                         if (isMounted) {
                             setPatientProfile(parsed);
+                            // Set loading to false immediately if we have valid cache
                             setLoading(false);
+                            hasCache = true;
                         }
-                        // Still fetch fresh data in background
                     }
                 } catch (e) {
                     console.warn('Failed to parse cached profile', e);
                 }
             }
 
-            // Safety timeout to prevent infinite loading (8 seconds)
+            // Safety timeout to prevent infinite loading (reduced to 6 seconds for better UX)
             timeoutId = setTimeout(() => {
                 if (isMounted) {
                     console.warn('⚠️ Loading timeout - forcing loading to false');
                     setLoading(false);
-                    setError('Loading took too long. Please refresh if data is missing.');
+                    // Don't show error if we at least have cache
+                    if (!hasCache) {
+                        setError('Loading took too long. Please check your connection.');
+                    }
                 }
-            }, 8000);
+            }, 6000);
 
             try {
-                if (isMounted) {
+                if (isMounted && !hasCache) {
                     setLoading(true);
                     setError(null);
                 }

@@ -15,6 +15,9 @@
 		504EC3121FED79650016851F /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 504EC3101FED79650016851F /* LaunchScreen.storyboard */; };
 		50B271D11FEDC1A000F3C39B /* public in Resources */ = {isa = PBXBuildFile; fileRef = 50B271D01FEDC1A000F3C39B /* public */; };
 		6FDD8C083F604E979B843C27 /* WellueSDKPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = D11B268E9348466CBC996A08 /* WellueSDKPlugin.swift */; };
+		861F6F3E2FA0AC1C00A8819C /* StoreKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 861F6F3D2FA0AC1C00A8819C /* StoreKit.framework */; };
+		861F6F412FA0B1E500A8819C /* IAP.swift in Sources */ = {isa = PBXBuildFile; fileRef = 861F6F3F2FA0B1E400A8819C /* IAP.swift */; };
+		861F6F422FA0B1E500A8819C /* IAPPlugin.m in Sources */ = {isa = PBXBuildFile; fileRef = 861F6F402FA0B1E400A8819C /* IAPPlugin.m */; };
 		A084ECDBA7D38E1E42DFC39D /* Pods_App.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AF277DCFFFF123FFC6DF26C7 /* Pods_App.framework */; };
 		F59C12E7AE354E0BB94EA219 /* WellueSDKPlugin.m in Sources */ = {isa = PBXBuildFile; fileRef = 916B2B78E03146E3BA5C4969 /* WellueSDKPlugin.m */; };
 /* End PBXBuildFile section */
@@ -29,6 +32,9 @@
 		504EC3111FED79650016851F /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/LaunchScreen.storyboard; sourceTree = "<group>"; };
 		504EC3131FED79650016851F /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		50B271D01FEDC1A000F3C39B /* public */ = {isa = PBXFileReference; lastKnownFileType = folder; path = public; sourceTree = "<group>"; };
+		861F6F3D2FA0AC1C00A8819C /* StoreKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = StoreKit.framework; path = System/Library/Frameworks/StoreKit.framework; sourceTree = SDKROOT; };
+		861F6F3F2FA0B1E400A8819C /* IAP.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IAP.swift; sourceTree = "<group>"; };
+		861F6F402FA0B1E400A8819C /* IAPPlugin.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = IAPPlugin.m; sourceTree = "<group>"; };
 		916B2B78E03146E3BA5C4969 /* WellueSDKPlugin.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = WellueSDKPlugin.m; sourceTree = "<group>"; };
 		AF277DCFFFF123FFC6DF26C7 /* Pods_App.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_App.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		AF51FD2D460BCFE21FA515B2 /* Pods-App.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-App.release.xcconfig"; path = "Pods/Target Support Files/Pods-App/Pods-App.release.xcconfig"; sourceTree = "<group>"; };
@@ -43,6 +49,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A084ECDBA7D38E1E42DFC39D /* Pods_App.framework in Frameworks */,
+				861F6F3E2FA0AC1C00A8819C /* StoreKit.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -52,6 +59,7 @@
 		27E2DDA53C4D2A4D1A88CE4A /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				861F6F3D2FA0AC1C00A8819C /* StoreKit.framework */,
 				AF277DCFFFF123FFC6DF26C7 /* Pods_App.framework */,
 			);
 			name = Frameworks;
@@ -78,6 +86,8 @@
 		504EC3061FED79650016851F /* App */ = {
 			isa = PBXGroup;
 			children = (
+				861F6F3F2FA0B1E400A8819C /* IAP.swift */,
+				861F6F402FA0B1E400A8819C /* IAPPlugin.m */,
 				50379B222058CBB4000EE86E /* capacitor.config.json */,
 				504EC3071FED79650016851F /* AppDelegate.swift */,
 				D11B268E9348466CBC996A08 /* WellueSDKPlugin.swift */,
@@ -130,8 +140,8 @@
 		504EC2FC1FED79650016851F /* Project object */ = {
 			isa = PBXProject;
 			attributes = {
-				LastSwiftUpdateCheck = 0920;
-				LastUpgradeCheck = 0920;
+				LastSwiftUpdateCheck = 920;
+				LastUpgradeCheck = 920;
 				TargetAttributes = {
 					504EC3031FED79650016851F = {
 						CreatedOnToolsVersion = 9.2;
@@ -218,6 +228,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				504EC3081FED79650016851F /* AppDelegate.swift in Sources */,
+				861F6F412FA0B1E500A8819C /* IAP.swift in Sources */,
+				861F6F422FA0B1E500A8819C /* IAPPlugin.m in Sources */,
 				6FDD8C083F604E979B843C27 /* WellueSDKPlugin.swift in Sources */,
 				F59C12E7AE354E0BB94EA219 /* WellueSDKPlugin.m in Sources */,
 			);

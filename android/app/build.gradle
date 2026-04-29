@@ -5,15 +5,15 @@ android {
     compileSdk rootProject.ext.compileSdkVersion
     
     compileOptions {
-        sourceCompatibility JavaVersion.VERSION_21
-        targetCompatibility JavaVersion.VERSION_21
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
     }
     
     defaultConfig {
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 2
-        versionName "1.1"
+        versionCode 4
+        versionName "1.3"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         if (org.gradle.api.JavaVersion.current().isCompatibleWith(JavaVersion.VERSION_17)) {
             println("Using Java 17 for build")
@@ -55,6 +55,16 @@ android {
             signingConfig signingConfigs.debug
         }
     }
+
+    // Force .so files to be extracted to disk — fixes 16 KB page alignment
+    // errors caused by vendor SDK libraries (liboffline-lib.so, libonline-lib.so)
+    // that cannot be recompiled. extractNativeLibs=true in the manifest is
+    // the official Android workaround for third-party non-conforming .so files.
+    packagingOptions {
+        jniLibs {
+            useLegacyPackaging = true
+        }
+    }
 }
 
 repositories {
@@ -81,19 +91,7 @@ dependencies {
     // Source: https://github.com/viatom-develop/LepuDemo.git
     implementation(name: 'lepu-blepro-1.0.8', ext: 'aar')
 
-    // AliveCor Kardia SDK AAR + required transitive dependencies
-    implementation project(':AliveCorKitLite-release')
-    implementation 'io.reactivex.rxjava2:rxandroid:2.1.1'
-    implementation 'io.reactivex.rxjava2:rxjava:2.2.21'
-    implementation 'com.google.code.gson:gson:2.10.1'
-    implementation 'com.jakewharton.timber:timber:5.0.1'
-    implementation 'com.squareup.retrofit2:retrofit:2.9.0'
-    implementation 'com.squareup.retrofit2:converter-gson:2.9.0'
-    implementation 'com.squareup.okhttp3:logging-interceptor:4.12.0'
-    implementation 'com.airbnb.android:lottie:6.4.0'
-    implementation 'androidx.localbroadcastmanager:localbroadcastmanager:1.1.0'
-    implementation 'androidx.security:security-crypto:1.1.0-alpha06'
-    implementation 'net.danlew:android.joda:2.12.7'
+    // AliveCor SDK removed from build
 
     implementation "androidx.appcompat:appcompat:$androidxAppCompatVersion"
     implementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"
@@ -102,6 +100,8 @@ dependencies {
     testImplementation "junit:junit:$junitVersion"
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
     androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
+    implementation "androidx.navigation:navigation-fragment:2.8.3"
+    implementation "androidx.navigation:navigation-ui:2.8.3"
     implementation project(':capacitor-cordova-android-plugins')
 }
 

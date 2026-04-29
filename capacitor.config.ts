@@ -31,6 +31,7 @@ const config: ExtendedCapacitorConfig = {
     scheme: "App",
     packageClassList: [
       'WellueSDK',
+      'IAP',
       'Bp2',
       'AliveCorSDK',
       'BluetoothLe',
@@ -41,6 +42,7 @@ const config: ExtendedCapacitorConfig = {
   },
   packageClassList: [
     'WellueSDK',
+    'IAP',
     'Bp2',
     'AliveCorSDK',
     'BluetoothLe',
