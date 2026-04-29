@@ -2,7 +2,5 @@ include ':app'
 include ':capacitor-cordova-android-plugins'
 project(':capacitor-cordova-android-plugins').projectDir = new File('./capacitor-cordova-android-plugins/')
 
-// AliveCor Kardia SDK AAR module
-include ':AliveCorKitLite-release'
 
 apply from: 'capacitor.settings.gradle'

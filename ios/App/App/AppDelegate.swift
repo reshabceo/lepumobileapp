@@ -15,16 +15,25 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         
         // Reference 1: Direct class reference
         _ = WellueSDK.self
-        _ = AliveCorPlugin.self
+        if #available(iOS 15.0, *) {
+            _ = IAPPlugin.self
+        }
         
         // Reference 2: Type metadata access
-        let pluginType = type(of: WellueSDK.self)
-        let _ = String(describing: pluginType)
+        let _ = String(describing: type(of: WellueSDK.self))
+        if #available(iOS 15.0, *) {
+            let _ = String(describing: type(of: IAPPlugin.self))
+        }
         
-        // Reference 3: Force class initialization by checking if it responds to a method
-        // This ensures the class is properly loaded into the runtime
+        // Reference 3: Force class initialization
         if WellueSDK.self.responds(to: #selector(WellueSDK.initialize(_:))) {
-            // Class is properly loaded
+            // WellueSDK is properly loaded
+        }
+        
+        if #available(iOS 15.0, *) {
+            if IAPPlugin.self.responds(to: NSSelectorFromString("loadProducts:")) {
+                // IAPPlugin is properly loaded
+            }
         }
         
         // Note: Safari Web Inspector works automatically in Debug builds

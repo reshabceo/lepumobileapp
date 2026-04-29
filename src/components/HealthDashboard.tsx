@@ -176,11 +176,6 @@ export const HealthDashboard = () => {
   const { logout } = useAuth();
   const loadingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // DEBUG: Add console log to verify this component is rendering
-  console.log(
-    "🔍 [DEBUG] HealthDashboard component is rendering - version with arrow button and no Live Health Overview"
-  );
-
   const { toast } = useToast();
   const {
     vitals,
@@ -720,64 +715,42 @@ export const HealthDashboard = () => {
     });
   };
 
-  // Show loading state (but respect timeout)
-  if (vitalsLoading && !forceStopLoading) {
+  // Main loading state
+  const loading = (vitalsLoading || !patientProfile) && !forceStopLoading;
+  
+  if (loading && !patientProfile) {
     return (
       <div className="bg-[#101010] min-h-screen text-white flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
-          <p className="text-gray-400">Loading health data...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // If loading was forced to stop, show error with retry
-  if (forceStopLoading && vitalsLoading) {
-    return (
-      <div className="bg-[#101010] min-h-screen text-white flex items-center justify-center p-4">
-        <div className="max-w-sm mx-auto text-center">
-          <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-6">
-            <Loader2 className="h-12 w-12 text-yellow-500 mx-auto mb-4" />
-            <h2 className="text-xl font-bold text-yellow-400 mb-2">
-              Loading Timeout
-            </h2>
-            <p className="text-gray-300 mb-4">
-              Taking longer than expected. Please try refreshing.
-            </p>
-            <button
-              onClick={() => window.location.reload()}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg transition-colors"
-            >
-              Refresh Page
-            </button>
+        <div className="flex flex-col items-center gap-4 p-6 text-center">
+          <Loader2 className="h-10 w-10 animate-spin text-blue-500" />
+          <div className="flex flex-col items-center">
+            <p className="text-xl font-bold tracking-tight">Syncing Health Data...</p>
+            <p className="text-gray-400 text-sm">This may take a few seconds</p>
           </div>
         </div>
       </div>
     );
   }
 
-  // Show error state
-  if (vitalsError) {
+  // Error or Timeout state
+  if ((vitalsError || forceStopLoading) && !patientProfile) {
     return (
-      <div className="bg-[#101010] min-h-screen text-white flex items-center justify-center p-4">
-        <div className="max-w-sm mx-auto text-center">
-          <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-6">
-            <Siren className="h-12 w-12 text-red-500 mx-auto mb-4" />
-            <h2 className="text-xl font-bold text-red-400 mb-2">
-              Connection Error
-            </h2>
-            <p className="text-gray-300 mb-4">{vitalsError}</p>
-            <p className="text-sm text-gray-400">
-              Make sure the backend server is running on port 3000
-            </p>
-            <button
-              onClick={() => window.location.reload()}
-              className="mt-4 bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg transition-all duration-200"
-            >
-              Retry
-            </button>
+      <div className="bg-[#101010] min-h-screen text-white flex items-center justify-center p-6">
+        <div className="max-w-md w-full bg-[#1A1A1A] border border-red-500/20 rounded-2xl p-8 text-center shadow-2xl shadow-red-500/10">
+          <div className="bg-red-500/20 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6">
+            <AlertCircle className="h-10 w-10 text-red-500" />
           </div>
+          <h3 className="text-2xl font-bold text-white mb-2">Application Request Timeout</h3>
+          <p className="text-gray-400 mb-8 leading-relaxed">
+            The application is taking longer than usual to load. This might be due to a poor connection or session sync issue.
+          </p>
+          <button
+            onClick={() => window.location.reload()}
+            className="w-full bg-red-600 hover:bg-red-700 text-white py-4 rounded-xl font-bold transition-all shadow-lg shadow-red-600/30 flex items-center justify-center gap-2"
+          >
+            <RefreshCw className="h-5 w-5" />
+            Reload App Properly
+          </button>
         </div>
       </div>
     );

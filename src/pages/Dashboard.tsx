@@ -13,7 +13,7 @@ const Dashboard = () => {
       </MobileAppContainer>
 
       {/* Bottom Navigation */}
-      <AppNavigation />
+      {/* <AppNavigation /> */}
     </div>
   );
 };

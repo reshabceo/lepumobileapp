@@ -7,6 +7,10 @@ import { supabaseUrl, supabaseAnonKey } from '@/lib/supabase';
 
 const FUNCTIONS_BASE = `${supabaseUrl.replace(/\/$/, '')}/functions/v1`;
 
+import { Capacitor } from '@capacitor/core';
+import { iapService } from '../services/iapService';
+import { getIAPProduct } from '../config/iap-products';
+
 export type PaymentType = 'appointment_video' | 'appointment_audio' | 'radiologist_review' | 'emergency' | 'ai_doctor_text' | 'ai_doctor_voice';
 
 export interface PricesResponse {
@@ -106,6 +110,24 @@ export async function verifyPayment(payload: VerifyPayload): Promise<{ success: 
   return data;
 }
 
+export async function fulfilIAP(params: { 
+  type: PaymentType; 
+  metadata: Record<string, any>; 
+  transactionId: string;
+  receipt: string;
+}): Promise<{ success: boolean; error?: string }> {
+  const res = await fetch(`${FUNCTIONS_BASE}/verify-iap-receipt`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify(params),
+  });
+  const data = await res.json();
+  if (!res.ok || !data.success) {
+    throw new Error(data.error || 'IAP Verification failed');
+  }
+  return data;
+}
+
 export interface CheckoutOptions {
   type: PaymentType;
   /** Required for all types – from doctor (video/audio/emergency) or radiologist (report_fee). */
@@ -145,6 +167,41 @@ export async function fetchAIDoctorPricing(): Promise<AIDoctorPricing> {
  */
 export async function payAndFulfil(options: CheckoutOptions): Promise<void> {
   const { type, amount_paise, metadata, onSuccess, onDismiss, onError } = options;
+
+  // iOS Compliance: Use In-App Purchase for digital services
+  if (Capacitor.getPlatform() === 'ios') {
+    let productId: string | undefined;
+
+    if (type === 'radiologist_review') {
+      // For radiologists, we use the tiered product selection
+      const { getRadiologistTier } = await import('../config/iap-products');
+      productId = getRadiologistTier(amount_paise).productId;
+    } else {
+      const product = getIAPProduct(type as any);
+      productId = product?.productId;
+    }
+
+    if (productId) {
+      try {
+        const transaction = await iapService.purchase(productId as any);
+        if (transaction) {
+          // Verify and fulfil on the backend
+          await fulfilIAP({
+            type,
+            metadata,
+            transactionId: transaction.transactionId,
+            receipt: transaction.receipt
+          });
+          onSuccess();
+          return;
+        }
+      } catch (err) {
+        const e = err instanceof Error ? err : new Error(String(err));
+        onError?.(e);
+        return;
+      }
+    }
+  }
 
   await loadRazorpayScript();
 

@@ -1,0 +1,83 @@
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+
+const APPLE_VERIFY_URL_PRODUCTION = "https://buy.itunes.apple.com/verifyReceipt"
+const APPLE_VERIFY_URL_SANDBOX = "https://sandbox.itunes.apple.com/verifyReceipt"
+
+serve(async (req) => {
+    // Handle CORS
+    if (req.method === 'OPTIONS') {
+        return new Response('ok', { headers: { 'Access-Control-Allow-Origin': '*' } })
+    }
+
+    try {
+        const { receipt, transactionId, type, metadata } = await req.json();
+        const sharedSecret = Deno.env.get('APP_STORE_SHARED_SECRET');
+        
+        const supabase = createClient(
+            Deno.env.get('SUPABASE_URL')!, 
+            Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+        );
+
+        // 1. Verify with Apple (Production then Sandbox fallback)
+        let response = await fetch(APPLE_VERIFY_URL_PRODUCTION, {
+            method: 'POST',
+            body: JSON.stringify({ 'receipt-data': receipt, 'password': sharedSecret })
+        });
+        
+        let result = await response.json();
+        
+        if (result.status === 21007) { // Sandbox receipt sent to production
+            const sbRes = await fetch(APPLE_VERIFY_URL_SANDBOX, {
+                method: 'POST',
+                body: JSON.stringify({ 'receipt-data': receipt, 'password': sharedSecret })
+            });
+            result = await sbRes.json();
+        }
+
+        if (result.status !== 0) {
+            return new Response(JSON.stringify({ success: false, error: 'Invalid Receipt', apple_status: result.status }), { 
+                status: 400,
+                headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
+            });
+        }
+
+        // 2. Extract purchase info
+        // For non-subscriptions, it's usually in result.receipt.in_app
+        const inApp = result.receipt?.in_app || [];
+        const latest = inApp.find((item: any) => item.transaction_id === transactionId) || inApp[0];
+
+        // 3. Log transaction in DB
+        await supabase.from('iap_transactions').insert({
+            transaction_id: transactionId,
+            user_id: metadata?.user_id,
+            product_id: latest?.product_id,
+            receipt_data: receipt,
+            apple_status: result.status,
+            metadata: metadata
+        });
+
+        // 4. Fulfill the service
+        if (type === 'emergency') {
+            const { appointment, alert } = metadata;
+            await supabase.from('appointments').insert(appointment);
+            await supabase.from('emergency_alerts').insert(alert);
+        } else if (type === 'ai_doctor_text' || type === 'ai_doctor_voice') {
+            await supabase.from('ai_doctor_consultations').insert(metadata.consultation);
+        } else if (type.startsWith('appointment_')) {
+            await supabase.from('appointments').insert(metadata.appointment);
+        } else if (type === 'radiologist_review') {
+            await supabase.from('radiologist_requests').insert(metadata.request);
+        }
+
+        return new Response(JSON.stringify({ success: true }), { 
+            headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } 
+        });
+
+    } catch (error: any) {
+        return new Response(JSON.stringify({ success: false, error: error.message }), { 
+            status: 500,
+            headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
+        });
+    }
+});

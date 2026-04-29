@@ -65,34 +65,27 @@ const MedicalDisclaimer = () => {
 
                 <div className="bg-[#2D333B] rounded-lg p-4">
                   <div className="flex items-center gap-2 mb-3">
+                    <Shield className="h-5 w-5 text-teal-400" />
+                    <h3 className="text-base font-semibold text-white">Jurisdiction & Device Clearance</h3>
+                  </div>
+                  <p className="text-gray-300 text-sm leading-relaxed mb-3">
+                    The AliveCor Kardia devices supported by this app have received regulatory clearance (FDA Cleared, CE Marked) for use in the <strong className="text-white">United States, United Kingdom, and European Economic Area</strong>. 
+                  </p>
+                  <p className="text-gray-300 text-sm leading-relaxed mb-3">
+                    If you are using this app outside of these regions, you must ensure that the medical hardware you use has received the appropriate local regulatory approval.
+                  </p>
+                  <div className="bg-blue-500/10 border border-blue-500/30 rounded p-2 text-xs text-blue-200">
+                    <strong>Note:</strong> The AliveCor KardiaMobile is a clinical-grade personal ECG device that is FDA-cleared to detect Atrial Fibrillation, Bradycardia, and Tachycardia.
+                  </div>
+                </div>
+
+                <div className="bg-[#2D333B] rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-3">
                     <Shield className="h-5 w-5 text-blue-400" />
                     <h3 className="text-base font-semibold text-white">Medical Device Disclaimer</h3>
                   </div>
                   <p className="text-gray-300 text-sm leading-relaxed">
-                    This app connects to external medical hardware devices (blood pressure monitors, ECG devices, etc.). The accuracy of readings depends on proper device usage, calibration, and user technique. Always verify readings with your healthcare provider and follow manufacturer instructions for device use.
-                  </p>
-                </div>
-
-                <div className="bg-[#2D333B] rounded-lg p-4">
-                  <div className="flex items-center gap-2 mb-3">
-                    <AlertTriangle className="h-5 w-5 text-orange-400" />
-                    <h3 className="text-base font-semibold text-white">Regulatory Information</h3>
-                  </div>
-                  <p className="text-gray-300 text-sm leading-relaxed mb-2">
-                    The medical devices used with this app may have regulatory clearance in specific jurisdictions. Please ensure that any medical device you use complies with local regulations and has appropriate regulatory approval for use in your region.
-                  </p>
-                  <p className="text-gray-400 text-xs leading-relaxed italic">
-                    For information about regulatory clearance of specific devices, please consult the device manufacturer or your healthcare provider.
-                  </p>
-                </div>
-
-                <div className="bg-[#2D333B] rounded-lg p-4">
-                  <div className="flex items-center gap-2 mb-3">
-                    <Shield className="h-5 w-5 text-purple-400" />
-                    <h3 className="text-base font-semibold text-white">Data Accuracy</h3>
-                  </div>
-                  <p className="text-gray-300 text-sm leading-relaxed">
-                    While we strive to provide accurate information and reliable device connectivity, we cannot guarantee the accuracy, completeness, or timeliness of any information in this app. Medical conditions and treatments vary by individual, and information that may be appropriate for one person may not be appropriate for another.
+                    This app connects to external medical hardware devices (AliveCor Kardia, BP monitors, etc.). The accuracy of readings depends on proper device usage, calibration, and user technique. Always verify readings with your healthcare provider and follow manufacturer instructions for device use.
                   </p>
                 </div>
               </div>
@@ -107,6 +100,7 @@ const MedicalDisclaimer = () => {
                   <li>You will consult with qualified healthcare professionals before making medical decisions</li>
                   <li>You will use medical devices according to manufacturer instructions</li>
                   <li>You understand that device readings should be verified by healthcare professionals</li>
+                  <li>You are using medical hardware that is cleared for use in your specific jurisdiction</li>
                 </ul>
               </div>
             </div>
