@@ -41,11 +41,35 @@ const Profile = () => {
   const { user, logout } = useAuth();
   const [profile, setProfile] = useState<PatientProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  // Modal states
+  const [personalModalOpen, setPersonalModalOpen] = useState(false);
+  const [medicalModalOpen, setMedicalModalOpen] = useState(false);
+  const [emergencyModalOpen, setEmergencyModalOpen] = useState(false);
   const [heightModalOpen, setHeightModalOpen] = useState(false);
   const [weightModalOpen, setWeightModalOpen] = useState(false);
+
+  // Form states
+  const [personalForm, setPersonalForm] = useState({
+    full_name: '',
+    phone_number: '',
+    date_of_birth: '',
+    gender: '',
+    address: ''
+  });
+  const [medicalForm, setMedicalForm] = useState({
+    blood_type: '',
+    allergies: '',
+    medical_conditions: '',
+    current_medications: ''
+  });
+  const [emergencyForm, setEmergencyForm] = useState({
+    emergency_contact_name: '',
+    emergency_contact_phone: ''
+  });
   const [heightInput, setHeightInput] = useState('');
   const [weightInput, setWeightInput] = useState('');
-  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -82,10 +106,8 @@ const Profile = () => {
         .single();
 
       if (error) {
-        // Handle "not found" error gracefully - user might not have patient profile yet
         if (error.code === 'PGRST116') {
           console.log('No patient profile found, showing user info only');
-          // Set profile to null but still show the page with user email
           setProfile(null);
           setLoading(false);
           return;
@@ -131,6 +153,36 @@ const Profile = () => {
     }
   };
 
+  // Modal Open Handlers
+  const handleOpenPersonalModal = () => {
+    setPersonalForm({
+      full_name: profile?.full_name || '',
+      phone_number: profile?.phone_number || '',
+      date_of_birth: profile?.date_of_birth || '',
+      gender: profile?.gender || '',
+      address: profile?.address || ''
+    });
+    setPersonalModalOpen(true);
+  };
+
+  const handleOpenMedicalModal = () => {
+    setMedicalForm({
+      blood_type: profile?.blood_type || '',
+      allergies: profile?.allergies?.join(', ') || '',
+      medical_conditions: profile?.medical_conditions?.join(', ') || '',
+      current_medications: profile?.current_medications?.join(', ') || ''
+    });
+    setMedicalModalOpen(true);
+  };
+
+  const handleOpenEmergencyModal = () => {
+    setEmergencyForm({
+      emergency_contact_name: profile?.emergency_contact_name || '',
+      emergency_contact_phone: profile?.emergency_contact_phone || ''
+    });
+    setEmergencyModalOpen(true);
+  };
+
   const handleOpenHeightModal = () => {
     setHeightInput(profile?.height_cm?.toString() || '');
     setHeightModalOpen(true);
@@ -141,15 +193,10 @@ const Profile = () => {
     setWeightModalOpen(true);
   };
 
-  const handleSaveHeight = async () => {
+  // Save Handlers
+  const handleUpdateProfile = async (updates: Partial<PatientProfile>, successMsg: string, setModal: (open: boolean) => void) => {
     if (!user || !profile?.id) {
       toast.error('User not found');
-      return;
-    }
-
-    const heightValue = parseFloat(heightInput);
-    if (isNaN(heightValue) || heightValue <= 0 || heightValue > 300) {
-      toast.error('Please enter a valid height between 1-300 cm');
       return;
     }
 
@@ -157,60 +204,60 @@ const Profile = () => {
       setSaving(true);
       const { error } = await supabase
         .from('patients')
-        .update({ height_cm: heightValue })
+        .update(updates)
         .eq('id', profile.id);
 
       if (error) {
-        console.error('Error updating height:', error);
-        toast.error('Failed to save height');
+        console.error('Error updating profile:', error);
+        toast.error('Failed to save changes');
         return;
       }
 
-      setProfile({ ...profile, height_cm: heightValue });
-      setHeightModalOpen(false);
-      toast.success('Height saved successfully');
+      setProfile({ ...profile, ...updates });
+      setModal(false);
+      toast.success(successMsg);
     } catch (error) {
       console.error('Error:', error);
-      toast.error('Failed to save height');
+      toast.error('Failed to save changes');
     } finally {
       setSaving(false);
     }
   };
 
-  const handleSaveWeight = async () => {
-    if (!user || !profile?.id) {
-      toast.error('User not found');
+  const handleSavePersonal = () => {
+    handleUpdateProfile(personalForm, 'Personal information updated', setPersonalModalOpen);
+  };
+
+  const handleSaveMedical = () => {
+    const updates = {
+      blood_type: medicalForm.blood_type,
+      allergies: medicalForm.allergies.split(',').map(s => s.trim()).filter(Boolean),
+      medical_conditions: medicalForm.medical_conditions.split(',').map(s => s.trim()).filter(Boolean),
+      current_medications: medicalForm.current_medications.split(',').map(s => s.trim()).filter(Boolean)
+    };
+    handleUpdateProfile(updates, 'Medical information updated', setMedicalModalOpen);
+  };
+
+  const handleSaveEmergency = () => {
+    handleUpdateProfile(emergencyForm, 'Emergency contact updated', setEmergencyModalOpen);
+  };
+
+  const handleSaveHeight = () => {
+    const val = parseFloat(heightInput);
+    if (isNaN(val) || val <= 0 || val > 300) {
+      toast.error('Enter valid height (1-300 cm)');
       return;
     }
+    handleUpdateProfile({ height_cm: val }, 'Height updated', setHeightModalOpen);
+  };
 
-    const weightValue = parseFloat(weightInput);
-    if (isNaN(weightValue) || weightValue <= 0 || weightValue > 500) {
-      toast.error('Please enter a valid weight between 1-500 kg');
+  const handleSaveWeight = () => {
+    const val = parseFloat(weightInput);
+    if (isNaN(val) || val <= 0 || val > 500) {
+      toast.error('Enter valid weight (1-500 kg)');
       return;
     }
-
-    try {
-      setSaving(true);
-      const { error } = await supabase
-        .from('patients')
-        .update({ weight_kg: weightValue })
-        .eq('id', profile.id);
-
-      if (error) {
-        console.error('Error updating weight:', error);
-        toast.error('Failed to save weight');
-        return;
-      }
-
-      setProfile({ ...profile, weight_kg: weightValue });
-      setWeightModalOpen(false);
-      toast.success('Weight saved successfully');
-    } catch (error) {
-      console.error('Error:', error);
-      toast.error('Failed to save weight');
-    } finally {
-      setSaving(false);
-    }
+    handleUpdateProfile({ weight_kg: val }, 'Weight updated', setWeightModalOpen);
   };
 
   if (loading) {
@@ -269,10 +316,18 @@ const Profile = () => {
           {/* Personal Information */}
           <Card className="glass-card border-emerald-500/30 bg-emerald-500/10">
             <CardContent className="p-6">
-              <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                <User className="w-5 h-5 text-emerald-400" />
-                Personal Information
-              </h3>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                  <User className="w-5 h-5 text-emerald-400" />
+                  Personal Information
+                </h3>
+                <button
+                  onClick={handleOpenPersonalModal}
+                  className="p-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 transition-colors"
+                >
+                  <Edit2 className="w-4 h-4 text-emerald-400" />
+                </button>
+              </div>
               <div className="space-y-3">
                 <div className="flex items-start gap-3">
                   <Mail className="w-5 h-5 text-emerald-400 mt-0.5 flex-shrink-0" />
@@ -282,45 +337,37 @@ const Profile = () => {
                   </div>
                 </div>
 
-                {profile?.phone_number && (
-                  <div className="flex items-start gap-3">
-                    <Phone className="w-5 h-5 text-emerald-400 mt-0.5 flex-shrink-0" />
-                    <div className="flex-1">
-                      <p className="text-xs text-emerald-200/60 mb-1">Phone Number</p>
-                      <p className="text-white">{profile.phone_number}</p>
-                    </div>
+                <div className="flex items-start gap-3">
+                  <Phone className="w-5 h-5 text-emerald-400 mt-0.5 flex-shrink-0" />
+                  <div className="flex-1">
+                    <p className="text-xs text-emerald-200/60 mb-1">Phone Number</p>
+                    <p className="text-white">{profile?.phone_number || 'Not provided'}</p>
                   </div>
-                )}
+                </div>
 
-                {profile?.date_of_birth && (
-                  <div className="flex items-start gap-3">
-                    <Calendar className="w-5 h-5 text-emerald-400 mt-0.5 flex-shrink-0" />
-                    <div className="flex-1">
-                      <p className="text-xs text-emerald-200/60 mb-1">Date of Birth</p>
-                      <p className="text-white">{formatDate(profile.date_of_birth)}</p>
-                    </div>
+                <div className="flex items-start gap-3">
+                  <Calendar className="w-5 h-5 text-emerald-400 mt-0.5 flex-shrink-0" />
+                  <div className="flex-1">
+                    <p className="text-xs text-emerald-200/60 mb-1">Date of Birth</p>
+                    <p className="text-white">{profile?.date_of_birth ? formatDate(profile.date_of_birth) : 'Not provided'}</p>
                   </div>
-                )}
+                </div>
 
-                {profile?.gender && (
-                  <div className="flex items-start gap-3">
-                    <User className="w-5 h-5 text-emerald-400 mt-0.5 flex-shrink-0" />
-                    <div className="flex-1">
-                      <p className="text-xs text-emerald-200/60 mb-1">Gender</p>
-                      <p className="text-white capitalize">{profile.gender}</p>
-                    </div>
+                <div className="flex items-start gap-3">
+                  <User className="w-5 h-5 text-emerald-400 mt-0.5 flex-shrink-0" />
+                  <div className="flex-1">
+                    <p className="text-xs text-emerald-200/60 mb-1">Gender</p>
+                    <p className="text-white capitalize">{profile?.gender || 'Not provided'}</p>
                   </div>
-                )}
+                </div>
 
-                {profile?.address && (
-                  <div className="flex items-start gap-3">
-                    <MapPin className="w-5 h-5 text-emerald-400 mt-0.5 flex-shrink-0" />
-                    <div className="flex-1">
-                      <p className="text-xs text-emerald-200/60 mb-1">Address</p>
-                      <p className="text-white">{profile.address}</p>
-                    </div>
+                <div className="flex items-start gap-3">
+                  <MapPin className="w-5 h-5 text-emerald-400 mt-0.5 flex-shrink-0" />
+                  <div className="flex-1">
+                    <p className="text-xs text-emerald-200/60 mb-1">Address</p>
+                    <p className="text-white">{profile?.address || 'Not provided'}</p>
                   </div>
-                )}
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -375,113 +422,127 @@ const Profile = () => {
           {/* Medical Information */}
           <Card className="glass-card border-emerald-500/30 bg-emerald-500/10">
             <CardContent className="p-6">
-              <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                <Heart className="w-5 h-5 text-emerald-400" />
-                Medical Information
-              </h3>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                  <Heart className="w-5 h-5 text-emerald-400" />
+                  Medical Information
+                </h3>
+                <button
+                  onClick={handleOpenMedicalModal}
+                  className="p-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 transition-colors"
+                >
+                  <Edit2 className="w-4 h-4 text-emerald-400" />
+                </button>
+              </div>
               <div className="space-y-3">
-                {profile?.blood_type && (
-                  <div className="flex items-start gap-3">
-                    <Droplet className="w-5 h-5 text-emerald-400 mt-0.5 flex-shrink-0" />
-                    <div className="flex-1">
-                      <p className="text-xs text-emerald-200/60 mb-1">Blood Type</p>
-                      <p className="text-white">{profile.blood_type}</p>
-                    </div>
+                <div className="flex items-start gap-3">
+                  <Droplet className="w-5 h-5 text-emerald-400 mt-0.5 flex-shrink-0" />
+                  <div className="flex-1">
+                    <p className="text-xs text-emerald-200/60 mb-1">Blood Type</p>
+                    <p className="text-white">{profile?.blood_type || 'Not provided'}</p>
                   </div>
-                )}
+                </div>
 
-                {profile?.allergies && profile.allergies.length > 0 && (
-                  <div className="flex items-start gap-3">
-                    <AlertCircle className="w-5 h-5 text-red-400 mt-0.5 flex-shrink-0" />
-                    <div className="flex-1">
-                      <p className="text-xs text-emerald-200/60 mb-1">Allergies</p>
-                      <div className="flex flex-wrap gap-2 mt-1">
-                        {profile.allergies.map((allergy, idx) => (
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="w-5 h-5 text-red-400 mt-0.5 flex-shrink-0" />
+                  <div className="flex-1">
+                    <p className="text-xs text-emerald-200/60 mb-1">Allergies</p>
+                    <div className="flex flex-wrap gap-2 mt-1">
+                      {profile?.allergies && profile.allergies.length > 0 ? (
+                        profile.allergies.map((allergy, idx) => (
                           <span
                             key={idx}
                             className="px-2 py-1 rounded-md bg-red-500/20 border border-red-500/30 text-sm text-red-200"
                           >
                             {allergy}
                           </span>
-                        ))}
-                      </div>
+                        ))
+                      ) : (
+                        <p className="text-gray-400 text-sm">None reported</p>
+                      )}
                     </div>
                   </div>
-                )}
+                </div>
 
-                {profile?.medical_conditions && profile.medical_conditions.length > 0 && (
-                  <div className="flex items-start gap-3">
-                    <Heart className="w-5 h-5 text-emerald-400 mt-0.5 flex-shrink-0" />
-                    <div className="flex-1">
-                      <p className="text-xs text-emerald-200/60 mb-1">Medical Conditions</p>
-                      <div className="flex flex-wrap gap-2 mt-1">
-                        {profile.medical_conditions.map((condition, idx) => (
+                <div className="flex items-start gap-3">
+                  <Heart className="w-5 h-5 text-emerald-400 mt-0.5 flex-shrink-0" />
+                  <div className="flex-1">
+                    <p className="text-xs text-emerald-200/60 mb-1">Medical Conditions</p>
+                    <div className="flex flex-wrap gap-2 mt-1">
+                      {profile?.medical_conditions && profile.medical_conditions.length > 0 ? (
+                        profile.medical_conditions.map((condition, idx) => (
                           <span
                             key={idx}
                             className="px-2 py-1 rounded-md bg-emerald-500/20 border border-emerald-500/30 text-sm text-emerald-200"
                           >
                             {condition}
                           </span>
-                        ))}
-                      </div>
+                        ))
+                      ) : (
+                        <p className="text-gray-400 text-sm">None reported</p>
+                      )}
                     </div>
                   </div>
-                )}
+                </div>
 
-                {profile?.current_medications && profile.current_medications.length > 0 && (
-                  <div className="flex items-start gap-3">
-                    <Pill className="w-5 h-5 text-emerald-400 mt-0.5 flex-shrink-0" />
-                    <div className="flex-1">
-                      <p className="text-xs text-emerald-200/60 mb-1">Current Medications</p>
-                      <div className="flex flex-wrap gap-2 mt-1">
-                        {profile.current_medications.map((medication, idx) => (
+                <div className="flex items-start gap-3">
+                  <Pill className="w-5 h-5 text-emerald-400 mt-0.5 flex-shrink-0" />
+                  <div className="flex-1">
+                    <p className="text-xs text-emerald-200/60 mb-1">Current Medications</p>
+                    <div className="flex flex-wrap gap-2 mt-1">
+                      {profile?.current_medications && profile.current_medications.length > 0 ? (
+                        profile.current_medications.map((medication, idx) => (
                           <span
                             key={idx}
                             className="px-2 py-1 rounded-md bg-blue-500/20 border border-blue-500/30 text-sm text-blue-200"
                           >
                             {medication}
                           </span>
-                        ))}
-                      </div>
+                        ))
+                      ) : (
+                        <p className="text-gray-400 text-sm">None reported</p>
+                      )}
                     </div>
                   </div>
-                )}
+                </div>
               </div>
             </CardContent>
           </Card>
 
           {/* Emergency Contact */}
-          {(profile?.emergency_contact_name || profile?.emergency_contact_phone) && (
-            <Card className="glass-card border-emerald-500/30 bg-emerald-500/10">
-              <CardContent className="p-6">
-                <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+          <Card className="glass-card border-emerald-500/30 bg-emerald-500/10">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-white flex items-center gap-2">
                   <AlertCircle className="w-5 h-5 text-emerald-400" />
                   Emergency Contact
                 </h3>
-                <div className="space-y-3">
-                  {profile.emergency_contact_name && (
-                    <div className="flex items-start gap-3">
-                      <User className="w-5 h-5 text-emerald-400 mt-0.5 flex-shrink-0" />
-                      <div className="flex-1">
-                        <p className="text-xs text-emerald-200/60 mb-1">Contact Name</p>
-                        <p className="text-white">{profile.emergency_contact_name}</p>
-                      </div>
-                    </div>
-                  )}
-
-                  {profile.emergency_contact_phone && (
-                    <div className="flex items-start gap-3">
-                      <Phone className="w-5 h-5 text-emerald-400 mt-0.5 flex-shrink-0" />
-                      <div className="flex-1">
-                        <p className="text-xs text-emerald-200/60 mb-1">Contact Phone</p>
-                        <p className="text-white">{profile.emergency_contact_phone}</p>
-                      </div>
-                    </div>
-                  )}
+                <button
+                  onClick={handleOpenEmergencyModal}
+                  className="p-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 transition-colors"
+                >
+                  <Edit2 className="w-4 h-4 text-emerald-400" />
+                </button>
+              </div>
+              <div className="space-y-3">
+                <div className="flex items-start gap-3">
+                  <User className="w-5 h-5 text-emerald-400 mt-0.5 flex-shrink-0" />
+                  <div className="flex-1">
+                    <p className="text-xs text-emerald-200/60 mb-1">Contact Name</p>
+                    <p className="text-white">{profile?.emergency_contact_name || 'Not provided'}</p>
+                  </div>
                 </div>
-              </CardContent>
-            </Card>
-          )}
+
+                <div className="flex items-start gap-3">
+                  <Phone className="w-5 h-5 text-emerald-400 mt-0.5 flex-shrink-0" />
+                  <div className="flex-1">
+                    <p className="text-xs text-emerald-200/60 mb-1">Contact Phone</p>
+                    <p className="text-white">{profile?.emergency_contact_phone || 'Not provided'}</p>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
           {/* Logout Button */}
           <Card className="glass-card border-red-500/30 bg-red-500/10">
@@ -498,104 +559,188 @@ const Profile = () => {
         </div>
       </div>
 
-      {/* Height Modal */}
-      <Dialog open={heightModalOpen} onOpenChange={setHeightModalOpen}>
-        <DialogContent className="bg-gradient-to-br from-slate-900 via-emerald-900 to-slate-900 border-emerald-500/30 text-white">
+      {/* Personal Info Modal */}
+      <Dialog open={personalModalOpen} onOpenChange={setPersonalModalOpen}>
+        <DialogContent className="bg-slate-900 border-emerald-500/30 text-white max-w-sm">
           <DialogHeader>
-            <DialogTitle className="text-white flex items-center gap-2">
-              <Ruler className="w-5 h-5 text-emerald-400" />
-              Update Height
-            </DialogTitle>
-            <DialogDescription className="text-emerald-200/70">
-              Enter your height in centimeters (cm)
-            </DialogDescription>
+            <DialogTitle>Personal Information</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <div>
-              <label className="text-sm font-medium text-emerald-200/80 mb-2 block">
-                Height (cm)
-              </label>
+            <div className="space-y-2">
+              <label className="text-xs text-emerald-200/60">Full Name</label>
               <Input
-                type="number"
-                placeholder="e.g., 175"
-                value={heightInput}
-                onChange={(e) => setHeightInput(e.target.value)}
-                className="bg-slate-800/50 border-emerald-500/30 text-white placeholder:text-emerald-300/50 focus:border-emerald-400"
-                min="1"
-                max="300"
-                step="0.1"
+                value={personalForm.full_name}
+                onChange={e => setPersonalForm({...personalForm, full_name: e.target.value})}
+                className="bg-slate-800 border-emerald-500/20"
               />
-              <p className="text-xs text-emerald-200/60 mt-2">
-                Enter a value between 1-300 cm
-              </p>
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs text-emerald-200/60">Phone Number</label>
+              <Input
+                value={personalForm.phone_number}
+                onChange={e => setPersonalForm({...personalForm, phone_number: e.target.value})}
+                className="bg-slate-800 border-emerald-500/20"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs text-emerald-200/60">Date of Birth</label>
+              <Input
+                type="date"
+                value={personalForm.date_of_birth}
+                onChange={e => setPersonalForm({...personalForm, date_of_birth: e.target.value})}
+                className="bg-slate-800 border-emerald-500/20"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs text-emerald-200/60">Gender</label>
+              <select
+                value={personalForm.gender}
+                onChange={e => setPersonalForm({...personalForm, gender: e.target.value})}
+                className="w-full bg-slate-800 border border-emerald-500/20 rounded-md p-2 text-sm"
+              >
+                <option value="">Select Gender</option>
+                <option value="male">Male</option>
+                <option value="female">Female</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs text-emerald-200/60">Address</label>
+              <textarea
+                value={personalForm.address}
+                onChange={e => setPersonalForm({...personalForm, address: e.target.value})}
+                className="w-full bg-slate-800 border border-emerald-500/20 rounded-md p-2 text-sm h-20 resize-none"
+              />
             </div>
           </div>
           <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setHeightModalOpen(false)}
-              className="border-emerald-500/30 text-emerald-200 hover:bg-emerald-500/20"
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={handleSaveHeight}
-              disabled={saving || !heightInput}
-              className="bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white"
-            >
-              {saving ? 'Saving...' : 'Save'}
-            </Button>
+            <Button variant="ghost" onClick={() => setPersonalModalOpen(false)}>Cancel</Button>
+            <Button onClick={handleSavePersonal} disabled={saving}>{saving ? 'Saving...' : 'Save'}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Medical Info Modal */}
+      <Dialog open={medicalModalOpen} onOpenChange={setMedicalModalOpen}>
+        <DialogContent className="bg-slate-900 border-emerald-500/30 text-white max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Medical Information</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label className="text-xs text-emerald-200/60">Blood Type</label>
+              <select
+                value={medicalForm.blood_type}
+                onChange={e => setMedicalForm({...medicalForm, blood_type: e.target.value})}
+                className="w-full bg-slate-800 border border-emerald-500/20 rounded-md p-2 text-sm"
+              >
+                <option value="">Select Blood Type</option>
+                {['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'].map(t => (
+                  <option key={t} value={t}>{t}</option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs text-emerald-200/60">Allergies (comma separated)</label>
+              <textarea
+                value={medicalForm.allergies}
+                onChange={e => setMedicalForm({...medicalForm, allergies: e.target.value})}
+                className="w-full bg-slate-800 border border-emerald-500/20 rounded-md p-2 text-sm h-20 resize-none"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs text-emerald-200/60">Conditions (comma separated)</label>
+              <textarea
+                value={medicalForm.medical_conditions}
+                onChange={e => setMedicalForm({...medicalForm, medical_conditions: e.target.value})}
+                className="w-full bg-slate-800 border border-emerald-500/20 rounded-md p-2 text-sm h-20 resize-none"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs text-emerald-200/60">Medications (comma separated)</label>
+              <textarea
+                value={medicalForm.current_medications}
+                onChange={e => setMedicalForm({...medicalForm, current_medications: e.target.value})}
+                className="w-full bg-slate-800 border border-emerald-500/20 rounded-md p-2 text-sm h-20 resize-none"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setMedicalModalOpen(false)}>Cancel</Button>
+            <Button onClick={handleSaveMedical} disabled={saving}>{saving ? 'Saving...' : 'Save'}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Emergency Contact Modal */}
+      <Dialog open={emergencyModalOpen} onOpenChange={setEmergencyModalOpen}>
+        <DialogContent className="bg-slate-900 border-emerald-500/30 text-white max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Emergency Contact</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label className="text-xs text-emerald-200/60">Contact Name</label>
+              <Input
+                value={emergencyForm.emergency_contact_name}
+                onChange={e => setEmergencyForm({...emergencyForm, emergency_contact_name: e.target.value})}
+                className="bg-slate-800 border-emerald-500/20"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs text-emerald-200/60">Contact Phone</label>
+              <Input
+                value={emergencyForm.emergency_contact_phone}
+                onChange={e => setEmergencyForm({...emergencyForm, emergency_contact_phone: e.target.value})}
+                className="bg-slate-800 border-emerald-500/20"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setEmergencyModalOpen(false)}>Cancel</Button>
+            <Button onClick={handleSaveEmergency} disabled={saving}>{saving ? 'Saving...' : 'Save'}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Height Modal */}
+      <Dialog open={heightModalOpen} onOpenChange={setHeightModalOpen}>
+        <DialogContent className="bg-slate-900 border-emerald-500/30 text-white max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Update Height</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <Input
+              type="number"
+              value={heightInput}
+              onChange={e => setHeightInput(e.target.value)}
+              className="bg-slate-800 border-emerald-500/20"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setHeightModalOpen(false)}>Cancel</Button>
+            <Button onClick={handleSaveHeight} disabled={saving}>{saving ? 'Saving...' : 'Save'}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* Weight Modal */}
       <Dialog open={weightModalOpen} onOpenChange={setWeightModalOpen}>
-        <DialogContent className="bg-gradient-to-br from-slate-900 via-emerald-900 to-slate-900 border-emerald-500/30 text-white">
+        <DialogContent className="bg-slate-900 border-emerald-500/30 text-white max-w-sm">
           <DialogHeader>
-            <DialogTitle className="text-white flex items-center gap-2">
-              <Scale className="w-5 h-5 text-emerald-400" />
-              Update Weight
-            </DialogTitle>
-            <DialogDescription className="text-emerald-200/70">
-              Enter your weight in kilograms (kg)
-            </DialogDescription>
+            <DialogTitle>Update Weight</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <div>
-              <label className="text-sm font-medium text-emerald-200/80 mb-2 block">
-                Weight (kg)
-              </label>
-              <Input
-                type="number"
-                placeholder="e.g., 70"
-                value={weightInput}
-                onChange={(e) => setWeightInput(e.target.value)}
-                className="bg-slate-800/50 border-emerald-500/30 text-white placeholder:text-emerald-300/50 focus:border-emerald-400"
-                min="1"
-                max="500"
-                step="0.1"
-              />
-              <p className="text-xs text-emerald-200/60 mt-2">
-                Enter a value between 1-500 kg
-              </p>
-            </div>
+            <Input
+              type="number"
+              value={weightInput}
+              onChange={e => setWeightInput(e.target.value)}
+              className="bg-slate-800 border-emerald-500/20"
+            />
           </div>
           <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setWeightModalOpen(false)}
-              className="border-emerald-500/30 text-emerald-200 hover:bg-emerald-500/20"
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={handleSaveWeight}
-              disabled={saving || !weightInput}
-              className="bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white"
-            >
-              {saving ? 'Saving...' : 'Save'}
-            </Button>
+            <Button variant="ghost" onClick={() => setWeightModalOpen(false)}>Cancel</Button>
+            <Button onClick={handleSaveWeight} disabled={saving}>{saving ? 'Saving...' : 'Save'}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
