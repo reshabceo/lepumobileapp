@@ -44,6 +44,7 @@ import {
   Timer,
   CheckCircle,
 } from "lucide-react";
+import { Capacitor } from "@capacitor/core";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
@@ -139,7 +140,14 @@ export const AIDoctorConsult: React.FC = () => {
   const [paymentStatus, setPaymentStatus] = useState<"unpaid" | "paid" | "expired">("unpaid");
   const [sessionExpiresAt, setSessionExpiresAt] = useState<string | null>(null);
   const [expiryCountdown, setExpiryCountdown] = useState<string>("");
-  const [pricing, setPricing] = useState<AIDoctorPricing | null>(null);
+  const [pricing, setPricing] = useState<AIDoctorPricing | null>(() => {
+    // Immediate fallback values for better UX
+    return {
+      price_text_paise: 10000,
+      price_voice_paise: 15000,
+      currency: "INR"
+    };
+  });
   const [payingMode, setPayingMode] = useState<"text" | "voice" | null>(null);
   const [isPaymentLoading, setIsPaymentLoading] = useState(false);
 
@@ -2086,9 +2094,18 @@ export const AIDoctorConsult: React.FC = () => {
                     placeholder="Describe your symptoms or attach medical reports..."
                     className="min-h-[52px] max-h-32 resize-none bg-[#050816]/80 border-white/10 text-sm text-white placeholder:text-gray-500"
                     onKeyDown={(e) => {
-                      if (e.key === "Enter" && !e.shiftKey) {
-                        e.preventDefault();
-                        void handleSend();
+                      // On mobile, Enter should start a new line. 
+                      // On web/desktop, Enter sends, Shift+Enter starts a new line.
+                      const isMobile = Capacitor.getPlatform() !== "web";
+                      if (e.key === "Enter") {
+                        if (isMobile) {
+                          // Allow default behavior (new line)
+                          return;
+                        }
+                        if (!e.shiftKey) {
+                          e.preventDefault();
+                          void handleSend();
+                        }
                       }
                     }}
                   />

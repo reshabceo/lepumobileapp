@@ -259,7 +259,7 @@ export const useRealTimeChat = (conversationId?: string) => {
             if (error) throw error;
             return data;
         } catch (err) {
-            console.error('Error getting/creating conversation:', err);
+            console.error('Error getting/creating conversation:', JSON.stringify(err, null, 2));
             throw err;
         }
     }, []);

@@ -32,6 +32,14 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
+  // Bypass service worker for S3 and Supabase storage/auth requests
+  if (
+    event.request.url.includes('amazonaws.com') || 
+    event.request.url.includes('supabase.co')
+  ) {
+    return;
+  }
+
   event.respondWith(
     // For HTML files, always fetch fresh content
     event.request.destination === 'document' ? 

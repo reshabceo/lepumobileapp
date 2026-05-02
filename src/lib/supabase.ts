@@ -22,100 +22,113 @@ console.log('🔍 Supabase Debug - Anon Key:', supabaseAnonKey.substring(0, 20) 
 // Supabase requests through Capacitor's native HTTP on native platforms.
 const isNative = Capacitor?.isNativePlatform?.() === true
 
-const nativeFetch: typeof fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
-  const isReqObj = typeof input !== 'string' && !(input instanceof URL)
-  const req = isReqObj ? (input as Request) : undefined
-  const url = isReqObj ? req!.url : String(input)
-  const method = (init?.method || req?.method || 'GET').toUpperCase()
+// 🛡️ Global Fetch Patch for Native Platforms
+// This ensures all third-party SDKs (Razorpay, AWS, etc.) use CapacitorHttp
+const originalFetch = window.fetch;
 
-  // Check if this is a file upload (FormData or Blob/File)
+const nativeFetch: typeof fetch = async (input: RequestInfo | URL, init?: React.RequestInit) => {
+  const isReqObj = typeof input !== 'string' && !(input instanceof URL);
+  const req = isReqObj ? (input as Request) : undefined;
+  const url = isReqObj ? req!.url : String(input);
+  const method = (init?.method || req?.method || 'GET').toUpperCase();
+
+  // 🛡️ SECURITY: Log request for debugging
+  console.log(`🌐 [GlobalFetch] ${method} ${url}`);
+
+  // Check if this is a file upload or a local/blob URL
   const isFileUpload = init?.body instanceof FormData || 
                        init?.body instanceof Blob || 
-                       init?.body instanceof File ||
-                       req?.body instanceof FormData ||
-                       req?.body instanceof Blob ||
-                       req?.body instanceof File
+                       init?.body instanceof File;
+  const isLocalUrl = url.startsWith('blob:') || url.startsWith('data:') || url.startsWith('file:');
 
-  // For file uploads on native platforms, use default fetch (Supabase handles it internally)
-  // CapacitorHttp doesn't handle FormData/File uploads well, so fallback to default fetch
-  if (isFileUpload) {
-    console.log('📤 File upload detected - using default fetch for native platform');
-    return fetch(input, init);
+  if (isFileUpload || isLocalUrl) {
+    return originalFetch(input, init);
   }
 
-  // Normalize headers to a plain object
-  const headerEntries = new Headers(init?.headers || req?.headers)
-  const headers: Record<string, string> = {}
-  headerEntries.forEach((value, key) => { headers[key] = value })
+  // Robust header extraction
+  const headers: Record<string, string> = {};
+  const headerEntries = new Headers(init?.headers || req?.headers);
+  headerEntries.forEach((value, key) => { headers[key] = value; });
 
-  // Parse JSON body when provided as string; CapacitorHttp expects an object for JSON
-  let data: any
+  // Handle JSON data correctly for CapacitorHttp
+  let data: any;
   if (init?.body) {
     try {
-      data = typeof init.body === 'string' ? JSON.parse(init.body) : init.body
+      data = typeof init.body === 'string' ? JSON.parse(init.body) : init.body;
     } catch {
-      // Fallback to raw string if not JSON
-      data = init.body
+      data = init.body;
     }
   }
 
-  const response = await CapacitorHttp.request({ url, method, headers, data })
+  try {
+    const response = await CapacitorHttp.request({ url, method, headers, data });
 
-  // Construct a fetch-compatible Response
-  const body = typeof response.data === 'string' ? response.data : JSON.stringify(response.data)
-  const respHeaders = new Headers()
-  // Copy known headers if available
-  if (response.headers) {
-    Object.entries(response.headers).forEach(([k, v]) => {
-      try { if (typeof v === 'string') respHeaders.set(k, v) } catch { /* no-op */ }
-    })
-  }
-  // Ensure JSON content-type when body is JSON
-  if (body && !respHeaders.has('content-type') && typeof response.data !== 'string') {
-    respHeaders.set('content-type', 'application/json')
-  }
+    // Construct fetch-compatible Response
+    const responseBody = typeof response.data === 'string' 
+      ? response.data 
+      : JSON.stringify(response.data);
 
-  return new Response(body, { status: response.status, headers: respHeaders })
+    const responseHeaders = new Headers();
+    if (response.headers) {
+      Object.entries(response.headers).forEach(([k, v]) => {
+        if (typeof v === 'string') responseHeaders.set(k, v);
+      });
+    }
+
+    return new Response(responseBody, {
+      status: response.status,
+      headers: responseHeaders,
+    });
+  } catch (err) {
+    console.error(`🚨 [GlobalFetch] Error for ${url}:`, err);
+    // Fallback to original fetch if CapacitorHttp fails criticaly
+    return originalFetch(input, init);
+  }
+};
+
+if (isNative) {
+  console.log('💉 [Native] Patching global fetch with CapacitorHttp');
+  window.fetch = nativeFetch as any;
 }
 
-console.log('🔍 Supabase Debug - Using native fetch:', isNative)
-
-// Use Capacitor HTTP on native platforms to fix "TypeError: Load failed" errors
-// On web, use default fetch
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   global: {
-    fetch: isNative ? nativeFetch : undefined, // Use Capacitor HTTP on native, default fetch on web
+    fetch: isNative ? nativeFetch as any : undefined,
   },
   auth: {
-    // Use localStorage for both web and native (works on iOS via WKWebView)
     storage: {
       getItem: (key: string) => {
         try {
-          return localStorage.getItem(key);
+          const val = localStorage.getItem(key);
+          if (val) console.log(`🔑 [Storage] Get: ${key} (found)`);
+          return val;
         } catch (error) {
-          console.error('❌ [Supabase] localStorage.getItem error:', error);
+          console.error('❌ [Storage] Get error:', error);
           return null;
         }
       },
       setItem: (key: string, value: string) => {
         try {
           localStorage.setItem(key, value);
+          console.log(`🔑 [Storage] Set: ${key}`);
         } catch (error) {
-          console.error('❌ [Supabase] localStorage.setItem error:', error);
+          console.error('❌ [Storage] Set error:', error);
         }
       },
       removeItem: (key: string) => {
         try {
           localStorage.removeItem(key);
+          console.log(`🔑 [Storage] Remove: ${key}`);
         } catch (error) {
-          console.error('❌ [Supabase] localStorage.removeItem error:', error);
+          console.error('❌ [Storage] Remove error:', error);
         }
       },
     },
     persistSession: true,
     autoRefreshToken: true,
+    detectSessionInUrl: true,
   },
-})
+});
 
 // ECG Data Storage Functions
 export async function storeEcgRecording(ecgData: {
