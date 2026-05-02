@@ -30,19 +30,35 @@ interface Doctor {
 }
 
 export const DoctorInfoCard: React.FC = React.memo(() => {
-  const [doctor, setDoctor] = useState<Doctor | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const { user } = useAuth();
   const navigate = useNavigate();
   const { currentCall, initiateCall } = usePatientVideoCall(user?.id);
   
+  const cacheKey = useMemo(() => user ? `doctor_info_${user.id}` : null, [user?.id]);
+
+  const [doctor, setDoctor] = useState<Doctor | null>(() => {
+    if (typeof window !== 'undefined' && user?.id) {
+      const cached = localStorage.getItem(`doctor_info_${user.id}`);
+      if (cached) {
+        try {
+          const parsed = JSON.parse(cached);
+          const cacheTime = parsed._cached_at || 0;
+          if (Date.now() - cacheTime < 10 * 60 * 1000) {
+            return parsed;
+          }
+        } catch (e) {
+          console.warn('Failed to parse cached doctor info', e);
+        }
+      }
+    }
+    return null;
+  });
+  const [loading, setLoading] = useState(!doctor);
+  const [error, setError] = useState<string | null>(null);
+  
   // Prevent multiple simultaneous fetches
   const fetchingRef = useRef(false);
   const lastUserIdRef = useRef<string | null>(null);
-  
-  // Cache key for localStorage
-  const cacheKey = useMemo(() => user ? `doctor_info_${user.id}` : null, [user?.id]);
 
   useEffect(() => {
     const fetchDoctorInfo = async () => {
