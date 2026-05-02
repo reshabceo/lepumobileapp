@@ -54,42 +54,57 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     // Get initial session
     // Get initial session
     const initializeAuth = async () => {
+      console.log('🔄 [Auth] Starting initialization...');
+      const isNative = Capacitor.isNativePlatform();
+      
       // Safety timeout: Ensure loading state is eventually released
       const timeoutId = setTimeout(() => {
         setIsLoading(current => {
           if (current) {
-            console.warn('⚠️ Auth initialization timed out - forcing release of loading state');
+            console.warn('⚠️ [Auth] Initialization timed out - forcing release');
             return false;
           }
           return current;
         });
-      }, 8000);
+      }, 10000);
 
       try {
-        const { user, error } = await auth.getCurrentUser();
-        if (user && !error) {
-          const { data: { session: currentSession } } = await supabase.auth.getSession();
-          setUser(user);
-          setSession(currentSession ?? null);
-          console.log('🔍 Auth Debug - Initial user loaded:', user.email);
+        // On native, give localStorage a moment to be ready
+        if (isNative) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+
+        const { user, error: userError } = await auth.getCurrentUser();
+        
+        if (userError) {
+          console.error('❌ [Auth] Error getting current user:', userError);
+        }
+
+        if (user) {
+          console.log('👤 [Auth] User detected:', user.email);
+          const { data: { session: currentSession }, error: sessionError } = await supabase.auth.getSession();
           
-          // Check for doctor in background
-          isDoctorByAuthId(user.id).then(async (isDoctor) => {
-            if (isDoctor) {
-              console.log('🚫 Patient app: doctor detected - signing out');
-              await supabase.auth.signOut();
-              setUser(null);
-              setSession(null);
-            }
-          });
+          if (sessionError) {
+            console.error('❌ [Auth] Session fetch error:', sessionError);
+          }
+
+          if (currentSession) {
+            console.log('✅ [Auth] Session restored successfully');
+            setUser(user);
+            setSession(currentSession);
+          } else {
+            console.warn('⚠️ [Auth] User found but session missing - signing out');
+            await supabase.auth.signOut();
+            setUser(null);
+            setSession(null);
+          }
         } else {
+          console.log('ℹ️ [Auth] No user found');
           setUser(null);
           setSession(null);
         }
       } catch (error) {
-        console.error('❌ Auth initialization failed:', error);
-        setUser(null);
-        setSession(null);
+        console.error('❌ [Auth] Critical initialization failure:', error);
       } finally {
         clearTimeout(timeoutId);
         setIsLoading(false);

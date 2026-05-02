@@ -28,6 +28,9 @@
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
 
+    <!-- Microphone Permission -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
     <!-- Network State Permission (helps with better network error handling) -->
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />

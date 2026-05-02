@@ -233,10 +233,10 @@ export const HealthDashboard = () => {
       cancelled = true;
     };
   }, [patientRowId]);
-  
+
   // Insurance claims notifications
   const { unreadCount: claimsUnreadCount, markAsRead: markClaimsAsRead } = useInsuranceClaimsNotifications();
-  
+
   // Health recommendations notifications
   const { unreadCount: recommendationsUnreadCount, markAsRead: markRecommendationsAsRead } = useHealthRecommendationsNotifications();
 
@@ -314,13 +314,13 @@ export const HealthDashboard = () => {
     const hasBP2Connected = connectedDevice?.name?.includes('BP2') || connectedDevice?.name?.includes('3049');
     const hasCGMConnected = cgmConnected;
     const hasCameraConnected = cameraConnected;
-    
+
     if (hasBP2Connected && hasCGMConnected && hasCameraConnected && deviceStatusExpanded) {
       // Auto-collapse after a short delay to show the user all devices are connected
       const timer = setTimeout(() => {
         setDeviceStatusExpanded(false);
       }, 2000); // 2 second delay
-      
+
       return () => clearTimeout(timer);
     }
   }, [connectedDevice, cgmConnected, cameraConnected, deviceStatusExpanded]);
@@ -347,9 +347,9 @@ export const HealthDashboard = () => {
         typeof f === "string"
           ? { fileName: f }
           : {
-              fileName: (f as { fileName?: string }).fileName || String(f),
-              fileType: (f as { fileType?: number }).fileType,
-            }
+            fileName: (f as { fileName?: string }).fileName || String(f),
+            fileType: (f as { fileType?: number }).fileType,
+          }
       );
 
       console.log("📁 BP2 files:", fileEntries);
@@ -717,7 +717,7 @@ export const HealthDashboard = () => {
 
   // Main loading state
   const loading = (vitalsLoading || !patientProfile) && !forceStopLoading;
-  
+
   if (loading && !patientProfile) {
     return (
       <div className="bg-[#101010] min-h-screen text-white flex items-center justify-center">
@@ -794,7 +794,7 @@ export const HealthDashboard = () => {
               <User className="w-5 h-5 text-white" />
               <ChevronDown className={`w-4 h-4 text-white transition-transform duration-200 ${isDropdownOpen ? 'rotate-180' : ''}`} />
             </button>
-            
+
             {/* User Dropdown Menu */}
             {isDropdownOpen && (
               <div className="absolute right-0 top-full mt-2 w-48 bg-[#21262D] border border-gray-700 rounded-lg shadow-lg z-50">
@@ -846,9 +846,8 @@ export const HealthDashboard = () => {
               </h3>
               <div className="flex items-center gap-2">
                 <div
-                  className={`w-3 h-3 rounded-full ${
-                    bluetoothEnabled ? "bg-green-500" : "bg-red-500"
-                  }`}
+                  className={`w-3 h-3 rounded-full ${bluetoothEnabled ? "bg-green-500" : "bg-red-500"
+                    }`}
                 />
                 <span className="text-sm text-gray-400">
                   {bluetoothEnabled ? "Bluetooth On" : "Bluetooth Off"}
@@ -858,11 +857,10 @@ export const HealthDashboard = () => {
 
             {/* Collapsible Device Status Content */}
             <div
-              className={`transition-all duration-300 overflow-hidden ${
-                deviceStatusExpanded
-                  ? "max-h-96 opacity-100"
-                  : "max-h-0 opacity-0"
-              }`}
+              className={`transition-all duration-300 overflow-hidden ${deviceStatusExpanded
+                ? "max-h-96 opacity-100"
+                : "max-h-0 opacity-0"
+                }`}
             >
               {/* BP & ECG Device Status */}
               {connectedDevice ? (
@@ -917,14 +915,14 @@ export const HealthDashboard = () => {
                           try {
                             setIsConnecting(true);
                             setConnectionStatus("Initializing...");
-                            
+
                             // Step 1: Ensure SDK is initialized
                             if (!isInitialized) {
                               console.log("🚀 Initializing Wellue SDK...");
                               await manualInitializeSDK();
                               await new Promise(resolve => setTimeout(resolve, 1000));
                             }
-                            
+
                             // Step 2: Check if device is already connected
                             if (connectedDevice) {
                               console.log("✅ Device already connected:", connectedDevice.name);
@@ -932,12 +930,12 @@ export const HealthDashboard = () => {
                               setConnectionStatus("");
                               return;
                             }
-                            
+
                             // Step 3: Robust scanning with retry mechanism
                             const maxRetries = 3;
                             let retryCount = 0;
                             let deviceFound = false;
-                            
+
                             while (retryCount < maxRetries && !deviceFound) {
                               if (retryCount > 0) {
                                 setConnectionStatus("Refreshing scan...");
@@ -948,19 +946,19 @@ export const HealthDashboard = () => {
                                 setConnectionStatus("Scanning for devices...");
                                 console.log("🔍 Starting initial device scan...");
                               }
-                              
+
                               // Start fresh scan
                               await startScan();
-                              
+
                               // Wait for devices to be found with longer timeout
                               let scanTime = 0;
                               const scanTimeout = 4000; // 4 seconds per attempt
-                              
+
                               while (scanTime < scanTimeout && availableDevices.length === 0) {
                                 await new Promise(resolve => setTimeout(resolve, 200));
                                 scanTime += 200;
                               }
-                              
+
                               if (availableDevices.length > 0) {
                                 deviceFound = true;
                                 console.log(`✅ Found ${availableDevices.length} device(s) on attempt ${retryCount + 1}`);
@@ -969,22 +967,22 @@ export const HealthDashboard = () => {
                                 console.log(`❌ No devices found on attempt ${retryCount}, retrying...`);
                               }
                             }
-                            
+
                             // Step 4: Auto-connect to first BP2 device found
                             if (deviceFound && availableDevices.length > 0) {
-                              const bp2Device = availableDevices.find(device => 
-                                device.name.toLowerCase().includes('bp2') || 
+                              const bp2Device = availableDevices.find(device =>
+                                device.name.toLowerCase().includes('bp2') ||
                                 device.name.toLowerCase().includes('3049')
                               ) || availableDevices[0];
-                              
+
                               setConnectionStatus(`Connecting to ${bp2Device.name}...`);
                               console.log("🔗 Auto-connecting to device:", bp2Device.name);
-                              
+
                               await connectToDevice(bp2Device);
-                              
+
                               // Store last connected device
                               localStorage.setItem("lastConnectedDevice", bp2Device.id);
-                              
+
                               setConnectionStatus("");
                               toast({
                                 title: "✅ Connected!",
@@ -993,12 +991,12 @@ export const HealthDashboard = () => {
                             } else {
                               throw new Error("No BP2 devices found after multiple scan attempts. Please ensure your device is on and nearby.");
                             }
-                            
+
                           } catch (error) {
                             console.error("❌ Smart Connect failed:", error);
                             setIsConnecting(false);
                             setConnectionStatus("");
-                            
+
                             toast({
                               title: "Connection Failed",
                               description: error instanceof Error ? error.message : "Failed to connect to device",
@@ -1007,11 +1005,10 @@ export const HealthDashboard = () => {
                           }
                         }}
                         disabled={isConnecting || !bluetoothEnabled}
-                        className={`${
-                          !bluetoothEnabled 
-                            ? "bg-gray-500 cursor-not-allowed" 
-                            : "bg-blue-500 hover:bg-blue-600"
-                        } disabled:bg-blue-400 disabled:cursor-not-allowed text-white text-xs font-medium px-3 py-1.5 rounded-lg transition-all duration-200 flex items-center gap-1`}
+                        className={`${!bluetoothEnabled
+                          ? "bg-gray-500 cursor-not-allowed"
+                          : "bg-blue-500 hover:bg-blue-600"
+                          } disabled:bg-blue-400 disabled:cursor-not-allowed text-white text-xs font-medium px-3 py-1.5 rounded-lg transition-all duration-200 flex items-center gap-1`}
                       >
                         {!bluetoothEnabled ? (
                           <>
@@ -1137,9 +1134,8 @@ export const HealthDashboard = () => {
               <div className="flex items-center gap-3 text-xs">
                 <div className="flex items-center gap-1">
                   <div
-                    className={`w-2 h-2 rounded-full ${
-                      connectedDevice ? "bg-green-500" : "bg-gray-500"
-                    }`}
+                    className={`w-2 h-2 rounded-full ${connectedDevice ? "bg-green-500" : "bg-gray-500"
+                      }`}
                   />
                   <span className="text-gray-400">BP/ECG</span>
                 </div>
@@ -1292,7 +1288,7 @@ export const HealthDashboard = () => {
             className="bg-emerald-900/60 backdrop-blur-sm hover:bg-emerald-800/70 text-white font-bold py-4 rounded-xl flex flex-col items-center justify-center gap-1 transition-all duration-200 hover:scale-105 active:scale-95 border border-emerald-400/40 hover:border-emerald-400/60"
           >
             <Stethoscope size={20} className="text-emerald-400" />
-            <span className="text-xs">AI Doc</span>
+            <span className="text-xs">AI Health Assistant</span>
           </button>
           <button
             onClick={() => {
@@ -1321,7 +1317,7 @@ export const HealthDashboard = () => {
             className="bg-purple-900/60 backdrop-blur-sm hover:bg-purple-800/70 text-white font-bold py-4 rounded-xl flex flex-col items-center justify-center gap-1 transition-all duration-200 hover:scale-105 active:scale-95 border border-purple-400/40 hover:border-purple-400/60"
           >
             <Pill size={20} className="text-purple-400" />
-            <span className="text-xs">Rx</span>
+            <span className="text-xs">Prescriptions</span>
           </button>
           <button
             onClick={() => {

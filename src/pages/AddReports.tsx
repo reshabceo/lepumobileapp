@@ -11,6 +11,13 @@ import { Camera as CapacitorCamera, CameraResultType, CameraSource } from '@capa
 import { App } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
 import { Network } from '@capacitor/network';
+import { Uploader } from '@capgo/capacitor-uploader';
+import { FilePicker } from '@capawesome/capacitor-file-picker';
+import { getS3PresignedUrl } from '@/services/s3MultipartUploadService';
+
+const SUPABASE_LIMIT_MB = 40;
+const SUPABASE_LIMIT_BYTES = SUPABASE_LIMIT_MB * 1024 * 1024;
+const S3_BUCKET = import.meta.env.VITE_AWS_S3_BUCKET || 'monitraq-dicom-upload-bucket';
 
 // Main Add Report Component
 export default function AddReports() {
@@ -98,8 +105,35 @@ export default function AddReports() {
     navigate('/reports');
   };
 
-  const handleFileUpload = () => {
+  const handleFileUpload = async () => {
     try {
+      if (Capacitor.isNativePlatform()) {
+        const result = await FilePicker.pickFiles({
+          multiple: false,
+          types: ['image/jpeg', 'image/png', 'application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']
+        });
+        if (result.files.length > 0) {
+          const file = result.files[0];
+          // On native, we store the file info in a way that we can use it later
+          // We can't easily create a File object from a path without reading it into memory,
+          // which we want to avoid. So we'll store the picker result.
+          (window as any)._nativeSelectedFile = file;
+          setSelectedFile({
+            name: file.name,
+            size: file.size,
+            type: file.mimeType,
+            // Mock enough of the File interface for UI
+          } as any);
+          setIsDicomUpload(false);
+          setSelectedDicomFiles([]);
+          toast({
+            title: "File Selected",
+            description: `${file.name} (${(file.size / (1024 * 1024)).toFixed(2)}MB) is ready to upload`,
+          });
+        }
+        return;
+      }
+
       if (fileInputRef.current) fileInputRef.current.value = '';
       setSelectingFile(true);
       fileInputRef.current?.click();
@@ -111,8 +145,39 @@ export default function AddReports() {
     }
   };
 
-  const handleDicomOrZipUpload = () => {
+  const handleDicomOrZipUpload = async () => {
     try {
+      if (Capacitor.isNativePlatform()) {
+        const result = await FilePicker.pickFiles({
+          multiple: false, // For now, handle single ZIP/DCM on native for simplicity
+          types: ['application/zip', 'application/octet-stream', '.dcm', '.dicom']
+        });
+        if (result.files.length > 0) {
+          const file = result.files[0];
+          const isZip = file.name.toLowerCase().endsWith('.zip') || file.mimeType.includes('zip');
+          const isDicom = file.name.toLowerCase().endsWith('.dcm') || file.name.toLowerCase().endsWith('.dicom');
+
+          if (!isZip && !isDicom) {
+            toast({ title: "Invalid", description: "Select only ZIP or DCM (.dcm) files.", variant: "destructive" });
+            return;
+          }
+
+          (window as any)._nativeSelectedFile = file;
+          setSelectedFile({
+            name: file.name,
+            size: file.size,
+            type: file.mimeType,
+          } as any);
+          setIsDicomUpload(true);
+          setSelectedDicomFiles([{ name: file.name, size: file.size, type: file.mimeType } as any]);
+          toast({
+            title: "DICOM / ZIP selected",
+            description: `${file.name} ready. Request radiologist from Reports → DICOM.`,
+          });
+        }
+        return;
+      }
+
       if (dicomFileInputRef.current) dicomFileInputRef.current.value = '';
       setSelectingFile(true);
       dicomFileInputRef.current?.click();
@@ -500,32 +565,122 @@ export default function AddReports() {
       return false;
     }
 
-    // DICOM / ZIP path: upload to dicom-files and dicom_studies
-    if (isDicomUpload) {
-      setUploading(true);
-      setUploadProgress(0);
-      const studyId = (typeof crypto.randomUUID === 'function') ? crypto.randomUUID() : (Date.now().toString(36) + Math.random().toString(36).substring(2));
-      const isZip = filesToUse.length === 1 && (filesToUse[0].name.toLowerCase().endsWith('.zip') || filesToUse[0].type === 'application/zip');
-      try {
-        setUploadProgress(20);
-        if (isZip) {
-          const safeFileName = filesToUse[0].name.replace(/[^a-zA-Z0-9.-]/g, '_');
-          const { error: uploadError } = await supabase.storage
-            .from('dicom-files')
-            .upload(`studies/${studyId}/original/${safeFileName}`, filesToUse[0], { cacheControl: '3600', upsert: false });
-          if (uploadError) throw uploadError;
+    setUploading(true);
+    setUploadProgress(0);
+
+    try {
+      const isNative = Capacitor.isNativePlatform();
+      const nativeFile = isNative ? (window as any)._nativeSelectedFile : null;
+      const file = filesToUse[0];
+      const fileSize = file.size;
+      const fileType = file.type || 'application/octet-stream';
+      const fileNameRaw = file.name;
+
+      console.log(`📤 [Upload] Starting [${isNative ? 'NATIVE' : 'WEB'}]:`, {
+        name: fileNameRaw,
+        size: fileSize,
+        type: fileType,
+        isDicom: isDicomUpload
+      });
+
+      // ── Determine Storage Destination ──
+      const useS3 = fileSize > SUPABASE_LIMIT_BYTES;
+      const storageType = useS3 ? 's3' : 'supabase';
+      console.log(`📍 [Upload] Routing to ${storageType.toUpperCase()} (Size limit: ${SUPABASE_LIMIT_MB}MB)`);
+      
+      // ── Generate Path & ID ──
+      const studyId = generateId();
+      const isZip = isDicomUpload && (fileNameRaw.toLowerCase().endsWith('.zip') || fileType.includes('zip'));
+      const safeName = fileNameRaw.replace(/[^a-zA-Z0-9._-]/g, '_');
+      
+      let storagePath: string;
+      if (isDicomUpload) {
+        storagePath = isZip
+          ? `studies/${studyId}/original/${safeName}`
+          : `studies/${studyId}/${generateId()}/${safeName}`;
+      } else {
+        const timestamp = Date.now();
+        const randomId = Math.random().toString(36).substring(7);
+        storagePath = `${profile.id}/report_${timestamp}_${randomId}.${fileNameRaw.split('.').pop()?.toLowerCase() || 'jpg'}`;
+      }
+      console.log(`📁 [Upload] Target path: ${storagePath}`);
+
+      let uploadUrl: string;
+      let headers: Record<string, string> = {
+        'Content-Type': fileType
+      };
+
+      if (isNative && nativeFile) {
+        // ── Native Upload Flow ──
+        setUploadProgress(10);
+        if (useS3) {
+          console.log('🔗 [Upload] Generating S3 Presigned URL...');
+          const s3Key = isDicomUpload ? `dicom/${profile.id}/${storagePath}` : `reports/${storagePath}`;
+          uploadUrl = await getS3PresignedUrl(s3Key, fileType);
+          console.log('✅ [Upload] S3 Presigned URL generated');
         } else {
-          for (let i = 0; i < filesToUse.length; i++) {
-            const f = filesToUse[i];
-            const seriesId = (typeof crypto.randomUUID === 'function') ? crypto.randomUUID() : (Date.now().toString(36) + Math.random().toString(36).substring(2));
-            const safeFileName = f.name.replace(/[^a-zA-Z0-9.-]/g, '_');
-            const path = `studies/${studyId}/${seriesId}/${safeFileName}`;
-            const { error: uploadError } = await supabase.storage.from('dicom-files').upload(path, f, { cacheControl: '3600', upsert: false });
-            if (uploadError) throw uploadError;
-            setUploadProgress(20 + Math.round((60 * (i + 1)) / filesToUse.length));
+          console.log(`🔗 [Upload] Generating Supabase Signed URL for bucket: ${isDicomUpload ? 'dicom-files' : 'patient-reports'}`);
+          const bucket = isDicomUpload ? 'dicom-files' : 'patient-reports';
+          const { data, error } = await supabase.storage.from(bucket).createSignedUploadUrl(storagePath);
+          if (error) {
+            console.error('❌ [Upload] Supabase Signed URL error:', error);
+            throw error;
           }
+          uploadUrl = data.signedUrl;
+          console.log('✅ [Upload] Supabase Signed URL generated');
         }
-        setUploadProgress(80);
+
+        setUploadProgress(30);
+        console.log(`🚀 Native uploading to ${storageType}... Path: ${nativeFile.path}`);
+
+        // Add progress listener for native uploader
+        const progressListener = await Uploader.addListener('uploadProgress', (info) => {
+          if (info.progress) {
+            const percent = Math.round(info.progress);
+            setUploadProgress(30 + (percent * 0.6)); // Scale 30-90%
+            console.log(`📤 Native Upload Progress: ${percent}%`);
+          }
+        });
+
+        try {
+          console.log(`📡 [Upload] Executing PUT request to: ${uploadUrl.substring(0, 50)}...`);
+          const uploadResult = await Uploader.upload({
+            url: uploadUrl,
+            path: nativeFile.path,
+            method: 'PUT',
+            headers: headers,
+            mimeType: fileType,
+          });
+          console.log('✅ [Upload] Native upload success:', uploadResult);
+        } catch (nativeErr) {
+          console.error('❌ [Upload] Native Uploader CRASHED:', nativeErr);
+          throw nativeErr;
+        } finally {
+          progressListener.remove();
+        }
+
+        setUploadProgress(90);
+      } else {
+        // ── Web Upload Flow (Existing) ──
+        console.log(`💻 [Upload] Web environment detected. Using Supabase SDK.`);
+        const bucket = isDicomUpload ? 'dicom-files' : 'patient-reports';
+        const { error: uploadError } = await supabase.storage
+          .from(bucket)
+          .upload(storagePath, file, {
+            cacheControl: '3600',
+            upsert: false,
+            contentType: fileType,
+          });
+        if (uploadError) {
+          console.error('❌ [Upload] Web Supabase upload error:', uploadError);
+          throw uploadError;
+        }
+        console.log('✅ [Upload] Web upload success');
+      }
+
+      // ── Database Entry ──
+      setUploadProgress(95);
+      if (isDicomUpload) {
         const { error: dbError } = await supabase.from('dicom_studies').insert({
           id: studyId,
           study_instance_uid: `upload-${studyId}`,
@@ -535,238 +690,52 @@ export default function AddReports() {
           uploaded_by_type: 'patient',
           status: 'staged',
           is_zip_upload: isZip,
-          zip_file_path: isZip && filesToUse[0] ? `studies/${studyId}/original/${filesToUse[0].name}` : null,
-          zip_file_size: isZip && filesToUse[0] ? filesToUse[0].size : null,
+          zip_file_path: isZip ? (useS3 ? `s3://${S3_BUCKET}/dicom/${profile.id}/${storagePath}` : storagePath) : null,
+          zip_file_size: isZip ? fileSize : null,
           zip_extracted: false,
-          description: filesToUse.length === 1 ? `Upload: ${filesToUse[0].name}` : `${filesToUse.length} DICOM files`,
+          description: `Upload: ${fileNameRaw} [${storageType.toUpperCase()}]`,
           patient_name: profile.full_name || profile.id,
         });
         if (dbError) throw dbError;
-        setUploadProgress(100);
-        toast({
-          title: "DICOM uploaded",
-          description: "Go to Reports → DICOM tab to request a radiologist review.",
+      } else {
+        const { error: insertError } = await supabase.from('patient_reports').insert({
+          patient_id: profile.id,
+          doctor_id: profile.assigned_doctor_id,
+          title: `${reportName} (by Dr. ${doctorName})`,
+          description: `Uploaded by patient. Consulted with: ${doctorName} [${storageType.toUpperCase()}]`,
+          report_type: reportType,
+          file_url: storagePath,
+          file_name: fileNameRaw,
+          file_size: fileSize,
+          mime_type: fileType,
+          uploaded_by_patient: true,
         });
-        setSelectedDicomFiles([]);
-        setSelectedFile(null);
-        setIsDicomUpload(false);
-        setTimeout(() => navigate('/reports'), 1500);
-        return true;
-      } catch (err: any) {
-        console.error('DICOM upload error:', err);
-        toast({ title: "Upload failed", description: err.message || "DICOM upload failed.", variant: "destructive" });
-        return false;
-      } finally {
-        setUploading(false);
-        setUploadProgress(0);
+        if (insertError) throw insertError;
       }
-    }
 
-    if (!profile.assigned_doctor_id) {
-      toast({
-        title: "No Assigned Doctor",
-        description: "You don't have an assigned doctor. Please contact support.",
-        variant: "destructive",
-      });
-      return false;
-    }
-
-    setUploading(true);
-    setUploadProgress(0);
-
-    // Declare progress interval at function scope so it can be cleared in finally
-    let progressInterval: NodeJS.Timeout | null = null;
-
-    try {
-      console.log('📤 Starting file upload...', {
-        fileName: selectedFile.name,
-        fileSize: selectedFile.size,
-        fileType: selectedFile.type,
-        platform: Capacitor.getPlatform(),
-        isNative: Capacitor.isNativePlatform(),
-      });
-
-      // Generate file name with patient ID prefix
-      const fileExt = selectedFile.name.split('.').pop()?.toLowerCase() || 'jpg';
-      const timestamp = Date.now();
-      const randomId = Math.random().toString(36).substring(7);
-      const fileName = `${profile.id}/report_${timestamp}_${randomId}.${fileExt}`;
-
-      try {
-        // Use Supabase Storage client API (works better on native platforms)
-        console.log('🚀 Uploading to Supabase Storage...');
-
-        // Start progress simulation
-        progressInterval = setInterval(() => {
-          setUploadProgress((prev) => {
-            // Gradually increase progress, but don't go above 90% until upload completes
-            if (prev < 90) {
-              return Math.min(prev + 5, 90);
-            }
-            return prev;
-          });
-        }, 500);
-
-        const { data: uploadData, error: uploadError } = await supabase.storage
-          .from('patient-reports')
-          .upload(fileName, selectedFile, {
-            cacheControl: '3600',
-            upsert: false,
-            contentType: selectedFile.type || 'application/octet-stream',
-          });
-
-        // Clear progress interval once upload completes
-        if (progressInterval) {
-          clearInterval(progressInterval);
-          progressInterval = null;
-        }
-
-        if (uploadError) {
-          console.error('❌ Upload error:', uploadError);
-
-          let errorMessage = uploadError.message || 'Upload failed';
-
-          // Provide user-friendly error messages
-          if (errorMessage.includes('timeout') || errorMessage.includes('Network request failed')) {
-            errorMessage = "Upload took too long. Check your internet connection and try again.";
-          } else if (errorMessage.includes('Failed to fetch') || errorMessage.includes('Network error')) {
-            errorMessage = "Network connection issue. Please check your internet and try again.";
-          } else if (errorMessage.includes('413') || errorMessage.includes('too large') || errorMessage.includes('Payload too large')) {
-            errorMessage = "File is too large. Maximum size is 20MB on mobile.";
-          } else if (errorMessage.includes('JWT') || errorMessage.includes('token') || errorMessage.includes('auth')) {
-            errorMessage = "Authentication error. Please sign in again.";
-          } else if (errorMessage.includes('duplicate') || errorMessage.includes('already exists')) {
-            // Retry with a new filename if duplicate
-            const retryFileName = `${profile.id}/report_${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
-            console.log('🔄 Retrying with new filename:', retryFileName);
-
-            const { data: retryData, error: retryError } = await supabase.storage
-              .from('patient-reports')
-              .upload(retryFileName, selectedFile, {
-                cacheControl: '3600',
-                upsert: false,
-                contentType: selectedFile.type || 'application/octet-stream',
-              });
-
-            if (retryError) {
-              throw retryError;
-            }
-
-            // Use retry filename for database entry
-            const finalFileName = retryFileName;
-            const { error: insertError } = await supabase
-              .from('patient_reports')
-              .insert({
-                patient_id: profile.id,
-                doctor_id: profile.assigned_doctor_id,
-                title: `${reportName} (by Dr. ${doctorName})`,
-                description: `Uploaded by patient. Consulted with: ${doctorName}`,
-                report_type: reportType,
-                file_url: finalFileName,
-                file_name: selectedFile.name,
-                file_size: selectedFile.size,
-                mime_type: selectedFile.type,
-                uploaded_by_patient: true,
-              });
-
-            if (insertError) {
-              console.error('❌ Database error:', insertError);
-              throw insertError;
-            }
-
-            setUploadProgress(100);
-            toast({
-              title: "Success!",
-              description: "Report uploaded successfully",
-            });
-
-            setTimeout(() => navigate('/reports'), 1000);
-            return true;
-          }
-
-          throw new Error(errorMessage);
-        }
-
-        console.log('✅ File uploaded successfully:', uploadData);
-
-        // Save to database
-        const { error: insertError } = await supabase
-          .from('patient_reports')
-          .insert({
-            patient_id: profile.id,
-            doctor_id: profile.assigned_doctor_id,
-            title: `${reportName} (by Dr. ${doctorName})`,
-            description: `Uploaded by patient. Consulted with: ${doctorName}`,
-            report_type: reportType,
-            file_url: fileName,
-            file_name: selectedFile.name,
-            file_size: selectedFile.size,
-            mime_type: selectedFile.type,
-            uploaded_by_patient: true,
-          });
-
-        if (insertError) {
-          console.error('❌ Database error:', insertError);
-          throw insertError;
-        }
-
-        setUploadProgress(100);
-        toast({
-          title: "Success!",
-          description: "Report uploaded successfully",
-        });
-
-        setTimeout(() => navigate('/reports'), 1000);
-        return true;
-
-      } catch (uploadError: any) {
-        // Clear progress interval on error
-        if (progressInterval) {
-          clearInterval(progressInterval);
-          progressInterval = null;
-        }
-
-        console.error('❌ Upload failed:', uploadError);
-
-        let errorMessage = uploadError.message || 'Upload failed';
-
-        // Provide user-friendly messages
-        if (errorMessage.includes('timeout') || errorMessage.includes('Network request failed')) {
-          errorMessage = "Upload took too long. Check your internet connection and try again.";
-        } else if (errorMessage.includes('Failed to fetch') || errorMessage.includes('Network error')) {
-          errorMessage = "Network connection issue. Please check your internet and try again.";
-        } else if (errorMessage.includes('413') || errorMessage.includes('too large') || errorMessage.includes('Payload too large')) {
-          errorMessage = "File is too large. Maximum size is 20MB on mobile.";
-        } else if (errorMessage.includes('JWT') || errorMessage.includes('token') || errorMessage.includes('auth')) {
-          errorMessage = "Authentication error. Please sign in again.";
-        }
-
-        toast({
-          title: "Upload Failed",
-          description: errorMessage,
-          variant: "destructive",
-          duration: 7000,
-        });
-        return false;
-      }
+      setUploadProgress(100);
+      toast({ title: "Success!", description: "Upload completed successfully" });
+      setTimeout(() => navigate('/reports'), 1500);
+      return true;
 
     } catch (error: any) {
-      console.error('❌ Unexpected error:', error);
+      console.error('❌ Upload failed:', error);
       toast({
-        title: "Error",
-        description: error.message || "An unexpected error occurred. Please try again.",
+        title: "Upload Failed",
+        description: error.message || "An unexpected error occurred.",
         variant: "destructive",
       });
       return false;
     } finally {
-      // Clear progress interval if still running
-      if (progressInterval) {
-        clearInterval(progressInterval);
-      }
-      // Ensure uploading state is always reset
       setUploading(false);
       setUploadProgress(0);
+      (window as any)._nativeSelectedFile = null;
     }
+  };
+
+  // Helper to generate IDs if not using crypto.randomUUID
+  const generateId = () => {
+    return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
   };
 
   const handleSave = async () => {

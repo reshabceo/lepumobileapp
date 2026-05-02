@@ -22,6 +22,12 @@ export default defineConfig(({ mode }) => ({
     },
     dedupe: ["react", "react-dom"],
   },
+  // ── Polyfills required by @aws-sdk in browser / Capacitor WebView ──────────
+  define: {
+    global: 'globalThis',
+    'process.env': '{}',
+    'process.browser': true,
+  },
   optimizeDeps: {
     include: [
       'jspdf',
@@ -29,15 +35,23 @@ export default defineConfig(({ mode }) => ({
       'react-dom',
       'react/jsx-runtime',
       '@radix-ui/react-tooltip',
+      '@aws-sdk/client-s3',
+      '@aws-sdk/lib-storage',
     ],
     esbuildOptions: {
+      // Provide Node.js globals for packages that expect them
+      define: {
+        global: 'globalThis',
+      },
       resolveExtensions: ['.jsx', '.js', '.ts', '.tsx'],
     },
   },
   build: {
+    target: 'es2022',
     commonjsOptions: {
       include: [/node_modules/],
       transformMixedEsModules: true,
     },
   },
 }));
+

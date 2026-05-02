@@ -1,2 +1,0 @@
-include ':app', ':AliveCorKitLite-release', ':AliveCorKit-release'
-rootProject.name='My Application'

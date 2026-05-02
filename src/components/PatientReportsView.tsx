@@ -485,80 +485,84 @@ const generateReportHTML = (analysisData: any, reportTitle: string): string => {
 const PatientReportsView: React.FC = () => {
     const navigate = useNavigate();
     const { user } = useAuth();
-    const { patientProfile: hookProfile, loading: hookLoading } = useRealTimeVitals();
+    // We still pull hookProfile to benefit from its cache, but we don't block the UI on hookLoading
+    const { patientProfile: hookProfile } = useRealTimeVitals();
     const [patientProfile, setPatientProfile] = useState<any>(null);
     const [reports, setReports] = useState<PatientReport[]>([]);
     const [dicomStudies, setDicomStudies] = useState<DicomStudy[]>([]);
     const [dicomLoading, setDicomLoading] = useState(false);
-    const [loading, setLoading] = useState(true);
+    // Start loading=false — we only show the spinner once we actually start a fetch
+    const [loading, setLoading] = useState(false);
     const [profileLoading, setProfileLoading] = useState(true);
+    const [reportsLoaded, setReportsLoaded] = useState(false);
     const [activeTab, setActiveTab] = useState<'from-doctor' | 'my-uploads' | 'dicom'>('from-doctor');
     const [requestRadiologistOpen, setRequestRadiologistOpen] = useState(false);
     const [selectedStudyForRequest, setSelectedStudyForRequest] = useState<DicomStudy | null>(null);
     const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-    // 🚀 OPTIMIZED: Fetch profile with instant cache + direct fetch
+    // ── Resolve patient profile ──────────────────────────────────────────────────
     useEffect(() => {
-        // Check cache first for instant load
-        if (user) {
-            const cacheKey = `patient_profile_${user.id}`;
-            const cachedProfile = localStorage.getItem(cacheKey);
-            if (cachedProfile) {
-                try {
-                    const parsed = JSON.parse(cachedProfile);
-                    const cacheTime = parsed._cached_at || 0;
-                    if (Date.now() - cacheTime < 5 * 60 * 1000) {
-                        console.log('✅ Using cached profile (instant)');
-                        setPatientProfile(parsed);
-                        setProfileLoading(false);
-                    }
-                } catch (e) {
-                    // Ignore cache parse errors
-                }
-            }
-        }
-
-        // Use hook profile if available
+        // 1. Use hook profile the moment it arrives
         if (hookProfile) {
             setPatientProfile(hookProfile);
             setProfileLoading(false);
             return;
         }
 
-        // Fetch directly if hook doesn't have it yet
-        if (user && !hookProfile) {
-            const fetchProfile = async () => {
-                try {
-                    setProfileLoading(true);
-                    const profileData = await db.getPatientProfile(user.id);
-                    if (profileData.data) {
-                        setPatientProfile(profileData.data);
-                    }
-                } catch (err) {
-                    console.error('❌ Failed to fetch profile:', err);
-                } finally {
-                    setProfileLoading(false);
-                }
-            };
-            fetchProfile();
+        if (!user) {
+            setProfileLoading(false);
+            return;
         }
 
-        // Fast timeout - 3 seconds max
-        timeoutRef.current = setTimeout(() => {
-            setProfileLoading(false);
-        }, 3000);
+        // 2. Check localStorage cache for instant load
+        const cacheKey = `patient_profile_${user.id}`;
+        const cachedProfile = localStorage.getItem(cacheKey);
+        if (cachedProfile) {
+            try {
+                const parsed = JSON.parse(cachedProfile);
+                const cacheTime = parsed._cached_at || 0;
+                if (Date.now() - cacheTime < 5 * 60 * 1000) {
+                    console.log('✅ Reports: using cached profile');
+                    setPatientProfile(parsed);
+                    setProfileLoading(false);
+                    return;
+                }
+            } catch (e) { /* ignore */ }
+        }
+
+        // 3. Direct DB fetch as last resort
+        const fetchProfile = async () => {
+            try {
+                setProfileLoading(true);
+                const profileData = await db.getPatientProfile(user.id);
+                if (profileData.data) {
+                    setPatientProfile(profileData.data);
+                }
+            } catch (err) {
+                console.error('❌ Failed to fetch profile:', err);
+            } finally {
+                setProfileLoading(false);
+            }
+        };
+        fetchProfile();
+
+        // Safety timeout — at most 4 s of profile loading
+        timeoutRef.current = setTimeout(() => setProfileLoading(false), 4000);
 
         return () => {
-            if (timeoutRef.current) {
-                clearTimeout(timeoutRef.current);
-            }
+            if (timeoutRef.current) clearTimeout(timeoutRef.current);
         };
     }, [hookProfile, user]);
 
+    // ── Fetch reports whenever the profile becomes available ─────────────────────
     useEffect(() => {
-        if (patientProfile) {
-            fetchReports();
+        if (patientProfile && !reportsLoaded) {
+            fetchReports(patientProfile);
         }
+        // Reset the loaded flag when the component unmounts so re-navigation re-fetches
+        return () => {
+            setReportsLoaded(false);
+        };
     }, [patientProfile]);
 
     const fetchDicomStudies = async () => {
@@ -588,8 +592,9 @@ const PatientReportsView: React.FC = () => {
         }
     }, [patientProfile, activeTab]);
 
-    const fetchReports = async () => {
-        if (!patientProfile) return;
+    const fetchReports = async (profile?: any) => {
+        const activeProfile = profile || patientProfile;
+        if (!activeProfile) return;
 
         try {
             setLoading(true);
@@ -599,7 +604,7 @@ const PatientReportsView: React.FC = () => {
           *,
           doctors!doctor_id(full_name)
         `)
-                .eq('patient_id', patientProfile.id)
+                .eq('patient_id', activeProfile.id)
                 .order('created_at', { ascending: false });
 
             if (error) {
@@ -615,6 +620,7 @@ const PatientReportsView: React.FC = () => {
             console.error('Error:', err);
         } finally {
             setLoading(false);
+            setReportsLoaded(true);
         }
     };
 
@@ -822,8 +828,8 @@ const PatientReportsView: React.FC = () => {
         return colors[type as keyof typeof colors] || 'bg-gray-100 text-gray-800';
     };
 
-    // Show loading state
-    if (profileLoading || hookLoading) {
+    // Show loading state — only block if we're still fetching the profile AND have nothing cached
+    if (profileLoading && !patientProfile) {
         return (
             <div className="bg-[#101010] min-h-screen text-white flex items-center justify-center">
                 <div className="flex flex-col items-center gap-4">
