@@ -4,12 +4,12 @@ import { ArrowLeft, FilePlus2, Search, Upload, Camera, ChevronDown, FolderArchiv
 import { useNavigate } from 'react-router-dom';
 import { MobileAppContainer } from '../components/MobileAppContainer';
 import { useToast } from '../hooks/use-toast';
-import { supabase, db, supabaseUrl } from '@/lib/supabase';
+import { supabase, db, supabaseUrl, supabaseAnonKey } from '@/lib/supabase';
 import { useRealTimeVitals } from '@/hooks/useRealTimeVitals';
 import { useAuth } from '@/contexts/AuthContext';
 import { Camera as CapacitorCamera, CameraResultType, CameraSource } from '@capacitor/camera';
 import { App } from '@capacitor/app';
-import { Capacitor } from '@capacitor/core';
+import { Capacitor, CapacitorHttp } from '@capacitor/core';
 import { Network } from '@capacitor/network';
 import { Uploader } from '@capgo/capacitor-uploader';
 import { FilePicker } from '@capawesome/capacitor-file-picker';
@@ -115,14 +115,18 @@ export default function AddReports() {
         if (result.files.length > 0) {
           const file = result.files[0];
           // On native, we store the file info in a way that we can use it later
-          // We can't easily create a File object from a path without reading it into memory,
-          // which we want to avoid. So we'll store the picker result.
           (window as any)._nativeSelectedFile = file;
+          localStorage.setItem('_native_selected_file', JSON.stringify({
+            path: file.path,
+            name: file.name,
+            size: file.size,
+            mimeType: file.mimeType
+          }));
+
           setSelectedFile({
             name: file.name,
             size: file.size,
             type: file.mimeType,
-            // Mock enough of the File interface for UI
           } as any);
           setIsDicomUpload(false);
           setSelectedDicomFiles([]);
@@ -163,6 +167,13 @@ export default function AddReports() {
           }
 
           (window as any)._nativeSelectedFile = file;
+          localStorage.setItem('_native_selected_file', JSON.stringify({
+            path: file.path,
+            name: file.name,
+            size: file.size,
+            mimeType: file.mimeType
+          }));
+
           setSelectedFile({
             name: file.name,
             size: file.size,
@@ -347,23 +358,36 @@ export default function AddReports() {
           const image = await CapacitorCamera.getPhoto({
             quality: 90,
             allowEditing: false,
-            resultType: CameraResultType.DataUrl,
+            resultType: CameraResultType.Uri, // 🚀 Use URI instead of DataUrl to prevent memory crashes
             source: CameraSource.Camera,
           });
 
-          if (image.dataUrl) {
-            // Convert data URL to File object
-            const response = await fetch(image.dataUrl);
-            const blob = await response.blob();
-            const fileName = `photo_${Date.now()}.jpg`;
-            const file = new File([blob], fileName, { type: 'image/jpeg' });
+            // Keep track of the native path for the uploader
+            if (Capacitor.isNativePlatform() && image.path) {
+              const nativeFileInfo = {
+                path: image.path,
+                name: `photo_${Date.now()}.jpg`,
+                size: 5 * 1024 * 1024, // Estimate 5MB for a photo
+                mimeType: 'image/jpeg'
+              };
+              (window as any)._nativeSelectedFile = nativeFileInfo;
+              localStorage.setItem('_native_selected_file', JSON.stringify(nativeFileInfo));
+            }
 
-            setSelectedFile(file);
-            toast({
-              title: "Photo Captured",
-              description: "Photo is ready to upload",
-            });
-          }
+            // Convert to a File object for the UI preview/Web fallback
+            const path = image.webPath || image.path;
+            if (path) {
+              const response = await fetch(path);
+              const blob = await response.blob();
+              const fileName = `photo_${Date.now()}.jpg`;
+              const file = new File([blob], fileName, { type: 'image/jpeg' });
+
+              setSelectedFile(file);
+              toast({
+                title: "Photo Captured",
+                description: "Photo is ready to upload",
+              });
+            }
         } catch (cameraError: any) {
           console.error('Camera error:', cameraError);
 
@@ -570,13 +594,86 @@ export default function AddReports() {
 
     try {
       const isNative = Capacitor.isNativePlatform();
-      const nativeFile = isNative ? (window as any)._nativeSelectedFile : null;
-      const file = filesToUse[0];
-      const fileSize = file.size;
-      const fileType = file.type || 'application/octet-stream';
-      const fileNameRaw = file.name;
+      
+      // 🚀 Recovery logic for app restarts
+      let nativeFile = isNative ? (window as any)._nativeSelectedFile : null;
+      if (isNative && !nativeFile) {
+        const cached = localStorage.getItem('_native_selected_file');
+        if (cached) {
+          try {
+            nativeFile = JSON.parse(cached);
+            console.log('🔄 [Upload] Recovered native file from cache:', nativeFile.name);
+          } catch (e) {
+            console.error('Failed to parse cached file info', e);
+          }
+        }
+      }
+      // 🚀 Native Signed URL Helper (Uses CapacitorHttp to bypass WebView fetch issues)
+      const getSignedUrlNatively = async (bucket: string, path: string) => {
+        console.log(`📡 [Native Request] Starting robust URL generation for ${bucket}/${path}...`);
+        
+        // Give the bridge a moment to breathe
+        await new Promise(r => setTimeout(r, 500));
 
-      console.log(`📤 [Upload] Starting [${isNative ? 'NATIVE' : 'WEB'}]:`, {
+        // Get token directly from storage to avoid SDK refresh hangs
+        const projectRef = supabaseUrl.split('//')[1].split('.')[0];
+        const tokenKey = `sb-${projectRef}-auth-token`;
+        const cachedSession = localStorage.getItem(tokenKey);
+        let token = supabaseAnonKey;
+        
+        if (cachedSession) {
+          try {
+            const parsed = JSON.parse(cachedSession);
+            token = parsed.access_token || token;
+            console.log('📡 [Native Auth] Using session token from storage');
+          } catch (e) {
+            console.warn('📡 [Native Auth] Failed to parse cached session', e);
+          }
+        } else {
+          console.log('📡 [Native Auth] No session found, using anon key');
+        }
+        
+        const encodedPath = path.split('/').map(segment => encodeURIComponent(segment)).join('/');
+        const fullUrl = `${supabaseUrl}/storage/v1/object/upload/sign/${bucket}/${encodedPath}`;
+        
+        console.log(`📡 [Native Request] POST ${fullUrl}`);
+        
+        const timeoutPromise = new Promise<any>((_, reject) => 
+          setTimeout(() => reject(new Error('Native Signed URL Timeout (20s)')), 20000)
+        );
+
+        const response = await Promise.race([
+          CapacitorHttp.post({
+            url: fullUrl,
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'apikey': supabaseAnonKey,
+              'Content-Type': 'application/json',
+            },
+            data: {}
+          }),
+          timeoutPromise
+        ]);
+        
+        console.log(`📡 [Native Response] Status: ${response.status}`);
+        if (response.status >= 200 && response.status < 300) {
+          const resultUrl = response.data.signedURL || response.data.signedUrl || response.data.url;
+          if (resultUrl) {
+            if (resultUrl.startsWith('/')) {
+              return `${supabaseUrl}/storage/v1${resultUrl}`;
+            }
+            return resultUrl;
+          }
+        }
+        throw new Error(`Native Signed URL error: ${response.status} ${JSON.stringify(response.data)}`);
+      };
+
+      const file = filesToUse[0];
+      const fileSize = file?.size || nativeFile?.size || 0;
+      const fileType = file?.type || nativeFile?.mimeType || 'application/octet-stream';
+      const fileNameRaw = file?.name || nativeFile?.name || 'file';
+
+      console.log(`📤 [Upload] Starting [${isNative && nativeFile ? 'NATIVE' : 'WEB'}]:`, {
         name: fileNameRaw,
         size: fileSize,
         type: fileType,
@@ -614,19 +711,35 @@ export default function AddReports() {
         // ── Native Upload Flow ──
         setUploadProgress(10);
         if (useS3) {
-          console.log('🔗 [Upload] Generating S3 Presigned URL...');
+          console.log(`🔗 [Upload] Generating S3 Presigned URL for key: dicom/${profile.id}/${storagePath}...`);
           const s3Key = isDicomUpload ? `dicom/${profile.id}/${storagePath}` : `reports/${storagePath}`;
-          uploadUrl = await getS3PresignedUrl(s3Key, fileType);
+          
+          const timeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('S3 URL Generation Timeout')), 20000)
+          );
+          uploadUrl = await Promise.race([getS3PresignedUrl(s3Key, fileType), timeoutPromise]) as string;
           console.log('✅ [Upload] S3 Presigned URL generated');
         } else {
-          console.log(`🔗 [Upload] Generating Supabase Signed URL for bucket: ${isDicomUpload ? 'dicom-files' : 'patient-reports'}`);
           const bucket = isDicomUpload ? 'dicom-files' : 'patient-reports';
-          const { data, error } = await supabase.storage.from(bucket).createSignedUploadUrl(storagePath);
-          if (error) {
-            console.error('❌ [Upload] Supabase Signed URL error:', error);
-            throw error;
+          console.log(`🔗 [Upload] Generating Supabase Signed URL for bucket: ${bucket}, path: ${storagePath}...`);
+          
+          try {
+            // 🚀 Try native method first on native platforms
+            if (isNative) {
+              console.log('🚀 [Upload] Using robust native URL generation...');
+              const timeoutPromise = new Promise((_, reject) => 
+                setTimeout(() => reject(new Error('Native Supabase URL Timeout (30s)')), 30000)
+              );
+              uploadUrl = await Promise.race([getSignedUrlNatively(bucket, storagePath), timeoutPromise]) as string;
+            } else {
+              const { data, error } = await supabase.storage.from(bucket).createSignedUploadUrl(storagePath);
+              if (error) throw error;
+              uploadUrl = data.signedUrl;
+            }
+          } catch (err: any) {
+            console.error('❌ [Upload] Signed URL generation failed:', err);
+            throw new Error(`Failed to initialize upload: ${err.message}`);
           }
-          uploadUrl = data.signedUrl;
           console.log('✅ [Upload] Supabase Signed URL generated');
         }
 
@@ -634,32 +747,58 @@ export default function AddReports() {
         console.log(`🚀 Native uploading to ${storageType}... Path: ${nativeFile.path}`);
 
         // Add progress listener for native uploader
-        const progressListener = await Uploader.addListener('uploadProgress', (info) => {
-          if (info.progress) {
-            const percent = Math.round(info.progress);
-            setUploadProgress(30 + (percent * 0.6)); // Scale 30-90%
-            console.log(`📤 Native Upload Progress: ${percent}%`);
-          }
-        });
+        let progressListener: any;
+        let uploadId: string | null = null;
 
         try {
           console.log(`📡 [Upload] Executing PUT request to: ${uploadUrl.substring(0, 50)}...`);
-          const uploadResult = await Uploader.upload({
-            url: uploadUrl,
-            path: nativeFile.path,
-            method: 'PUT',
-            headers: headers,
-            mimeType: fileType,
+          
+          // Wait for the upload events
+          await new Promise<void>(async (resolve, reject) => {
+            // Setup listener FIRST
+            progressListener = await Uploader.addListener('events', (event: any) => {
+              if (uploadId && event.id !== uploadId) return;
+              
+              if (event.name === 'uploading') {
+                if (event.payload.percent) {
+                  const percent = Math.round(event.payload.percent);
+                  setUploadProgress(30 + (percent * 0.5)); // Scale 30-80%
+                  console.log(`📤 Native Upload Progress: ${percent}%`);
+                }
+              } else if (event.name === 'completed') {
+                console.log('✅ [Upload] Native upload success');
+                resolve();
+              } else if (event.name === 'failed') {
+                console.error('❌ [Upload] Native Uploader CRASHED:', event.payload.error);
+                reject(new Error(event.payload.error || 'Upload failed'));
+              }
+            });
+
+            // Start upload AFTER listener is registered
+            try {
+              const result = await Uploader.startUpload({
+                filePath: nativeFile.path,
+                serverUrl: uploadUrl,
+                method: 'PUT',
+                headers: headers,
+                mimeType: fileType,
+                notificationTitle: isDicomUpload ? 'Uploading DICOM Study' : 'Uploading Medical Report'
+              });
+              uploadId = result.id;
+            } catch (startErr) {
+              reject(startErr);
+            }
           });
-          console.log('✅ [Upload] Native upload success:', uploadResult);
         } catch (nativeErr) {
           console.error('❌ [Upload] Native Uploader CRASHED:', nativeErr);
           throw nativeErr;
         } finally {
-          progressListener.remove();
+          if (progressListener) {
+            await progressListener.remove();
+          }
         }
 
-        setUploadProgress(90);
+        setUploadProgress(85);
       } else {
         // ── Web Upload Flow (Existing) ──
         console.log(`💻 [Upload] Web environment detected. Using Supabase SDK.`);
@@ -680,8 +819,10 @@ export default function AddReports() {
 
       // ── Database Entry ──
       setUploadProgress(95);
+      console.log('📝 [Upload] Inserting DB record...', { isDicomUpload });
       if (isDicomUpload) {
-        const { error: dbError } = await supabase.from('dicom_studies').insert({
+        console.log('📝 [Upload] Inserting dicom_studies...', studyId);
+        const payload = {
           id: studyId,
           study_instance_uid: `upload-${studyId}`,
           patient_id: profile.id,
@@ -695,10 +836,60 @@ export default function AddReports() {
           zip_extracted: false,
           description: `Upload: ${fileNameRaw} [${storageType.toUpperCase()}]`,
           patient_name: profile.full_name || profile.id,
-        });
-        if (dbError) throw dbError;
+        };
+        
+        if (isNative) {
+          console.log('📝 [Upload] Native direct insert dicom_studies. Getting session...');
+          
+          const timeoutPromise = new Promise<any>((_, reject) => 
+            setTimeout(() => reject(new Error('Native DB Insert Timeout (25s)')), 25000)
+          );
+
+          const projectRef = import.meta.env.VITE_SUPABASE_URL.split('//')[1].split('.')[0];
+          const tokenKey = `sb-${projectRef}-auth-token`;
+          const cachedSession = localStorage.getItem(tokenKey);
+          let token = null;
+          
+          if (cachedSession) {
+            try {
+              token = JSON.parse(cachedSession).access_token;
+            } catch (e) {}
+          }
+          
+          if (!token) {
+            const session = await Promise.race([
+              supabase.auth.getSession(),
+              new Promise<any>((_, reject) => setTimeout(() => reject(new Error('Session Timeout')), 5000))
+            ]);
+            token = session.data.session?.access_token;
+          }
+
+          console.log('📝 [Upload] Executing native DB insert for DICOM...');
+          const resp = await Promise.race([
+            CapacitorHttp.post({
+              url: `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/dicom_studies`,
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+                'Content-Type': 'application/json',
+                'Prefer': 'return=representation'
+              },
+              data: payload
+            }),
+            timeoutPromise
+          ]);
+          
+          console.log(`📝 [Upload] dicom_studies native insert result status: ${resp.status}`);
+          if (resp.status >= 400) throw new Error(`DB Insert Error ${resp.status}: ${JSON.stringify(resp.data)}`);
+          console.log('📝 [Upload] dicom_studies native insert result data:', resp.data);
+        } else {
+          const { data: dbData, error: dbError } = await supabase.from('dicom_studies').insert(payload).select();
+          console.log('📝 [Upload] dicom_studies web insert result:', { error: dbError, data: dbData });
+          if (dbError) throw dbError;
+        }
       } else {
-        const { error: insertError } = await supabase.from('patient_reports').insert({
+        console.log('📝 [Upload] Inserting patient_reports...', fileNameRaw);
+        const payload = {
           patient_id: profile.id,
           doctor_id: profile.assigned_doctor_id,
           title: `${reportName} (by Dr. ${doctorName})`,
@@ -709,13 +900,65 @@ export default function AddReports() {
           file_size: fileSize,
           mime_type: fileType,
           uploaded_by_patient: true,
-        });
-        if (insertError) throw insertError;
+        };
+
+        if (isNative) {
+          console.log('📝 [Upload] Native direct insert patient_reports. Getting session...');
+          
+          const timeoutPromise = new Promise<any>((_, reject) => 
+            setTimeout(() => reject(new Error('Native DB Insert Timeout (25s)')), 25000)
+          );
+
+          const projectRef = import.meta.env.VITE_SUPABASE_URL.split('//')[1].split('.')[0];
+          const tokenKey = `sb-${projectRef}-auth-token`;
+          const cachedSession = localStorage.getItem(tokenKey);
+          let token = null;
+          
+          if (cachedSession) {
+            try {
+              token = JSON.parse(cachedSession).access_token;
+            } catch (e) {}
+          }
+          
+          if (!token) {
+            const session = await Promise.race([
+              supabase.auth.getSession(),
+              new Promise<any>((_, reject) => setTimeout(() => reject(new Error('Session Timeout')), 5000))
+            ]);
+            token = session.data.session?.access_token;
+          }
+
+          console.log('📝 [Upload] Executing native DB insert...');
+          const resp = await Promise.race([
+            CapacitorHttp.post({
+              url: `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/patient_reports`,
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+                'Content-Type': 'application/json',
+                'Prefer': 'return=representation'
+              },
+              data: payload
+            }),
+            timeoutPromise
+          ]);
+          
+          console.log(`📝 [Upload] patient_reports native insert result status: ${resp.status}`);
+          if (resp.status >= 400) throw new Error(`DB Insert Error ${resp.status}: ${JSON.stringify(resp.data)}`);
+          console.log('📝 [Upload] patient_reports native insert result data:', resp.data);
+        } else {
+          const { data: reportData, error: insertError } = await supabase.from('patient_reports').insert(payload).select();
+          console.log('📝 [Upload] patient_reports web insert result:', { error: insertError, data: reportData });
+          if (insertError) throw insertError;
+        }
       }
 
       setUploadProgress(100);
       toast({ title: "Success!", description: "Upload completed successfully" });
-      setTimeout(() => navigate('/reports'), 1500);
+      
+      // 🚀 Navigate to the correct tab based on upload type
+      const targetTab = isDicomUpload ? 'dicom' : 'my-uploads';
+      setTimeout(() => navigate('/reports', { state: { activeTab: targetTab } }), 1500);
       return true;
 
     } catch (error: any) {
@@ -751,7 +994,10 @@ export default function AddReports() {
       }
     } else {
       // Regular report: require form fields and single file
-      if (!reportType || !reportName || !doctorName || !selectedFile) {
+      // On native, we might only have _nativeSelectedFile if state was cleared
+      const hasFile = selectedFile || (Capacitor.isNativePlatform() && (window as any)._nativeSelectedFile);
+      
+      if (!reportType || !reportName || !doctorName || !hasFile) {
         toast({
           title: "Missing Information",
           description: "Please fill in all required fields and select a file",
