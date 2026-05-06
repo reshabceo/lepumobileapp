@@ -14,17 +14,19 @@
  *   • iOS & Android: each part is a separate HTTPS PUT, ensuring reliability
  */
 
-import { useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { useState, useEffect } from 'react';
+import { supabase, supabaseUrl, supabaseAnonKey } from '@/lib/supabase';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { toast } from 'sonner';
 import { Upload, FileArchive, CheckCircle, Loader2, File, Cloud, Database } from 'lucide-react';
 import { uploadLargeFileToS3, getS3PresignedUrl } from '@/services/s3MultipartUploadService';
-import { Capacitor } from '@capacitor/core';
+import { Capacitor, CapacitorHttp } from '@capacitor/core';
 import { Uploader } from '@capgo/capacitor-uploader';
 import { FilePicker } from '@capawesome/capacitor-file-picker';
+import { useAuth } from '@/contexts/AuthContext';
+import { Filesystem, Directory } from '@capacitor/filesystem';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const SUPABASE_LIMIT_MB = 40;
@@ -50,6 +52,7 @@ const formatBytes = (bytes: number): string => {
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface DicomUploaderProps {
   onUploadComplete?: (studyId: string) => void;
+  patientProfile?: any;
 }
 
 type Destination = 'supabase' | 's3' | null;
@@ -73,12 +76,33 @@ const INITIAL_STATE: UploadState = {
 };
 
 // ─── Component ────────────────────────────────────────────────────────────────
-export default function DicomUploader({ onUploadComplete }: DicomUploaderProps) {
+export default function DicomUploader({ onUploadComplete, patientProfile: propProfile }: DicomUploaderProps) {
+  const { user } = useAuth();
   const [state, setState] = useState<UploadState>(INITIAL_STATE);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
   const update = (patch: Partial<UploadState>) =>
     setState((prev) => ({ ...prev, ...patch }));
+
+  // 🚀 Recovery logic: Sync selectedFile state with localStorage on mount (survives Android process death)
+  useEffect(() => {
+    if (Capacitor.isNativePlatform() && !selectedFile) {
+      const cached = localStorage.getItem('_native_selected_dicom_file');
+      if (cached) {
+        try {
+          const fileData = JSON.parse(cached);
+          console.log('🔄 [DICOM] Restoring selected file from cache:', fileData.name);
+          setSelectedFile({
+            name: fileData.name,
+            size: fileData.size,
+            type: fileData.mimeType || 'application/octet-stream',
+          } as any);
+        } catch (e) {
+          console.error('Failed to restore selected file info', e);
+        }
+      }
+    }
+  }, []);
 
   // ── File selection ──────────────────────────────────────────────────────────
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -98,16 +122,48 @@ export default function DicomUploader({ onUploadComplete }: DicomUploaderProps) 
             return;
           }
 
-          (window as any)._nativeSelectedDicomFile = file;
+          let finalPath = file.path;
+          // 🚀 Fix for Android SecurityException: Copy to cache
+          if (Capacitor.getPlatform() === 'android' && finalPath?.startsWith('content://')) {
+            try {
+              const cacheName = `dicom_upload_${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+              toast.info('Preparing file for upload...', { duration: 2000 });
+              
+              const copyResult = await Filesystem.copy({
+                from: finalPath,
+                to: cacheName,
+                toDirectory: Directory.Cache
+              });
+              finalPath = copyResult.uri;
+              console.log('📂 [DICOM] Copied content URI to cache:', finalPath);
+            } catch (copyErr) {
+              console.error('Failed to copy file to cache:', copyErr);
+              // Fallback to original path, though it might fail later
+            }
+          }
+
+          const fileToSave = {
+            ...file,
+            path: finalPath
+          };
+
+          (window as any)._nativeSelectedDicomFile = fileToSave;
+          localStorage.setItem('_native_selected_dicom_file', JSON.stringify({
+            path: fileToSave.path,
+            name: fileToSave.name,
+            size: fileToSave.size,
+            mimeType: fileToSave.mimeType
+          }));
+
           setSelectedFile({
-            name: file.name,
-            size: file.size,
-            type: file.mimeType,
+            name: fileToSave.name,
+            size: fileToSave.size,
+            type: fileToSave.mimeType,
           } as any);
 
-          const sizeMB = (file.size / 1024 / 1024).toFixed(1);
-          const dest = file.size > SUPABASE_LIMIT_BYTES ? 'AWS S3' : 'Supabase';
-          toast.success(`Selected: ${file.name} (${sizeMB} MB) → ${dest}`);
+          const sizeMB = (fileToSave.size / 1024 / 1024).toFixed(1);
+          const dest = fileToSave.size > SUPABASE_LIMIT_BYTES ? 'AWS S3' : 'Supabase';
+          toast.success(`Selected: ${fileToSave.name} (${sizeMB} MB) → ${dest}`);
         }
       } catch (err) {
         console.error('File selection error:', err);
@@ -190,50 +246,154 @@ export default function DicomUploader({ onUploadComplete }: DicomUploaderProps) 
 
   // ── Main upload handler ─────────────────────────────────────────────────────
   const handleUpload = async () => {
-    if (!selectedFile) return toast.error('No file selected');
+    const isNative = Capacitor.isNativePlatform();
+    
+    if (!selectedFile && !isNative) return toast.error('No file selected');
 
     setState({ ...INITIAL_STATE, uploading: true, status: 'Authenticating…' });
 
     try {
-      const isNative = Capacitor.isNativePlatform();
-      const nativeFile = isNative ? (window as any)._nativeSelectedDicomFile : null;
+      let storageLocation = '';
+      let storageType: 'supabase' | 's3' = 'supabase';
+      let uploadUrl = '';
 
-      console.log(`📤 [DICOM] Starting [${isNative ? 'NATIVE' : 'WEB'}]:`, {
-        name: selectedFile.name,
-        size: selectedFile.size,
-        type: selectedFile.type
+      // 🚀 Recovery logic for app restarts
+      let nativeFile = isNative ? (window as any)._nativeSelectedDicomFile : null;
+      if (isNative && !nativeFile) {
+        const cached = localStorage.getItem('_native_selected_dicom_file');
+        if (cached) {
+          try {
+            nativeFile = JSON.parse(cached);
+            console.log('🔄 [DICOM] Recovered native file from cache:', nativeFile.name);
+          } catch (e) {
+            console.error('Failed to parse cached DICOM info', e);
+          }
+        }
+      }
+
+      if (!selectedFile && !nativeFile) {
+        return toast.error('No file selected');
+      }
+
+      const fileNameRaw = selectedFile?.name || nativeFile?.name || 'file';
+      const fileSize = selectedFile?.size || nativeFile?.size || 0;
+      const fileType = selectedFile?.type || nativeFile?.mimeType || 'application/octet-stream';
+
+      console.log(`📤 [DICOM] Starting [${isNative && nativeFile ? 'NATIVE' : 'WEB'}]:`, {
+        name: fileNameRaw,
+        size: fileSize,
+        type: fileType
       });
 
-      // 1. Auth
-      const { data: { user }, error: authErr } = await supabase.auth.getUser();
-      if (authErr || !user) throw new Error('Not authenticated. Please log in.');
+      // 1. Auth & Patient Profile
+      update({ status: 'Authenticating…', progress: 1 });
+      
+      const projectRef = supabaseUrl.split('//')[1].split('.')[0];
+      const tokenKey = `sb-${projectRef}-auth-token`;
+      const cachedSession = localStorage.getItem(tokenKey);
+      let authUser = user;
+      
+      if (!authUser) {
+        console.log('📡 [DICOM] No user from hook, trying robust fetch...');
+        const { data: { user: fetchedUser } } = await supabase.auth.getUser();
+        authUser = fetchedUser;
+      }
+      
+      if (!authUser) throw new Error('Not authenticated. Please log in.');
 
-      // 2. Patient profile
-      update({ status: 'Fetching patient profile…', progress: 1 });
-      const { data: patient, error: patientErr } = await supabase
-        .from('patients')
-        .select('id, full_name')
-        .eq('auth_user_id', user.id)
-        .maybeSingle();
+      // 2. Patient profile with timeout
+      update({ status: 'Fetching patient profile…', progress: 5 });
+      
+      let patient = propProfile;
+      if (!patient) {
+        console.log('📡 [DICOM] No profile from props, fetching with 15s timeout...');
+        const profileTimeout = new Promise<any>((_, reject) => 
+          setTimeout(() => reject(new Error('Profile fetch timeout')), 15000)
+        );
+        
+        const profilePromise = supabase
+          .from('patients')
+          .select('id, full_name')
+          .eq('auth_user_id', authUser.id)
+          .maybeSingle();
+        
+        const { data: fetchedPatient, error: patientErr } = await Promise.race([profilePromise, profileTimeout]);
+        if (patientErr) throw new Error(`Profile error: ${patientErr.message}`);
+        patient = fetchedPatient;
+      } else {
+        console.log('✅ [DICOM] Using profile from props:', patient.id);
+      }
 
-      if (patientErr) throw new Error(`Profile error: ${patientErr.message}`);
       if (!patient) throw new Error('Patient profile not found. Complete your profile first.');
 
       // 3. Build S3/Supabase key
       const studyId = generateId();
-      const isZip = selectedFile.name.toLowerCase().endsWith('.zip');
-      const safeName = selectedFile.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+      const isZip = fileNameRaw.toLowerCase().endsWith('.zip');
+      const safeName = fileNameRaw.replace(/[^a-zA-Z0-9._-]/g, '_');
       const relPath = isZip
         ? `studies/${studyId}/original/${safeName}`
         : `studies/${studyId}/${generateId()}/${safeName}`;
 
-      const fileMB = selectedFile.size / 1024 / 1024;
-      const useS3 = selectedFile.size > SUPABASE_LIMIT_BYTES;
-      const storageType: 'supabase' | 's3' = useS3 ? 's3' : 'supabase';
+      const fileMB = fileSize / 1024 / 1024;
+      const useS3 = fileSize > SUPABASE_LIMIT_BYTES;
+      storageType = useS3 ? 's3' : 'supabase';
       console.log(`📍 [DICOM] Routing to ${storageType.toUpperCase()} | Size: ${fileMB.toFixed(1)} MB`);
 
       // 4. Route to correct storage
-      let storageLocation: string;
+      storageLocation = '';
+
+      // 🚀 Native Signed URL Helper
+      const getSignedUrlNatively = async (bucket: string, path: string) => {
+        console.log(`📡 [DICOM Native] Starting URL generation for ${bucket}/${path}...`);
+        await new Promise(r => setTimeout(r, 500));
+
+        const projectRef = supabaseUrl.split('//')[1].split('.')[0];
+        const tokenKey = `sb-${projectRef}-auth-token`;
+        const cachedSession = localStorage.getItem(tokenKey);
+        let token = supabaseAnonKey;
+        
+        if (cachedSession) {
+          try {
+            const parsed = JSON.parse(cachedSession);
+            token = parsed.access_token || token;
+            console.log('📡 [DICOM Native] Using session token');
+          } catch (e) {}
+        }
+
+        const encodedPath = path.split('/').map(segment => encodeURIComponent(segment)).join('/');
+        const fullUrl = `${supabaseUrl}/storage/v1/object/upload/sign/${bucket}/${encodedPath}`;
+        
+        console.log(`📡 [DICOM Native] POST ${fullUrl}`);
+        
+        const timeoutPromise = new Promise<any>((_, reject) => 
+          setTimeout(() => reject(new Error('Native DICOM URL Timeout (20s)')), 20000)
+        );
+
+        const response = await Promise.race([
+          CapacitorHttp.post({
+            url: fullUrl,
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'apikey': supabaseAnonKey,
+              'Content-Type': 'application/json',
+            },
+            data: {}
+          }),
+          timeoutPromise
+        ]);
+        
+        console.log(`📡 [DICOM Native] Status: ${response.status}`);
+        if (response.status >= 200 && response.status < 300) {
+          const resultUrl = response.data.signedURL || response.data.signedUrl || response.data.url;
+          if (resultUrl) {
+            if (resultUrl.startsWith('/')) {
+              return `${supabaseUrl}/storage/v1${resultUrl}`;
+            }
+            return resultUrl;
+          }
+        }
+        throw new Error(`Native Signed URL error: ${response.status} ${JSON.stringify(response.data)}`);
+      };
 
       if (isNative && nativeFile) {
         // ── Native Upload ──
@@ -241,19 +401,35 @@ export default function DicomUploader({ onUploadComplete }: DicomUploaderProps) 
         storageType = useS3 ? 's3' : 'supabase';
 
         if (useS3) {
-          console.log('🔗 [DICOM] Generating S3 Presigned URL...');
           const s3Key = `dicom/${patient.id}/${relPath}`;
-          uploadUrl = await getS3PresignedUrl(s3Key, selectedFile.type || 'application/octet-stream');
+          console.log(`🔗 [DICOM] Generating S3 Presigned URL for: ${s3Key}...`);
+          
+          const timeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('S3 URL Generation Timeout')), 20000)
+          );
+          uploadUrl = await Promise.race([getS3PresignedUrl(s3Key, fileType), timeoutPromise]) as string;
           storageLocation = `s3://${S3_BUCKET}/${s3Key}`;
           console.log('✅ [DICOM] S3 Presigned URL generated');
         } else {
-          console.log('🔗 [DICOM] Generating Supabase Signed URL...');
-          const { data, error } = await supabase.storage.from('dicom-files').createSignedUploadUrl(relPath);
-          if (error) {
-            console.error('❌ [DICOM] Supabase Signed URL error:', error);
-            throw error;
+          const bucket = 'dicom-files';
+          console.log(`🔗 [DICOM] Generating Supabase Signed URL for: ${relPath}...`);
+          
+          try {
+            if (isNative) {
+              console.log('🚀 [DICOM] Using robust native URL generation...');
+              const timeoutPromise = new Promise((_, reject) => 
+                setTimeout(() => reject(new Error('Native DICOM URL Timeout (30s)')), 30000)
+              );
+              uploadUrl = await Promise.race([getSignedUrlNatively(bucket, relPath), timeoutPromise]) as string;
+            } else {
+              const { data, error } = await supabase.storage.from(bucket).createSignedUploadUrl(relPath);
+              if (error) throw error;
+              uploadUrl = data.signedUrl;
+            }
+          } catch (err: any) {
+            console.error('❌ [DICOM] Signed URL generation failed:', err);
+            throw new Error(`Failed to initialize upload: ${err.message}`);
           }
-          uploadUrl = data.signedUrl;
           storageLocation = relPath;
           console.log('✅ [DICOM] Supabase Signed URL generated');
         }
@@ -261,34 +437,76 @@ export default function DicomUploader({ onUploadComplete }: DicomUploaderProps) 
         console.log(`🚀 [DICOM] Initializing Native Uploader to ${storageType.toUpperCase()}...`);
         update({ status: `Uploading to ${storageType.toUpperCase()}…`, progress: 30 });
         
-        const progressListener = await Uploader.addListener('uploadProgress', (info) => {
-          if (info.progress) {
-            const percent = Math.round(info.progress);
-            update({ 
-              progress: 30 + (percent * 0.6), 
-              status: `Uploading to ${storageType.toUpperCase()}… ${percent}%` 
-            });
-            console.log(`⏳ [DICOM] Native Progress: ${percent}%`);
-          }
-        });
-
+        let progressListener: any;
+        let uploadId: string | null = null;
+        
         try {
           console.log(`📡 [DICOM] Executing PUT request to: ${uploadUrl.substring(0, 50)}...`);
-          await Uploader.upload({
-            url: uploadUrl,
-            path: nativeFile.path,
-            method: 'PUT',
-            headers: { 'Content-Type': selectedFile.type || 'application/octet-stream' },
+          
+          await new Promise<void>(async (resolve, reject) => {
+            progressListener = await Uploader.addListener('events', (event: any) => {
+              if (uploadId && event.id !== uploadId) return;
+
+              if (event.name === 'uploading') {
+                if (event.payload.percent) {
+                  const percent = Math.round(event.payload.percent);
+                  update({ 
+                    progress: 30 + (percent * 0.5), 
+                    status: `Uploading to ${storageType.toUpperCase()}… ${percent}%` 
+                  });
+                  console.log(`⏳ [DICOM] Native Progress: ${percent}%`);
+                }
+              } else if (event.name === 'completed') {
+                console.log('✅ [DICOM] Native upload success');
+                resolve();
+              } else if (event.name === 'failed') {
+                console.error('❌ [DICOM] Native Uploader CRASHED:', event.payload.error);
+                reject(new Error(event.payload.error || 'Upload failed'));
+              }
+            });
+
+            // 🚀 Start upload with a fail-safe
+            try {
+              console.log(`📡 [DICOM] Calling Uploader.startUpload for ${fileNameRaw}...`);
+              const startTimeout = setTimeout(() => {
+                 if (!uploadId) reject(new Error('Uploader failed to start within 15s'));
+              }, 15000);
+
+              let uploadFilePath = nativeFile.path;
+              if (Capacitor.getPlatform() === 'android' && uploadFilePath.startsWith('file://')) {
+                uploadFilePath = uploadFilePath.replace('file://', '');
+              }
+
+              const result = await Uploader.startUpload({
+                filePath: uploadFilePath,
+                serverUrl: uploadUrl,
+                method: 'PUT',
+                headers: { 
+                  'Content-Type': fileType,
+                  'x-amz-acl': 'public-read' // Optional: for S3 if needed, but Supabase doesn't mind
+                },
+                mimeType: fileType,
+                notificationTitle: 'Uploading DICOM Study'
+              });
+              
+              clearTimeout(startTimeout);
+              uploadId = result.id;
+              console.log(`📡 [DICOM] Upload started successfully, ID: ${uploadId}`);
+            } catch (startErr) {
+              console.error('❌ [DICOM] Uploader.startUpload failed:', startErr);
+              reject(startErr);
+            }
           });
-          console.log('✅ [DICOM] Native upload success');
         } catch (nativeErr) {
           console.error('❌ [DICOM] Native Uploader CRASHED:', nativeErr);
           throw nativeErr;
         } finally {
-          progressListener.remove();
+          if (progressListener) {
+            await progressListener.remove();
+          }
         }
         
-        update({ progress: 90 });
+        update({ progress: 85 });
       } else {
         // ── Web Upload ──
         if (useS3) {
@@ -302,7 +520,8 @@ export default function DicomUploader({ onUploadComplete }: DicomUploaderProps) 
 
       // 5. Save to database
       update({ status: 'Saving study record…', progress: 95 });
-      const { error: dbErr } = await supabase.from('dicom_studies').insert({
+      console.log('📝 [DICOM] Inserting record into dicom_studies...', studyId);
+      const payload = {
         id: studyId,
         study_instance_uid: `upload-${studyId}`,
         patient_id: patient.id,
@@ -311,14 +530,62 @@ export default function DicomUploader({ onUploadComplete }: DicomUploaderProps) 
         uploaded_by_type: 'patient',
         status: 'staged',
         is_zip_upload: isZip,
-        zip_file_path: isZip ? storageLocation : null,
-        zip_file_size: isZip ? selectedFile.size : null,
+        zip_file_path: isZip ? (storageLocation || relPath) : null,
+        zip_file_size: isZip ? fileSize : null,
         zip_extracted: false,
-        description: `Upload: ${selectedFile.name} [${storageType.toUpperCase()}]`,
+        description: `Upload: ${fileNameRaw} [${storageType.toUpperCase()}]`,
         patient_name: patient.full_name || patient.id,
-      });
+      };
 
-      if (dbErr) throw new Error(`Database error: ${dbErr.message}`);
+      if (isNative && (window as any).Capacitor) {
+        console.log('📝 [DICOM] Native direct insert dicom_studies. Getting session...');
+        
+        const timeoutPromise = new Promise<any>((_, reject) => 
+          setTimeout(() => reject(new Error('Native DICOM DB Insert Timeout (25s)')), 25000)
+        );
+
+        const projectRef = import.meta.env.VITE_SUPABASE_URL.split('//')[1].split('.')[0];
+        const tokenKey = `sb-${projectRef}-auth-token`;
+        const cachedSession = localStorage.getItem(tokenKey);
+        let token = null;
+        
+        if (cachedSession) {
+          try {
+            token = JSON.parse(cachedSession).access_token;
+          } catch (e) {}
+        }
+        
+        if (!token) {
+          const session = await Promise.race([
+            supabase.auth.getSession(),
+            new Promise<any>((_, reject) => setTimeout(() => reject(new Error('Session Timeout')), 5000))
+          ]);
+          token = session.data.session?.access_token;
+        }
+
+        console.log('📝 [DICOM] Executing native DB insert...');
+        const resp = await Promise.race([
+          CapacitorHttp.post({
+            url: `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/dicom_studies`,
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+              'Content-Type': 'application/json',
+              'Prefer': 'return=representation'
+            },
+            data: payload
+          }),
+          timeoutPromise
+        ]);
+        
+        console.log(`📝 [DICOM] Insert result status: ${resp.status}`);
+        if (resp.status >= 400) throw new Error(`Database error ${resp.status}: ${JSON.stringify(resp.data)}`);
+        console.log('📝 [DICOM] Insert result data:', resp.data);
+      } else {
+        const { data: dbData, error: dbErr } = await supabase.from('dicom_studies').insert(payload).select();
+        console.log('📝 [DICOM] Insert result:', { error: dbErr, data: dbData });
+        if (dbErr) throw new Error(`Database error: ${dbErr.message}`);
+      }
 
       // 6. Done
       update({ progress: 100, status: 'Upload complete!' });
