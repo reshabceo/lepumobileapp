@@ -17,84 +17,7 @@ if (!supabaseUrl || !supabaseAnonKey) {
 console.log('🔍 Supabase Debug - URL:', supabaseUrl)
 console.log('🔍 Supabase Debug - Anon Key:', supabaseAnonKey.substring(0, 20) + '...')
 
-// On some iOS simulator environments, WKWebView fetch can intermittently fail
-// with "TypeError: Load failed". To make auth/network calls robust, route
-// Supabase requests through Capacitor's native HTTP on native platforms.
-const isNative = Capacitor?.isNativePlatform?.() === true
-
-// 🛡️ Global Fetch Patch for Native Platforms
-// This ensures all third-party SDKs (Razorpay, AWS, etc.) use CapacitorHttp
-const originalFetch = window.fetch;
-
-const nativeFetch: typeof fetch = async (input: RequestInfo | URL, init?: React.RequestInit) => {
-  const isReqObj = typeof input !== 'string' && !(input instanceof URL);
-  const req = isReqObj ? (input as Request) : undefined;
-  const url = isReqObj ? req!.url : String(input);
-  const method = (init?.method || req?.method || 'GET').toUpperCase();
-
-  // 🛡️ SECURITY: Log request for debugging
-  console.log(`🌐 [GlobalFetch] ${method} ${url}`);
-
-  // Check if this is a file upload or a local/blob URL
-  const isFileUpload = init?.body instanceof FormData || 
-                       init?.body instanceof Blob || 
-                       init?.body instanceof File;
-  const isLocalUrl = url.startsWith('blob:') || url.startsWith('data:') || url.startsWith('file:');
-
-  if (isFileUpload || isLocalUrl) {
-    return originalFetch(input, init);
-  }
-
-  // Robust header extraction
-  const headers: Record<string, string> = {};
-  const headerEntries = new Headers(init?.headers || req?.headers);
-  headerEntries.forEach((value, key) => { headers[key] = value; });
-
-  // Handle JSON data correctly for CapacitorHttp
-  let data: any;
-  if (init?.body) {
-    try {
-      data = typeof init.body === 'string' ? JSON.parse(init.body) : init.body;
-    } catch {
-      data = init.body;
-    }
-  }
-
-  try {
-    const response = await CapacitorHttp.request({ url, method, headers, data });
-
-    // Construct fetch-compatible Response
-    const responseBody = typeof response.data === 'string' 
-      ? response.data 
-      : JSON.stringify(response.data);
-
-    const responseHeaders = new Headers();
-    if (response.headers) {
-      Object.entries(response.headers).forEach(([k, v]) => {
-        if (typeof v === 'string') responseHeaders.set(k, v);
-      });
-    }
-
-    return new Response(responseBody, {
-      status: response.status,
-      headers: responseHeaders,
-    });
-  } catch (err) {
-    console.error(`🚨 [GlobalFetch] Error for ${url}:`, err);
-    // Fallback to original fetch if CapacitorHttp fails criticaly
-    return originalFetch(input, init);
-  }
-};
-
-if (isNative) {
-  console.log('💉 [Native] Patching global fetch with CapacitorHttp');
-  window.fetch = nativeFetch as any;
-}
-
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-  global: {
-    fetch: isNative ? nativeFetch as any : undefined,
-  },
   auth: {
     storage: {
       getItem: (key: string) => {
@@ -522,26 +445,20 @@ export const auth = {
 // Check if an auth user is a doctor (patient app must block doctors)
 export const isDoctorByAuthId = async (authUserId: string): Promise<boolean> => {
   try {
-    // Add a 3-second timeout to the query to prevent hangs
-    const timeoutPromise = new Promise((_, reject) => 
-      setTimeout(() => reject(new Error('Timeout')), 3000)
-    );
-
-    const queryPromise = supabase
+    // Remove the aggressive timeout entirely. Let the network handle it.
+    const { data, error } = await supabase
       .from('doctors')
       .select('id')
       .eq('auth_user_id', authUserId)
       .maybeSingle();
-
-    const result = await Promise.race([queryPromise, timeoutPromise]) as any;
     
-    if (result.error) {
-      console.warn('❌ isDoctor check error:', result.error);
+    if (error) {
+      console.warn('❌ isDoctor check error:', error);
       return false; 
     }
-    return !!result.data;
+    return !!data;
   } catch (err) {
-    console.warn('⚠️ isDoctor check timed out or failed, defaulting to patient role');
+    console.warn('⚠️ isDoctor check failed, defaulting to patient role');
     return false;
   }
 };

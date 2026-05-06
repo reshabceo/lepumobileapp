@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { FileText, Download, Calendar, User, ArrowLeft, Upload, Stethoscope, Plus, Loader2, FileDown, Image, Send } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
-import { supabase, db } from '@/lib/supabase';
+import { FileText, Download, Calendar, User, ArrowLeft, Upload, Stethoscope, Plus, Loader2, FileDown, Image, Send, RotateCcw } from 'lucide-react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { supabase, db, supabaseUrl, supabaseAnonKey } from '@/lib/supabase';
 import { useRealTimeVitals } from '@/hooks/useRealTimeVitals';
 import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/hooks/use-toast';
 import jsPDF from 'jspdf';
 import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
 import { Share } from '@capacitor/share';
-import { Capacitor } from '@capacitor/core';
+import { Capacitor, CapacitorHttp } from '@capacitor/core';
 import html2pdf from 'html2pdf.js';
 import DicomUploader from './DicomUploader';
 import RequestRadiologistModal from './RequestRadiologistModal';
@@ -484,6 +485,8 @@ const generateReportHTML = (analysisData: any, reportTitle: string): string => {
 
 const PatientReportsView: React.FC = () => {
     const navigate = useNavigate();
+    const location = useLocation();
+    const { toast } = useToast();
     const { user } = useAuth();
     // We still pull hookProfile to benefit from its cache, but we don't block the UI on hookLoading
     const { patientProfile: hookProfile } = useRealTimeVitals();
@@ -495,7 +498,9 @@ const PatientReportsView: React.FC = () => {
     const [loading, setLoading] = useState(false);
     const [profileLoading, setProfileLoading] = useState(true);
     const [reportsLoaded, setReportsLoaded] = useState(false);
-    const [activeTab, setActiveTab] = useState<'from-doctor' | 'my-uploads' | 'dicom'>('from-doctor');
+    const [activeTab, setActiveTab] = useState<'from-doctor' | 'my-uploads' | 'dicom'>(
+        (location.state as any)?.activeTab || localStorage.getItem('reports_active_tab') || 'from-doctor'
+    );
     const [requestRadiologistOpen, setRequestRadiologistOpen] = useState(false);
     const [selectedStudyForRequest, setSelectedStudyForRequest] = useState<DicomStudy | null>(null);
     const timeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -565,6 +570,11 @@ const PatientReportsView: React.FC = () => {
         };
     }, [patientProfile]);
 
+    // 🚀 Persist active tab to handle Android process death/restarts
+    useEffect(() => {
+        localStorage.setItem('reports_active_tab', activeTab);
+    }, [activeTab]);
+
     const fetchDicomStudies = async () => {
         if (!patientProfile) return;
         setDicomLoading(true);
@@ -598,26 +608,40 @@ const PatientReportsView: React.FC = () => {
 
         try {
             setLoading(true);
-            const { data, error } = await supabase
+            console.log(`📡 [Reports] Fetching reports for patient: ${activeProfile.id}...`);
+            
+            // 🚀 Robust timeout for reports fetch
+            const timeoutPromise = new Promise<any>((_, reject) => 
+                setTimeout(() => reject(new Error('Reports fetch timeout (15s)')), 15000)
+            );
+
+            const fetchPromise = supabase
                 .from('patient_reports')
                 .select(`
-          *,
-          doctors!doctor_id(full_name)
-        `)
+                    *,
+                    doctors!doctor_id(full_name)
+                `)
                 .eq('patient_id', activeProfile.id)
                 .order('created_at', { ascending: false });
 
+            const { data, error } = await Promise.race([fetchPromise, timeoutPromise]);
+
             if (error) {
-                console.error('Error fetching reports:', error);
+                console.error('❌ [Reports] Error fetching reports:', error);
+                toast.error('Failed to load reports. Please try again.');
             } else {
-                const formattedReports = data?.map(report => ({
+                console.log(`✅ [Reports] Successfully fetched ${data?.length || 0} reports`);
+                const formattedReports = data?.map((report: any) => ({
                     ...report,
                     doctor_name: report.doctors?.full_name || 'Unknown Doctor'
                 })) || [];
                 setReports(formattedReports);
             }
-        } catch (err) {
-            console.error('Error:', err);
+        } catch (err: any) {
+            console.error('❌ [Reports] Unexpected error:', err);
+            if (err.message?.includes('timeout')) {
+                toast.error('Connection slow. Reports loading timed out.');
+            }
         } finally {
             setLoading(false);
             setReportsLoaded(true);
@@ -936,6 +960,7 @@ const PatientReportsView: React.FC = () => {
                 {activeTab === 'dicom' && (
                     <div className="space-y-6 mb-20">
                         <DicomUploader
+                            patientProfile={patientProfile}
                             onUploadComplete={(studyId) => {
                                 fetchDicomStudies();
                             }}
@@ -987,14 +1012,40 @@ const PatientReportsView: React.FC = () => {
 
                 {/* Loading State (reports tabs) */}
                 {activeTab !== 'dicom' && loading && (
-                    <div className="text-center py-8">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto"></div>
-                        <p className="text-gray-400 mt-2">Loading reports...</p>
+                    <div className="text-center py-20 flex flex-col items-center gap-4">
+                        <Loader2 className="h-10 w-10 animate-spin text-blue-500" />
+                        <div className="space-y-1">
+                            <p className="text-gray-300 font-medium text-lg">Loading reports...</p>
+                            <p className="text-gray-500 text-sm">Please wait while we fetch your documents</p>
+                        </div>
+                    </div>
+                )}
+
+                {/* Error / Retry State */}
+                {activeTab !== 'dicom' && !loading && !reportsLoaded && (
+                    <div className="text-center py-20 flex flex-col items-center gap-4">
+                        <div className="bg-red-500/10 p-4 rounded-full">
+                            <RotateCcw className="h-8 w-8 text-red-500" />
+                        </div>
+                        <div className="space-y-2">
+                            <p className="text-gray-300 font-medium text-lg">Failed to load reports</p>
+                            <p className="text-gray-500 text-sm max-w-[250px] mx-auto">This could be due to a slow connection or a temporary issue.</p>
+                        </div>
+                        <button
+                            onClick={() => {
+                                setReportsLoaded(false);
+                                if (patientProfile) fetchReports(patientProfile);
+                            }}
+                            className="mt-2 flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg transition-all"
+                        >
+                            <RotateCcw className="h-4 w-4" />
+                            <span>Try Again</span>
+                        </button>
                     </div>
                 )}
 
                 {/* No Reports */}
-                {activeTab !== 'dicom' && !loading && filteredReports.length === 0 && (
+                {activeTab !== 'dicom' && !loading && reportsLoaded && filteredReports.length === 0 && (
                     <div className="text-center py-12">
                         <FileText className="h-16 w-16 text-gray-600 mx-auto mb-4" />
                         <h3 className="text-lg font-semibold text-gray-300 mb-2">

@@ -33,6 +33,8 @@ import {
   Pill,
   Target,
   Receipt,
+  AlertCircle,
+  RefreshCw,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
@@ -1249,7 +1251,7 @@ export const HealthDashboard = () => {
 
         {/* Bottom Action Buttons */}
         <div className="grid grid-cols-2 md:grid-cols-5  gap-3 mb-6">
-          <button
+          {/* <button
             type="button"
             onClick={() => navigate("/patient-messages")}
             className="bg-slate-800/80 backdrop-blur-sm hover:bg-slate-700/80 text-white font-bold py-4 rounded-xl flex flex-col items-center justify-center gap-1 transition-all duration-200 hover:scale-105 active:scale-95 border border-slate-500/40 hover:border-slate-400/60 relative"
@@ -1261,7 +1263,8 @@ export const HealthDashboard = () => {
             )}
             <MessageSquare size={20} className="text-slate-300" />
             <span className="text-xs">Messages</span>
-          </button>
+          </button> */}
+
           <button
             onClick={handleViewReports}
             className="bg-purple-900/60 backdrop-blur-sm hover:bg-purple-800/70 text-white font-bold py-4 rounded-xl flex flex-col items-center justify-center gap-1 transition-all duration-200 hover:scale-105 active:scale-95 border border-purple-400/40 hover:border-purple-400/60"

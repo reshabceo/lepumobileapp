@@ -50,7 +50,7 @@ const priorityColors: Record<RecommendationPriority, { bg: string; border: strin
 };
 
 // Status colors
-const statusColors = {
+const statusColors: Record<string, { bg: string; text: string; label: string }> = {
   active: { bg: 'bg-blue-500/10', text: 'text-blue-400', label: 'Active' },
   in_progress: { bg: 'bg-yellow-500/10', text: 'text-yellow-400', label: 'In Progress' },
   completed: { bg: 'bg-green-500/10', text: 'text-green-400', label: 'Completed' },
@@ -241,8 +241,8 @@ export const RecommendationsDashboard: React.FC = () => {
 
   // Detail view
   if (selectedRec) {
-    const Icon = typeIcons[selectedRec.recommendation_type];
-    const priorityStyle = priorityColors[selectedRec.priority];
+    const Icon = typeIcons[selectedRec.recommendation_type] || Target;
+    const priorityStyle = priorityColors[selectedRec.priority] || priorityColors.medium;
 
     return (
       <div className="bg-[#101010] min-h-screen text-white p-4">
@@ -481,9 +481,9 @@ export const RecommendationsDashboard: React.FC = () => {
         ) : (
           <div className="space-y-3">
             {filteredRecommendations.map((rec) => {
-              const Icon = typeIcons[rec.recommendation_type];
-              const priorityStyle = priorityColors[rec.priority];
-              const statusStyle = statusColors[rec.status];
+              const Icon = typeIcons[rec.recommendation_type] || Target;
+              const priorityStyle = priorityColors[rec.priority] || priorityColors.medium;
+              const statusStyle = statusColors[rec.status] || statusColors.active;
 
               return (
                 <div
