@@ -482,8 +482,7 @@ export default function DicomUploader({ onUploadComplete, patientProfile: propPr
                 serverUrl: uploadUrl,
                 method: 'PUT',
                 headers: { 
-                  'Content-Type': fileType,
-                  'x-amz-acl': 'public-read' // Optional: for S3 if needed, but Supabase doesn't mind
+                  'Content-Type': fileType
                 },
                 mimeType: fileType,
                 notificationTitle: 'Uploading DICOM Study'
