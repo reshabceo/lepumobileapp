@@ -9,6 +9,7 @@ import android.webkit.WebView;
 
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
+import androidx.activity.EdgeToEdge;
 
 import com.getcapacitor.BridgeActivity;
 import com.monitraq.wellue.WelluePlugin;
@@ -20,6 +21,9 @@ public class MainActivity extends BridgeActivity {
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
+        // Android 15 Edge-to-Edge compatibility bypass
+        EdgeToEdge.enable(this);
+
         // CRITICAL: Register plugins BEFORE super.onCreate()
         // BridgeActivity creates the bridge in super.onCreate(), so plugins must be
         // added to initialPlugins first

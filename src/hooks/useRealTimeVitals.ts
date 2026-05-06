@@ -75,7 +75,7 @@ export const useRealTimeVitals = () => {
                 }
             }
 
-            // Safety timeout to prevent infinite loading (reduced to 6 seconds for better UX)
+            // Safety timeout to prevent infinite loading (increased to 30 seconds for mobile robustness)
             timeoutId = setTimeout(() => {
                 if (isMounted) {
                     console.warn('⚠️ Loading timeout - forcing loading to false');
@@ -85,7 +85,7 @@ export const useRealTimeVitals = () => {
                         setError('Loading took too long. Please check your connection.');
                     }
                 }
-            }, 6000);
+            }, 30000);
 
             try {
                 if (isMounted && !hasCache) {
@@ -96,7 +96,7 @@ export const useRealTimeVitals = () => {
                 // 🚀 OPTIMIZED: Fetch profile with timeout protection
                 const profilePromise = db.getPatientProfile(user.id);
                 const timeoutPromise = new Promise((_, reject) => 
-                    setTimeout(() => reject(new Error('Profile fetch timeout')), 7000)
+                    setTimeout(() => reject(new Error('Profile fetch timeout')), 30000)
                 );
 
                 const profileResult = await Promise.race([
