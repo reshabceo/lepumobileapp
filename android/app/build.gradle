@@ -12,8 +12,8 @@ android {
     defaultConfig {
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 9
-        versionName "1.9"
+        versionCode 11
+        versionName "1.11"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         if (org.gradle.api.JavaVersion.current().isCompatibleWith(JavaVersion.VERSION_17)) {
             println("Using Java 17 for build")
@@ -43,6 +43,12 @@ android {
             keyAlias 'androiddebugkey'
             keyPassword 'android'
         }
+        release {
+            storeFile file('upload-key.keystore')
+            storePassword 'monitraq'
+            keyAlias 'upload'
+            keyPassword 'monitraq'
+        }
     }
 
     buildTypes {
@@ -52,7 +58,7 @@ android {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
-            signingConfig signingConfigs.debug
+            signingConfig signingConfigs.release
         }
     }
 
