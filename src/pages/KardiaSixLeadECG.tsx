@@ -3,35 +3,45 @@ import { useNavigate } from "react-router-dom";
 import { Loader2, Activity, ArrowLeft, FileText } from "lucide-react";
 import { aliveCorSDK, AliveCorRecordingResult } from "@/lib/alivecor-sdk-bridge";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
+import { getAliveCorToken, db, storeAliveCorRecording, triggerEcgAiAnalysis } from "@/lib/supabase";
+import { buildAliveCorIngestPayload } from "@/lib/aliveCorKardia";
+import { AliveCorEcgResult } from "@/plugins/alivecor";
 
-// Simple 6‑lead ECG page that delegates the full recording
-// experience to the native AliveCor SDK via Capacitor.
 const KardiaSixLeadECG: React.FC = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { user } = useAuth();
   const [isRecording, setIsRecording] = useState(false);
   const [lastResult, setLastResult] = useState<AliveCorRecordingResult | null>(null);
 
   const handleStartRecording = async () => {
+    if (!user) {
+      toast({ title: "Authentication Required", description: "Please sign in to perform a 6‑lead ECG.", variant: "destructive" });
+      return;
+    }
+
     try {
       setIsRecording(true);
       setLastResult(null);
 
-      // TODO: Replace this with a real API call to your own
-      // Kardia auth server that wraps the docker image described
-      // in the AliveCor docs. This endpoint should return a JWT.
-      //
-      // Example shape:
-      // const jwtResponse = await fetch("/api/alivecor/token", { method: "POST" });
-      // const { jwt } = await jwtResponse.json();
-      //
-      // For now we just block if there is no backend configured.
-      const jwtEnv = import.meta.env.VITE_ALIVECOR_TEST_JWT as string | undefined;
-      if (!jwtEnv) {
+      const { data: profile, error: profileErr } = await db.getPatientProfile(user.id);
+      if (profileErr || !profile) {
+        throw new Error(profileErr?.message || "Patient profile not found");
+      }
+
+      let jwtToken: string | undefined;
+      try {
+        jwtToken = await getAliveCorToken(profile.id);
+      } catch (tokenErr) {
+        console.warn("Failed to fetch backend JWT, falling back to test JWT if available", tokenErr);
+        jwtToken = import.meta.env.VITE_ALIVECOR_TEST_JWT as string | undefined;
+      }
+
+      if (!jwtToken) {
         toast({
           title: "AliveCor Auth Not Configured",
-          description:
-            "Set up the Kardia auth server and expose an API that returns a JWT, then wire it into this page.",
+          description: "Unable to retrieve a valid Kardia JWT. Ensure the backend auth proxy is running.",
           variant: "destructive",
         });
         setIsRecording(false);
@@ -39,20 +49,34 @@ const KardiaSixLeadECG: React.FC = () => {
       }
 
       const result = await aliveCorSDK.startSixLeadRecording({
-        jwt: jwtEnv,
-        mainsFrequencyHz: 50, // TODO: make region‑aware (50 vs 60 Hz)
-        environment: "sandbox",
+        jwt: jwtToken,
+        mainsFrequencyHz: 50,
+        environment: import.meta.env.PROD ? "production" : "sandbox",
+        patientId: profile.id,
       });
 
       setLastResult(result);
 
       if (result.success) {
-        toast({
-          title: "6‑Lead ECG Completed",
-          description:
-            result.diagnosisText ||
-            `Recording finished${result.heartRate ? ` • HR ${result.heartRate} bpm` : ""}.`,
-        });
+        // Build payload and store in Supabase
+        try {
+          const payload = buildAliveCorIngestPayload(profile.id, result as unknown as AliveCorEcgResult);
+          const stored = await storeAliveCorRecording(payload);
+          if (stored?.id) {
+            triggerEcgAiAnalysis(stored.id);
+          }
+          toast({
+            title: "6‑Lead ECG Saved",
+            description: result.diagnosisText || "Recording saved and analyzed successfully.",
+          });
+        } catch (storageErr) {
+          console.error("Failed to store AliveCor recording", storageErr);
+          toast({
+            title: "Recording Saved Locally",
+            description: "ECG completed but failed to sync with the server. It will be synced later.",
+            variant: "warning",
+          });
+        }
       } else {
         toast({
           title: "Recording Not Completed",

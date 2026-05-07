@@ -3,9 +3,14 @@ import { registerPlugin } from "@capacitor/core";
 
 export interface AliveCorRecordingResult {
   success: boolean;
-  // Optional fields that native plugins can populate later
   heartRate?: number;
   diagnosisText?: string;
+  determination?: string;
+  sampleRate?: number;
+  durationSeconds?: number;
+  deviceType?: string;
+  isInverted?: boolean;
+  waveformLeads?: Record<string, number[]>;
   pdfPath?: string;
 }
 
@@ -22,7 +27,21 @@ export interface AliveCorSDKPlugin {
     jwt: string;
     mainsFrequencyHz: 50 | 60;
     environment?: "sandbox" | "production";
+    patientId?: string;
   }): Promise<AliveCorRecordingResult>;
+
+  initialize(options: {
+    jwt: string;
+    isDebugMode?: boolean;
+  }): Promise<void>;
+
+  getDeviceStatus(): Promise<{
+    connected: boolean;
+    deviceName: string;
+    deviceType: string;
+  }>;
+
+  dispose(): Promise<void>;
 }
 
 const NativeAliveCor = registerPlugin<AliveCorSDKPlugin>("AliveCorSDK");
@@ -42,6 +61,7 @@ class AliveCorSDKBridge {
     jwt: string;
     mainsFrequencyHz: 50 | 60;
     environment?: "sandbox" | "production";
+    patientId?: string;
   }): Promise<AliveCorRecordingResult> {
     if (!this.isNativePlatform()) {
       console.warn(
@@ -61,6 +81,7 @@ class AliveCorSDKBridge {
         jwt: params.jwt,
         mainsFrequencyHz: params.mainsFrequencyHz,
         environment: params.environment ?? "sandbox",
+        patientId: params.patientId,
       });
       return result;
     } catch (err) {
@@ -69,6 +90,18 @@ class AliveCorSDKBridge {
         success: false,
       };
     }
+  }
+
+  async initialize(jwt: string, isDebug: boolean = false): Promise<void> {
+    if (!this.isNativePlatform()) return;
+    return NativeAliveCor.initialize({ jwt, isDebugMode: isDebug });
+  }
+
+  async getDeviceStatus() {
+    if (!this.isNativePlatform()) {
+      return { connected: false, deviceName: "", deviceType: "WEB" };
+    }
+    return NativeAliveCor.getDeviceStatus();
   }
 }
 

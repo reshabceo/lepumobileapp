@@ -273,6 +273,9 @@ export const HealthDashboard = () => {
     availableDevices,
     connectToDevice,
     manualInitializeSDK,
+    aliveCorConnected,
+    aliveCorDeviceInfo,
+    checkAliveCorStatus,
   } = useDevice();
 
   // Ensure the banner doesn't show a stale Bluetooth error when Bluetooth is ON
@@ -1034,6 +1037,71 @@ export const HealthDashboard = () => {
                 </div>
               )}
 
+              {/* AliveCor (Kardia) Device Status */}
+              {aliveCorConnected ? (
+                <div className="mb-2 p-2 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="bg-emerald-500 p-1.5 rounded-full">
+                        <Activity className="h-4 w-4 text-white" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-white">
+                          {aliveCorDeviceInfo?.deviceName || "Kardia Device"}
+                        </p>
+                        <p className="text-xs text-gray-400">
+                          {aliveCorDeviceInfo?.deviceType || "AliveCor ECG"}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
+                      <span className="text-xs text-emerald-400">Ready</span>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="mb-2 p-2 bg-gray-500/10 border border-gray-500/20 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="bg-gray-500 p-1.5 rounded-full">
+                        <Activity className="h-4 w-4 text-white" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-gray-400">
+                          Kardia (AliveCor)
+                        </p>
+                        <p className="text-xs text-gray-500">Not connected</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={async () => {
+                        if (!bluetoothEnabled) {
+                          toast({
+                            title: "Bluetooth Required",
+                            description: "Please enable Bluetooth to connect to Kardia",
+                            variant: "destructive",
+                          });
+                          return;
+                        }
+                        // For Kardia, "Connect" can trigger a status refresh or a pairing flow
+                        await checkAliveCorStatus();
+                        if (!aliveCorConnected) {
+                          toast({
+                            title: "Kardia Not Found",
+                            description: "Ensure your Kardia device is nearby and ready to record.",
+                          });
+                        }
+                      }}
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium px-3 py-1.5 rounded-lg transition-all duration-200 flex items-center gap-1"
+                    >
+                      <Bluetooth className="h-3 w-3" />
+                      Connect
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* CGM Device Status */}
               {/* {cgmConnected ? (
                 <div className="mb-2 p-2 bg-blue-500/10 border border-blue-500/20 rounded-lg">
@@ -1148,6 +1216,10 @@ export const HealthDashboard = () => {
                 <div className="flex items-center gap-1">
                   <div className={`w-2 h-2 rounded-full ${cameraConnected ? "bg-purple-500" : "bg-gray-500"}`} />
                   <span className="text-gray-400">Camera</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <div className={`w-2 h-2 rounded-full ${aliveCorConnected ? "bg-emerald-500" : "bg-gray-500"}`} />
+                  <span className="text-gray-400">Kardia</span>
                 </div>
               </div>
               <button
