@@ -7,7 +7,7 @@ import {
   triggerEcgAiAnalysis,
 } from '@/lib/supabase';
 import { buildAliveCorIngestPayload } from '@/lib/aliveCorKardia';
-import { AliveCor } from '@/plugins/alivecor';
+import { aliveCorSDK } from '@/lib/alivecor-sdk-bridge';
 import { useToast } from '@/hooks/use-toast';
 import { Activity, Stethoscope } from 'lucide-react';
 
@@ -60,13 +60,11 @@ export const AliveCorEcgCard: React.FC = () => {
     setBusy(true);
     try {
       const jwt = await getAliveCorToken(patientId);
-      await AliveCor.initialize({
+      await aliveCorSDK.initialize(jwt, import.meta.env.DEV);
+      const result = await aliveCorSDK.startSixLeadRecording({
         jwt,
-        isDebugMode: import.meta.env.DEV,
-      });
-      const result = await AliveCor.startRecording({
-        leadConfig: 'six',
-        mainsFilter: 50,
+        mainsFrequencyHz: 50,
+        patientId,
       });
       const payload = buildAliveCorIngestPayload(patientId, result);
       const stored = await storeAliveCorRecording(payload);

@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { wellueSDK, WellueDevice, WellueSDKCallbacks } from '../lib/wellue-sdk-bridge';
+import { aliveCorSDK } from '../lib/alivecor-sdk-bridge';
 
 interface DeviceContextType {
     // Device state
@@ -25,6 +26,11 @@ interface DeviceContextType {
     startBPMeasurement: () => Promise<void>;
     startECGMeasurement: () => Promise<void>;
     stopMeasurement: () => Promise<void>;
+    
+    // AliveCor (Kardia) state
+    aliveCorConnected: boolean;
+    aliveCorDeviceInfo: { deviceName: string; deviceType: string } | null;
+    checkAliveCorStatus: () => Promise<void>;
     
     // SDK instance
     wellueSDK: typeof wellueSDK;
@@ -52,6 +58,8 @@ export const DeviceProvider: React.FC<DeviceProviderProps> = ({ children }) => {
     const [isInitialized, setIsInitialized] = useState<boolean>(false);
     const [bluetoothEnabled, setBluetoothEnabled] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
+    const [aliveCorConnected, setAliveCorConnected] = useState<boolean>(false);
+    const [aliveCorDeviceInfo, setAliveCorDeviceInfo] = useState<{ deviceName: string; deviceType: string } | null>(null);
 
     // Initialize SDK and set up callbacks
     useEffect(() => {
@@ -713,6 +721,32 @@ export const DeviceProvider: React.FC<DeviceProviderProps> = ({ children }) => {
         }
     };
 
+    const checkAliveCorStatus = async () => {
+        try {
+            const status = await aliveCorSDK.getDeviceStatus();
+            setAliveCorConnected(status.connected);
+            if (status.connected) {
+                setAliveCorDeviceInfo({ deviceName: status.deviceName, deviceType: status.deviceType });
+            } else {
+                setAliveCorDeviceInfo(null);
+            }
+        } catch (err) {
+            console.error('Failed to check AliveCor status:', err);
+            setAliveCorConnected(false);
+            setAliveCorDeviceInfo(null);
+        }
+    };
+
+    // Initial AliveCor status check
+    useEffect(() => {
+        if (aliveCorSDK.isNativePlatform()) {
+            checkAliveCorStatus();
+            // Optional: poll every 10 seconds
+            const interval = setInterval(checkAliveCorStatus, 10000);
+            return () => clearInterval(interval);
+        }
+    }, []);
+
     const value: DeviceContextType = {
         connectedDevice,
         availableDevices,
@@ -732,7 +766,10 @@ export const DeviceProvider: React.FC<DeviceProviderProps> = ({ children }) => {
         startBPMeasurement,
         startECGMeasurement,
         stopMeasurement,
-        wellueSDK
+        wellueSDK,
+        aliveCorConnected,
+        aliveCorDeviceInfo,
+        checkAliveCorStatus
     };
 
     return (
