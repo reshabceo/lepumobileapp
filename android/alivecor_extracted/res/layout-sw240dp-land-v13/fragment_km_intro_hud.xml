@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<androidx.cardview.widget.CardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/kardia_white"
+    app:cardCornerRadius="@dimen/margin_8"
+    app:cardPreventCornerOverlap="false"
+    app:cardUseCompatPadding="true">
+
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <TextView
+            android:id="@+id/km_hud_header"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="@dimen/margin16dp"
+            android:layout_marginTop="@dimen/margin16dp"
+            android:layout_marginEnd="@dimen/margin16dp"
+            android:ellipsize="end"
+            android:gravity="start"
+            android:text="@string/recording_intro_km_title"
+            android:textColor="@color/black"
+            android:textSize="@dimen/text_size_h3"
+            android:textStyle="bold"
+            app:layout_constraintEnd_toStartOf="@id/hud_container"
+            app:layout_constraintHeight_percent="0.35"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <TextView
+            android:id="@+id/km_hud_desc"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="@dimen/margin16dp"
+            android:layout_marginTop="@dimen/margin16dp"
+            android:layout_marginEnd="@dimen/margin16dp"
+            android:layout_marginBottom="@dimen/margin16dp"
+            android:ellipsize="end"
+            android:gravity="start"
+            android:text="@string/recording_intro_km_body"
+            android:textColor="@color/kardia_black"
+            android:textSize="@dimen/text_size_h3"
+            app:layout_constraintBottom_toTopOf="@+id/km_intro_tutorial"
+            app:layout_constraintEnd_toStartOf="@id/hud_container"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/km_hud_header" />
+
+        <TextView
+            android:id="@+id/km_intro_tutorial"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="@dimen/margin_16"
+            android:layout_marginEnd="@dimen/margin16dp"
+            android:layout_marginBottom="@dimen/margin12dp"
+            android:background="@drawable/button_with_grey_border"
+            android:ems="10"
+            android:gravity="center"
+            android:letterSpacing="0.01"
+            android:padding="@dimen/margin12dp"
+            android:text="@string/view_tutorial"
+            android:textAllCaps="true"
+            android:textColor="@color/kardia_default_text_color"
+            android:textSize="@dimen/text_size_h3"
+            android:textStyle="bold"
+            app:layout_constraintBottom_toTopOf="@+id/km_intro_hud_help"
+            app:layout_constraintStart_toStartOf="parent" />
+
+        <TextView
+            android:id="@+id/km_intro_hud_help"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="@dimen/margin16dp"
+            android:layout_marginEnd="@dimen/margin16dp"
+            android:layout_marginBottom="@dimen/margin12dp"
+            android:background="@drawable/button_with_bg_grey"
+            android:ems="10"
+            android:gravity="center"
+            android:letterSpacing="0.01"
+            android:paddingTop="@dimen/margin12dp"
+            android:paddingBottom="@dimen/margin12dp"
+            android:text="@string/contact_support"
+            android:textAllCaps="true"
+            android:textColor="@color/kardia_default_text_color"
+            android:textSize="@dimen/text_size_h3"
+            android:textStyle="bold"
+            android:visibility="visible"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintStart_toStartOf="parent" />
+
+        <include
+            android:id="@+id/hud_container"
+            layout="@layout/km_intro_hud_component"
+            android:layout_width="200dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="@dimen/margin16dp"
+            android:layout_marginTop="@dimen/margin_8"
+            android:layout_marginEnd="@dimen/margin16dp"
+            android:layout_marginBottom="@dimen/margin_8"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+
+            />
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+</androidx.cardview.widget.CardView>

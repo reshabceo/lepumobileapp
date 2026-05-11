@@ -3,10 +3,24 @@ import { registerPlugin } from "@capacitor/core";
 
 export interface AliveCorRecordingResult {
   success: boolean;
-  // Optional fields that native plugins can populate later
   heartRate?: number;
   diagnosisText?: string;
+  determination?: string;
+  sampleRate?: number;
+  durationSeconds?: number;
+  deviceType?: string;
+  isInverted?: boolean;
+  waveformLeads?: Record<string, number[]>;
   pdfPath?: string;
+}
+
+export interface AliveCorSDKOptions {
+  jwt: string;
+  mainsFrequencyHz: number;
+  patientId?: string;
+  environment?: string;
+  bundleId?: string;
+  isDebugMode?: boolean;
 }
 
 export interface AliveCorSDKPlugin {
@@ -18,11 +32,32 @@ export interface AliveCorSDKPlugin {
    * responsible for initializing AliveCorKitLite with this JWT
    * and launching the turnkey recording UI.
    */
-  startSixLeadRecording(options: {
+  startSixLeadRecording(options: AliveCorSDKOptions): Promise<AliveCorRecordingResult>;
+
+  initialize(options: {
     jwt: string;
-    mainsFrequencyHz: 50 | 60;
-    environment?: "sandbox" | "production";
-  }): Promise<AliveCorRecordingResult>;
+    isDebugMode?: boolean;
+  }): Promise<void>;
+
+  getDeviceStatus(): Promise<{
+    connected: boolean;
+    deviceName: string;
+    deviceId?: string;
+    ready: boolean;
+    bluetoothEnabled: boolean;
+    batteryLevel?: number;
+    statusText: string;
+  }>;
+
+  startScan(): Promise<void>;
+  stopScan(): Promise<void>;
+  connect(options: { deviceId: string }): Promise<{ success: boolean; deviceId: string; deviceName: string }>;
+  requestPermissions(): Promise<{ bluetooth: string; audio: string }>;
+
+  dispose(): Promise<void>;
+
+  addListener(eventName: "deviceFound", listenerFunc: (data: { deviceName: string; deviceId: string; rssi: number }) => void): any;
+  addListener(eventName: "deviceConnected", listenerFunc: (data: { success: boolean; deviceId: string; deviceName: string }) => void): any;
 }
 
 const NativeAliveCor = registerPlugin<AliveCorSDKPlugin>("AliveCorSDK");
@@ -42,6 +77,8 @@ class AliveCorSDKBridge {
     jwt: string;
     mainsFrequencyHz: 50 | 60;
     environment?: "sandbox" | "production";
+    patientId?: string;
+    bundleId?: string;
   }): Promise<AliveCorRecordingResult> {
     if (!this.isNativePlatform()) {
       console.warn(
@@ -61,14 +98,59 @@ class AliveCorSDKBridge {
         jwt: params.jwt,
         mainsFrequencyHz: params.mainsFrequencyHz,
         environment: params.environment ?? "sandbox",
+        isDebugMode: params.environment !== "production",
+        patientId: params.patientId,
+        bundleId: params.bundleId
       });
       return result;
-    } catch (err) {
+    } catch (err: any) {
       console.error("[AliveCorSDKBridge] Failed to start 6‑lead recording:", err);
       return {
         success: false,
+        diagnosisText: err?.message || "Recording failed"
       };
     }
+  }
+
+  async initialize(jwt: string, isDebug: boolean = false): Promise<void> {
+    if (!this.isNativePlatform()) return;
+    return NativeAliveCor.initialize({ jwt, isDebugMode: isDebug });
+  }
+
+  async getDeviceStatus() {
+    if (!this.isNativePlatform()) {
+      return { connected: false, deviceName: "", deviceType: "WEB", ready: false, bluetoothEnabled: false };
+    }
+    return NativeAliveCor.getDeviceStatus();
+  }
+
+  async startScan() {
+    if (!this.isNativePlatform()) return;
+    return NativeAliveCor.startScan();
+  }
+
+  async stopScan() {
+    if (!this.isNativePlatform()) return;
+    return NativeAliveCor.stopScan();
+  }
+
+  async connect(deviceId: string) {
+    if (!this.isNativePlatform()) return { success: false, deviceId: "", deviceName: "" };
+    return NativeAliveCor.connect({ deviceId });
+  }
+
+  /**
+   * Request Bluetooth and Audio permissions required by the AliveCor SDK.
+   */
+  async requestPermissions(): Promise<void> {
+    if (!this.isNativePlatform()) return;
+    const status = await NativeAliveCor.requestPermissions();
+    console.log("[AliveCorSDKBridge] Permission status:", status);
+  }
+
+  addListener(eventName: string, listenerFunc: Function) {
+    if (!this.isNativePlatform()) return { remove: () => {} };
+    return (NativeAliveCor as any).addListener(eventName, listenerFunc);
   }
 }
 

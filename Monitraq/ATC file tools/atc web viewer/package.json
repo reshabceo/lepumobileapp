@@ -1,0 +1,30 @@
+{
+  "name": "atc-viewer-js",
+  "author": "Shriram <ssanthana313@alivecor.com>",
+  "private": true,
+  "version": "1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "bufferpack": "^0.0.6",
+    "d3": "^7.8.5",
+    "dateutil": "^0.1.0",
+    "dateutils": "^0.5.1",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-dropzone": "^14.2.3",
+    "react-hot-toast": "^2.4.0",
+    "react-json-view": "^1.21.3",
+    "structjs": "^0.2.2"
+  },
+  "devDependencies": {
+    "@types/react": "^18.0.27",
+    "@types/react-dom": "^18.0.10",
+    "@vitejs/plugin-react-swc": "^3.0.0",
+    "vite": "^4.1.0"
+  }
+}

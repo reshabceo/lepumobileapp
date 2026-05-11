@@ -44,6 +44,16 @@ import { useDevice } from "@/contexts/DeviceContext";
 import { useRealTimeVitals } from "@/hooks/useRealTimeVitals";
 import { DoctorInfoCard } from "./DoctorInfoCard";
 import { EmergencyButton } from "./EmergencyButton";
+import { getPatientRiskCriteria } from "@/lib/supabase";
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogHeader, 
+  DialogTitle, 
+  DialogDescription,
+  DialogFooter 
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 import { useInsuranceClaimsNotifications } from "@/hooks/useInsuranceClaimsNotifications";
 import { useHealthRecommendationsNotifications } from "@/hooks/useHealthRecommendationsNotifications";
 import { usePatientUnreadMessages } from "@/hooks/usePatientChat";
@@ -175,7 +185,7 @@ export const HealthDashboard = () => {
   const navigate = useNavigate();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [forceStopLoading, setForceStopLoading] = useState(false);
-  const { logout } = useAuth();
+  const { user, logout } = useAuth();
   const loadingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const { toast } = useToast();
@@ -273,6 +283,17 @@ export const HealthDashboard = () => {
     availableDevices,
     connectToDevice,
     manualInitializeSDK,
+    aliveCorConnected,
+    aliveCorDeviceInfo,
+    aliveCorBackendReady,
+    checkAliveCorStatus,
+    isKardiaScanning,
+    kardiaDevices,
+    startKardiaScan,
+    stopKardiaScan,
+    connectKardia,
+    kardiaBattery,
+    kardiaStatusText,
   } = useDevice();
 
   // Ensure the banner doesn't show a stale Bluetooth error when Bluetooth is ON
@@ -300,6 +321,42 @@ export const HealthDashboard = () => {
     []
   );
   const [isLoadingSaved, setIsLoadingSaved] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [riskAlertOpen, setRiskAlertOpen] = useState(false);
+  const [activeRisk, setActiveRisk] = useState<any>(null);
+
+  // High Risk Alert Check
+  useEffect(() => {
+    const checkRisk = async () => {
+      if (user) {
+        try {
+          const { data: patient } = await supabase
+            .from('patients')
+            .select('id')
+            .eq('auth_user_id', user.id)
+            .single();
+            
+          if (patient) {
+            const { data: riskData } = await getPatientRiskCriteria(patient.id);
+            if (riskData && riskData.is_high_risk) {
+              setActiveRisk(riskData);
+              // Small delay to ensure UI is ready
+              setTimeout(() => setRiskAlertOpen(true), 1500);
+            }
+          }
+        } catch (err) {
+          console.error("Risk check failed:", err);
+        }
+      }
+    };
+    checkRisk();
+  }, [user]);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    setTimeout(() => setIsRefreshing(false), 2000);
+  };
+
   const [isConnecting, setIsConnecting] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState("");
   const previewCanvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -1034,6 +1091,106 @@ export const HealthDashboard = () => {
                 </div>
               )}
 
+              {/* AliveCor (Kardia) Device Status */}
+              {aliveCorConnected ? (
+                <div className="mb-2 p-2 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="bg-emerald-500 p-1.5 rounded-full">
+                        <Activity className="h-4 w-4 text-white" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-white">KardiaMobile 6L</p>
+                        <p className="text-xs text-gray-400">
+                          {kardiaStatusText} {aliveCorDeviceInfo?.deviceName ? `· ${aliveCorDeviceInfo.deviceName}` : ''}
+                          {kardiaBattery !== null && kardiaBattery > 0 ? ` · Battery ${Math.round(kardiaBattery * 100)}%` : ''}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {!aliveCorBackendReady && (
+                        <div className="group relative">
+                          <div className="w-2 h-2 bg-amber-500 rounded-full" />
+                          <div className="absolute bottom-full right-0 mb-2 w-32 p-2 bg-black border border-white/10 rounded text-[10px] text-gray-300 hidden group-hover:block">
+                            Kardia Auth Backend is unreachable.
+                          </div>
+                        </div>
+                      )}
+                      <div className="flex items-center gap-1">
+                        <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
+                        <span className="text-xs text-emerald-400">Ready</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : isKardiaScanning ? (
+                <div className="mb-2 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <Loader2 className="w-4 h-4 text-blue-400 animate-spin" />
+                      <span className="text-sm font-medium text-blue-400">Scanning for Kardia devices...</span>
+                    </div>
+                    <button
+                      onClick={stopKardiaScan}
+                      className="text-xs text-gray-400 hover:text-white"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                  <div className="space-y-1 max-h-32 overflow-y-auto pr-1 custom-scrollbar">
+                    {kardiaDevices.length === 0 ? (
+                      <p className="text-[10px] text-gray-500 text-center py-2">No devices found yet. Move your Kardia device closer.</p>
+                    ) : (
+                      kardiaDevices.map((dev) => (
+                        <button
+                          key={dev.deviceId}
+                          onClick={() => connectKardia(dev.deviceId)}
+                          disabled={isConnecting}
+                          className="w-full flex items-center justify-between p-2 hover:bg-white/5 rounded-md transition-colors border border-transparent hover:border-white/10"
+                        >
+                          <div className="flex items-center gap-2 text-left">
+                            <Activity className="w-3 h-3 text-emerald-400" />
+                            <span className="text-xs text-gray-200">{dev.deviceName}</span>
+                          </div>
+                          <span className="text-[10px] text-gray-500">{dev.rssi} dBm</span>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="mb-2 p-2 bg-gray-500/10 border border-gray-500/20 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="bg-gray-500 p-1.5 rounded-full">
+                        <Activity className="h-4 w-4 text-white" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-gray-400">KardiaMobile 6L</p>
+                        <p className="text-xs text-gray-500">Not connected</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={async () => {
+                        if (!bluetoothEnabled) {
+                          toast({
+                            title: "Bluetooth Required",
+                            description: "Please enable Bluetooth to connect to Kardia",
+                            variant: "destructive",
+                          });
+                          return;
+                        }
+                        await startKardiaScan();
+                      }}
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium px-3 py-1.5 rounded-lg transition-all duration-200 flex items-center gap-1"
+                    >
+                      <Bluetooth className="h-3 w-3" />
+                      Connect
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* CGM Device Status */}
               {/* {cgmConnected ? (
                 <div className="mb-2 p-2 bg-blue-500/10 border border-blue-500/20 rounded-lg">
@@ -1148,6 +1305,10 @@ export const HealthDashboard = () => {
                 <div className="flex items-center gap-1">
                   <div className={`w-2 h-2 rounded-full ${cameraConnected ? "bg-purple-500" : "bg-gray-500"}`} />
                   <span className="text-gray-400">Camera</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <div className={`w-2 h-2 rounded-full ${aliveCorConnected ? "bg-emerald-500" : "bg-gray-500"}`} />
+                  <span className="text-gray-400">Kardia</span>
                 </div>
               </div>
               <button
@@ -1314,6 +1475,13 @@ export const HealthDashboard = () => {
           >
             <Receipt size={20} className="text-amber-400" />
             <span className="text-xs">Invoices</span>
+          </button>
+          <button
+            onClick={() => navigate("/alivecor-history")}
+            className="bg-rose-900/60 backdrop-blur-sm hover:bg-rose-800/70 text-white font-bold py-4 rounded-xl flex flex-col items-center justify-center gap-1 transition-all duration-200 hover:scale-105 active:scale-95 border border-rose-400/40 hover:border-rose-400/60"
+          >
+            <Activity size={20} className="text-rose-400" />
+            <span className="text-xs">ECG Records</span>
           </button>
           <button
             onClick={() => navigate("/prescriptions")}

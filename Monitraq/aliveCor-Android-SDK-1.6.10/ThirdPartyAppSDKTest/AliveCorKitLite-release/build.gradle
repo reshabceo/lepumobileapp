@@ -1,0 +1,2 @@
+configurations.maybeCreate("default")
+artifacts.add("default", file('alivecorkitlite-core-1.6.10-914f71ed.aar'))

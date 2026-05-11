@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { wellueSDK, WellueDevice, WellueSDKCallbacks } from '../lib/wellue-sdk-bridge';
+import { aliveCorSDK } from '../lib/alivecor-sdk-bridge';
 
 interface DeviceContextType {
     // Device state
@@ -25,6 +26,19 @@ interface DeviceContextType {
     startBPMeasurement: () => Promise<void>;
     startECGMeasurement: () => Promise<void>;
     stopMeasurement: () => Promise<void>;
+    
+    // AliveCor (Kardia) state
+    aliveCorConnected: boolean;
+    aliveCorDeviceInfo: { deviceName: string; deviceType: string } | null;
+    aliveCorBackendReady: boolean;
+    isKardiaScanning: boolean;
+    kardiaDevices: { deviceName: string; deviceId: string; rssi: number }[];
+    kardiaBattery: number | null;
+    kardiaStatusText: string;
+    checkAliveCorStatus: () => Promise<void>;
+    startKardiaScan: () => Promise<void>;
+    stopKardiaScan: () => Promise<void>;
+    connectKardia: (deviceId: string) => Promise<void>;
     
     // SDK instance
     wellueSDK: typeof wellueSDK;
@@ -52,6 +66,13 @@ export const DeviceProvider: React.FC<DeviceProviderProps> = ({ children }) => {
     const [isInitialized, setIsInitialized] = useState<boolean>(false);
     const [bluetoothEnabled, setBluetoothEnabled] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
+    const [aliveCorConnected, setAliveCorConnected] = useState<boolean>(false);
+    const [aliveCorDeviceInfo, setAliveCorDeviceInfo] = useState<{ deviceName: string; deviceType: string } | null>(null);
+    const [aliveCorBackendReady, setAliveCorBackendReady] = useState<boolean>(false);
+    const [isKardiaScanning, setIsKardiaScanning] = useState<boolean>(false);
+    const [kardiaDevices, setKardiaDevices] = useState<{ deviceName: string; deviceId: string; rssi: number }[]>([]);
+    const [kardiaBattery, setKardiaBattery] = useState<number | null>(null);
+    const [kardiaStatusText, setKardiaStatusText] = useState<string>('Disconnected');
 
     // Initialize SDK and set up callbacks
     useEffect(() => {
@@ -228,6 +249,30 @@ export const DeviceProvider: React.FC<DeviceProviderProps> = ({ children }) => {
         };
 
         initializeSDK();
+    }, []);
+    
+    // Polling for AliveCor (Kardia) status - merged and safety added
+    useEffect(() => {
+        let isMounted = true;
+        
+        const safeCheck = async () => {
+            if (!isMounted) return;
+            try {
+                if (wellueSDK.isNativePlatform()) {
+                    await checkAliveCorStatus();
+                }
+            } catch (e) {
+                console.warn('AliveCor status poll failed', e);
+            }
+        };
+
+        safeCheck();
+        const interval = setInterval(safeCheck, 15000);
+        
+        return () => {
+            isMounted = false;
+            clearInterval(interval);
+        };
     }, []);
 
     // Improved connection health check with better disconnection detection
@@ -713,6 +758,103 @@ export const DeviceProvider: React.FC<DeviceProviderProps> = ({ children }) => {
         }
     };
 
+    const checkAliveCorStatus = async () => {
+        try {
+            // Check native device status
+            const status = await aliveCorSDK.getDeviceStatus();
+            setAliveCorConnected(status.connected);
+            setKardiaStatusText(status.statusText);
+            setKardiaBattery(status.batteryLevel || null);
+            
+            if (status.connected) {
+                setAliveCorDeviceInfo({ deviceName: status.deviceName, deviceType: 'ECG' });
+            } else {
+                setAliveCorDeviceInfo(null);
+            }
+
+            // Check backend health
+            const { checkAliveCorBackendHealth } = await import('@/lib/supabase');
+            const health = await checkAliveCorBackendHealth();
+            setAliveCorBackendReady(health.ok && health.configured);
+        } catch (err) {
+            console.error('Failed to check AliveCor status:', err);
+            setAliveCorConnected(false);
+            setAliveCorDeviceInfo(null);
+            setAliveCorBackendReady(false);
+            setKardiaStatusText('Error');
+        }
+    };
+
+    const startKardiaScan = async () => {
+        if (isKardiaScanning) return;
+        console.log('🔍 Starting Kardia scan...');
+        setIsKardiaScanning(true);
+        setKardiaDevices([]);
+        
+        try {
+            const listener = await aliveCorSDK.addListener('deviceFound', (data) => {
+                console.log('🔍 Kardia device found:', data);
+                setKardiaDevices(prev => {
+                    if (prev.some(d => d.deviceId === data.deviceId)) return prev;
+                    return [...prev, data];
+                });
+            });
+            
+            await aliveCorSDK.startScan();
+            
+            // Auto stop after 15s
+            setTimeout(async () => {
+                console.log('⏱️ Kardia scan timeout, stopping...');
+                await stopKardiaScan();
+                if (listener) listener.remove();
+            }, 15000);
+        } catch (err) {
+            console.error('Kardia scan error:', err);
+            setIsKardiaScanning(false);
+        }
+    };
+
+    const stopKardiaScan = async () => {
+        try {
+            await aliveCorSDK.stopScan();
+        } catch (ignore) {}
+        setIsKardiaScanning(false);
+    };
+
+    const connectKardia = async (deviceId: string) => {
+        try {
+            setIsConnecting(true);
+            console.log('🔗 Connecting to Kardia device:', deviceId);
+            const result = await aliveCorSDK.connect(deviceId);
+            if (result.success) {
+                console.log('✅ Kardia connected successfully');
+                setAliveCorConnected(true);
+                setAliveCorDeviceInfo({ deviceName: result.deviceName, deviceType: 'ECG' });
+            }
+            setIsConnecting(false);
+        } catch (err) {
+            console.error('Kardia connect error:', err);
+            setIsConnecting(false);
+            setError('Failed to connect to Kardia device');
+        }
+    };
+
+    // Initial AliveCor status check
+    useEffect(() => {
+        let isMounted = true;
+        if (aliveCorSDK.isNativePlatform()) {
+            checkAliveCorStatus();
+            // Optional: poll every 10 seconds
+            const interval = setInterval(() => {
+                if (isMounted) checkAliveCorStatus();
+            }, 10000);
+            return () => {
+                isMounted = false;
+                clearInterval(interval);
+            };
+        }
+    }, []);
+
     const value: DeviceContextType = {
         connectedDevice,
         availableDevices,
@@ -732,6 +874,17 @@ export const DeviceProvider: React.FC<DeviceProviderProps> = ({ children }) => {
         startBPMeasurement,
         startECGMeasurement,
         stopMeasurement,
+        aliveCorConnected,
+        aliveCorDeviceInfo,
+        aliveCorBackendReady,
+        isKardiaScanning,
+        kardiaDevices,
+        kardiaBattery,
+        kardiaStatusText,
+        checkAliveCorStatus,
+        startKardiaScan,
+        stopKardiaScan,
+        connectKardia,
         wellueSDK
     };
 

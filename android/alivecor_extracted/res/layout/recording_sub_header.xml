@@ -1,0 +1,152 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:paddingBottom="@dimen/margin8dp">
+
+    <View
+        android:id="@+id/frag_ecg_realtime_timer_bkg"
+        android:layout_width="80dp"
+        android:layout_height="80dp"
+        android:background="@drawable/img_bkg_circle_80_gray"
+        app:layout_constraintBottom_toBottomOf="@+id/frag_ecg_realtime_timer_progress"
+        app:layout_constraintEnd_toEndOf="@+id/frag_ecg_realtime_timer_progress"
+        app:layout_constraintHorizontal_bias="0.52"
+        app:layout_constraintStart_toStartOf="@+id/frag_ecg_realtime_timer_progress"
+        app:layout_constraintTop_toTopOf="@+id/frag_ecg_realtime_timer_progress" />
+
+    <View
+        android:id="@+id/frag_ecg_realtime_timer_progress"
+        android:layout_width="80dp"
+        android:layout_height="80dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toStartOf="@+id/frag_ecg_realtime_meter_img"
+        app:layout_constraintHorizontal_bias="0.52"
+        app:layout_constraintStart_toEndOf="@+id/frag_ecg_realtime_beats_img"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <View
+        android:id="@+id/frag_ecg_realtime_timer_cover"
+        android:layout_width="60dp"
+        android:layout_height="60dp"
+        android:layout_gravity="center"
+        android:background="@drawable/img_bkg_circle_58_m2_white"
+        app:layout_constraintBottom_toBottomOf="@+id/frag_ecg_realtime_timer_bkg"
+        app:layout_constraintEnd_toEndOf="@+id/frag_ecg_realtime_timer_bkg"
+        app:layout_constraintStart_toStartOf="@+id/frag_ecg_realtime_timer_bkg"
+        app:layout_constraintTop_toTopOf="@+id/frag_ecg_realtime_timer_bkg" />
+
+    <TextView
+        android:id="@+id/frag_ecg_realtime_timer_text"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:gravity="center"
+        android:textColor="@color/text_color_dark"
+        android:textSize="20sp"
+        android:textStyle="bold"
+        app:layout_constraintBottom_toBottomOf="@+id/frag_ecg_realtime_timer_checkmark"
+        app:layout_constraintEnd_toEndOf="@+id/frag_ecg_realtime_timer_checkmark"
+        app:layout_constraintStart_toStartOf="@+id/frag_ecg_realtime_timer_checkmark"
+        app:layout_constraintTop_toTopOf="@+id/frag_ecg_realtime_timer_checkmark" />
+
+    <ImageView
+        android:id="@+id/frag_ecg_realtime_beats_img"
+        android:layout_width="30dp"
+        android:layout_height="27dp"
+        android:layout_gravity="center"
+        android:layout_marginStart="63dp"
+        android:src="@drawable/ic_heart_bpm_24_red"
+        app:layout_constraintBottom_toBottomOf="@+id/frag_ecg_realtime_timer_bkg"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="@+id/frag_ecg_realtime_timer_bkg" />
+
+    <TextView
+        android:id="@+id/frag_ecg_realtime_bpm_lbl"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentLeft="true"
+        android:layout_alignParentBottom="true"
+        android:layout_marginStart="8dp"
+        android:gravity="center_horizontal"
+        android:text="@string/bpm"
+        android:textAllCaps="true"
+        android:textColor="@color/black"
+        android:textSize="@dimen/text_size_14sp"
+        android:textStyle="bold"
+        app:layout_constraintBottom_toBottomOf="@+id/frag_ecg_realtime_beats_count"
+        app:layout_constraintEnd_toEndOf="@+id/frag_ecg_realtime_beats_img"
+        app:layout_constraintStart_toEndOf="@+id/frag_ecg_realtime_beats_count"
+        app:layout_constraintTop_toTopOf="@+id/frag_ecg_realtime_beats_count" />
+
+    <TextView
+        android:id="@+id/frag_ecg_realtime_beats_count"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_above="@id/frag_ecg_realtime_bpm_lbl"
+        android:layout_alignParentLeft="true"
+        android:layout_marginTop="12dp"
+        android:gravity="center"
+        android:textColor="@color/black"
+        android:textSize="@dimen/text_size_14sp"
+        android:textStyle="bold"
+        app:layout_constraintEnd_toStartOf="@+id/frag_ecg_realtime_bpm_lbl"
+        app:layout_constraintHorizontal_bias="0.5"
+        app:layout_constraintHorizontal_chainStyle="packed"
+        app:layout_constraintStart_toStartOf="@+id/frag_ecg_realtime_beats_img"
+        app:layout_constraintTop_toBottomOf="@+id/frag_ecg_realtime_beats_img"
+        tools:text="120" />
+
+    <ImageView
+        android:id="@+id/frag_ecg_realtime_meter_img"
+        android:layout_width="30dp"
+        android:layout_height="30dp"
+        android:layout_gravity="center"
+        android:layout_marginEnd="62dp"
+        app:layout_constraintBottom_toBottomOf="@+id/frag_ecg_realtime_timer_bkg"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="@+id/frag_ecg_realtime_timer_bkg"
+        tools:src="@drawable/battery_indicator_100" />
+
+    <TextView
+        android:id="@+id/frag_ecg_realtime_meter_lbl"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_above="@id/frag_ecg_realtime_bpm_lbl"
+        android:layout_alignParentRight="true"
+        android:layout_alignParentBottom="true"
+        android:layout_marginTop="12dp"
+        android:gravity="center_horizontal|top"
+        android:textColor="@color/black"
+        android:textSize="@dimen/text_size_14sp"
+        android:textStyle="bold"
+        app:layout_constraintEnd_toEndOf="@+id/frag_ecg_realtime_meter_img"
+        app:layout_constraintStart_toStartOf="@+id/frag_ecg_realtime_meter_img"
+        app:layout_constraintTop_toBottomOf="@+id/frag_ecg_realtime_meter_img"
+        tools:text="@string/record_ekg_battery" />
+
+    <View
+        android:id="@+id/frag_ecg_realtime_timer_checkmark"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:layout_gravity="center"
+        android:background="@drawable/ic_checkmark_58"
+        android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="@+id/frag_ecg_realtime_timer_cover"
+        app:layout_constraintEnd_toEndOf="@+id/frag_ecg_realtime_timer_cover"
+        app:layout_constraintStart_toStartOf="@+id/frag_ecg_realtime_timer_cover"
+        app:layout_constraintTop_toTopOf="@+id/frag_ecg_realtime_timer_cover"
+        tools:visibility="visible" />
+
+    <View
+        android:id="@+id/balloon_battery_container"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        app:layout_constraintTop_toTopOf="@id/frag_ecg_realtime_meter_img"
+        app:layout_constraintStart_toStartOf="@+id/frag_ecg_realtime_meter_lbl"
+        app:layout_constraintBottom_toBottomOf="@+id/frag_ecg_realtime_meter_lbl"
+        app:layout_constraintEnd_toEndOf="@+id/frag_ecg_realtime_meter_lbl"/>
+
+</androidx.constraintlayout.widget.ConstraintLayout>

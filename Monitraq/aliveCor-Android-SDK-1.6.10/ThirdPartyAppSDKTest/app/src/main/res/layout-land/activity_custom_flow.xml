@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="horizontal"
+    android:fitsSystemWindows="true"
+    tools:context=".CustomFlowActivity">
+
+    <FrameLayout
+        android:id="@+id/custom_flow_fragment_container"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="1.0" />
+
+    <ScrollView
+        android:layout_width="wrap_content"
+        android:layout_height="match_parent"
+        android:background="#444446"
+        >
+
+        <LinearLayout
+            android:id="@+id/custom_flow_additional_scrollview"
+            android:layout_width="280dp"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="16dp"
+            android:visibility="gone"
+            tools:visibility="visible">
+
+            <!--
+                Display the RhythmStripView in 'Preview' mode, showing a small amount of it.
+                The RhythmStripView has a few different styleable attributes available for configuration.
+            -->
+            <com.alivecor.view.RhythmStripView
+                android:id="@+id/custom_flow_preview_strip"
+                android:layout_width="match_parent"
+                android:layout_height="150dp"
+                app:displayMode="preview"
+                app:majorColorGrid="@android:color/darker_gray"
+                app:minorColorGrid="#444446"
+                app:traceStrokeColor="@android:color/white"
+                app:traceStrokeWidth="4dp"
+                app:graphScale="0.75" />
+
+            <TextView
+                android:id="@+id/custom_flow_additional_info"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:gravity="center"
+                android:textColor="@color/white" />
+        </LinearLayout>
+    </ScrollView>
+
+</LinearLayout>

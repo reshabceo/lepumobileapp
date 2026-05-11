@@ -70,51 +70,8 @@ export const ManualVitalInput = () => {
       return false;
     }
 
-    // Validate ranges
-    if (bloodPressureSystolic && (parseInt(bloodPressureSystolic) < 70 || parseInt(bloodPressureSystolic) > 250)) {
-      toast({
-        title: 'Invalid Blood Pressure',
-        description: 'Systolic should be between 70-250 mmHg',
-        variant: 'destructive'
-      });
-      return false;
-    }
-
-    if (heartRate && (parseInt(heartRate) < 30 || parseInt(heartRate) > 250)) {
-      toast({
-        title: 'Invalid Heart Rate',
-        description: 'Heart rate should be between 30-250 bpm',
-        variant: 'destructive'
-      });
-      return false;
-    }
-
-    if (spo2 && (parseInt(spo2) < 70 || parseInt(spo2) > 100)) {
-      toast({
-        title: 'Invalid SpO2',
-        description: 'SpO2 should be between 70-100%',
-        variant: 'destructive'
-      });
-      return false;
-    }
-
-    if (temperature && (parseFloat(temperature) < 35 || parseFloat(temperature) > 43)) {
-      toast({
-        title: 'Invalid Temperature',
-        description: 'Temperature should be between 35-43°C',
-        variant: 'destructive'
-      });
-      return false;
-    }
-
-    if (bloodSugar && (parseInt(bloodSugar) < 20 || parseInt(bloodSugar) > 600)) {
-      toast({
-        title: 'Invalid Blood Sugar',
-        description: 'Blood sugar should be between 20-600 mg/dL',
-        variant: 'destructive'
-      });
-      return false;
-    }
+    // Range validation removed per user request
+    // Only non-negative numbers are allowed (handled by handleInputChange)
 
     return true;
   };
@@ -361,7 +318,7 @@ export const ManualVitalInput = () => {
                       onChange={(e) => handleInputChange('bloodPressureSystolic', e.target.value)}
                       className="bg-white/5 border-white/20 text-white placeholder:text-white/40"
                     />
-                    <p className="text-xs text-emerald-200/60 mt-1">Upper (70-250)</p>
+                    <p className="text-xs text-emerald-200/60 mt-1">Upper</p>
                   </div>
                   <div>
                     <Input
@@ -372,7 +329,7 @@ export const ManualVitalInput = () => {
                       onChange={(e) => handleInputChange('bloodPressureDiastolic', e.target.value)}
                       className="bg-white/5 border-white/20 text-white placeholder:text-white/40"
                     />
-                    <p className="text-xs text-emerald-200/60 mt-1">Lower (40-150)</p>
+                    <p className="text-xs text-emerald-200/60 mt-1">Lower</p>
                   </div>
                 </div>
               </div>
@@ -391,7 +348,7 @@ export const ManualVitalInput = () => {
                   onChange={(e) => handleInputChange('heartRate', e.target.value)}
                   className="bg-white/5 border-white/20 text-white placeholder:text-white/40"
                 />
-                <p className="text-xs text-emerald-200/60">Normal: 60-100 bpm</p>
+                <p className="text-xs text-emerald-200/60">Heart rate in beats per minute</p>
               </div>
 
               {/* SpO2 */}
@@ -408,7 +365,7 @@ export const ManualVitalInput = () => {
                   onChange={(e) => handleInputChange('spo2', e.target.value)}
                   className="bg-white/5 border-white/20 text-white placeholder:text-white/40"
                 />
-                <p className="text-xs text-emerald-200/60">Normal: 95-100%</p>
+                <p className="text-xs text-emerald-200/60">Oxygen saturation percentage</p>
               </div>
 
               {/* Temperature */}
@@ -425,7 +382,7 @@ export const ManualVitalInput = () => {
                   onChange={(e) => handleInputChange('temperature', e.target.value)}
                   className="bg-white/5 border-white/20 text-white placeholder:text-white/40"
                 />
-                <p className="text-xs text-emerald-200/60">Normal: 36.5-37.5°C</p>
+                <p className="text-xs text-emerald-200/60">Body temperature in Celsius</p>
               </div>
 
               {/* Blood Sugar */}
@@ -442,7 +399,7 @@ export const ManualVitalInput = () => {
                   onChange={(e) => handleInputChange('bloodSugar', e.target.value)}
                   className="bg-white/5 border-white/20 text-white placeholder:text-white/40"
                 />
-                <p className="text-xs text-emerald-200/60">Fasting: 70-100 mg/dL | After meal: &lt;140 mg/dL</p>
+                <p className="text-xs text-emerald-200/60">Blood glucose level</p>
               </div>
 
               {/* Submit Button */}

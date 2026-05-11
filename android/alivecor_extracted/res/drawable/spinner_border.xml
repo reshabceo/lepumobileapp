@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <layer-list>
+            <item>
+                <shape>
+                    <solid android:color="@color/white"></solid>
+
+                    <corners android:radius="@dimen/margin4dp" />
+
+                    <padding android:bottom="@dimen/margin8dp" android:top="@dimen/margin8dp" />
+                    <stroke android:width="@dimen/margin1dp" android:color="@color/spinner_border_color" />
+                </shape>
+            </item>
+            <item android:drawable="@drawable/ic_baseline_arrow_drop_down_24" android:end="@dimen/insights_margin_4" android:gravity="right|center_vertical" />
+        </layer-list>
+    </item>
+</selector>

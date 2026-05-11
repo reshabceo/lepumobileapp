@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/mainLayout"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:gravity="center"
+    tools:context=".MainActivity"
+    tools:layout_editor_absoluteX="1dp"
+    tools:layout_editor_absoluteY="0dp">
+
+    <Button
+        android:id="@+id/start_recording_default"
+        android:layout_width="250dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="1dp"
+        android:text="@string/start_default_flow"
+        app:layout_constraintBottom_toTopOf="@+id/start_recording_custom"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintVertical_chainStyle="packed" />
+
+    <Button
+        android:id="@+id/start_recording_custom"
+        android:layout_width="250dp"
+        android:layout_height="wrap_content"
+        android:text="@string/start_custom_flow"
+        app:layout_constraintBottom_toTopOf="@+id/view_recorded_ecgs"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/start_recording_default" />
+
+    <Button
+        android:id="@+id/view_recorded_ecgs"
+        android:layout_width="250dp"
+        android:layout_height="wrap_content"
+        android:text="@string/view_all_recorded_ecgs"
+        app:layout_constraintBottom_toTopOf="@+id/view_last_ecg"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/start_recording_custom" />
+
+    <Button
+        android:id="@+id/view_last_ecg"
+        android:layout_width="250dp"
+        android:layout_height="wrap_content"
+        android:text="@string/view_last_recorded_ecg"
+        app:layout_constraintBottom_toTopOf="@+id/test_ekg_analyzer"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/view_recorded_ecgs" />
+
+    <Button
+        android:id="@+id/test_ekg_analyzer"
+        android:layout_width="250dp"
+        android:layout_height="wrap_content"
+        android:text="@string/test_ekganalyzer"
+        app:layout_constraintBottom_toTopOf="@+id/settings"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/view_last_ecg" />
+
+    <Button
+        android:id="@+id/settings"
+        android:layout_width="250dp"
+        android:layout_height="wrap_content"
+        android:text="@string/settings"
+        app:layout_constraintBottom_toTopOf="@+id/about"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/test_ekg_analyzer" />
+
+    <Button
+        android:id="@+id/about"
+        android:layout_width="250dp"
+        android:layout_height="wrap_content"
+        android:text="@string/about"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/settings" />
+
+
+    <com.airbnb.lottie.LottieAnimationView
+        android:id="@+id/complete_animation"
+        android:layout_width="88dp"
+        android:layout_height="88dp"
+        android:layout_marginTop="20dp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/about" />
+
+    <TextView
+        android:id="@+id/versionNum"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="16dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent" />
+
+</androidx.constraintlayout.widget.ConstraintLayout>

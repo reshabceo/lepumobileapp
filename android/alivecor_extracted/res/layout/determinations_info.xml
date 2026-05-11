@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical">
+
+    <com.google.android.material.appbar.AppBarLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+
+        <androidx.appcompat.widget.Toolbar
+            android:id="@+id/determinations_info_toolbar"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:navigationIcon="?attr/homeAsUpIndicator" />
+
+    </com.google.android.material.appbar.AppBarLayout>
+
+    <ScrollView
+        style="@style/WhiteShadowScrollView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@color/munsell">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingLeft="16dp"
+            android:paddingTop="32dp"
+            android:paddingRight="16dp"
+            android:paddingBottom="16dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_horizontal"
+                android:layout_marginBottom="16dp"
+                android:gravity="center_horizontal"
+                android:text="@string/cpom_determination_info_title"
+                android:textAppearance="@style/Text.h1" />
+
+            <TextView
+                android:id="@+id/cpom_determination_info_normal_textView"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="start"
+                android:layout_marginBottom="16dp"
+                android:text="@string/cpom_determination_info_normal"
+                android:textAppearance="@style/Text.b" />
+
+            <TextView
+                android:id="@+id/cpom_determination_info_bradycardia_textView"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="start"
+                android:layout_marginBottom="16dp"
+                android:text="@string/cpom_determination_info_bradycardia"
+                android:textAppearance="@style/Text.b" />
+
+            <TextView
+                android:id="@+id/cpom_determination_info_tachycardia_textView"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="start"
+                android:layout_marginBottom="16dp"
+                android:text="@string/cpom_determination_info_tachycardia"
+                android:textAppearance="@style/Text.b" />
+
+            <TextView
+                android:id="@+id/cpom_determination_info_possible_afib_textView"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="start"
+                android:layout_marginBottom="16dp"
+                android:text="@string/cpom_determination_info_possible_afib"
+                android:textAppearance="@style/Text.b" />
+
+            <TextView
+                android:id="@+id/cpom_determination_info_unclassified_textView"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="start"
+                android:layout_marginBottom="16dp"
+                android:text="@string/cpom_determination_info_unclassified"
+                android:textAppearance="@style/Text.b" />
+
+            <TextView
+                android:id="@+id/cpom_determination_info_unreadable_textView"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="start"
+                android:layout_marginBottom="16dp"
+                android:text="@string/cpom_determination_info_unreadable"
+                android:textAppearance="@style/Text.b" />
+
+            <TextView
+                android:id="@+id/cpom_determination_info_too_short_textView"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="start"
+                android:layout_marginBottom="16dp"
+                android:text="@string/cpom_determination_info_too_short"
+                android:textAppearance="@style/Text.b" />
+
+            <TextView
+                android:id="@+id/cpom_determination_info_no_analysis_textView"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="start"
+                android:layout_marginBottom="32dp"
+                android:text="@string/cpom_determination_info_no_analysis"
+                android:textAppearance="@style/Text.b" />
+
+            <TextView
+                android:id="@+id/cpom_determination_info_potential_findings_textView"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="start"
+                android:layout_marginBottom="16dp"
+                android:text="@string/cpom_determination_info_potential_findings"
+                android:textAppearance="@style/Text.sm" />
+
+        </LinearLayout>
+
+    </ScrollView>
+
+</LinearLayout>

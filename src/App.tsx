@@ -49,6 +49,7 @@ import RadiologistDashboard from "./pages/RadiologistDashboard";
 import KardiaSixLeadECG from "./pages/KardiaSixLeadECG";
 import RecommendationsDashboard from "./pages/RecommendationsDashboard";
 import PatientMessages from "./pages/PatientMessages";
+import AliveCorHistory from "./pages/AliveCorHistory";
 
 const queryClient = new QueryClient();
 
@@ -123,6 +124,11 @@ const App = () => (
               <Route path="/kardia-6l-ecg" element={
                 <ProtectedRoute>
                   <KardiaSixLeadECG />
+                </ProtectedRoute>
+              } />
+              <Route path="/alivecor-history" element={
+                <ProtectedRoute>
+                  <AliveCorHistory />
                 </ProtectedRoute>
               } />
               <Route path="/ecg-results" element={

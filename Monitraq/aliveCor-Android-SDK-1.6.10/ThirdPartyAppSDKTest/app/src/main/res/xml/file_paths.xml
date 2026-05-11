@@ -1,0 +1,7 @@
+<!-- BEGIN_INCLUDE(file_provider_paths_declaration) -->
+<paths>
+
+    <files-path
+        name="shared_files"
+        path="ecgs/" />
+</paths><!-- END_INCLUDE(file_provider_paths_declaration) -->
