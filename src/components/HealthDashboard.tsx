@@ -44,6 +44,16 @@ import { useDevice } from "@/contexts/DeviceContext";
 import { useRealTimeVitals } from "@/hooks/useRealTimeVitals";
 import { DoctorInfoCard } from "./DoctorInfoCard";
 import { EmergencyButton } from "./EmergencyButton";
+import { getPatientRiskCriteria } from "@/lib/supabase";
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogHeader, 
+  DialogTitle, 
+  DialogDescription,
+  DialogFooter 
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 import { useInsuranceClaimsNotifications } from "@/hooks/useInsuranceClaimsNotifications";
 import { useHealthRecommendationsNotifications } from "@/hooks/useHealthRecommendationsNotifications";
 import { usePatientUnreadMessages } from "@/hooks/usePatientChat";
@@ -175,7 +185,7 @@ export const HealthDashboard = () => {
   const navigate = useNavigate();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [forceStopLoading, setForceStopLoading] = useState(false);
-  const { logout } = useAuth();
+  const { user, logout } = useAuth();
   const loadingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const { toast } = useToast();
@@ -311,6 +321,42 @@ export const HealthDashboard = () => {
     []
   );
   const [isLoadingSaved, setIsLoadingSaved] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [riskAlertOpen, setRiskAlertOpen] = useState(false);
+  const [activeRisk, setActiveRisk] = useState<any>(null);
+
+  // High Risk Alert Check
+  useEffect(() => {
+    const checkRisk = async () => {
+      if (user) {
+        try {
+          const { data: patient } = await supabase
+            .from('patients')
+            .select('id')
+            .eq('auth_user_id', user.id)
+            .single();
+            
+          if (patient) {
+            const { data: riskData } = await getPatientRiskCriteria(patient.id);
+            if (riskData && riskData.is_high_risk) {
+              setActiveRisk(riskData);
+              // Small delay to ensure UI is ready
+              setTimeout(() => setRiskAlertOpen(true), 1500);
+            }
+          }
+        } catch (err) {
+          console.error("Risk check failed:", err);
+        }
+      }
+    };
+    checkRisk();
+  }, [user]);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    setTimeout(() => setIsRefreshing(false), 2000);
+  };
+
   const [isConnecting, setIsConnecting] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState("");
   const previewCanvasRef = useRef<HTMLCanvasElement | null>(null);
