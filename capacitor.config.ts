@@ -21,6 +21,9 @@ const config: ExtendedCapacitorConfig = {
       storage: {
         name: 'Storage'
       }
+    },
+    CapacitorHttp: {
+      enabled: true
     }
   },
   android: {

@@ -1,0 +1,80 @@
+#root {
+  width: 60vw;
+  margin: 0 auto;
+  padding: 2rem;
+  text-align: center;
+}
+
+.FContainer {
+  border-style: dashed;
+  text-align: center;
+  height: 60vh;
+  border-radius: 20px;
+  border: 2px dashed #6387C5;
+  background-color: #2b2b2b;
+  margin: 5vh 0;
+  padding: 1rem;
+  cursor: pointer;
+  display: flex;
+  justify-content: center;
+  align-content: center;
+  flex-direction: column;
+  align-items: center;
+}
+
+.FDContainer {
+  border-style: dashed;
+  text-align: center;
+  height: 60vh;
+  border-radius: 20px;
+  border: 2px dashed #6387C5;
+  background-color: #2b2b2b;
+  margin: 5vh 0;
+  padding: 1rem;
+  display: flex;
+  justify-content: center;
+  align-content: center;
+  flex-direction: column;
+  align-items: center;
+}
+
+.jContainer {
+  display: flex;
+  justify-content: center;
+  align-content: center;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  margin: 5vh 0;
+  padding: 1rem;
+  border-radius: 20px;
+  background-color: #2b2b2b;
+}
+
+.jsonview {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  text-align: left;
+
+}
+.jsonviewRefresh {
+  display: flex;
+  justify-content: flex-end;
+  margin: 2rem;
+}
+
+.buttonView {
+  display: flex;
+  justify-content: center;
+  align-content: center;
+  flex-direction: row;
+  align-items: center;
+  text-align: center;
+}
+
+.EKGpreview {
+  width: 100%;
+  height: fit-content;
+  overflow-x: scroll;
+}

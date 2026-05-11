@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <dimen name="ecg_results_strip_h">100dp</dimen>
+</resources>

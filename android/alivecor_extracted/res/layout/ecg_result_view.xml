@@ -1,0 +1,150 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical">
+
+    <LinearLayout
+        android:id="@+id/result_view_result_band_with_description"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingTop="8dp"
+        android:paddingBottom="8dp"
+        tools:background="@color/result_screen_green">
+
+        <LinearLayout
+            android:id="@+id/frag_ecg_result_result_band"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/frag_ecg_result_title"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:layout_marginStart="17dp"
+                android:lines="1"
+                android:maxLines="1"
+                android:textAppearance="@style/Text.h1"
+                android:textColor="@color/white"
+                tools:text="Normal" />
+
+            <ImageView
+                android:id="@+id/frag_ecg_result_determination_info"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:layout_gravity="center_vertical"
+                android:padding="4dp"
+                android:scaleType="centerInside"
+                android:src="@drawable/information_md" />
+
+            <View
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1" />
+
+            <TextView
+                android:id="@+id/frag_ecg_result_bpm"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_vertical"
+                android:textAppearance="@style/Text.h1"
+                android:textColor="@color/white"
+                tools:text="88" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_vertical"
+                android:layout_marginStart="4dp"
+                android:layout_marginTop="1dp"
+                android:layout_marginEnd="17dp"
+                android:text="BPM"
+                android:textAppearance="@style/Text.lbl"
+                android:textColor="@color/white" />
+
+        </LinearLayout>
+    </LinearLayout>
+
+    <FrameLayout
+        android:id="@+id/frag_ecg_result_ecg_view"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <!-- The RhythmStripView's height can be set to grow for 6-lead EKGs -->
+        <com.alivecor.view.RhythmStripView
+            android:id="@+id/frag_ecg_result_ecgview"
+            android:layout_width="match_parent"
+            android:layout_height="@dimen/ecg_results_strip_h"
+            android:background="@color/white"
+            android:minHeight="@dimen/ecg_results_strip_h" />
+
+        <LinearLayout
+            android:id="@+id/inverted_desc"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@drawable/img_bkg_gradient_gray90_gray40_24"
+            android:orientation="horizontal"
+            android:paddingLeft="16dp"
+            android:paddingRight="16dp">
+
+            <TextView
+                android:id="@+id/frag_ecg_results_speed"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_vertical"
+                android:text="25 mm/s"
+                android:textColor="@color/text_color_dark"
+                android:textSize="@dimen/text_size_smaller" />
+
+            <TextView
+                android:id="@+id/frag_ecg_results_gain"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_vertical"
+                android:layout_marginStart="8dp"
+                android:text="10 mm/mV"
+                android:textColor="@color/text_color_dark"
+                android:textSize="@dimen/text_size_smaller" />
+
+            <View
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1" />
+
+            <LinearLayout
+                android:id="@+id/frag_ecg_results_invert_container"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:minWidth="60dp"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/frag_ecg_results_invert_label"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center_vertical"
+                    android:text="@string/ecg_results_invert"
+                    android:textColor="@color/text_color_dark"
+                    android:textSize="@dimen/text_size_smaller" />
+
+                <TextView
+                    android:id="@+id/frag_ecg_results_invert"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center_vertical"
+                    android:layout_marginLeft="8dp"
+                    android:text="@string/ecg_results_invert_off"
+                    android:textColor="@color/kardia_teal"
+                    android:textSize="@dimen/text_size_smaller" />
+
+            </LinearLayout>
+
+        </LinearLayout>
+
+    </FrameLayout>
+
+</LinearLayout>

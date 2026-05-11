@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content">
+
+    <com.google.android.material.textview.MaterialTextView
+        android:id="@+id/setupParingSubTitle"
+        style="@style/KiwiHeader"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginEnd="@dimen/dp_12"
+        android:text="@string/onboarding_paring_setup_sub_title"
+        app:layout_constraintEnd_toStartOf="@+id/closeIv"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <com.google.android.material.textview.MaterialTextView
+        android:id="@+id/setupParingTitle"
+        style="@style/Onboarding.HeaderH1"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:text="@string/kardia_mobile6l"
+        app:layout_constraintEnd_toEndOf="@id/setupParingSubTitle"
+        app:layout_constraintStart_toStartOf="@id/setupParingSubTitle"
+        app:layout_constraintTop_toBottomOf="@id/setupParingSubTitle" />
+
+    <ImageView
+        android:id="@+id/closeIv"
+        android:layout_width="@dimen/dp_30"
+        android:layout_height="@dimen/dp_30"
+        android:layout_marginEnd="@dimen/dp_12"
+        android:contentDescription="@string/set_up_your_device"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="@id/setupParingSubTitle"
+        app:srcCompat="@drawable/ic_close" />
+
+</androidx.constraintlayout.widget.ConstraintLayout>
