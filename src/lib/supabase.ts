@@ -224,6 +224,28 @@ export async function getAliveCorRecordingDetail(patientId: string, recordingId:
 }
 
 /**
+ * Fetch radiologist reports for a patient from the radiologist_reports table.
+ */
+export async function getRadiologistReports(patientId: string) {
+  return supabase
+    .from('radiologist_reports')
+    .select('*, doctors!doctor_id(full_name)')
+    .eq('patient_id', patientId)
+    .order('created_at', { ascending: false });
+}
+
+/**
+ * Fetch patient specific vital risk criteria.
+ */
+export async function getPatientRiskCriteria(patientId: string) {
+  return supabase
+    .from('patient_vital_risk_criteria')
+    .select('*')
+    .eq('patient_id', patientId)
+    .maybeSingle();
+}
+
+/**
  * Check if the AliveCor backend is reachable (no auth required).
  * Uses: GET https://alivecorapi.monitraq.com/api/health
  */

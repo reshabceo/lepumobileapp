@@ -12,6 +12,7 @@ import { Capacitor, CapacitorHttp } from '@capacitor/core';
 import html2pdf from 'html2pdf.js';
 import DicomUploader from './DicomUploader';
 import RequestRadiologistModal from './RequestRadiologistModal';
+import { getRadiologistReports } from '@/lib/supabase';
 
 interface PatientReport {
     id: string;
@@ -496,9 +497,11 @@ const PatientReportsView: React.FC = () => {
     const [dicomLoading, setDicomLoading] = useState(false);
     // Start loading=false — we only show the spinner once we actually start a fetch
     const [loading, setLoading] = useState(false);
+    const [radiologistReports, setRadiologistReports] = useState<any[]>([]);
+    const [radiologistLoading, setRadiologistLoading] = useState(false);
     const [profileLoading, setProfileLoading] = useState(true);
     const [reportsLoaded, setReportsLoaded] = useState(false);
-    const [activeTab, setActiveTab] = useState<'from-doctor' | 'my-uploads' | 'dicom'>(
+    const [activeTab, setActiveTab] = useState<'from-doctor' | 'my-uploads' | 'dicom' | 'dicom-by-doctor'>(
         (location.state as any)?.activeTab || localStorage.getItem('reports_active_tab') || 'from-doctor'
     );
     const [requestRadiologistOpen, setRequestRadiologistOpen] = useState(false);
@@ -575,6 +578,23 @@ const PatientReportsView: React.FC = () => {
         localStorage.setItem('reports_active_tab', activeTab);
     }, [activeTab]);
 
+    const fetchRadiologistReports = async () => {
+        if (!patientProfile) return;
+        setRadiologistLoading(true);
+        try {
+            const { data, error } = await getRadiologistReports(patientProfile.id);
+            if (error) {
+                console.error('Error fetching radiologist reports:', error);
+            } else {
+                setRadiologistReports(data || []);
+            }
+        } catch (err) {
+            console.error('Error:', err);
+        } finally {
+            setRadiologistLoading(false);
+        }
+    };
+
     const fetchDicomStudies = async () => {
         if (!patientProfile) return;
         setDicomLoading(true);
@@ -599,6 +619,9 @@ const PatientReportsView: React.FC = () => {
     useEffect(() => {
         if (patientProfile && activeTab === 'dicom') {
             fetchDicomStudies();
+        }
+        if (patientProfile && activeTab === 'dicom-by-doctor') {
+            fetchRadiologistReports();
         }
     }, [patientProfile, activeTab]);
 
@@ -922,37 +945,47 @@ const PatientReportsView: React.FC = () => {
                     )}
                 </div>
 
-                {/* Tabs */}
-                <div className="flex bg-gray-800/50 rounded-lg p-1 mb-6">
+                {/* Tabs - Responsive Grid */}
+                <div className="grid grid-cols-2 gap-2 bg-gray-800/50 rounded-lg p-1 mb-6">
                     <button
                         onClick={() => setActiveTab('from-doctor')}
-                        className={`flex-1 flex items-center justify-center gap-1.5 py-3 px-2 rounded-md transition-all duration-200 text-sm ${activeTab === 'from-doctor'
+                        className={`flex items-center justify-center gap-1.5 py-3 px-2 rounded-md transition-all duration-200 text-xs sm:text-sm ${activeTab === 'from-doctor'
                             ? 'bg-blue-600 text-white shadow-lg'
                             : 'text-gray-400 hover:text-white hover:bg-gray-700/50'
                             }`}
                     >
-                        <Stethoscope className="h-4 w-4 flex-shrink-0" />
+                        <Stethoscope className="h-3.5 w-3.5 flex-shrink-0" />
                         <span className="font-medium truncate">From Doctor</span>
                     </button>
                     <button
                         onClick={() => setActiveTab('my-uploads')}
-                        className={`flex-1 flex items-center justify-center gap-1.5 py-3 px-2 rounded-md transition-all duration-200 text-sm ${activeTab === 'my-uploads'
+                        className={`flex items-center justify-center gap-1.5 py-3 px-2 rounded-md transition-all duration-200 text-xs sm:text-sm ${activeTab === 'my-uploads'
                             ? 'bg-blue-600 text-white shadow-lg'
                             : 'text-gray-400 hover:text-white hover:bg-gray-700/50'
                             }`}
                     >
-                        <Upload className="h-4 w-4 flex-shrink-0" />
+                        <Upload className="h-3.5 w-3.5 flex-shrink-0" />
                         <span className="font-medium truncate">My Uploads</span>
                     </button>
                     <button
                         onClick={() => setActiveTab('dicom')}
-                        className={`flex-1 flex items-center justify-center gap-1.5 py-3 px-2 rounded-md transition-all duration-200 text-sm ${activeTab === 'dicom'
+                        className={`flex items-center justify-center gap-1.5 py-3 px-2 rounded-md transition-all duration-200 text-xs sm:text-sm ${activeTab === 'dicom'
                             ? 'bg-blue-600 text-white shadow-lg'
                             : 'text-gray-400 hover:text-white hover:bg-gray-700/50'
                             }`}
                     >
-                        <Image className="h-4 w-4 flex-shrink-0" />
+                        <Image className="h-3.5 w-3.5 flex-shrink-0" />
                         <span className="font-medium truncate">DICOM</span>
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('dicom-by-doctor')}
+                        className={`flex items-center justify-center gap-1.5 py-3 px-2 rounded-md transition-all duration-200 text-xs sm:text-sm ${activeTab === 'dicom-by-doctor'
+                            ? 'bg-blue-600 text-white shadow-lg'
+                            : 'text-gray-400 hover:text-white hover:bg-gray-700/50'
+                            }`}
+                    >
+                        <Stethoscope className="h-3.5 w-3.5 flex-shrink-0" />
+                        <span className="font-medium truncate">DICOM (Doctor)</span>
                     </button>
                 </div>
 
@@ -1006,6 +1039,65 @@ const PatientReportsView: React.FC = () => {
                         )}
                         {!dicomLoading && dicomStudies.length === 0 && (
                             <p className="text-sm text-gray-500 text-center py-4">Upload a DICOM or ZIP file above, then request a radiologist review.</p>
+                        )}
+                    </div>
+                )}
+
+                {/* DICOM by Doctor Tab */}
+                {activeTab === 'dicom-by-doctor' && (
+                    <div className="space-y-4 mb-20">
+                        {radiologistLoading ? (
+                            <div className="text-center py-20 flex flex-col items-center gap-4">
+                                <Loader2 className="h-10 w-10 animate-spin text-blue-500" />
+                                <p className="text-gray-400">Loading radiologist reports...</p>
+                            </div>
+                        ) : radiologistReports.length > 0 ? (
+                            radiologistReports.map((report) => (
+                                <div
+                                    key={report.id}
+                                    className="bg-[#1A1A1A] border border-gray-800 rounded-xl p-4 hover:border-gray-700 transition-all"
+                                >
+                                    <div className="flex items-center gap-3 mb-3">
+                                        <div className="bg-blue-500/10 p-2 rounded-lg">
+                                            <FileText className="h-5 w-5 text-blue-500" />
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <h3 className="font-semibold text-white truncate">{report.report_title || 'Radiologist Report'}</h3>
+                                            <p className="text-xs text-gray-500">
+                                                {new Date(report.created_at).toLocaleDateString()}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <p className="text-gray-400 text-sm mb-4 line-clamp-3">
+                                        {report.findings || report.report_content || 'No findings available.'}
+                                    </p>
+                                    <div className="flex items-center justify-between border-t border-gray-800 pt-3">
+                                        <div className="flex items-center text-xs text-gray-500">
+                                            <User className="h-3 w-3 mr-1" />
+                                            <span>Dr. {report.doctors?.full_name || 'Radiologist'}</span>
+                                        </div>
+                                        <button 
+                                            onClick={() => {
+                                                toast({
+                                                    title: report.report_title || "Radiologist Report",
+                                                    description: report.impression || "Opening detailed view...",
+                                                });
+                                            }}
+                                            className="text-blue-400 text-xs font-semibold hover:text-blue-300"
+                                        >
+                                            View Details
+                                        </button>
+                                    </div>
+                                </div>
+                            ))
+                        ) : (
+                            <div className="text-center py-20">
+                                <Stethoscope className="h-16 w-16 text-gray-700 mx-auto mb-4" />
+                                <p className="text-gray-400 font-medium">No DICOM Reports from Doctor</p>
+                                <p className="text-sm text-gray-500 mt-2 max-w-[250px] mx-auto">
+                                    Reports shared by radiologists will appear here.
+                                </p>
+                            </div>
                         )}
                     </div>
                 )}

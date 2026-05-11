@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, User, Mail, Phone, Calendar, MapPin, Droplet, Heart, AlertCircle, Pill, UserCircle, LogOut, Ruler, Scale, Edit2 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { supabase } from '../lib/supabase';
+import { supabase, getPatientRiskCriteria } from '../lib/supabase';
 import { Button } from '../components/ui/button';
 import { Card, CardContent } from '../components/ui/card';
 import { Input } from '../components/ui/input';
@@ -40,6 +40,7 @@ const Profile = () => {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
   const [profile, setProfile] = useState<PatientProfile | null>(null);
+  const [riskCriteria, setRiskCriteria] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -120,6 +121,12 @@ const Profile = () => {
       }
 
       setProfile(data);
+      
+      // Load risk criteria
+      const { data: riskData } = await getPatientRiskCriteria(data.id);
+      if (riskData) {
+        setRiskCriteria(riskData);
+      }
     } catch (error) {
       console.error('Error:', error);
       toast.error('Failed to load profile');
@@ -505,6 +512,60 @@ const Profile = () => {
                     </div>
                   </div>
                 </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Vital High Risk Section */}
+          <Card className="glass-card border-red-500/30 bg-red-500/10">
+            <CardContent className="p-6">
+              <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                <AlertCircle className="w-5 h-5 text-red-400" />
+                Vital High Risk Thresholds
+              </h3>
+              <div className="space-y-4">
+                {riskCriteria ? (
+                  <>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="bg-slate-900/50 p-3 rounded-lg border border-red-500/20">
+                        <p className="text-xs text-red-200/60 mb-1">Blood Pressure</p>
+                        <p className="text-white font-medium">
+                          &gt;{riskCriteria.systolic_high || 140}/{riskCriteria.diastolic_high || 90} mmHg
+                        </p>
+                      </div>
+                      <div className="bg-slate-900/50 p-3 rounded-lg border border-red-500/20">
+                        <p className="text-xs text-red-200/60 mb-1">Heart Rate</p>
+                        <p className="text-white font-medium">
+                          &gt;{riskCriteria.heart_rate_high || 100} BPM
+                        </p>
+                      </div>
+                      <div className="bg-slate-900/50 p-3 rounded-lg border border-red-500/20">
+                        <p className="text-xs text-red-200/60 mb-1">SpO2</p>
+                        <p className="text-white font-medium">
+                          &lt;{riskCriteria.spo2_low || 95}%
+                        </p>
+                      </div>
+                      <div className="bg-slate-900/50 p-3 rounded-lg border border-red-500/20">
+                        <p className="text-xs text-red-200/60 mb-1">Risk Status</p>
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                          riskCriteria.is_high_risk ? 'bg-red-500 text-white' : 'bg-green-500 text-white'
+                        }`}>
+                          {riskCriteria.is_high_risk ? 'HIGH RISK' : 'STABLE'}
+                        </span>
+                      </div>
+                    </div>
+                    {riskCriteria.doctor_notes && (
+                      <div className="bg-red-500/5 border border-red-500/20 p-3 rounded-lg">
+                        <p className="text-xs text-red-200/60 mb-1">Doctor's Risk Notes</p>
+                        <p className="text-sm text-white italic">"{riskCriteria.doctor_notes}"</p>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="text-center py-4 bg-slate-900/30 rounded-lg">
+                    <p className="text-sm text-gray-400 italic">No custom risk criteria set by doctor.</p>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
