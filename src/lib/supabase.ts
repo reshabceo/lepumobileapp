@@ -219,8 +219,8 @@ export async function getAliveCorRecordings(patientMrn: string, limit: number = 
 /**
  * Fetch detailed ECG recording (including waveform) for a specific record ID.
  */
-export async function getAliveCorRecordingDetail(recordingId: string): Promise<any> {
-  return aliveCorGet(`/api/alivecor/recording/${recordingId}`);
+export async function getAliveCorRecordingDetail(patientId: string, recordingId: string): Promise<any> {
+  return aliveCorGet(`/api/alivecor/recordings/${patientId}/${recordingId}`);
 }
 
 /**
