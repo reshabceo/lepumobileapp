@@ -1,0 +1,1661 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string-array name="answer_bradycardia">
+        <item>@string/bradycardia_ans1</item>
+        <item>@string/bradycardia_ans2</item>
+        <item>@string/bradycardia_ans3</item>
+    </string-array>
+    <string-array name="answer_normal">
+        <item>@string/normal_sinus_rhythm_ans1</item>
+    </string-array>
+    <string-array name="answer_normal_sinus_rhythm">
+        <item>@string/normal_sinus_rhythm_ans1</item>
+    </string-array>
+    <string-array name="answer_possible_atrial_fibrillation">
+        <item>@string/possible_atrial_fibrillation_ans1</item>
+        <item>@string/possible_atrial_fibrillation_ans2</item>
+        <item>@string/possible_atrial_fibrillation_ans3</item>
+        <item>@string/possible_atrial_fibrillation_ans4</item>
+    </string-array>
+    <string-array name="answer_sinus_rhythm_with_pvc">
+        <item>@string/sinus_rhythm_with_pvc_ans1</item>
+        <item>@string/sinus_rhythm_with_pvc_ans2</item>
+        <item>@string/sinus_rhythm_with_pvc_ans3</item>
+    </string-array>
+    <string-array name="answer_sinus_rhythm_with_se">
+        <item>@string/sinus_rhythm_with_se_ans1</item>
+        <item>@string/sinus_rhythm_with_se_ans2</item>
+        <item>@string/sinus_rhythm_with_se_ans3</item>
+    </string-array>
+    <string-array name="answer_sinus_rhythm_with_wide_qrs">
+        <item>@string/sinus_rhythm_with_wide_qrs_ans1</item>
+        <item>@string/sinus_rhythm_with_wide_qrs_ans2</item>
+        <item>@string/sinus_rhythm_with_wide_qrs_ans3</item>
+    </string-array>
+    <string-array name="answer_tachycardia">
+        <item>@string/tachycardia_ans1</item>
+        <item>@string/tachycardia_ans2</item>
+        <item>@string/tachycardia_ans3</item>
+    </string-array>
+    <string-array name="answer_unclassified">
+        <item>@string/unclassified_ans</item>
+    </string-array>
+    <string-array name="question_atrial_fibrillation">
+        <item>@string/atrial_fibrillation_ques1</item>
+        <item>@string/possible_atrial_fibrillation_ques2</item>
+        <item>@string/what_can_i_do_next</item>
+        <item>@string/possible_atrial_fibrillation_ques4</item>
+    </string-array>
+    <string-array name="question_bradycardia">
+        <item>@string/bradycardia_ques1</item>
+        <item>@string/bradycardia_ques2</item>
+        <item>@string/what_can_i_do_next</item>
+    </string-array>
+    <string-array name="question_normal">
+        <item>@string/normal_sinus_rhythm_ques1</item>
+    </string-array>
+    <string-array name="question_normal_sinus_rhythm">
+        <item>@string/normal_sinus_rhythm_ques1</item>
+    </string-array>
+    <string-array name="question_sinus_rhythm_with_pvc">
+        <item>@string/sinus_rhythm_with_pvc_ques1</item>
+        <item>@string/sinus_rhythm_with_pvc_ques2</item>
+        <item>@string/what_can_i_do_next</item>
+    </string-array>
+    <string-array name="question_sinus_rhythm_with_se">
+        <item>@string/sinus_rhythm_with_se_ques1</item>
+        <item>@string/sinus_rhythm_with_se_ques2</item>
+        <item>@string/what_can_i_do_next</item>
+    </string-array>
+    <string-array name="question_sinus_rhythm_with_wide_qrs">
+        <item>@string/sinus_rhythm_with_wide_qrs_ques1</item>
+        <item>@string/sinus_rhythm_with_wide_qrs_ques2</item>
+        <item>@string/what_can_i_do_next</item>
+    </string-array>
+    <string-array name="question_tachycardia">
+        <item>@string/tachycardia_ques1</item>
+        <item>@string/tachycardia_ques2</item>
+        <item>@string/what_can_i_do_next</item>
+    </string-array>
+    <string-array name="supported_languages" translatable="false">
+        <item>en|English</item>
+        <item>ar|Arabic</item>
+        <item>bg|Bulgarian</item>
+        <item>cs|Czech</item>
+        <item>cy|Welsh</item>
+        <item>da|Danish</item>
+        <item>de|German</item>
+        <item>en-rGB|English (UK)</item>
+        <item>es|Spanish</item>
+        <item>es-rUS|Spanish (United States)</item>
+        <item>et|Estonian</item>
+        <item>fi|Finnish</item>
+        <item>fr|French</item>
+        <item>he|Hebrew</item>
+        <item>hr|Croatian</item>
+        <item>hu|Hungarian</item>
+        <item>it|Italian</item>
+        <item>iw|Hebrew (legacy code)</item>
+        <item>ja|Japanese</item>
+        <item>ko|Korean</item>
+        <item>lt|Lithuanian</item>
+        <item>lv|Latvian</item>
+        <item>ms-rSG|Malay (Singapore)</item>
+        <item>nb|Norwegian Bokmål</item>
+        <item>nl|Dutch</item>
+        <item>pl|Polish</item>
+        <item>pt-rBR|Portuguese (Brazil)</item>
+        <item>pt-rPT|Portuguese (Portugal)</item>
+        <item>ro|Romanian</item>
+        <item>ru|Russian</item>
+        <item>sk|Slovak</item>
+        <item>sl|Slovenian</item>
+        <item>sr|Serbian</item>
+        <item>sv|Swedish</item>
+        <item>ta-rSG|Tamil (Singapore)</item>
+        <item>th|Thai</item>
+        <item>vi|Vietnamese</item>
+        <item>zh-rCN|Chinese (Simplified)</item>
+        <item>zh-rTW|Chinese (Traditional)</item>
+    </string-array>
+    <attr format="reference" name="ic_close"/>
+    <attr format="reference" name="ic_done"/>
+    <attr format="reference" name="ic_next"/>
+    <attr format="reference" name="ic_previous"/>
+    <attr format="reference" name="ic_refresh"/>
+    <attr format="reference" name="ic_send"/>
+    <attr format="reference" name="ic_share"/>
+    <attr format="reference" name="ic_view"/>
+    <attr format="reference" name="premium_table_badge_asset"/>
+    <attr format="color|reference" name="premium_table_promo_txt_color"/>
+    <attr format="color|reference" name="premium_table_row_shade"/>
+    <attr format="color|reference" name="premium_table_text_color"/>
+    <attr format="reference" name="progressTimerStyle"/>
+    <color name="actionbar_bg_shadow">#888D969E</color>
+    <color name="actionbar_bg_solid">#F2F2F2</color>
+    <color name="algorithm_af_color">#ff8800</color>
+    <color name="algorithm_dark_texts">#1f1f1f</color>
+    <color name="algorithm_nsr_color">#00abe8</color>
+    <color name="algorithm_und_color">#9e9c9c</color>
+    <color name="aliveCor_active_blue">#0072BC</color>
+    <color name="analysis_apple">#EEEEEE</color>
+    <color name="analysis_none">@color/grey_light</color>
+    <color name="analysis_normal">@color/kardia_green</color>
+    <color name="analysis_severe">@color/coral</color>
+    <color name="analysis_unsupported">@color/analysis_none</color>
+    <color name="analysis_warning">@color/kardia_yellow</color>
+    <color name="bg_pressed">#20000000</color>
+    <color name="black">#000000</color>
+    <color name="blue_light">#c4e5ec</color>
+    <color name="button_bg_color_grey">#F1F2F3</color>
+    <color name="button_primary_disabled">@color/kardia_teal_disabled</color>
+    <color name="button_primary_enabled">@color/kardia_teal</color>
+    <color name="button_primary_pressed">@color/kardia_teal_btn_pressed</color>
+    <color name="color_btn_light_grey">#F1F2F3</color>
+    <color name="color_chip_border">#B4BBC0</color>
+    <color name="color_gray">#1A142A39</color>
+    <color name="color_gray_fill">#e8ecec</color>
+    <color name="coral">#f78c4e</color>
+    <color name="crisis_red">@color/kardia_crisis_red</color>
+    <color name="default_background_consumer">#F3F5FA</color>
+    <color name="dialog_title_neutral">@color/kardia_teal_blue_9d</color>
+    <color name="divider">#9291AE</color>
+    <color name="ecg_details_time_color">@color/aliveCor_active_blue</color>
+    <color name="ecg_grid_color">#E8E8E8</color>
+    <color name="ecg_trace_color">#666666</color>
+    <color name="gray_statusbar">#b3b3b3</color>
+    <color name="gray_teal_statusbar">#7dad95</color>
+    <color name="gray_window_bg">@color/munsell</color>
+    <color name="grey_dark_unclass">#9e9c9c</color>
+    <color name="grey_darker">#6b6a6a</color>
+    <color name="grey_light">#d1d0cf</color>
+    <color name="grey_lighter">#eae9e8</color>
+    <color name="grey_separator_dark">#9e9c9c</color>
+    <color name="kardi_card_sub_title_black">#000000</color>
+    <color name="kardia_abnormal">@color/kardia_orange</color>
+    <color name="kardia_accent">@color/kardia_red</color>
+    <color name="kardia_background_mint">@color/kardia_mint</color>
+    <color name="kardia_background_white">@color/karida_white</color>
+    <color name="kardia_bg_mint">#F4FAF8</color>
+    <color name="kardia_bg_white">#FFFFFF</color>
+    <color name="kardia_black">@color/kardia_navy</color>
+    <color name="kardia_black_o24">#3e142a39</color>
+    <color name="kardia_black_o54">#89142a39</color>
+    <color name="kardia_black_var">#3e5c70</color>
+    <color name="kardia_blue">#9dd3df</color>
+    <color name="kardia_crisis_red">#b53835</color>
+    <color name="kardia_default_text_color">#182C3D</color>
+    <color name="kardia_dim_overlay">#B3000000</color>
+    <color name="kardia_error">#F15757</color>
+    <color name="kardia_error_border">#CC3D3F</color>
+    <color name="kardia_gradient2_end">@color/kardia_black_var</color>
+    <color name="kardia_gradient2_start">@color/kardia_black</color>
+    <color name="kardia_gradient_end">@color/kardia_teal_var</color>
+    <color name="kardia_gradient_start">@color/kardia_teal</color>
+    <color name="kardia_gray_f0">#f0f0f0</color>
+    <color name="kardia_gray_f7">#f7f6f4</color>
+    <color name="kardia_gray_light">#d1d0cf</color>
+    <color name="kardia_green">#6bc077</color>
+    <color name="kardia_icon">#77B5DE</color>
+    <color name="kardia_icon_grey">#979797</color>
+    <color name="kardia_light_blue">#c4e5ec</color>
+    <color name="kardia_light_spruce">#067F6F</color>
+    <color name="kardia_light_teal">#6bc1b6</color>
+    <color name="kardia_main_text_dark">#263238</color>
+    <color name="kardia_mint">#f4faf8</color>
+    <color name="kardia_navy">#142a39</color>
+    <color name="kardia_normal">@color/kardia_green</color>
+    <color name="kardia_orange">#ff8800</color>
+    <color name="kardia_platinum">#e8eaeb</color>
+    <color name="kardia_premium">#77B5DE</color>
+    <color name="kardia_primary">@color/kardia_teal</color>
+    <color name="kardia_primary_teal">#2D9F86</color>
+    <color name="kardia_primary_teal_pale">#1f2D9F86</color>
+    <color name="kardia_primary_var">@color/kardia_teal_var</color>
+    <color name="kardia_primary_varl">#1C826C</color>
+    <color name="kardia_purple">#9268AE</color>
+    <color name="kardia_red">#f15757</color>
+    <color name="kardia_sec">#142A39</color>
+    <color name="kardia_sec_var">#142A39</color>
+    <color name="kardia_secondary">@color/kardia_black</color>
+    <color name="kardia_secondary_var">@color/kardia_black_var</color>
+    <color name="kardia_shade">#F0F0F0</color>
+    <color name="kardia_shade_grey">#f0f0f0</color>
+    <color name="kardia_slate">#536063</color>
+    <color name="kardia_spruce">#067F6F</color>
+    <color name="kardia_teal">#2d9f86</color>
+    <color name="kardia_teal_a1f">#1f2d9f86</color>
+    <color name="kardia_teal_blue_9d">#9DD3DF</color>
+    <color name="kardia_teal_blue_c4">#C4E5EC</color>
+    <color name="kardia_teal_blue_c4_a80">#ccC4E5EC</color>
+    <color name="kardia_teal_btn_pressed">#24806b</color>
+    <color name="kardia_teal_control_disabled">#c5d4d0</color>
+    <color name="kardia_teal_disabled">#c5d4d0</color>
+    <color name="kardia_teal_gradient_dark">#2ea087</color>
+    <color name="kardia_teal_gradient_light">#00cfaf</color>
+    <color name="kardia_teal_light">#6bc1b6</color>
+    <color name="kardia_teal_light_f1">#F1F5F3</color>
+    <color name="kardia_teal_light_f1_a10">#15F1F5F3</color>
+    <color name="kardia_teal_o54">#892d9f86</color>
+    <color name="kardia_teal_var">#1c826c</color>
+    <color name="kardia_teal_very_light">#c8e4e9</color>
+    <color name="kardia_tertiary">#F15757</color>
+    <color name="kardia_unclassified">@color/kardia_yellow</color>
+    <color name="kardia_view_separator_background">#babfbd</color>
+    <color name="kardia_white">#ffffff</color>
+    <color name="kardia_white_o54">#89ffffff</color>
+    <color name="kardia_yellow">#fdc246</color>
+    <color name="karida_grey1">#f1f5f3</color>
+    <color name="karida_grey2">#babfbd</color>
+    <color name="karida_grey3">#536062</color>
+    <color name="karida_white">#ffffff</color>
+    <color name="kiwi_blue">#1F3568</color>
+    <color name="kiwi_gray">#E5E5E5</color>
+    <color name="kiwi_gray_bg">#EBEAEF</color>
+    <color name="kiwi_gray_edittext">#EBEAEF</color>
+    <color name="kiwi_gray_timer_bkg">#F2F2F7</color>
+    <color name="kiwi_navy">#142A39</color>
+    <color name="kiwi_primary">#FF2D9F86</color>
+    <color name="kiwi_sec_hint">#88142A39</color>
+    <color name="kiwi_secondary">#FF142A39</color>
+    <color name="kiwi_slate">#536063</color>
+    <color name="kiwi_text_color">#414042</color>
+    <color name="kiwi_timer_progress_color">#174E8C</color>
+    <color name="kiwi_white">#FFFFFF</color>
+    <color name="ks_blue">#2A5EA7</color>
+    <color name="light_blue">#c4e5ec</color>
+    <color name="light_green">#00A184</color>
+    <color name="light_grey">#F0F0F0</color>
+    <color name="light_primary">#1A1F3568</color>
+    <color name="light_spruce">#EAF5F3</color>
+    <color name="med_overlay_border">#808080</color>
+    <color name="medium_jungle_green">#142a39</color>
+    <color name="medium_jungle_green_a30">#30142a39</color>
+    <color name="medium_jungle_green_a60">#60142a39</color>
+    <color name="more_options">#F0F8F5</color>
+    <color name="munsell">#f1f5f3</color>
+    <color name="munsell_a19">#19f1f5f3</color>
+    <color name="munsell_a80">#80f1f5f3</color>
+    <color name="pale_aqua">#c6e6ed</color>
+    <color name="pdf_notification_box">#F4F4F4</color>
+    <color name="platinum">#e8eaeb</color>
+    <color name="premium_purple">#9268ae</color>
+    <color name="progress_default_circle_color">#80ffffff</color>
+    <color name="progress_default_progress_color">#33b5e5</color>
+    <color name="recording_primary_border">#FDFBFF</color>
+    <color name="recording_primary_text">#001B3E</color>
+    <color name="recording_secondary_fill">#5D6574</color>
+    <color name="recording_secondary_text">#565F71</color>
+    <color name="red">#FF0000</color>
+    <color name="result_screen_green">#6AC077</color>
+    <color name="secondary_text">#7E7E7E</color>
+    <color name="silver">#babfbd</color>
+    <color name="silver_a20">#33babfbd</color>
+    <color name="silver_a60">#99babfbd</color>
+    <color name="spinner_border_color">#16142a39</color>
+    <color name="spinner_separator_color">#24142A39</color>
+    <color name="standard_modal_background">#a0000000</color>
+    <color name="stroke_color_grey">#B5BCC1</color>
+    <color name="text_color_dark">#242828</color>
+    <color name="text_color_light">#6b6a6a</color>
+    <color name="text_color_url">@color/kardia_teal</color>
+    <color name="text_field_bg">#feffff</color>
+    <color name="text_field_border">#e5ebea</color>
+    <color name="text_kardia_black">@color/medium_jungle_green</color>
+    <color name="text_kardia_black_53">#536062</color>
+    <color name="text_kardia_black_53_a60">#99536062</color>
+    <color name="text_kardia_black_a80">#cc142A39</color>
+    <color name="text_kardia_link">@color/text_kardia_teal_light_6b</color>
+    <color name="text_kardia_teal_light_6b">#6bc1b6</color>
+    <color name="text_kardia_teal_light_c4">#C4E5EC</color>
+    <color name="text_kardia_teal_light_c4_99a">#99C4E5EC</color>
+    <color name="text_kardia_teal_light_f1">#F1F5F3</color>
+    <color name="text_white">#ffffff</color>
+    <color name="translucent_black">#99000000</color>
+    <color name="transparent">#00000000</color>
+    <color name="transparent_color">#00000000</color>
+    <color name="vertical_divider_left">#CCFFFFFF</color>
+    <color name="vertical_divider_right">#7F555555</color>
+    <color name="view_divider">#D6E3FF</color>
+    <color name="white">#ffffff</color>
+    <color name="white_54">#80FFFFFF</color>
+    <color name="yellow">#FFA100</color>
+    <dimen name="actionbar_underscore_height">3dp</dimen>
+    <dimen name="activity_horizontal_margin">16dp</dimen>
+    <dimen name="activity_vertical_margin">16dp</dimen>
+    <dimen name="bottom_expand_button_size">50dp</dimen>
+    <dimen name="bottom_expand_size">70dp</dimen>
+    <dimen name="bpm_label_text_size">13sp</dimen>
+    <dimen name="bpm_value_text_size">18sp</dimen>
+    <dimen name="button_height_40dp">40dp</dimen>
+    <dimen name="button_height_56dp">56dp</dimen>
+    <dimen name="card_corner_radius">4dp</dimen>
+    <dimen name="card_with_pin_height">200dp</dimen>
+    <dimen name="closeButtonMarginTop">20dp</dimen>
+    <dimen name="custom_actionbar_height">60dp</dimen>
+    <dimen name="device_image_width">180dp</dimen>
+    <dimen name="dimen_17">17dp</dimen>
+    <dimen name="dimen_29">29dp</dimen>
+    <dimen name="dimen_32">32dp</dimen>
+    <dimen name="dp_0">0dp</dimen>
+    <dimen name="dp_1">1dp</dimen>
+    <dimen name="dp_10">10dp</dimen>
+    <dimen name="dp_12">12dp</dimen>
+    <dimen name="dp_14">14dp</dimen>
+    <dimen name="dp_16">16dp</dimen>
+    <dimen name="dp_17">17dp</dimen>
+    <dimen name="dp_18">18dp</dimen>
+    <dimen name="dp_2">2dp</dimen>
+    <dimen name="dp_20">20dp</dimen>
+    <dimen name="dp_21">21dp</dimen>
+    <dimen name="dp_23">23dp</dimen>
+    <dimen name="dp_24">24dp</dimen>
+    <dimen name="dp_27">27dp</dimen>
+    <dimen name="dp_28">28dp</dimen>
+    <dimen name="dp_30">30dp</dimen>
+    <dimen name="dp_32">32dp</dimen>
+    <dimen name="dp_4">4dp</dimen>
+    <dimen name="dp_40">40dp</dimen>
+    <dimen name="dp_64">64dp</dimen>
+    <dimen name="dp_8">8dp</dimen>
+    <dimen name="ecg_badge_after_icon_margin">3dp</dimen>
+    <dimen name="ecg_result_title_max_width">260dp</dimen>
+    <dimen name="ecg_results_strip_h">232dp</dimen>
+    <dimen name="fab_margin">16dp</dimen>
+    <dimen name="height41dp">41dp</dimen>
+    <dimen name="height_kardia_card">150dp</dimen>
+    <dimen name="insights_margin_2">24dp</dimen>
+    <dimen name="insights_margin_4">12dp</dimen>
+    <dimen name="kardia_button_h1">40dp</dimen>
+    <dimen name="kardia_button_h2">56dp</dimen>
+    <dimen name="kardia_button_h3">85dp</dimen>
+    <dimen name="kardia_corner_radius">8dp</dimen>
+    <dimen name="kardia_margin">16dp</dimen>
+    <dimen name="kardia_radio_button_h2">56dp</dimen>
+    <dimen name="kardia_text_body1">16sp</dimen>
+    <dimen name="kardia_text_body2">16sp</dimen>
+    <dimen name="kardia_text_button">14sp</dimen>
+    <dimen name="kardia_text_caption">12sp</dimen>
+    <dimen name="kardia_text_h1">96sp</dimen>
+    <dimen name="kardia_text_h2">60sp</dimen>
+    <dimen name="kardia_text_h3">48sp</dimen>
+    <dimen name="kardia_text_h4">34sp</dimen>
+    <dimen name="kardia_text_h5">24sp</dimen>
+    <dimen name="kardia_text_h6">20sp</dimen>
+    <dimen name="kardia_text_overline">10sp</dimen>
+    <dimen name="kardia_text_subtitle2">14sp</dimen>
+    <dimen name="left_margin_card_left">155dp</dimen>
+    <dimen name="margin12dp">12dp</dimen>
+    <dimen name="margin14dp">14dp</dimen>
+    <dimen name="margin16dp">16dp</dimen>
+    <dimen name="margin1dp">1dp</dimen>
+    <dimen name="margin20dp">20dp</dimen>
+    <dimen name="margin21dp">21dp</dimen>
+    <dimen name="margin24dp">24dp</dimen>
+    <dimen name="margin25dp">25dp</dimen>
+    <dimen name="margin26dp">26dp</dimen>
+    <dimen name="margin34dp">34dp</dimen>
+    <dimen name="margin36dp">36dp</dimen>
+    <dimen name="margin40dp">40dp</dimen>
+    <dimen name="margin44dp">44dp</dimen>
+    <dimen name="margin45dp">45dp</dimen>
+    <dimen name="margin47dp">47dp</dimen>
+    <dimen name="margin4dp">4dp</dimen>
+    <dimen name="margin51dp">51dp</dimen>
+    <dimen name="margin8dp">8dp</dimen>
+    <dimen name="margin_16">16dp</dimen>
+    <dimen name="margin_2">4dp</dimen>
+    <dimen name="margin_20">20dp</dimen>
+    <dimen name="margin_24">24dp</dimen>
+    <dimen name="margin_4">4dp</dimen>
+    <dimen name="margin_8">8dp</dimen>
+    <dimen name="negative_actionbar_underscore_height_minus_1">-4dp</dimen>
+    <dimen name="password_dialog_side_padding">20dp</dimen>
+    <dimen name="profile_complete_anim_size">300dp</dimen>
+    <dimen name="right_margin_right_card">145dp</dimen>
+    <dimen name="sp_10">10sp</dimen>
+    <dimen name="sp_12">12sp</dimen>
+    <dimen name="sp_14">14sp</dimen>
+    <dimen name="sp_16">16sp</dimen>
+    <dimen name="sp_18">18sp</dimen>
+    <dimen name="sp_20">20sp</dimen>
+    <dimen name="sp_24">24sp</dimen>
+    <dimen name="sp_26">26sp</dimen>
+    <dimen name="sp_34">34sp</dimen>
+    <dimen name="standardDialogBorderRadius">8dp</dimen>
+    <dimen name="standardDialogButtonHeight">40dp</dimen>
+    <dimen name="standardDialogButtonMargin">16dp</dimen>
+    <dimen name="standardDialogButtonTopMargin">32dp</dimen>
+    <dimen name="standardDialogIconHeight">70dp</dimen>
+    <dimen name="standardDialogIconWidth">70dp</dimen>
+    <dimen name="standardDialogMargin">16dp</dimen>
+    <dimen name="standardDialogSubBodyHeight">16dp</dimen>
+    <dimen name="standardDialogSubIconHeight">32dp</dimen>
+    <dimen name="standardDialogSubTitleHeight">16dp</dimen>
+    <dimen name="standardDialogTextMargin">16dp</dimen>
+    <dimen name="standardDialogTopSpacerHeight">48dp</dimen>
+    <dimen name="teal_btn_corner_radius">2dp</dimen>
+    <dimen name="text_ecg_screen_h1">17sp</dimen>
+    <dimen name="text_ecg_screen_h2">14sp</dimen>
+    <dimen name="text_ecg_screen_h3">12sp</dimen>
+    <dimen name="text_notification_body">14sp</dimen>
+    <dimen name="text_notification_learn_more">12sp</dimen>
+    <dimen name="text_size_12sp">12sp</dimen>
+    <dimen name="text_size_14sp">14sp</dimen>
+    <dimen name="text_size_16sp">16sp</dimen>
+    <dimen name="text_size_24sp">24sp</dimen>
+    <dimen name="text_size_b">16sp</dimen>
+    <dimen name="text_size_h1">20sp</dimen>
+    <dimen name="text_size_h1_1">18sp</dimen>
+    <dimen name="text_size_h2">16sp</dimen>
+    <dimen name="text_size_h3">14sp</dimen>
+    <dimen name="text_size_lbl">12sp</dimen>
+    <dimen name="text_size_m">14sp</dimen>
+    <dimen name="text_size_smalle">13sp</dimen>
+    <dimen name="text_size_smaller">12sp</dimen>
+    <dimen name="width_textview">185dp</dimen>
+    <plurals name="profile_years">
+    <item quantity="one">%1$d yr</item>
+    <item quantity="other">%1$d yrs</item>
+  </plurals>
+    <string name="about_address" translatable="false">AliveCor Inc, 189 N. Bernardo Avenue, Suite 100, Mountain View, CA 94043 USA</string>
+    <string name="about_alg_v1_version" translatable="false">KAIv1: %1$s</string>
+    <string name="about_alg_v2_version" translatable="false">KAIv2: %1$s</string>
+    <string name="about_alg_version" translatable="false">KAIv1: %1$s\nKAIv2: %2$s</string>
+    <string name="about_b21" translatable="false">B210AC%1$s</string>
+    <string name="about_brussels" translatable="false">Obelis s.a. Bd. Général Wahis 53 1030 Brussels Belgium</string>
+    <string name="about_ce_mark" translatable="false">0123</string>
+    <string name="about_copyright">\u00A9 Copyright %s AliveCor, Inc. All Rights Reserved. AliveCor is a registered or unregistered trademark of AliveCor, Inc. in the United States and other countries.</string>
+    <string name="about_fcc_id" translatable="false">FCCID: 2ASFFAC019 (KardiaMobile 6L only)</string>
+    <string name="about_part_num" translatable="false">Part#: %1$s</string>
+    <string name="about_patent_nos" translatable="false">US Patent Numbers: 8301232, 8509882, and Patents Pending</string>
+    <string name="about_powered_by_alivecor" translatable="false">Software &amp; Services powered by AliveCor</string>
+    <string name="about_sdk_title_eu" translatable="false">About Kardia SDK Android</string>
+    <string name="about_sdk_title_us" translatable="false">About Kardia Core Android</string>
+    <string name="about_sdk_version" translatable="false">Version: %1$s</string>
+    <string name="about_um_version" translatable="false">UniversalMonitor: %1$s</string>
+    <string name="accuracy_like_never_before">Accuracy like never before</string>
+    <string name="ackit_kiwi_loading">Loading…</string>
+    <string name="activity">Activity:</string>
+    <string name="activity_check">ACTIVITY CHECK</string>
+    <string name="activity_qst_desc">The type of activity happening immediately prior to the recording is helpful to understand what is going on with your heart at different levels of physical activity.</string>
+    <string name="activity_qst_header">What was your activity level prior to this recording?</string>
+    <string name="additional_information">Additional Information</string>
+    <string name="advance_determinations">Advanced Determinations</string>
+    <string name="advance_determinations_two_line">advanced \ndeterminations</string>
+    <string name="af">Possible AFib</string>
+    <string name="af_detected_text">Your EKG shows signs of Atrial Fibrillation.\n\nFor additional analysis, send this EKG to our Clinician Review service or share it with your doctor.</string>
+    <string name="af_detected_text_v2">Indicates atrial fibrillation, an irregular heart rhythm, was detected in the EKG. This finding can be detected at any heart rate.\n\nFor additional analysis, send this EKG to our Clinician Review service or share it with your doctor.</string>
+    <string name="afib_desc">Indicates atrial fibrillation, an irregular heart rhythm, was detected in the EKG. This finding can be detected at any heart rate.</string>
+    <string name="afib_title">“Possible Atrial Fibrillation”</string>
+    <string name="age">Age</string>
+    <string name="ai_v2_clinician_review_desc">Your next EKG will be reviewed by a board-certified cardiologist in 24 hours or less. This is an FDA requirement in order to unlock new determinations. Once reviewed, your report will be available in your EKG History and you’ll have full access to new determinations.</string>
+    <string name="ai_v2_ekg_settings_desc">You can choose not to use advanced determinations at any time. Simply go to your Profile to manage your EKG settings.</string>
+    <string name="ai_v2_more_accuracy_desc">We’ve upgraded the way Kardia analyzes your EKGs. As a KardiaCare member, you now have access to advanced determinations and a deeper look at your heart rhythm.</string>
+    <string name="ai_v2_more_accuracy_header">More accuracy than ever with new determinations</string>
+    <string name="ai_v2_more_accuracy_new_detections">New Determinations:</string>
+    <string name="ai_v2_sinus_rhythm_with_irregularity">“Sinus Rhythm with Irregularity”</string>
+    <string name="ai_v2_sinus_rhythm_with_irregularity_desc">Your EKG shows sinus rhythm with irregularity. This can be present in healthy adults and in adults with heart conditions.</string>
+    <string name="ai_v2_sinus_rhythm_with_pvc">“Sinus Rhythm with Premature Ventricular Contractions”</string>
+    <string name="ai_v2_sinus_rhythm_with_pvc_desc">Your EKG shows sinus rhythm with occasional premature ventricular contractions (PVCs). This can be present in healthy adults and in adults with heart conditions.</string>
+    <string name="ai_v2_sinus_rhythm_with_supraventricular_ectopy_desc">Your EKG shows sinus rhythm with occasional supraventricular ectopy (SVE). This can be present in healthy adults and in adults with heart conditions.</string>
+    <string name="ai_v2_sinus_rhythm_with_wide_qrs">“Sinus Rhythm with Wide QRS”</string>
+    <string name="ai_v2_sinus_rhythm_with_wide_qrs_desc">Your EKG shows sinus rhythm with Wide QRS. This can be present in healthy adults and in adults with heart conditions.</string>
+    <string name="algorithm_results">Algorithm Results</string>
+    <string name="allow">Allow</string>
+    <string name="allow_access">Allow Access</string>
+    <string name="amber_light">Amber Light</string>
+    <string name="apple_determination_af">Atrial Fibrillation</string>
+    <string name="apple_determination_high_hr">Heart Rate Over 120</string>
+    <string name="apple_determination_inconclusive">Inconclusive</string>
+    <string name="apple_determination_low_hr">Heart Rate Under 50</string>
+    <string name="apple_determination_sinus">Sinus Rhythm</string>
+    <string name="apple_determination_unrecognized">Unrecognized</string>
+    <string name="artial_title">“Atrial Fibrillation”</string>
+    <string name="at_rest_sitting_or_lying_down">At rest (sitting or lying down)</string>
+    <string name="atrial_fibrillation">Atrial Fibrillation</string>
+    <string name="atrial_fibrillation_ques1">What is Atrial Fibrillation?</string>
+    <string name="audio_stats">Audio Stats</string>
+    <string name="average_notification_desc">The average beat display is the average of all the normal, non-ectopic (extra/missed) beats in the EKG. An average beat display is intended to be a simple visual representation of one beat in a 30-second EKG.</string>
+    <string name="average_notification_title">Average Beat Plot</string>
+    <string name="axis_name_amplitude">Amplitude (mV)</string>
+    <string name="axis_name_rr_time">RR (Seconds)</string>
+    <string name="axis_name_time">Time (Seconds)</string>
+    <string name="axis_name_time_ms">Time (ms)</string>
+    <string name="back">Back</string>
+    <string name="bfx">BFx</string>
+    <string name="ble_permission_message_new">Please turn on Bluetooth permissions to pair Your %s</string>
+    <string name="bluetooth_off_dialog_title">Turn on Bluetooth</string>
+    <string name="bluetooth_system_dialog_body">You will be taken to your device settings to change bluetooth permission settings.</string>
+    <string name="bluetooth_system_dialog_title">You must allow bluetooth permissions to connect a device</string>
+    <string name="bluetooth_unknown_device">Unknown</string>
+    <string name="bpm">bpm</string>
+    <string name="bradycardia_ans1">Bradycardia is based on the words ‘brady’ meaning slow and ‘-cardia’ meaning heart.\n\nBradycardia is a heart rate that\'s less than 50 beats per minute, which is slower than normal for most people. Kardia’s determination “Bradycardia” indicates a mild form of bradycardia between 40 to 50 beats per minute, with no atrial fibrillation or wide QRS detected.</string>
+    <string name="bradycardia_ans2">The normal range for heart rate depends on your age and physical condition; for example, a heart rate less than 50 beats per minute can be normal in healthy adults and in athletes, and during sleep.While bradycardia can be normal, it can also be caused by thyroid disease, sleep apnea, certain medications, or damage to the heart tissue from heart disease or from the aging process. When the heart beats too slowly, you may have no symptoms or you may experience dizziness, chest pain or pressure*, lack of energy, or shortness of breath.</string>
+    <string name="bradycardia_ans3">The treatment for bradycardia depends on what is causing the slow heart rate, as well as your symptoms. Mild bradycardia with no symptoms usually requires no treatment. Bradycardia may be treated with medications, or by adjusting current medications. For severe bradycardia, a pacemaker may be recommended, which is a small device implanted under the skin that can speed up the heart rate as needed. If you have bradycardia, your doctor can give you additional instructions about how to manage it and your overall heart health.</string>
+    <string name="bradycardia_desc">Atrial fibrillation was not detected and your heart rate was slow, at 40-50 bpm. This can be normal in some adults and athletes. Bradycardia can also be due to an arrhythmia.</string>
+    <string name="bradycardia_detected_text">Your heart rate is less than 50 beats per minute, which is slower than normal for most people. Atrial fibrillation was not detected.</string>
+    <string name="bradycardia_ques1">What is Bradycardia?</string>
+    <string name="bradycardia_ques2">What causes Bradycardia?</string>
+    <string name="bradycardia_result">Bradycardia</string>
+    <string name="bradycardia_title">“Bradycardia”</string>
+    <string name="cancel">Cancel</string>
+    <string name="change_in_heart_rate">Change in heart rate</string>
+    <string name="chest_pain_pounding_flutter">Chest pain, pounding, or flutter</string>
+    <string name="close">Close</string>
+    <string name="complete">Complete</string>
+    <string name="connect_a_new_device">Connect a new device?</string>
+    <string name="connect_a_new_device_desc">Pairing a new Kardia device will forget the previous device. Are you sure you want to proceed?</string>
+    <string name="connect_new_device">Connect New Device</string>
+    <string name="connect_your_device">Connect Your Device</string>
+    <string name="connected">Connected</string>
+    <string name="connecting_triangle">Connecting…</string>
+    <string name="contact_customer_care">Contact Customer Care</string>
+    <string name="contact_support">Contact Support</string>
+    <string name="copyright_text">© Copyright %s, Alivecor Inc.</string>
+    <string name="cpom_determination_info_bradycardia">&lt;b>\'Bradycardia\'&lt;/b>: Atrial fibrillation was not detected and your heart rate was slow, at 40-50 bpm. This can be normal in some adults and athletes. Bradycardia can also be due to an arrhythmia.</string>
+    <string name="cpom_determination_info_no_analysis">&lt;b>\'No Analysis\'&lt;/b>: There is no Instant Analysis for this EKG.</string>
+    <string name="cpom_determination_info_normal">&lt;b>\'Normal\'&lt;/b>: Indicates normal sinus rhythm with no rhythm or heart rate abnormalities detected; your heart rate was 50-100 beats per minute (bpm).</string>
+    <string name="cpom_determination_info_possible_afib">&lt;b>\'Possible Atrial Fibrillation\'&lt;/b>: Indicates atrial fibrillation, an irregular heart rhythm, was detected in the EKG. This finding can be detected at any heart rate.</string>
+    <string name="cpom_determination_info_potential_findings">&lt;i>These are potential findings and not diagnoses. The algorithms do not detect heart attack, blood clots, or stroke. Contact your doctor with any concerns.&lt;/i></string>
+    <string name="cpom_determination_info_tachycardia">&lt;b>\'Tachycardia\'&lt;/b>: Atrial fibrillation was not detected and your heart rate was fast, at 100-140 bpm. This can be a normal response to conditions such as stress or exercise. Tachycardia can also be due to an arrhythmia.</string>
+    <string name="cpom_determination_info_title">Kardia Instant Analysis Algorithm Findings</string>
+    <string name="cpom_determination_info_too_short">&lt;b>\'Too Short\'&lt;/b>: Your EKG recording must be at least 30 seconds to allow Instant Analysis algorithms to perform an analysis.</string>
+    <string name="cpom_determination_info_unclassified">&lt;b>\'Unclassified\'&lt;/b>: Atrial fibrillation was not detected and your EKG does not fall under the algorithmic classifications of \'Normal\', \'Bradycardia\', or \'Tachycardia\'. An \'Unclassified\' finding may be caused by other arrhythmias, unusually fast or slow heart rates, or poor quality recordings.</string>
+    <string name="cpom_determination_info_unreadable">&lt;b>\'Unreadable\'&lt;/b>: The EKG could not be read, likely due to signal noise and/or incorrect recording technique.</string>
+    <string name="cpom_view_tutorial">View Tutorial</string>
+    <string name="cr_loading">Loading…</string>
+    <string name="date">Date:</string>
+    <string name="date_of_birth">Date Of Birth</string>
+    <string name="determination_details">DETERMINATION DETAILS</string>
+    <string name="determination_details_unreadable_desc">There are a few reasons why you may be getting noisy or unreadable recordings. Since KardiaMobile communicates with your smart phone via high frequency ultrasound, it is important that you keep the device within a few inches of the microphone and eliminate any sources of electric interference. Here are some of the common things to look for:</string>
+    <string name="determination_details_unreadable_point_1">Confirm your smart phone or tablet is not plugged in or charging while recording an EKG</string>
+    <string name="determination_details_unreadable_point_2">Move away from sources of electrical interference such as large computer monitors or television screens</string>
+    <string name="determination_details_unreadable_point_3">Try to avoid areas with environmental noise like loud crowds, or running water.</string>
+    <string name="determination_details_unreadable_point_4">Be sure you don’t have headphones plugged in to your smart phone</string>
+    <string name="determination_details_unreadable_point_5">If you wear hearing aids, be sure to turn them off</string>
+    <string name="determination_details_unreadable_point_6">Try cleaning the metal electrodes with a damp cloth. For more information on how to clean your device, tap the button below.</string>
+    <string name="determination_details_unreadable_point_7">Try moistening where the sensors contact your skin with a bit of water to improve conductivity with the electrodes.</string>
+    <string name="determination_details_unreadable_point_8">When recording from the hands, relax the arms and hands to reduce muscle noise. You may even rest forearms and hands on a flat surface, place the KardiaMobile EKG on the flat surface with the metal electrodes up, and let your fingers rest on the electrodes.</string>
+    <string name="determination_details_unreadable_point_9">Make sure that both you and the mobile device remain still during EKG recordings. Movement during recordings will cause noise in the tracing</string>
+    <string name="device_lock_blocked">Blocked.\nThis device is no longer eligible.</string>
+    <string name="device_lock_blocked_message">If you are having symptoms, please contact your doctor.</string>
+    <string name="device_lock_generic_message">This device has been locked and is unavailable for usage.</string>
+    <string name="device_lock_is_unavailable">Device is unavailable</string>
+    <string name="device_lock_off_line_not_registered">You are offline and your device has not been registered.</string>
+    <string name="device_lock_off_line_not_registered_message">Please check your network connection and try again. To register this device, record your first EKG.</string>
+    <string name="device_lock_okay">okay</string>
+    <string name="device_lock_stale_message">Device stale go online and refresh device plan</string>
+    <string name="device_lock_status_blocked">blocked</string>
+    <string name="device_lock_title">Device Lock</string>
+    <string name="device_name_k1000" translatable="false">AliveCor K1000</string>
+    <string name="device_name_kardia_mobile" translatable="false">KardiaMobile</string>
+    <string name="device_name_kardiacard" translatable="false">KardiaMobile Card</string>
+    <string name="device_name_sakura" translatable="false">OMRON Complete\u2122</string>
+    <string name="device_name_triangle" translatable="false">KardiaMobile 6L</string>
+    <string name="device_not_found">Device Not Found</string>
+    <string name="dizzy_light_headed_fainting">Dizzy, light-headed, or fainting</string>
+    <string name="dnf_msg">Please make sure you’ve enabled Bluetooth, touch the electrodes to wake up your device, and try again.</string>
+    <string name="dob">DOB:</string>
+    <string name="done_all_caps">DONE</string>
+    <string name="duration_hours">h</string>
+    <string name="duration_minutes">m</string>
+    <string name="duration_seconds">s</string>
+    <string name="ecg_details_bpm_text">BPM</string>
+    <string name="ecg_expand_bottom_text_enhanced_on">ENHANCE ON</string>
+    <string name="ecg_expand_bottom_text_invert_on">INVERT ON</string>
+    <string name="ecg_expand_text_more">MORE</string>
+    <string name="ecg_realtime_change_device">Change Device</string>
+    <string name="ecg_realtime_first_ecg_get_kardia">Get KardiaMobile</string>
+    <string name="ecg_realtime_first_ecg_keep_fingers">Keep your fingers on OMRON Complete\u2122\'s pads and hold still until the recording has finished.</string>
+    <string name="ecg_realtime_first_ecg_keep_fingers_sakura">Keep your fingers on %1$s\'s electrodes and hold still until the recording has finished.</string>
+    <string name="ecg_realtime_first_ecg_need_help">Need Help?</string>
+    <string name="ecg_realtime_first_ecg_panel_text1">To start recording, place your fingers on the pads</string>
+    <string name="ecg_realtime_first_ecg_recording_in_progress">Recording in progress…</string>
+    <string name="ecg_realtime_first_ecg_you_will_need">You will need a KardiaMobile device to record your EKG.</string>
+    <string name="ecg_realtime_first_ecg_your_ecg_tracing">Your EKG tracing cannot be displayed until a cardiologist is able to review your first recording.</string>
+    <string name="ecg_realtime_help_sakura_3">1. Wrap the cuff securely.\n2. Press the BP [START/STOP] button.\n3. Touch 4 electrodes as shown in the image.</string>
+    <string name="ecg_realtime_lead_avf">aVF</string>
+    <string name="ecg_realtime_lead_avl">aVL</string>
+    <string name="ecg_realtime_lead_avr">aVR</string>
+    <string name="ecg_realtime_lead_i" translatable="false">I</string>
+    <string name="ecg_realtime_lead_ii">II</string>
+    <string name="ecg_realtime_lead_iii">III</string>
+    <string name="ecg_realtime_record_settings">EKG Settings</string>
+    <string name="ecg_realtime_scale" translatable="false">25mm/s, 10mm/mV</string>
+    <string name="ecg_realtime_signal_medium">Good Signal</string>
+    <string name="ecg_realtime_signal_no">No Signal</string>
+    <string name="ecg_realtime_signal_strong">Great Signal</string>
+    <string name="ecg_realtime_signal_weak">Weak Signal</string>
+    <string name="ecg_realtime_single_lead_portrait">Single-Lead EKG</string>
+    <string name="ecg_realtime_six_lead_portrait">6-Lead EKG</string>
+    <string name="ecg_realtime_six_lead_portrait_new">Six-Lead EKG</string>
+    <string name="ecg_results_invert">Invert:</string>
+    <string name="ecg_results_invert_auto">Auto-Invert:</string>
+    <string name="ecg_results_invert_off">Off</string>
+    <string name="ecg_results_invert_on">On</string>
+    <string name="ecg_results_invert_undo">Undo</string>
+    <string name="ecg_top_text_analysis">ANALYSIS</string>
+    <string name="ekg_details">EKG Details</string>
+    <string name="ekg_legend">EKG LEGEND</string>
+    <string name="ekg_recoding">EKG Recording</string>
+    <string name="ekg_recording_overview">EKG Recording Overview</string>
+    <string name="enable">Enable</string>
+    <string name="enable_bluetooth_heading">First, make sure you’ve enabled bluetooth on your phone</string>
+    <string name="enable_gps">Please enable GPS</string>
+    <string name="encrypt_pdf_msg">In order to protect your privacy, we do not recommend storing or sending files without password protection.  Please enter the password that will be used to encrypt your PDF</string>
+    <string name="encrypt_pdf_title">Password Protect PDF</string>
+    <string name="enhanced_filter">Enhanced Filter</string>
+    <string name="enter_a_description">Enter a description</string>
+    <string name="error">Error</string>
+    <string name="exit">Exit</string>
+    <string name="expand">EXPAND</string>
+    <string name="field_mainsfilter">Mains Filter: %1$d Hz</string>
+    <string name="field_scale">Scale: %1$smm/s, %2$smm/mV</string>
+    <string name="fieldlabel_comments">Notes:</string>
+    <string name="fieldlabel_determination">Determination:</string>
+    <string name="fieldlabel_duration">Duration:</string>
+    <string name="fieldlabel_hr">Heart Rate:</string>
+    <string name="fieldlabel_patient">Patient:</string>
+    <string name="fieldlabel_patientid">ID:</string>
+    <string name="fieldlabel_recorded">Recorded:</string>
+    <string name="fieldlabel_tags">Tags:</string>
+    <string name="find_device_sub1">First, make sure you’ve enabled Bluetooth on your phone.</string>
+    <string name="find_device_sub2">After tapping the “Find My Device” button below, place and hold your fingers on the electrodes of your device until the device wakes up and the Bluetooth connection is made.</string>
+    <string name="find_your_device_header">Let’s start by finding your device.</string>
+    <string name="finding_by_alivecor">Instant Analysis:</string>
+    <string name="finding_by_alivecor_v2">Kardia Advanced Determination:</string>
+    <string name="fmt_apple_determination">%1$s (Apple Health)</string>
+    <string name="fmt_bpm">%1$s bpm</string>
+    <string name="footer_copy_right_msg">%s AliveCor, Inc.</string>
+    <string name="footer_disclaimer">Kardia does not check for heart attack. If you believe you are having a medical emergency, call emergency services. AliveCor  does not provide medical advice or services, and any information from AliveCor is provided to assist you and your doctor with your medical care and not as a replacement for consulting with your doctor.</string>
+    <string name="footer_disclaimer_new">This report does not replace medical advice, please seek professional medical assistance if you are or believe you are suffering from any medical problem. This device does not detect or measure all heart rate, heart rhythm or heart waveform changes, especially those related to ischemic heart conditions.  The information provided by the AliveCor Heart Monitor as well as the clinical analysis and report provided by Cardiac Health Medical Group’s contracted cardiologists are useful aids in user self-evaluations, but are not intended to be a replacement for complete 12 Lead ECG exams or medical evaluations by your personal physician.</string>
+    <string name="footer_msg">Confidential patient information</string>
+    <string name="for_investigational_use_only">For investigational use only</string>
+    <string name="from_apple_health_small">From Apple Health</string>
+    <string name="generate_ecg">Generate ECG</string>
+    <string name="get_support">Get Support</string>
+    <string name="go_to_settings">Go to Settings</string>
+    <string name="got_it">Got it</string>
+    <string name="guest">Guest</string>
+    <string name="hello_blank_fragment">Hello blank fragment</string>
+    <string name="i_need_help">I need help</string>
+    <string name="initializing">Initializing...</string>
+    <string name="intense_activity">Intense activity</string>
+    <string name="join_kardiacare_to_access_advanced_determinations">Join KardiaCare to access advanced determinations. Get a deeper look at your heart rhythm and more data to share with your doctor.</string>
+    <string name="k1000_tutorial">ALIVECOR K1000 Tutorial</string>
+    <string name="k1000_tutorial_desc_step3">An image of your device on the recording screen of your phone will light up when contact is made. Your recording will automatically begin and you will be notified when your recording finishes.</string>
+    <string name="k1000_tutorial_step2_desc">Choose a 6-lead EKG for six views of your heart, or a single-lead EKG for a single view.\n\nFirst, let’s learn how to take a 6-Lead EKG.</string>
+    <string name="k1000_tutorial_step2_title">AliveCor K1000 can record two types of EKGs.</string>
+    <string name="k1000_tutorial_title_step3">Your screen will indicate when a connection is made.</string>
+    <string name="kai_30_seconds_disclaimer_pdf">* Instant Analysis evaluates the first 30 seconds of each recording.</string>
+    <string name="kai_30_seconds_disclaimer_pdf_for_kardia_determination">* Kardia Determination evaluates the first 30 seconds of each recording.</string>
+    <string name="kardia">Kardia</string>
+    <string name="kardia6l_only_tutorial_step2_desc">Place the bottom electrode on the bare skin of either your left knee or inside of your left ankle to start the recording. You will be notified when your recording finishes.</string>
+    <string name="kardia6l_tutorial_step2_desc">Choose a 6-lead EKG for six views of your heart, or a single-lead EKG for a single view. Both types of EKGs can detect the same arrhythmias.\n\nFirst, let’s learn how to take a 6-Lead EKG.</string>
+    <string name="kardia6l_tutorial_step2_title">KardiaMobile 6L can record\ntwo types of EKGs.</string>
+    <string name="kardia6l_tutorial_step3_desc">With fingers from each hand on the top electrodes, position your device so that the \"A\" logo is facing up.</string>
+    <string name="kardia6l_tutorial_step3_title">To record a 6-lead EKG, place your thumbs on top of the electrodes.</string>
+    <string name="kardia6l_tutorial_step4_desc">Place the bottom electrode on the bare skin of either your left knee or inside of your left ankle to start the recording.</string>
+    <string name="kardia6l_tutorial_step4_title">Next, place the bottom\nelectrode on your bare left\nknee or left ankle.</string>
+    <string name="kardia6l_tutorial_step5_desc">Make sure your device is on a flat surface. The electrodes on the recording screen on your phone will turn green when a good connection has been made. You will be notified when your recording finishes.</string>
+    <string name="kardia6l_tutorial_step5_title">To record a single-lead EKG, lightly place two fingers from each hand on the electrodes.</string>
+    <string name="kardia_advance_determination">Kardia Advanced Determination:</string>
+    <string name="kardia_advanced_determinations">Kardia Advanced Determinations</string>
+    <string name="kardia_card_low_battery_message">Contact Customer Care to request a replacement device or connect another device.</string>
+    <string name="kardia_card_low_battery_title">Battery level is too low to record your EKG</string>
+    <string name="kardia_determination">Kardia Determination:</string>
+    <string name="kardia_determinations">Kardia Determinations</string>
+    <string name="kardia_device_connected">%s Connected</string>
+    <string name="kardia_does_not_check">Kardia does not check for heart attack.</string>
+    <string name="kardia_mobile6l">KardiaMobile 6L</string>
+    <string name="kardia_mobile6l_tutorial">KardiaMobile 6L Tutorial</string>
+    <string name="kardia_mobile_tutorial">Kardiamobile Tutorial</string>
+    <string name="kardia_mobile_tutorial_title_desc2">Make sure your device is laying on a flat surface. To get the best signal, place your device near the microphone of your phone or tablet.</string>
+    <string name="kardia_mobile_tutorial_title_desc3">The electrodes on the recording screen will turn green when a stable connection has been made.</string>
+    <string name="kardia_mobile_tutorial_title_desc4">Once your recording has started, keep your fingers on the electrodes. Give it a few seconds to smooth out. See your results after your recording finishes.</string>
+    <string name="kardia_mobile_tutorial_title_step2">Place your device near your phone.</string>
+    <string name="kardia_mobile_tutorial_title_step3">Lightly place fingers from each hand on the electrodes.</string>
+    <string name="kardia_mobile_tutorial_title_step4">Your EKG recording will begin.</string>
+    <string name="kardiamobile_card_tutorial">KardiaMobile Card Tutorial</string>
+    <string name="kardiastation_recording">Recording</string>
+    <string name="kcard_recording_tutorial_step3">Firmly pinch the power button between your fingers to turn on your device. Look for the amber LED light to illuminate. &lt;b>Your device will automatically turn off after 10 seconds if there is no contact with the electrodes.&lt;/b></string>
+    <string name="kcard_recording_tutorial_step4">Hold the device in your hands with your thumbs on the electrodes and fingers underneath the device. You will be notified when your recording finishes.</string>
+    <string name="lbl_afib">Atrial Fibrillation</string>
+    <string name="lbl_password">Password</string>
+    <string name="learn_more">Learn more</string>
+    <string name="learn_more_about_ekg_readings">Learn more about EKG readings\n and your heart health</string>
+    <string name="left_hand">Left Hand</string>
+    <string name="less">LESS</string>
+    <string name="light_activity">Light activity</string>
+    <string name="loading">Loading…</string>
+    <string name="location_disabled_message">It looks like location is OFF. You must enable Location Services in order to connect to a device.</string>
+    <string name="long_detected_result_text">Instant Analysis does not analyze EKG recordings longer than 1 minute.\n\nWe recommend changing the recording duration to 30 seconds in your Settings.</string>
+    <string name="long_result">Too Long</string>
+    <string name="make_sure_your_bluetooth_is_turned_on_kcard">Make sure that your bluetooth is turned on and your KardiaMobile Card is nearby.</string>
+    <string name="moderate_activity">Moderate activity</string>
+    <string name="more_data_to_share_with_your_doctor">More data to share with your doctor</string>
+    <string name="nav_steps">Step %d of %d</string>
+    <string name="nearby_request">Application requires \"Nearby devices\" permission to discover, advertise, and connect bluetooth devices.</string>
+    <string name="nearby_request_title">\"Nearby devices\" permission is required</string>
+    <string name="next">Next</string>
+    <string name="no_additional_information">No additional information to display</string>
+    <string name="no_analysis">No Analysis</string>
+    <string name="no_analysis_desc">There is no Instant Analysis for this EKG.</string>
+    <string name="no_analysis_title">“No Analysis”</string>
+    <string name="no_notes_to_disaplay">No notes to display</string>
+    <string name="no_symptom">No symptoms</string>
+    <string name="no_tags_to_disaplay">No tags to display</string>
+    <string name="noise_detected">Unreadable</string>
+    <string name="noise_detected_short_text">There is too much interference in this recording. Please re-record the EKG. Try to relax and hold still, rest your arms, or move to a quiet location or away from electronics and machinery.</string>
+    <string name="normal_desc">Indicates normal sinus rhythm with no rhythm or heart rate abnormalities detected; your heart rate was 50-100 beats per minute (bpm).</string>
+    <string name="normal_ques1">What is Normal?</string>
+    <string name="normal_sinus_rhythm">Normal Sinus Rhythm</string>
+    <string name="normal_sinus_rhythm_ans1">Normal sinus rhythm means that the electrical signals that control the heart are occurring normally, originating at the top of the heart (from a region called the sinus node) and then traveling along the bottom of the heart, without delay.\n\nWhile similar, sinus rhythm is different from heart rate. Your heart rate refers to the number of times your heart beats in a minute. Sinus rhythm, on the other hand, refers to the pattern of your heartbeat.\n\nIn adults, normal sinus rhythm usually accompanies a heart rate of 50 to 100 beats per minute. However, normal heart rates vary from person to person.\n\nKardia’s determination “Normal Sinus Rhythm” indicates that Wide QRS, occasional Premature Ventricular Contractions (PVCs) or other irregularities were not detected.</string>
+    <string name="normal_sinus_rhythm_ques1">What is Normal Sinus Rhythm?</string>
+    <string name="normal_sinus_title">“Normal Sinus Rhythm”</string>
+    <string name="normal_title">“Normal”</string>
+    <string name="notes">Notes</string>
+    <string name="nsr_detected_result">Normal</string>
+    <string name="nsr_detected_text">No rhythm abnormalities detected in your EKG.</string>
+    <string name="nsr_disclaimer">%1$s does not check for heart attack. If you believe you are having a medical emergency, call emergency services. Do not change your medication without talking to your doctor.</string>
+    <string name="nsr_disclaimer_short">If you believe you are having a medical emergency, call emergency services. Do not change your medication without talking to your doctor.</string>
+    <string name="ok">OK</string>
+    <string name="okay">Okay</string>
+    <string name="onboard_first_time_no_kardia_url" translatable="false">https://www.alivecor.com/app-redirect/app_buy_device-android-kardia</string>
+    <string name="onboarding_allow_location">Allow location</string>
+    <string name="onboarding_bluetooth_failure_desc">Turn on Bluetooth in your phone\'s Settings\nto pair KardiaMobile 6L.</string>
+    <string name="onboarding_bluetooth_failure_title">Turn on Bluetooth to\nconnect to KardiaMobile\n6L.</string>
+    <string name="onboarding_bluetooth_turn_on_desc">Enable Bluetooth on your phone to connect \n with KardiaMobile 6L</string>
+    <string name="onboarding_bluetooth_turn_on_title">Now let\'s start by finding \n your device</string>
+    <string name="onboarding_find_my_device">Find my device</string>
+    <string name="onboarding_got_to_Settings">Go to settings</string>
+    <string name="onboarding_learn_more">Learn More</string>
+    <string name="onboarding_location_disclaimer">Kiwi will not track or store your location.</string>
+    <string name="onboarding_location_permission_denied_desc">You\'ve previously denied location \n permission. Turn on Location in your\n Android Settings to continue.</string>
+    <string name="onboarding_location_permission_denied_desc_12">You\'ve previously denied Precise Location \n permission. Turn on Precise Location in your\n Android Settings to continue.</string>
+    <string name="onboarding_location_permission_denied_title">To begin setup,\nLocation permission is required.</string>
+    <string name="onboarding_location_permission_denied_title_12">To begin setup,\nPrecise Location permission is required.</string>
+    <string name="onboarding_location_permission_desc">Android requires Location Services \n permission to connect to \n Bluetooth Low Energy devices.</string>
+    <string name="onboarding_location_permission_title">Location permission is \n required.</string>
+    <string name="onboarding_need_help">I need Help</string>
+    <string name="onboarding_paring_setup_sub_title">Now Setting Up</string>
+    <string name="onboarding_scan_desc">Tap the top two electrodes to pair \n KardiaMobile with your phone.</string>
+    <string name="onboarding_scan_failure_title">Unable to pair\nKardiaMobile 6L.</string>
+    <string name="onboarding_scan_timeout_failure_desc">Make sure that your phone\'s Bluetooth is\nturned on and your Kardia is nearby.</string>
+    <string name="onboarding_scan_timeout_failure_text">KardiaMobile 6L was not\nfound.</string>
+    <string name="onboarding_scan_title">Touch the electrodes \n to wake up your device.</string>
+    <string name="onboarding_success_desc">Your Kardia device is paired with your phone and ready to record your EKG.</string>
+    <string name="onboarding_success_title">Success!\nKardiaMobile 6L is set up.</string>
+    <string name="onboarding_try_again">Try Again</string>
+    <string name="original_filter">Original Filter</string>
+    <string name="other">Other</string>
+    <string name="patient_mrn_id">Patient MRN/ID:</string>
+    <string name="pdf_analysis_disclaimer">* Instant Analysis is done on Lead I.</string>
+    <string name="pdf_analysis_disclaimer_for_kardia_advance_determination">* Kardia Advanced Determination is done on Lead I.</string>
+    <string name="pdf_analysis_disclaimer_for_kardia_determination">* Kardia Determination is done on Lead I.</string>
+    <string name="please_check_network">Please check your network connection and try again.</string>
+    <string name="please_specify">Please specify:</string>
+    <string name="possible_atrial_fibrillation">Possible Atrial Fibrillation</string>
+    <string name="possible_atrial_fibrillation_ans1">The term atrial fibrillation is based on the words, ‘atrial’ meaning the upper part of heart, and ‘fibrillation’ which means quivering. Atrial fibrillation is a quivering or irregular heartbeat (arrhythmia). Atrial fibrillation can lead to blood clots, stroke, heart failure, and other heart-related complications. Normally, your heart contracts and relaxes to a regular beat. In atrial fibrillation, the upper chambers of the heart (atria) beat irregularly and the blood does not effectively move in the heart, which may result in clot formation. If a clot breaks off, enters the bloodstream and lodges in an artery leading to the brain, a stroke results. 1 in 7 strokes are caused by atrial fibrillation. The clot risk is why patients with this condition are often put on blood thinners. Untreated atrial fibrillation is associated with a 5-fold increased risk for stroke. Kardia’s determination “Atrial Fibrillation” indicates an irregular rhythm at any heart rate, that is not a sinus rhythm, which could include: atrial fibrillation, atrial flutter w variable block, wandering atrial pacemaker, or sinus with PACs.</string>
+    <string name="possible_atrial_fibrillation_ans2">Risk factors for atrial fibrillation include advanced age, high blood pressure, heart disease, alcohol use, family history, sleep apnea, thyroid problem, and diabetes. Sometimes people with atrial fibrillation have no symptoms at all. Others may experience fatigue, rapid heartbeat, fluttering or thumping in chest, dizziness, shortness of breath, anxiety, weakness, fainting, confusion, sweating, or chest pain or pressure.*</string>
+    <string name="possible_atrial_fibrillation_ans3">The treatment for atrial fibrillation depends on your risk of stroke and your symptoms. Many patients will need to take a blood thinner (antithrombotic medication) that treats and prevents blood clots that can lead to a stroke. Additional medications may be prescribed to slow the heart rate, or restore the heart rhythm to normal. Patients with atrial fibrillation are advised to engage in regular physical activity, eat a heart-healthy diet, manage high blood pressure, avoid excessive amounts of alcohol and caffeine, not smoke, control cholesterol, and maintain a healthy weight. All of these goals aid in the prevention of overall heart disease, too. Finally, there are invasive procedures that may be performed (electrical cardioversion, catheter or surgical ablation) to restore the heart rhythm to normal.</string>
+    <string name="possible_atrial_fibrillation_ans4">&lt;b>\"Partnering in Your Treatment\" Worksheet&lt;/b>&lt;br>&lt;br> Filling out this sheet from the American Heart Association can help you discuss your goals and options with your healthcare provider.</string>
+    <string name="possible_atrial_fibrillation_ques2">What causes Atrial Fibrillation?</string>
+    <string name="possible_atrial_fibrillation_ques4">Additional Resources</string>
+    <string name="potential_desc">These are potential findings and not diagnoses. The algorithms do not detect heart attack, blood clots, or stroke. Contact your doctor with any concerns.</string>
+    <string name="power_button">Power Button</string>
+    <string name="power_button_kcard">Power Button</string>
+    <string name="prefs_screen_ekg">EKG settings</string>
+    <string name="prepared_for">Prepared for</string>
+    <string name="proceed">Proceed</string>
+    <string name="process_dialog_text">Processing file</string>
+    <string name="pvc_notification_desc">Kardia AI can detect the QRS locations within the EKG. It can also identify whether this beat is a PVC or not, the number of PVCs, and the PVC location. This feature is only available for EKGs detected as Sinus Rhythm.</string>
+    <string name="pvc_notification_title">PVC Annotation</string>
+    <string name="qt">QT:</string>
+    <string name="qt_analysis">QT Analysis:</string>
+    <string name="qt_requested">QT Requested</string>
+    <string name="qt_results_unavailable">QT Results Unavailable</string>
+    <string name="qtcb">QTcB:</string>
+    <string name="qtcf">QTcF:</string>
+    <string name="record_another_ecg">Record Another ECG</string>
+    <string name="record_ekg_battery">Battery</string>
+    <string name="record_ekg_signal">Signal\nStrength</string>
+    <string name="record_ekg_title_single_lead">Recording Single-Lead EKG</string>
+    <string name="record_ekg_title_six_lead">Recording 6-Lead EKG</string>
+    <string name="record_new_ecg">Record New ECG</string>
+    <string name="record_new_ekg">Record a new EKG</string>
+    <string name="record_time_label">Recording\nTime</string>
+    <string name="recorded_on">Recorded on:</string>
+    <string name="recording_complete">Recording complete</string>
+    <string name="recording_device_body">Your recording will start once good bare-skin contact is detected on all electrodes.</string>
+    <string name="recording_device_title">To start recording touch the electrodes</string>
+    <string name="recording_error_bluetooth_off_message">Turn on Bluetooth in your phone\'s settings to connect to %1$s</string>
+    <string name="recording_error_bluetooth_off_title">Turn on Bluetooth to start your recording</string>
+    <string name="recording_error_mains_message">Move away from chargers, electrical devices, and outlets, then start a new recording.</string>
+    <string name="recording_error_mains_title">Electrical interference detected</string>
+    <string name="recording_error_mic_message">%1$s transmits EKG\ndata to your phone using\nhigh-frequency sound.</string>
+    <string name="recording_error_mic_title">Microphone access is\nrequired to record EKG</string>
+    <string name="recording_error_mic_voice_cta">Update settings</string>
+    <string name="recording_error_mic_voice_message">Microphone access is required to use the voice recording for notes feature</string>
+    <string name="recording_error_mic_voice_title">Microphone access is\nrequired to record a voice note</string>
+    <string name="recording_error_nfc_message">NFC interferes with the signal coming from your %1$s device.</string>
+    <string name="recording_error_nfc_title">Turn off Android NFC to start your recording</string>
+    <string name="recording_error_noise_message">Please record your EKG again. Try to remain still to reduce muscle noise</string>
+    <string name="recording_error_noise_title">Recording is unreadable due to interference</string>
+    <string name="recording_error_short_message">This EKG is too short to analyze. You can save it or start a new recording.</string>
+    <string name="recording_error_short_message_unlock">This EKG is too short to analyze.</string>
+    <string name="recording_error_short_title">Your EKG recording was interrupted</string>
+    <string name="recording_error_title_bluetooth_turn_on">Turn on Bluetooth to connect to %1$s</string>
+    <string name="recording_error_triangle_battery_low_message">Please follow instructions to replace the battery and try again.</string>
+    <string name="recording_error_triangle_battery_low_title">Battery level is too low to record your EKG</string>
+    <string name="recording_error_triangle_location_permission_message">Android requires location Services permission to connect to Bluetooth Low Energy devices.</string>
+    <string name="recording_error_triangle_location_permission_title">Location permission is required</string>
+    <string name="recording_error_triangle_not_found_cta">Connect</string>
+    <string name="recording_error_triangle_not_found_message">Tap \"Connect\" to search for your Device, then touch the electrodes to connect.</string>
+    <string name="recording_error_triangle_not_found_title">Connect to your %1$s</string>
+    <string name="recording_intro_bottom">Left leg or knee</string>
+    <string name="recording_intro_km_body">Your recording will start once contact is detected on the electrodes.</string>
+    <string name="recording_intro_km_title">Touch the electrodes to start recording</string>
+    <string name="recording_intro_left">Left hand</string>
+    <string name="recording_intro_middle">Logo Up</string>
+    <string name="recording_intro_right">Right hand</string>
+    <string name="recording_intro_tr1lead_body">Your recording will start once good contact is detected on the top electrodes.</string>
+    <string name="recording_intro_tr6lead_body">Your recording will start once good bare-skin contact is detected on all electrodes.</string>
+    <string name="recording_intro_triangle_bottom">Left ankle or left knee</string>
+    <string name="recording_intro_triangle_desc">Your EKG recording will start once contact is detected on the electrodes.</string>
+    <string name="recording_lead">%s Recording</string>
+    <string name="recording_next">NEXT</string>
+    <string name="recording_sent">Recording sent</string>
+    <string name="recording_sent_desc">This recording has been sent to an AliveCor Labs Certified Clinical Technician.</string>
+    <string name="recording_sent_description">Your EKG has been successfully recorded and sent to your service provider.</string>
+    <string name="recording_with_device">Recording with</string>
+    <string name="request_ecg_analysis">Request ECG Analysis</string>
+    <string name="require_bluetooth_permission">%s requires Bluetooth access</string>
+    <string name="require_bluetooth_permission_desc">In your phone’s settings, give the Kardia app access to Bluetooth in order to connect to %s</string>
+    <string name="results_modifier_pacs">Multiple PACs</string>
+    <string name="results_modifier_pvcs">Multiple PVCs</string>
+    <string name="results_modifier_wide_qrs">Wide QRS</string>
+    <string name="review_recording">Review and submit your recording</string>
+    <string name="review_recording_description">Please review your EKG details below and tap submit to send this information to your provider.</string>
+    <string name="right_hand">Right Hand</string>
+    <string name="rr">RR:</string>
+    <string name="rr_notification_desc">Detection of QRS locations allows Kardia AI to measure the distance between heartbeats or the RR interval. This can be used to review variability of heart rate, which may be useful in understanding heart rate variability, or to visually display irregularity in rate (such as in Afib).</string>
+    <string name="rr_notification_title">R-R Interval Plot</string>
+    <string name="save_this_ekg">Save this EKG</string>
+    <string name="search_your_kardia_device">Searching for your \n%s</string>
+    <string name="search_your_kardia_device_sub">Please keep your fingers on the device while we search for it.</string>
+    <string name="search_your_kardia_mobile_card">Searching for your KardiaMobile Card</string>
+    <string name="select_all_that_apply">Select all that apply</string>
+    <string name="selected_device">Selected Device</string>
+    <string name="server_error">Server Error</string>
+    <string name="server_error_message">Something went wrong. Please try again. If this problem persists, please call customer care (855) 338-8800.</string>
+    <string name="set_up_your_device">Set up your device</string>
+    <string name="settings">Settings</string>
+    <string name="sex">Sex:</string>
+    <string name="sex_">Sex</string>
+    <string name="share">Share</string>
+    <string name="short_detected_short_text">Your EKG recording must be at least 30 seconds to allow Instant Analysis algorithms to perform an analysis.</string>
+    <string name="short_result">Too Short</string>
+    <string name="single_lead">1L</string>
+    <string name="sinus_rhythm">Sinus Rhythm</string>
+    <string name="sinus_rhythm_with_pvc">Sinus Rhythm with Premature Ventricular Contractions</string>
+    <string name="sinus_rhythm_with_pvc_ans1">Kardia Advanced Determination “Sinus Rhythm with Premature Ventricular Contractions” indicates sinus rhythm with occasional premature ventricular contractions. Premature ventricular contractions (PVCs) are extra heartbeats that originate in the bottom of the heart and usually beat sooner than the next expected regular heartbeat. After the PVC beat, a pause usually occurs, which causes the next normal heartbeat to be more forceful. If you\'ve felt your heart skip a beat, it was this more forceful beat that you felt.</string>
+    <string name="sinus_rhythm_with_pvc_ans2">People of any age can experience occasional PVCs at one time or another. Some of the triggers for PVCs include caffeine,tobacco, alcohol, cough and cold medicine, high blood pressure, anxiety, stress, sleep apnea, lung disease, and heart disease. In many cases, the underlying cause cannot be identified.\n    PVCs often cause few or no symptoms, but you might feel a fluttering in your chest,* dizziness, increased awareness of your heart beat, or skipped or missed beats.</string>
+    <string name="sinus_rhythm_with_pvc_ans3">If you have PVCs, but you\'re otherwise healthy, there is usually no reason for concern, and no need for treatment. If you have frequent symptomatic PVCs, or PVCs with heart disease, you may need treatment. If you have premature ventricular contractions, your doctor can give you additional instructions about how to manage them and your overall heart health.</string>
+    <string name="sinus_rhythm_with_pvc_ques1">What is Sinus Rhythm with \nPremature Ventricular Contractions?</string>
+    <string name="sinus_rhythm_with_pvc_ques2">What causes PVCs?</string>
+    <string name="sinus_rhythm_with_se_ans1">Kardia Advanced Determination “Sinus with Supraventricular Ectopy (SVE)” indicates sinus rhythm with occasional irregular beats originating from the top of the heart. A common reason for this is premature atrial contractions (PACs).  PACs are extra heartbeats that originate in the top of the heart and usually beat sooner than the next expected regular heartbeat.\n    After the PAC beat, a pause usually occurs, which causes the next normal heartbeat to be more forceful. If you\'ve felt your heart skip a beat, it was this more forceful beat that you felt. PACs rarely cause symptoms, but you may feel a fluttering in your chest,* dizziness, increased awareness of your heart beat, or skipped or missed beats.</string>
+    <string name="sinus_rhythm_with_se_ans2">People of any age can experience occasional PACs at one time or another. Some of the triggers for irregularity include: caffeine, tobacco, alcohol, cough and cold medicine, high blood pressure, anxiety, stress, sleep apnea, lung disease, and heart disease. In many cases, the underlying cause cannot be identified. If you have PACs, but you\'re otherwise healthy, there is usually no reason for concern, and no need for treatment.</string>
+    <string name="sinus_rhythm_with_se_ans3">If you have frequent symptomatic PACs, or PACs with heart disease, you may need treatment. Frequent PACs can increase your risk of developing atrial fibrillation. If you have Sinus Rhythm with Supraventricular Ectopy, your doctor can give you additional instructions about how to manage it and your overall heart health.</string>
+    <string name="sinus_rhythm_with_se_ques1">What is Sinus Rhythm with \nSupraventricular Ectopy?</string>
+    <string name="sinus_rhythm_with_se_ques2">What causes PACs?</string>
+    <string name="sinus_rhythm_with_se_title">“Sinus Rhythm with Supraventricular Ectopy”</string>
+    <string name="sinus_rhythm_with_supraventricular_ectopy">Sinus Rhythm with Supraventricular Ectopy</string>
+    <string name="sinus_rhythm_with_wide_qrs">Sinus Rhythm with \nWide QRS</string>
+    <string name="sinus_rhythm_with_wide_qrs_ans1">Kardia Advanced Determination “Sinus Rhythm with Wide QRS” indicates sinus rhythm with a QRS, or portion of your EKG, that is longer than expected. This could indicate a bundle branch block in which there is a delay in the passage of heart\'s electrical signals along the bottom of the heart. The electrical signal to make the heartbeat starts at the top of the heart and travels to the bottom of the heart. As the signal travels, it makes the heart contract in a coordinated manner. A wider QRS may indicate that the bottom of the heart is contracting a little later than it should. Wide QRS is noted on EKG when there is a delay, or widening, in the part of the EKG called the QRS complex.</string>
+    <string name="sinus_rhythm_with_wide_qrs_ans2">Your doctor can review your wide QRS EKG and give you additional information on whether you have a bundle branch block. Some of the causes for bundle branch block include heart attack; a thickened, stiffened or weakened heart muscle (congestive heart failure); lung disease; or high blood Pressure. Bundle branch block does not usually cause symptoms unless you have some other heart condition. In those cases, people may experience fainting, dizziness, or weakness, or chest pain.*</string>
+    <string name="sinus_rhythm_with_wide_qrs_ans3">Bundle branch block may not need treatment. When it does, treatment often involves managing the health condition that caused bundle branch block. If you have bundle branch block, your doctor can give you additional instructions about how to manage it and your overall heart health.</string>
+    <string name="sinus_rhythm_with_wide_qrs_ques1">What is Sinus Rhythm with \nWide QRS?</string>
+    <string name="sinus_rhythm_with_wide_qrs_ques2">What causes Sinus Rhythm with Wide QRS?</string>
+    <string name="sinus_rhythm_with_wide_qrs_title">Sinus Rhythm with Wide QRS</string>
+    <string name="six_lead">6L</string>
+    <string name="skip">Skip</string>
+    <string name="something_went_wrong">Something went wrong</string>
+    <string name="star">Star</string>
+    <string name="submit">Submit</string>
+    <string name="successful_pairing_heading">Success! KardiaMobile Card has been set up.</string>
+    <string name="successful_pairing_sub_heading">Your KardiaMobile Card is paired with your phone and ready to record your EKG.</string>
+    <string name="summary_normal">Normal</string>
+    <string name="summary_unread">Unreadable</string>
+    <string name="symptom_check">SYMPTOM CHECK</string>
+    <string name="symptom_qst_desc">It\'s important to track and monitor symptoms along the way. Did you experience any of the following?</string>
+    <string name="symptom_qst_header">Did you have any symptoms?</string>
+    <string name="symptoms">Symptoms:</string>
+    <string name="tachycardia_ans1">Tachycardia is based on the words ‘tachy’ which means fast, and ‘-cardia’ meaning heart.\n\nTachycardia is a heart rate that is faster than normal, more than 100 beats per minute. Kardia’s determination “Tachycardia” indicates a form of tachycardia between 100 to 140 beats per minute, with no atrial fibrillation or wide QRS detected.</string>
+    <string name="tachycardia_ans2">The normal range for heart rate depends on your age and physical condition. The most common form of tachycardia is sinus tachycardia, which is a normal increase in heart rate. A rapid heartbeat may be your body\'s response to common conditions such as exercise, anxiety, fright, dehydration, emotional distress, fever, drugs, certain medications, thyroid disease, or anemia. Other causes of tachycardia may be due to heart disease or conditions that affect the heart\'s electrical system. When the heart beats fast, you may have no symptoms or you may experience dizziness, fluttering in chest, chest pain or pressure*, or shortness of breath.</string>
+    <string name="tachycardia_ans3">The treatment for tachycardia depends on what is causing the fast rate, as well as your symptoms. For sinus tachycardia, the cause of the fast heart rate is treated, rather than treating the fast heart rate itself . Cutting down on coffee, alcohol, and tobacco may be advised. Severe tachycardia may be treated with medication, cardioversion, radiofrequency ablation or surgery. If you have Tachycardia, your doctor can give you additional instructions about how to manage it and your overall heart health.</string>
+    <string name="tachycardia_desc">Atrial fibrillation was not detected and your heart rate was fast, at 100-140 bpm. This can be a normal response to conditions such as stress or exercise. Tachycardia can also be due to an arrhythmia.</string>
+    <string name="tachycardia_detected_text">Your heart rate is faster than 100 beats per minute. This can be normal with stress or physical activity. Atrial fibrillation was not detected.</string>
+    <string name="tachycardia_ques1">What is Tachycardia?</string>
+    <string name="tachycardia_ques2">What causes Tachycardia?</string>
+    <string name="tachycardia_result">Tachycardia</string>
+    <string name="tachycardia_title">“Tachycardia”</string>
+    <string name="tags">Tags</string>
+    <string name="three_new_detections_including_pvcs">3 new determinations, including PVCs</string>
+    <string name="time">Time:</string>
+    <string name="title_activity_test_record">TestRecordActivity</string>
+    <string name="title_instant_analysis">Instant Analysis for</string>
+    <string name="title_record_ekg">Record Your EKG</string>
+    <string name="too_short_desc">Your EKG recording must be at least 30 seconds to allow Instant Analysis algorithms to perform an analysis.</string>
+    <string name="too_short_title">“Too Short”</string>
+    <string name="touch_the_electrodes">Touch the electrodes on your device</string>
+    <string name="trouble_breathing">Trouble breathing</string>
+    <string name="turn_on_device_message">Turn on your KardiaMobile Card by pressing the power button</string>
+    <string name="turn_on_device_sub_heading">To preserve battery life, &lt;b>your device will automatically turn off after 10 seconds&lt;/b> if it does not detect contact with electrodes.\n\nLook for the amber LED light on your device to indicate it\'s turned on.</string>
+    <string name="turn_on_your_device">Turn on your device</string>
+    <string name="turn_on_your_device_and_touch_the_electrodes_to_start_recording">Touch the electrodes on your device to start recording</string>
+    <string name="turn_on_your_kardiamobile_card_device">Turn on your KardiaMobile Card device</string>
+    <string name="unable_to_find_kcard">Unable to pair your KardiaMobile Card</string>
+    <string name="unclassified_ans">When atrial fibrillation was not detected and your EKG does not fall under the algorithmic classifications of \'Normal\', \'Bradycardia\', or \'Tachycardia\' an \'Unclassified\' result is given.\n\nAn \'Unclassified\' finding may be caused by other arrhythmias, unusually fast or slow heart rates, poor quality recording, or for just falling outside the boundaries of our algorithmic requirements to be called one of our other results.\n\nYou always have the option to share your EKG with your physician or medical professional, or submit it for a Clinician Review directly from the Kardia app to be reviewed by a team of human clinicians.</string>
+    <string name="unclassified_desc">Atrial fibrillation was not detected and your EKG does not fall under the algorithmic classifications of “Normal,” “Bradycardia,” or “Tachycardia.” An “Unclassified” finding may be caused by other arrhythmias, unusually fast or slow heart rates, or poor quality recordings.</string>
+    <string name="unclassified_title">“Unclassified”</string>
+    <string name="undetermined_result">Unclassified</string>
+    <string name="undetermined_text">This EKG recording falls outside of the current categories of the Instant Analysis detectors.\n\nOne common reason for receiving an Unclassified response is if your heart rate is outside of our normal range of 50 to 100 beats per minute.\n\nFor additional information, send this EKG to our Clinician Review service or share it with your doctor.</string>
+    <string name="undetermined_text_kardia_ai">Atrial fibrillation was not detected and your EKG does not fall under the algorithmic classifications of Normal, Bradycardia, or Tachycardia. This may be caused by other arrhythmias, unusually fast or slow heart rates, or poor quality recordings.\n\nFor additional information, send this EKG to our Clinician Review service or share it with your doctor.</string>
+    <string name="unknown">Unknown</string>
+    <string name="unlock_with_kardia_care">unlock with Kardiacare</string>
+    <string name="unreadable_desc">The EKG could not be read, likely due to signal noise and/or incorrect recording technique.</string>
+    <string name="unreadable_title">“Unreadable”</string>
+    <string name="unsupported_result">Unsupported - Update App</string>
+    <string name="upgrade_to_kardia_care">upgrade to kardiacare</string>
+    <string name="upload_error">Upload Error</string>
+    <string name="upload_error_description">There was an issue with uploading your EKG. Your EKG is saved and will automatically submit when your connection is reestablished. Do not force close the app. Try reconnecting to your network.</string>
+    <string name="view_resource">VIEW RESOURCE</string>
+    <string name="view_tutorial">View Tutorial</string>
+    <string name="what_can_i_do_next">What can I do next?</string>
+    <string name="you_are_currently_offline">You’re currently offline</string>
+    <string name="you_are_offline">You Are Offline</string>
+    <string name="your_ekg_has_recorded">Your EKG has been successfully recorded.</string>
+    <string name="your_recording_will_start_once_good_bare_skin_contact_is_detected_on_all_electrodes">Your recording will start once good bare-skin contact is detected on all electrodes</string>
+    <style name="AIV2.MoreAccuracy.BackBtn" parent="KardiaTextH4">
+        <item name="android:textColor">#067F6F</item>
+        <item name="android:background">@drawable/rect_transparent_corners_r4</item>
+        <item name="android:gravity">center_vertical</item>
+    </style>
+    <style name="AIV2.MoreAccuracy.SubHeading" parent="Kardia.Base">
+        <item name="android:textSize">16sp</item>
+        <item name="android:textColor">@color/kardia_sec</item>
+        <item name="fontFamily">roboto</item>
+        <item name="android:letterSpacing">-0.01</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:lineSpacingExtra">1sp</item>
+    </style>
+    <style name="AIV2.MoreAccuracy.SubHeading.Desc" parent="AIV2.MoreAccuracy.SubHeading">
+        <item name="android:textStyle">normal</item>
+    </style>
+    <style name="AccentLabel" parent="@style/TextAppearance.AppCompat.Small">
+        <item name="android:textColor">?colorAccent</item>
+        <item name="android:paddingLeft">4dp</item>
+    </style>
+    <style name="AlertDialogPrimary" parent="ThemeOverlay.MaterialComponents.Dialog.Alert">
+        <item name="android:colorPrimary">@color/kardia_teal</item>
+        <item name="android:colorAccent">@color/kardia_teal</item>
+        <item name="android:textColor">@color/kardia_teal</item>
+        <item name="buttonBarNegativeButtonStyle">@style/NegativeButtonStyle</item>
+        <item name="buttonBarPositiveButtonStyle">@style/PositiveButtonStyle</item>
+    </style>
+    <style name="AlertDialogTeal" parent="@style/Theme.AppCompat.Light.Dialog">
+        <item name="android:colorPrimary">@color/kiwi_primary</item>
+        <item name="android:colorAccent">@color/kiwi_primary</item>
+        <item name="android:textColor">@color/kiwi_navy</item>
+    </style>
+    <style name="AlivecorStandardModalButton" parent="Widget.AppCompat.Button">
+        <item name="android:textSize">14sp</item>
+        <item name="android:fontFamily">roboto</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textAllCaps">true</item>
+    </style>
+    <style name="AlivecorStandardModalButtonBlack" parent="AlivecorStandardModalButton">
+        <item name="android:background">@drawable/standard_modal_corner_bg_black</item>
+        <item name="android:textColor">@color/white</item>
+    </style>
+    <style name="AlivecorStandardModalButtonGreen" parent="AlivecorStandardModalButton">
+        <item name="android:background">@drawable/standard_modal_corner_bg_green</item>
+        <item name="android:textColor">@color/white</item>
+    </style>
+    <style name="AlivecorStandardModalButtonRed" parent="AlivecorStandardModalButton">
+        <item name="android:background">@drawable/standard_modal_corner_bg_red</item>
+        <item name="android:textColor">@color/white</item>
+    </style>
+    <style name="AlivecorStandardModalButtonWhite" parent="AlivecorStandardModalButton">
+        <item name="android:background">@drawable/standard_modal_corner_bg</item>
+        <item name="android:textColor">@color/black</item>
+    </style>
+    <style name="AlivecorStandardModalTextMessage" parent="Widget.AppCompat.TextView">
+        <item name="android:textSize">16sp</item>
+        <item name="android:fontFamily">roboto</item>
+        <item name="android:textColor">@color/kardia_sec</item>
+    </style>
+    <style name="AlivecorStandardModalTextTitle" parent="Widget.AppCompat.TextView">
+        <item name="android:textSize">20sp</item>
+        <item name="android:fontFamily">roboto</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textColor">@color/kardia_sec</item>
+    </style>
+    <style name="Body1">
+        <item name="android:fontFamily">@font/atkinson_hyperlegible_regular</item>
+        <item name="android:letterSpacing">0.01</item>
+        <item name="android:lineHeight">22sp</item>
+        <item name="android:textColor">@color/recording_secondary_text</item>
+        <item name="android:textSize">18sp</item>
+    </style>
+    <style name="Body1.Bold">
+        <item name="android:fontFamily">@font/atkinson_hyperlegible_bold</item>
+    </style>
+    <style name="BottomNavigationBackButton" parent="Widget.AppCompat.Button">
+        <item name="android:layout_height">52dp</item>
+        <item name="android:textSize">16sp</item>
+        <item name="android:fontFamily">roboto</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textColor">@color/kardia_black</item>
+        <item name="android:background">@drawable/btn_black_selector</item>
+        <item name="android:textAllCaps">true</item>
+        <item name="android:letterSpacing">0.05</item>
+    </style>
+    <style name="CR.ProgressDialog.ProgressInfoText" parent="@style/Kardia.Base">
+        <item name="android:textSize">20sp</item>
+        <item name="android:letterSpacing">0.01</item>
+        <item name="android:textColor">@color/black</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:gravity">center</item>
+        <item name="android:textAlignment">center</item>
+    </style>
+    <style name="DrawerArrow" parent="Base.Widget.AppCompat.DrawerArrowToggle">
+        <item name="color">@color/white</item>
+    </style>
+    <style name="ErrorLabel" parent="@style/TextAppearance.AppCompat.Small">
+        <item name="android:textColor">@color/red</item>
+        <item name="android:paddingLeft">4dp</item>
+    </style>
+    <style name="Full.Blue.Button" parent="KiwiButton.White">
+        <item name="backgroundTint">@color/kiwi_blue</item>
+        <item name="android:textColor">@color/kiwi_white</item>
+    </style>
+    <style name="Full.Blue.Button.AllCaps" parent="Full.Blue.Button">
+        <item name="textAllCaps">true</item>
+    </style>
+    <style name="FullScreen.NoActionBar" parent="GrayTeal.NoActionBar">
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowActionBar">false</item>
+        <item name="android:windowFullscreen">true</item>
+        <item name="android:windowContentOverlay">@null</item>
+        <item name="android:fitsSystemWindows">true</item>
+    </style>
+    <style name="FullscreenDialogFrag.Dimmed" parent="@style/Theme.AppCompat.Light">
+        <item name="android:windowBackground">@color/kardia_dim_overlay</item>
+    </style>
+    <style name="FullscreenDialogFragLightActionBar" parent="@style/Theme.AppCompat.Light">
+        <item name="colorPrimary">@color/gray_window_bg</item>
+        <item name="colorAccent">@color/kardia_teal</item>
+        <item name="colorPrimaryDark">@color/gray_teal_statusbar</item>
+        <item name="android:windowBackground">@color/gray_window_bg</item>
+        <item name="android:textColorLink">@color/kardia_teal</item>
+        <item name="colorControlNormal">@color/kardia_teal</item>
+        <item name="titleTextColor">@color/text_kardia_black</item>
+
+        <item name="android:windowIsFloating">false</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowAnimationStyle">@style/Animation.AppCompat.Dialog</item>
+    </style>
+    <style name="GrayBlue.NoActionBar" parent="Theme.AppCompat.Light.NoActionBar">
+        
+        <item name="colorPrimary">@color/gray_window_bg</item>
+        <item name="colorAccent">@color/ks_blue</item>
+        <item name="colorPrimaryDark">@color/gray_teal_statusbar</item>
+        <item name="android:windowBackground">@color/gray_window_bg</item>
+        <item name="android:textColorLink">@color/ks_blue</item>
+        <item name="colorControlNormal">@color/ks_blue</item>
+        <item name="colorControlHighlight">@color/ks_blue</item>
+        <item name="colorControlActivated">@color/ks_blue</item>
+        <item name="titleTextColor">@color/text_kardia_black</item>
+        <item name="android:textColorSecondary">@android:color/primary_text_light</item>
+
+        <item name="android:dialogTheme">@style/AlertDialogTeal</item>
+        <item name="android:alertDialogTheme">@style/AlertDialogTeal</item>
+        <item name="dialogTheme">@style/AlertDialogTeal</item>
+        <item name="drawerArrowStyle">@style/DrawerArrow</item>
+
+        <item name="ic_close">@drawable/ic_close_teal_24dp</item>
+        <item name="ic_send">@drawable/ic_send_teal_24dp</item>
+        <item name="ic_done">@drawable/ic_done_teal_24dp</item>
+        <item name="ic_next">@drawable/ic_next_teal_24dp</item>
+        <item name="ic_previous">@drawable/ic_prev_teal_24dp</item>
+        <item name="ic_view">@drawable/ic_view_teal_24dp</item>
+        <item name="ic_share">@drawable/ic_share_teal_24dp</item>
+        <item name="ic_refresh">@drawable/ic_refresh_teal_24dp</item>
+
+        <item name="android:listDivider">@color/transparent</item>
+    </style>
+    <style name="GrayTeal.NoActionBar" parent="Theme.AppCompat.Light.NoActionBar">
+        
+        <item name="colorPrimary">@color/gray_window_bg</item>
+        <item name="colorAccent">@color/kardia_teal</item>
+        <item name="colorPrimaryDark">@color/gray_teal_statusbar</item>
+        <item name="android:windowBackground">@color/gray_window_bg</item>
+        <item name="android:textColorLink">@color/kardia_teal</item>
+        <item name="colorControlNormal">@color/kardia_teal</item>
+        <item name="colorControlHighlight">@color/kardia_teal</item>
+        <item name="colorControlActivated">@color/kardia_teal</item>
+        <item name="titleTextColor">@color/text_kardia_black</item>
+        <item name="android:textColorSecondary">@android:color/primary_text_light</item>
+
+        <item name="android:dialogTheme">@style/AlertDialogTeal</item>
+        <item name="android:alertDialogTheme">@style/AlertDialogTeal</item>
+        <item name="dialogTheme">@style/AlertDialogTeal</item>
+        <item name="drawerArrowStyle">@style/DrawerArrow</item>
+
+        <item name="ic_close">@drawable/ic_close_teal_24dp</item>
+        <item name="ic_send">@drawable/ic_send_teal_24dp</item>
+        <item name="ic_done">@drawable/ic_done_teal_24dp</item>
+        <item name="ic_next">@drawable/ic_next_teal_24dp</item>
+        <item name="ic_previous">@drawable/ic_prev_teal_24dp</item>
+        <item name="ic_view">@drawable/ic_view_teal_24dp</item>
+        <item name="ic_share">@drawable/ic_share_teal_24dp</item>
+        <item name="ic_refresh">@drawable/ic_refresh_teal_24dp</item>
+
+        <item name="android:listDivider">@color/transparent</item>
+    </style>
+    <style name="Headline6">
+        <item name="android:fontFamily">@font/dm_sans_medium</item>
+        <item name="android:letterSpacing">0.01</item>
+        <item name="android:textColor">@color/recording_primary_text</item>
+        <item name="android:textSize">@dimen/text_size_24sp</item>
+    </style>
+    <style name="Home.LargeHeader" parent="Base.TextAppearance.AppCompat.Display1">
+        <item name="android:textStyle">bold</item>
+        <item name="android:fontFamily">roboto</item>
+        <item name="android:textSize">@dimen/sp_34</item>
+        <item name="android:textColor">@color/kiwi_navy</item>
+    </style>
+    <style name="KS.FullScreen.NoActionBar" parent="GrayBlue.NoActionBar">
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowActionBar">false</item>
+        <item name="android:windowFullscreen">true</item>
+        <item name="android:windowContentOverlay">@null</item>
+        <item name="android:fitsSystemWindows">true</item>
+    </style>
+    <style name="KS.RecordingDevice.Text.Body" parent="Widget.AppCompat.TextView">
+        <item name="android:textStyle">normal</item>
+        <item name="android:textSize">18sp</item>
+        <item name="android:textColor">@color/recording_secondary_text</item>
+    </style>
+    <style name="KS.RecordingDevice.Text.Body.Bold" parent="KS.RecordingDevice.Text.Body">
+        <item name="android:textStyle">bold</item>
+    </style>
+    <style name="KS.RecordingDevice.Text.Default" parent="Widget.AppCompat.TextView">
+        <item name="android:textStyle">normal</item>
+        <item name="android:textSize">16sp</item>
+        <item name="android:textColor">@color/recording_primary_text</item>
+    </style>
+    <style name="KS.RecordingDevice.Text.Title" parent="Widget.AppCompat.TextView">
+        <item name="android:textStyle">normal</item>
+        <item name="android:textSize">20sp</item>
+        <item name="android:textColor">@color/recording_primary_text</item>
+    </style>
+    <style name="Kardia.Base" parent="@style/TextAppearance.AppCompat">
+        <item name="android:textColor">@color/kardia_main_text_dark</item>
+        <item name="android:fontFamily">roboto</item>
+    </style>
+    <style name="Kardia.Body1" parent="Kardia.Base">
+        <item name="android:textSize">@dimen/kardia_text_body1</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+    <style name="Kardia.Body2" parent="Kardia.Base">
+        <item name="android:textSize">@dimen/kardia_text_body2</item>
+    </style>
+    <style name="Kardia.Body3" parent="Kardia.Base">
+        <item name="android:textSize">@dimen/kardia_text_body2</item>
+        <item name="android:textColor">@color/black</item>
+    </style>
+    <style name="Kardia.Body3.bold" parent="Kardia.Base">
+        <item name="android:textSize">@dimen/kardia_text_body2</item>
+        <item name="android:textColor">@color/black</item>
+        <item name="android:textStyle">normal|bold</item>
+    </style>
+    <style name="Kardia.Button" parent="Kardia.Base">
+        <item name="android:textSize">@dimen/kardia_text_button</item>
+        <item name="android:textAllCaps">true</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+    <style name="Kardia.Button.Message.Bold" parent="Kardia.Base">
+        <item name="android:textSize">@dimen/kardia_text_button</item>
+        <item name="android:textAllCaps">false</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+    <style name="Kardia.Caption" parent="Kardia.Base">
+        <item name="android:textSize">@dimen/kardia_text_caption</item>
+    </style>
+    <style name="Kardia.EKG.AnalysisTag" parent="Kardia.Base">
+        <item name="android:textSize">10sp</item>
+        <item name="fontFamily">roboto</item>
+        <item name="android:letterSpacing">0.25</item>
+        <item name="android:textColor">@color/kardia_sec</item>
+    </style>
+    <style name="Kardia.EKG.AnalysisText" parent="Kardia.Base">
+        <item name="android:textSize">14sp</item>
+        <item name="fontFamily">roboto</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textColor">@color/kardia_sec</item>
+    </style>
+    <style name="Kardia.H2.Text" parent="Kardia.Base">
+        <item name="android:textSize">20sp</item>
+        <item name="android:letterSpacing">0.01</item>
+        <item name="android:textColor">#000000</item>
+    </style>
+    <style name="Kardia.H3.Text.Bold" parent="Kardia.Base">
+        <item name="android:textSize">16sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textColor">#000000</item>
+    </style>
+    <style name="Kardia.Header" parent="Kardia.Base">
+        <item name="android:fontFamily">roboto</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:letterSpacing">0.01</item>
+        <item name="android:textSize">26sp</item>
+        <item name="android:textColor">@color/kardia_sec</item>
+    </style>
+    <style name="Kardia.Overline" parent="Kardia.Base">
+        <item name="android:textSize">@dimen/kardia_text_overline</item>
+        
+        <item name="android:letterSpacing">0.25</item>
+    </style>
+    <style name="Kardia.Sub.Header" parent="Kardia.Base">
+        <item name="android:fontFamily">roboto</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:letterSpacing">0.01</item>
+        <item name="android:textSize">20sp</item>
+        <item name="android:textColor">@color/kardia_sec</item>
+    </style>
+    <style name="Kardia.Subtitle2" parent="Kardia.Base">
+        <item name="android:textSize">@dimen/kardia_text_subtitle2</item>
+    </style>
+    <style name="Kardia.Title" parent="Widget.AppCompat.TextView">
+        <item name="android:fontFamily">roboto</item>
+        <item name="android:textStyle">normal</item>
+        <item name="android:letterSpacing">0.25</item>
+        <item name="android:textSize">10sp</item>
+        <item name="android:textColor">@color/kardia_sec</item>
+    </style>
+    <style name="Kardia.h1" parent="Kardia.Base">
+        <item name="android:textSize">@dimen/kardia_text_h1</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+    <style name="Kardia.h2" parent="Kardia.Base">
+        <item name="android:textSize">@dimen/kardia_text_h2</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+    <style name="Kardia.h3" parent="Kardia.Base">
+        <item name="android:textSize">@dimen/kardia_text_h3</item>
+    </style>
+    <style name="Kardia.h4" parent="Kardia.Base">
+        <item name="android:textSize">@dimen/kardia_text_h4</item>
+    </style>
+    <style name="Kardia.h5" parent="Kardia.Base">
+        <item name="android:textSize">@dimen/kardia_text_h5</item>
+    </style>
+    <style name="Kardia.h6" parent="Kardia.Base">
+        <item name="android:textSize">@dimen/kardia_text_h6</item>
+        <item name="android:textStyle">normal|bold</item>
+    </style>
+    <style name="KardiaButton" parent="Widget.AppCompat.Button">
+        <item name="android:textSize">14sp</item>
+        <item name="android:letterSpacing">0.05</item>
+        <item name="android:textColor">#142A39</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+    <style name="KardiaButtonH1.BlackBorder" parent="Widget.AppCompat.Button">
+        <item name="android:layout_height">@dimen/kardia_button_h1</item>
+        <item name="android:textSize">14sp</item>
+        <item name="android:fontFamily">roboto</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textColor">@color/button_black_text_color_selector</item>
+        <item name="android:background">@drawable/kardia_ghost_button_black_selector</item>
+        <item name="android:textAllCaps">true</item>
+        <item name="android:letterSpacing">0.05</item>
+    </style>
+    <style name="KardiaDisclaimer" parent="Kardia.Base">
+        <item name="android:textSize">14sp</item>
+        <item name="android:letterSpacing">0.01</item>
+        <item name="android:textColor">#888888</item>
+        <item name="android:lineSpacingExtra">1sp</item>
+        <item name="android:fontFamily">roboto</item>
+    </style>
+    <style name="KardiaPurchasePrompt.Description" parent="Widget.AppCompat.TextView">
+        <item name="android:textSize">16sp</item>
+        <item name="android:fontFamily">roboto</item>
+        <item name="android:lineSpacingExtra">1sp</item>
+        <item name="android:textColor">@color/kardia_sec</item>
+    </style>
+    <style name="KardiaTextH4" parent="Widget.AppCompat.TextView">
+        <item name="android:fontFamily">roboto</item>
+        <item name="android:textStyle">normal|bold</item>
+        <item name="android:textSize">14sp</item>
+        <item name="android:textColor">@color/kardia_main_text_dark</item>
+    </style>
+    <style name="KardiaTextH6" parent="Widget.AppCompat.TextView">
+        <item name="android:fontFamily">roboto</item>
+        <item name="android:textStyle">normal|bold</item>
+        <item name="android:textSize">20sp</item>
+        <item name="android:letterSpacing">0.01</item>
+        <item name="android:textColor">@color/kardia_sec</item>
+    </style>
+    <style name="Kiwi.MediumHeader" parent="Base.TextAppearance.AppCompat.Display1">
+        <item name="android:textStyle">bold</item>
+        <item name="android:fontFamily">roboto</item>
+        <item name="android:textSize">@dimen/sp_26</item>
+        <item name="android:textColor">@color/kiwi_navy</item>
+    </style>
+    <style name="KiwiBody.Slate" parent="Widget.AppCompat.TextView">
+        <item name="android:fontFamily">roboto</item>
+        <item name="android:textStyle">normal</item>
+        <item name="android:textSize">@dimen/sp_16</item>
+        <item name="android:lineSpacingExtra">1sp</item>
+        <item name="android:textColor">@color/kiwi_slate</item>
+    </style>
+    <style name="KiwiBoldHeader" parent="KiwiHeader">
+        <item name="android:textStyle">bold</item>
+    </style>
+    <style name="KiwiButton.GreenRounded" parent="KiwiButton.White">
+        <item name="android:textColor">@color/white</item>
+        <item name="backgroundTint">@color/light_green</item>
+        <item name="android:textAllCaps">false</item>
+
+    </style>
+    <style name="KiwiButton.White" parent="Widget.MaterialComponents.Button">
+        <item name="android:height">@dimen/button_height_40dp</item>
+        <item name="android:fontFamily">roboto</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textSize">@dimen/sp_14</item>
+        <item name="android:letterSpacing">0.05</item>
+        <item name="android:insetTop">@dimen/dp_0</item>
+        <item name="android:insetBottom">@dimen/dp_0</item>
+        <item name="backgroundTint">@color/white</item>
+        <item name="android:textColor">@color/kiwi_navy</item>
+    </style>
+    <style name="KiwiHeader" parent="Widget.AppCompat.TextView">
+        <item name="android:fontFamily">roboto</item>
+        <item name="android:textStyle">normal</item>
+        <item name="android:textSize">@dimen/sp_16</item>
+        <item name="android:lineSpacingExtra">1sp</item>
+        <item name="android:textColor">@color/kiwi_navy</item>
+    </style>
+    <style name="KiwiHeader.H2.Bold" parent="KiwiBoldHeader">
+        <item name="android:textSize">@dimen/sp_26</item>
+        <item name="android:letterSpacing">0.01</item>
+    </style>
+    <style name="KiwiSpacedCaption">
+        <item name="android:textStyle">bold</item>
+        <item name="android:textSize">@dimen/sp_10</item>
+        <item name="android:letterSpacing">0.25</item>
+        <item name="android:lineSpacingExtra">4sp</item>
+        <item name="android:fontFamily">roboto</item>
+        <item name="android:textAllCaps">true</item>
+        <item name="android:textColor">@color/kiwi_navy</item>
+    </style>
+    <style name="KiwiSpacedCaptionNormal" parent="KiwiSpacedCaption">
+        <item name="android:textStyle">normal</item>
+    </style>
+    <style name="KiwiTextH4" parent="Widget.AppCompat.TextView">
+        <item name="android:fontFamily">roboto</item>
+        <item name="android:textStyle">normal</item>
+        <item name="android:textSize">@dimen/sp_16</item>
+        <item name="android:letterSpacing">0.05</item>
+        <item name="android:textColor">@color/kiwi_navy</item>
+    </style>
+    <style name="KiwiTextH4.Bold" parent="KiwiTextH4">
+    <item name="android:textStyle">bold</item>
+    <item name="android:textSize">@dimen/sp_16</item>
+    </style>
+    <style name="Large.Blue.Textview" parent="Widget.AppCompat.TextView">
+        <item name="android:textSize">@dimen/sp_16</item>
+        <item name="android:fontFamily">roboto</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:letterSpacing">0.01</item>
+        <item name="backgroundTint">@color/kiwi_blue</item>
+        <item name="android:textColor">@color/kiwi_blue</item>
+    </style>
+    <style name="LearnMoreButton" parent="Widget.AppCompat.Button">
+        <item name="android:layout_height">52dp</item>
+        <item name="android:padding">8dp</item>
+        <item name="android:textSize">16sp</item>
+        <item name="android:fontFamily">roboto</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textColor">@color/kardia_teal</item>
+        <item name="android:background">@drawable/green_btn_background</item>
+        <item name="android:textAllCaps">true</item>
+        <item name="android:letterSpacing">0.05</item>
+    </style>
+    <style name="LegacyDialogTeal" parent="@style/Theme.AppCompat.Light.Dialog">
+        <item name="colorPrimary">@color/kardia_teal</item>
+        <item name="colorAccent">@color/kardia_teal</item>
+        <item name="colorPrimaryDark">@color/gray_teal_statusbar</item>
+    </style>
+    <style name="NegativeButtonStyle" parent="Widget.MaterialComponents.Button.TextButton.Dialog">
+        <item name="android:textColor">@color/text_kardia_black</item>
+    </style>
+    <style name="Onboarding.HeaderH1" parent="Home.LargeHeader">
+        <item name="android:textSize">@dimen/sp_24</item>
+    </style>
+    <style name="PositiveButtonStyle" parent="Widget.MaterialComponents.Button.TextButton.Dialog">
+        <item name="android:textColor">@color/text_kardia_black</item>
+    </style>
+    <style name="PrimaryLabel" parent="@style/TextAppearance.AppCompat.Small">
+        <item name="android:textColor">?android:attr/textColorPrimary</item>
+        <item name="android:paddingLeft">4dp</item>
+    </style>
+    <style name="Profile.Simple.Button" parent="Kardia.Base">
+        <item name="android:textSize">14sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:letterSpacing">0.05</item>
+        <item name="android:textColor">#142A39</item>
+    </style>
+    <style name="StandardDialog" parent="@android:style/Theme.Dialog">
+        <item name="android:windowFrame">@null</item>
+        <item name="android:windowBackground">@drawable/standard_modal_background</item>
+        <item name="android:windowIsFloating">false</item>
+        <item name="android:windowContentOverlay">@null</item>
+        <item name="android:windowTitleStyle">@null</item>
+        <item name="android:colorBackgroundCacheHint">@null</item>
+        <item name="android:windowAnimationStyle">@android:style/Animation.Dialog</item>
+        <item name="android:windowSoftInputMode">stateUnspecified|adjustPan</item>
+        <item name="android:gravity">center</item>
+    </style>
+    <style name="StyleRealTimeScale" parent="Widget.AppCompat.TextView">
+        <item name="android:textSize">12sp</item>
+        <item name="android:letterSpacing">0.03</item>
+        <item name="android:lineSpacingExtra">2sp</item>
+        <item name="android:textColor">@color/kardia_slate</item>
+        <item name="android:textStyle">normal</item>
+    </style>
+    <style name="Text.a" parent="TextAppearance.App.Base">
+        <item name="android:fontFamily">sans-serif-medium</item>
+        <item name="android:textColor">@color/kardia_teal</item>
+        <item name="android:textSize">@dimen/text_size_m</item>
+    </style>
+    <style name="Text.a.w" parent="Text.a">
+        <item name="android:textColor">@color/white</item>
+    </style>
+    <style name="Text.am" parent="TextAppearance.App.Base">
+        <item name="android:textSize">@dimen/text_size_m</item>
+        <item name="android:fontFamily">sans-serif-medium</item>
+        <item name="android:textColor">@color/kardia_teal</item>
+    </style>
+    <style name="Text.b" parent="TextAppearance.App.Base">
+        <item name="android:textSize">@dimen/text_size_b</item>
+    </style>
+    <style name="Text.b.w" parent="Text.b">
+        <item name="android:textColor">@color/white</item>
+    </style>
+    <style name="Text.bb" parent="TextAppearance.App.Base">
+        <item name="android:textSize">@dimen/text_size_b</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+    <style name="Text.bb.w" parent="Text.bb">
+        <item name="android:textColor">@color/white</item>
+    </style>
+    <style name="Text.h1" parent="TextAppearance.App.Base">
+        <item name="android:fontFamily">sans-serif-medium</item>
+        <item name="android:textSize">@dimen/text_size_h1</item>
+    </style>
+    <style name="Text.h1.1" parent="TextAppearance.App.Base">
+        <item name="android:fontFamily">sans-serif-medium</item>
+        <item name="android:textSize">@dimen/text_size_h1_1</item>
+    </style>
+    <style name="Text.h1.w" parent="Text.h1">
+        <item name="android:textColor">@color/white</item>
+    </style>
+    <style name="Text.h2" parent="TextAppearance.App.Base">
+        <item name="android:fontFamily">sans-serif-medium</item>
+        <item name="android:textSize">@dimen/text_size_h2</item>
+    </style>
+    <style name="Text.h2.w" parent="Text.h2">
+        <item name="android:textColor">@color/white</item>
+    </style>
+    <style name="Text.h3" parent="TextAppearance.App.Base">
+        <item name="android:fontFamily">sans-serif-medium</item>
+        <item name="android:textSize">@dimen/text_size_h3</item>
+        <item name="android:textColor">@color/text_kardia_black</item>
+    </style>
+    <style name="Text.h3.w" parent="Text.h3">
+        <item name="android:textColor">#99ffffff</item>
+    </style>
+    <style name="Text.lbl" parent="TextAppearance.App.Base">
+        <item name="android:textColor">@color/grey_darker</item>
+        <item name="android:textSize">@dimen/text_size_lbl</item>
+    </style>
+    <style name="Text.m" parent="TextAppearance.App.Base">
+        <item name="android:textSize">@dimen/text_size_m</item>
+        <item name="android:textColor">@color/text_kardia_black_a80</item>
+    </style>
+    <style name="Text.m.w" parent="Text.m">
+        <item name="android:textColor">@color/white</item>
+    </style>
+    <style name="Text.sb" parent="TextAppearance.App.Base">
+        <item name="android:fontFamily">sans-serif-medium</item>
+        <item name="android:textSize">@dimen/text_size_b</item>
+        <item name="android:textColor">@color/text_color_light</item>
+    </style>
+    <style name="Text.sm" parent="Text.m">
+        <item name="android:textColor">@color/text_kardia_black_53</item>
+        <item name="android:textSize">@dimen/text_size_lbl</item>
+    </style>
+    <style name="Text.sm.medium" parent="Text.m">
+        <item name="android:textColor">@color/grey_darker</item>
+        <item name="android:textSize">@dimen/text_size_m</item>
+        <item name="android:fontFamily">sans-serif-medium</item>
+    </style>
+    <style name="TextAppearance.App.Base" parent="@style/TextAppearance.AppCompat">
+        <item name="android:textColor">@color/text_kardia_black</item>
+    </style>
+    <style name="UpgradeKardiaButton" parent="Widget.AppCompat.Button">
+        <item name="android:layout_height">52dp</item>
+        <item name="android:padding">8dp</item>
+        <item name="android:textSize">16sp</item>
+        <item name="android:fontFamily">roboto</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textColor">@color/kardia_purple</item>
+        <item name="android:background">@drawable/purple_btn_background</item>
+        <item name="android:textAllCaps">true</item>
+        <item name="android:letterSpacing">0.05</item>
+    </style>
+    <style name="WhiteShadowScrollView" parent="@android:style/Widget.ScrollView">
+        <item name="android:requiresFadingEdge">vertical</item>
+        <item name="android:fadingEdgeLength">12dp</item>
+        <item name="android:fadingEdge">vertical</item>
+    </style>
+    <style name="kardia_btn_primary">
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:paddingLeft">16dp</item>
+        <item name="android:paddingRight">16dp</item>
+        <item name="android:paddingTop">8dp</item>
+        <item name="android:paddingBottom">8dp</item>
+        <item name="android:gravity">center</item>
+        <item name="android:background">@drawable/bkg_btn_teal_corners_r2</item>
+        <item name="android:textAllCaps">false</item>
+        <item name="android:textSize">16sp</item>
+        <item name="android:textColor">@color/white</item>
+        <item name="android:fontFamily">sans-serif-medium</item>
+    </style>
+    <style name="kardia_btn_primary_bottom_corners">
+        <item name="android:layout_height">40dp</item>
+        <item name="android:minWidth">200dp</item>
+        <item name="android:paddingLeft">16dp</item>
+        <item name="android:paddingRight">16dp</item>
+        <item name="android:gravity">center</item>
+        <item name="android:background">@drawable/bkg_btn_teal_bottom_r4</item>
+        <item name="android:textAllCaps">false</item>
+        <item name="android:textSize">16sp</item>
+        <item name="android:textColor">@color/white</item>
+        <item name="android:fontFamily">sans-serif-medium</item>
+    </style>
+    <style name="kardia_btn_secondary">
+        <item name="android:layout_height">32dp</item>
+        <item name="android:minWidth">130dp</item>
+        <item name="android:paddingLeft">16dp</item>
+        <item name="android:paddingRight">16dp</item>
+        <item name="android:gravity">center</item>
+        <item name="android:background">@drawable/bkg_btn_stroked_teal_corners_r2</item>
+        <item name="android:textAllCaps">false</item>
+        <item name="android:textSize">16sp</item>
+        <item name="android:textColor">@color/kardia_teal</item>
+        <item name="android:fontFamily">sans-serif-medium</item>
+    </style>
+    <style name="kardia_btn_secondary_on_dark">
+        <item name="android:layout_height">32dp</item>
+        <item name="android:minWidth">144dp</item>
+        <item name="android:minHeight">32dp</item>
+        <item name="android:paddingLeft">16dp</item>
+        <item name="android:paddingRight">16dp</item>
+        <item name="android:gravity">center</item>
+        <item name="android:background">@drawable/bkg_btn_stroked_aqua_corners_r2</item>
+        <item name="android:textAllCaps">false</item>
+        <item name="android:textSize">@dimen/text_ecg_screen_h3</item>
+        <item name="android:textColor">@color/text_btn_teal10</item>
+        <item name="android:fontFamily">sans-serif-medium</item>
+    </style>
+    <declare-styleable name="EcgBadge">
+        <attr format="string" name="badgeTitle"/>
+        <attr format="string" name="badgeValue"/>
+        <attr format="reference" name="badgeIcon"/>
+        <attr format="dimension" name="badgeAfterIconMargin"/>
+        <attr format="color" name="badgeTextColor"/>
+    </declare-styleable>
+    <declare-styleable name="EcgStripView">
+        <attr format="boolean" name="onlySingleLead"/>
+        <attr format="dimension" name="traceThickness"/>
+        <attr format="color" name="traceColor"/>
+        <attr format="color" name="majorGridColor"/>
+        <attr format="color" name="minorGridColor"/>
+    </declare-styleable>
+    <declare-styleable name="ProgressTimer">
+        <attr format="integer" name="progress"/>
+        <attr format="integer" name="max"/>
+        <attr format="color" name="circleColor"/>
+        <attr format="color" name="progressColor"/>
+        <attr format="reference" name="shadowDrawable"/>
+    </declare-styleable>
+    <declare-styleable name="RhythmStripView">
+        <attr format="boolean" name="alwaysSingleLead"/>
+        <attr format="dimension" name="traceStrokeWidth"/>
+        <attr format="color" name="traceStrokeColor"/>
+        <attr format="color" name="majorColorGrid"/>
+        <attr format="color" name="minorColorGrid"/>
+        <attr format="float" name="graphScale"/>
+        <attr format="enum" name="displayMode">
+            <enum name="preview" value="0"/>
+            <enum name="full" value="1"/>
+        </attr>
+    </declare-styleable>
+</resources>

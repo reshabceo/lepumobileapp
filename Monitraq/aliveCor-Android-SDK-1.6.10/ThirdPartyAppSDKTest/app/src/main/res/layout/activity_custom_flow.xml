@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:fitsSystemWindows="true"
+    tools:context=".CustomFlowActivity">
+
+    <FrameLayout
+        android:id="@+id/custom_flow_fragment_container"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1.0" />
+
+    <androidx.appcompat.widget.AppCompatButton
+        android:visibility="gone"
+        android:id="@+id/pdfButton"
+        android:text="Export a PDF"
+        android:layout_width="190dp"
+        android:layout_height="48dp" />
+
+    <LinearLayout
+        android:id="@+id/custom_flow_additional_scrollview"
+        android:layout_width="match_parent"
+        android:layout_height="140dp"
+        android:background="#444446"
+        android:orientation="horizontal"
+        android:padding="8dp"
+        android:visibility="gone"
+        tools:visibility="visible">
+
+        <!--
+           Display the RhythmStripView in 'Preview' mode, showing a small amount of the ECG trace.
+           The RhythmStripView has a few different styleable attributes available for configuration.
+        -->
+        <com.alivecor.view.RhythmStripView
+            android:id="@+id/custom_flow_preview_strip"
+            android:layout_width="180dp"
+            android:layout_height="match_parent"
+            app:displayMode="preview"
+            app:graphScale="0.5"
+            app:majorColorGrid="@android:color/darker_gray"
+            app:minorColorGrid="#444446"
+            app:traceStrokeColor="@android:color/white"
+            app:traceStrokeWidth="4dp" />
+
+        <ScrollView
+            android:layout_width="match_parent"
+            android:layout_height="match_parent">
+            <TextView
+                android:id="@+id/custom_flow_additional_info"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:paddingBottom="8dp"
+                android:textColor="@color/white" />
+        </ScrollView>
+    </LinearLayout>
+
+
+</LinearLayout>

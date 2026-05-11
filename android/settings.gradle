@@ -1,7 +1,8 @@
 include ':app'
 include ':capacitor-cordova-android-plugins'
 project(':capacitor-cordova-android-plugins').projectDir = new File('./capacitor-cordova-android-plugins/')
-include ':AliveCorKitLite-release'
+// Removed separate module to fix package not found errors
+
 
 
 apply from: 'capacitor.settings.gradle'

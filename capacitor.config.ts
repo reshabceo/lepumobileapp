@@ -4,7 +4,7 @@ type IOSConfig = CapacitorConfig['ios'] & { packageClassList?: string[] };
 type ExtendedCapacitorConfig = CapacitorConfig & { ios?: IOSConfig; packageClassList?: string[] };
 
 const config: ExtendedCapacitorConfig = {
-  appId: 'com.monitraq.mobile',
+  appId: 'com.monitraq.app',
   appName: 'Monitraq',
   webDir: 'dist',
   plugins: {
@@ -21,6 +21,9 @@ const config: ExtendedCapacitorConfig = {
       storage: {
         name: 'Storage'
       }
+    },
+    CapacitorHttp: {
+      enabled: true
     }
   },
   android: {

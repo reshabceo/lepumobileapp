@@ -207,6 +207,7 @@ docker run -p 8080:8080 -p 3000:3000 vital-signs
 - **Integration Guide**: `/backend/COMPLETE_INTEGRATION_GUIDE.md`
 - **Test Client**: `/backend/test-client.html`
 - **Mobile Integration**: `/backend/MOBILE_INTEGRATION.md`
+- **AliveCor 6-Lead ECG**: `ALIVECOR_INTEGRATION.md`
 
 ## 🔄 **Real-time System Architecture**
 
