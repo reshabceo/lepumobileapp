@@ -14,7 +14,11 @@ android {
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 11
         versionName "1.11"
+        multiDexEnabled true
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        ndk {
+            abiFilters 'armeabi-v7a', 'arm64-v8a'
+        }
         if (org.gradle.api.JavaVersion.current().isCompatibleWith(JavaVersion.VERSION_17)) {
             println("Using Java 17 for build")
         }
@@ -29,7 +33,7 @@ android {
     productFlavors {
         production {
             dimension "environment"
-            applicationId "com.monitraq.mobile"
+            applicationId "com.monitraq.app"
         }
         staging {
             dimension "environment"
@@ -71,6 +75,10 @@ android {
             useLegacyPackaging = true
         }
     }
+
+    buildFeatures {
+        viewBinding true
+    }
 }
 
 repositories {
@@ -94,12 +102,39 @@ dependencies {
     // Source: https://github.com/viatom-develop/LepuDemo.git
     implementation files('libs/lepu-blepro-1.0.8.aar')
 
-    // AliveCor SDK integration
-    implementation project(':AliveCorKitLite-release')
+    // AliveCor SDK integration - REQUIRED dependencies for the AAR
+    implementation files('libs/alivecorkit-core-1.6.10-914f71ed.aar')
+    implementation 'net.danlew:android.joda:2.12.5'
+    implementation 'com.squareup.retrofit2:retrofit:2.9.0'
+    implementation 'com.squareup.retrofit2:converter-gson:2.9.0'
+    implementation 'com.squareup.retrofit2:converter-scalars:2.9.0' // CRITICAL: Fixes NoClassDefFoundError for ScalarsConverterFactory
+    implementation 'com.squareup.retrofit2:adapter-rxjava2:2.9.0'
+    implementation 'com.squareup.okhttp3:okhttp:4.12.0'
+    implementation 'com.squareup.okhttp3:logging-interceptor:4.12.0'
+    implementation 'io.reactivex.rxjava2:rxjava:2.2.21'
+    implementation 'io.reactivex.rxjava2:rxandroid:2.1.1'
+    implementation 'com.jakewharton.timber:timber:5.0.1' // Added to fix AliveCor SDK crash
+    implementation 'com.google.dagger:dagger:2.51.1' // CRITICAL: Fixes NoClassDefFoundError for Preconditions
+    annotationProcessor 'com.google.dagger:dagger-compiler:2.51.1'
+    // Room 2.7.1 (KMP) - MUST match the version AliveCor SDK was compiled against.
+    // The SDK's KardiaEcgDatabase_Impl uses createOpenDelegate() (new KMP API), NOT
+    // createOpenHelper() (old API). Using Room < 2.7 causes AbstractMethodError at runtime.
+    implementation 'androidx.room:room-runtime:2.7.1'
+    implementation 'androidx.room:room-rxjava2:2.7.1'
+    // androidx.sqlite KMP library - required by Room 2.7+ for SQLiteConnection
+    implementation 'androidx.sqlite:sqlite:2.5.1'
+    implementation 'androidx.sqlite:sqlite-framework:2.5.1'
 
     implementation "androidx.appcompat:appcompat:$androidxAppCompatVersion"
     implementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"
+    implementation "androidx.security:security-crypto:1.1.0-alpha06"
     implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
+    
+    // AliveCor transitive dependencies found missing in logs
+    implementation 'com.github.bosphere.android-filelogger:filelogger:1.0.7'
+    implementation 'io.reactivex.rxjava2:rxandroid:2.1.1'
+    implementation 'io.reactivex.rxjava2:rxjava:2.2.21'
+    implementation 'com.squareup.okhttp3:logging-interceptor:4.12.0'
     implementation project(':capacitor-android')
     testImplementation "junit:junit:$junitVersion"
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"

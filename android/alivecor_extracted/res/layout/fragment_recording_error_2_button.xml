@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@drawable/rect_r27_munsell_gradient"
+    android:orientation="vertical">
+
+    <TextView
+        android:id="@+id/recording_error_2_btn_title"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="29dp"
+        android:layout_marginTop="@dimen/insights_margin_2"
+        android:layout_marginEnd="29dp"
+        android:gravity="center"
+        android:text="@string/recording_intro_km_title"
+        android:textColor="@color/black"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"/>
+
+    <TextView
+        android:id="@+id/recording_error_2_btn_message"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="29dp"
+        android:layout_marginTop="@dimen/insights_margin_4"
+        android:layout_marginEnd="29dp"
+        android:gravity="center"
+        android:text="@string/recording_intro_km_body"
+        android:textColor="@color/translucent_black"
+        android:textSize="14sp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/recording_error_2_btn_title" />
+
+        <TextView
+            android:id="@+id/recording_error_2_btn_button_positive"
+            style="@style/kardia_btn_primary"
+            android:layout_width="wrap_content"
+            android:layout_marginStart="29dp"
+            android:layout_marginTop="@dimen/insights_margin_4"
+            android:layout_marginEnd="29dp"
+            android:background="@drawable/bkg_btn_teal_gradient_corners_r20"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/recording_error_2_btn_message"
+            tools:text="Go to Settings" />
+
+        <TextView
+            android:id="@+id/recording_error_2_btn_button_negative"
+            style="@style/kardia_btn_primary"
+            android:layout_width="wrap_content"
+            android:layout_marginStart="29dp"
+            android:layout_marginTop="@dimen/insights_margin_4"
+            android:layout_marginEnd="29dp"
+            android:background="@drawable/bkg_btn_teal_gradient_corners_r20"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/recording_error_2_btn_button_positive"
+            tools:text="Go to Settings" />
+
+
+    <TextView
+        android:id="@+id/recording_error_2_btn_help"
+        android:layout_width="wrap_content"
+        android:layout_height="18dp"
+        android:layout_marginStart="29dp"
+        android:layout_marginEnd="29dp"
+        android:layout_marginTop="10dp"
+        android:layout_marginBottom="@dimen/insights_margin_4"
+        android:drawableEnd="@drawable/ic_chevron_right"
+        android:gravity="center"
+        android:text="@string/i_need_help"
+        android:textColor="@color/black"
+        android:textSize="14sp"
+        android:textStyle="bold"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/recording_error_2_btn_button_negative" />
+
+</androidx.constraintlayout.widget.ConstraintLayout>

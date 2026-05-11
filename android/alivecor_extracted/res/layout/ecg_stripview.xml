@@ -1,0 +1,241 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="wrap_content"
+    android:layout_height="match_parent"
+    xmlns:tools="http://schemas.android.com/tools"
+    tools:viewBindingIgnore="true"
+    android:orientation="vertical">
+
+    <include layout="@layout/actionbar_ecgreview" />
+
+    <RelativeLayout
+        android:id="@+id/layout"
+        android:layout_width="wrap_content"
+        android:layout_height="match_parent"
+        android:layout_marginBottom="@dimen/bottom_expand_button_size"
+        android:layout_marginTop="@dimen/custom_actionbar_height">
+
+        <com.alivecor.ecg.record.EcgStripView
+            android:id="@+id/view_ecgstrip"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:scrollbars="horizontal" />
+
+        <com.alivecor.ecg.record.EcgBadge
+            android:id="@+id/ecgBpm"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_alignWithParentIfMissing="true"
+            android:layout_gravity="end"
+            android:layout_marginEnd="10dp"
+            android:layout_marginRight="10dp"
+            android:layout_marginTop="5dp"
+            android:layout_toLeftOf="@+id/ecgBfx"
+            app:badgeAfterIconMargin="@dimen/ecg_badge_after_icon_margin"
+            app:badgeIcon="@drawable/icon_bpm_heart"
+            app:badgeTitle="@string/ecg_details_bpm_text" />
+
+        <com.alivecor.ecg.record.EcgBadge
+            android:id="@+id/ecgBfx"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_alignParentRight="true"
+            android:layout_gravity="end"
+            android:layout_marginLeft="4dp"
+            android:layout_marginRight="4dp"
+            android:background="@drawable/half_black_touch_bg"
+            android:paddingBottom="5dp"
+            android:paddingLeft="10dp"
+            android:paddingRight="10dp"
+            android:paddingTop="5dp"
+            app:badgeTextColor="@color/aliveCor_active_blue"
+            app:badgeTitle="@string/bfx" />
+
+        <TextView
+            android:id="@+id/ecgAlgorithm"
+            style="@android:style/TextAppearance.Medium"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="14dp"
+            android:layout_marginTop="10dp"
+            android:layout_toStartOf="@+id/ecgBpm"
+            android:background="@drawable/badge_bg_analysis_severe"
+            android:gravity="center"
+            android:paddingBottom="3dp"
+            android:paddingLeft="18dp"
+            android:paddingRight="18dp"
+            android:paddingTop="3dp"
+            android:text="@string/af"
+            android:textStyle="bold"
+            android:drawablePadding="4dp"
+            tools:visibility="visible"
+            android:visibility="gone"
+            app:drawableEndCompat="@drawable/information_colored_16"
+            app:drawableTint="@color/algorithm_dark_texts" />
+
+        <LinearLayout
+            android:id="@+id/frag_ecg_realtime_gauge"
+            android:orientation="horizontal"
+            android:layout_width="match_parent"
+            android:layout_height="26dp"
+            android:layout_alignParentBottom="true"
+            android:gravity="center"
+            tools:visibility="visible">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:gravity="center_vertical"
+                android:textSize="@dimen/text_size_smalle"
+                android:textColor="@color/text_color_light"
+                android:text="25 mm/s" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:layout_marginLeft="8dp"
+                android:gravity="center_vertical"
+                android:textSize="@dimen/text_size_smalle"
+                android:textColor="@color/text_color_light"
+                android:text="10 mm/mV" />
+
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/textProgress"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_centerHorizontal="true"
+            android:layout_centerVertical="true"
+            android:textAppearance="?android:attr/textAppearanceMedium"
+            android:visibility="gone" />
+
+    </RelativeLayout>
+
+    <LinearLayout
+        android:id="@+id/ecgExpandLayout"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:background="@drawable/expandable_bar_bg"
+        android:clickable="true"
+        android:orientation="vertical"
+        android:paddingTop="@dimen/actionbar_underscore_height">
+
+        <LinearLayout
+            android:id="@+id/ecgExpandButton"
+            android:layout_width="match_parent"
+            android:layout_height="@dimen/bottom_expand_button_size"
+            android:animateLayoutChanges="true"
+            android:background="@drawable/half_black_touch_bg"
+            android:gravity="center"
+            android:orientation="vertical">
+
+            <ImageView
+                android:id="@+id/ecgArrowUp"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:src="@drawable/icon_more" />
+
+            <TextView
+                android:id="@+id/ecgExpandButtonText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/ecg_expand_text_more"
+                android:textAppearance="?android:textAppearanceSmall"
+                android:textColor="@color/kardia_teal" />
+
+            <ImageView
+                android:id="@+id/ecgArrowDown"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:src="@drawable/icon_less"
+                android:visibility="invisible" />
+
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/ecgExpandHiddenLayout"
+            android:layout_width="match_parent"
+            android:layout_height="@dimen/bottom_expand_size"
+            android:gravity="center"
+            android:orientation="horizontal">
+
+            <LinearLayout
+                android:id="@+id/ecgExpandEnhanced"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:background="@drawable/half_black_touch_bg"
+                android:gravity="center"
+                android:orientation="vertical">
+
+                <ImageView
+                    android:id="@+id/ecgExpandEnhancedImage"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:padding="2dp"
+                    android:src="@drawable/enhance_off" />
+
+                <TextView
+                    android:id="@+id/ecgExpandEnhancedText"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center"
+                    android:singleLine="true"
+                    android:text="@string/ecg_expand_bottom_text_enhanced_on"
+                    android:textAppearance="?android:textAppearanceSmall"
+                    android:textColor="@color/kardia_teal" />
+
+            </LinearLayout>
+
+            <View
+                android:layout_width="2dp"
+                android:layout_height="match_parent"
+                android:layout_marginBottom="20dp"
+                android:layout_marginTop="20dp"
+                android:layout_weight="0"
+                android:background="@drawable/vertical_divider" />
+
+            <LinearLayout
+                android:id="@+id/ecgExpandInvert"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:background="@drawable/half_black_touch_bg"
+                android:gravity="center"
+                android:orientation="vertical">
+
+                <ImageView
+                    android:id="@+id/ecgExpandInvertImage"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:padding="2dp"
+                    android:src="@drawable/invert_off" />
+
+                <TextView
+                    android:id="@+id/ecgExpandInvertText"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center"
+                    android:singleLine="true"
+                    android:text="@string/ecg_expand_bottom_text_invert_on"
+                    android:textAppearance="?android:textAppearanceSmall"
+                    android:textColor="@color/kardia_teal" />
+
+            </LinearLayout>
+
+            <View
+                android:layout_width="2dp"
+                android:layout_height="match_parent"
+                android:layout_marginBottom="20dp"
+                android:layout_marginTop="20dp"
+                android:layout_weight="0"
+                android:background="@drawable/vertical_divider" />
+
+        </LinearLayout>
+
+    </LinearLayout>
+
+</FrameLayout>

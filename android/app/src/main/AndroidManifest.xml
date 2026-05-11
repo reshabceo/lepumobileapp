@@ -4,16 +4,15 @@
     <uses-feature android:name="android.hardware.bluetooth_le" android:required="true" />
 
     <!-- Bluetooth permissions for API <= 30 -->
-    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
-    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
 
     <!-- Bluetooth permissions for API >= 31 (Android 12+) -->
     <uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
-    <!-- Uncomment if advertising is needed -->
-    <!-- <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE" /> -->
+    <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE" />
 
     <!-- Storage and File Access Permissions -->
     <!-- For Android 13+ (API 33+) - Granular media permissions -->
@@ -34,6 +33,11 @@
     <!-- Network State Permission (helps with better network error handling) -->
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+
+    <!-- AliveCor SDK specific permissions -->
+    <uses-permission android:name="android.permission.NFC" />
+    <uses-permission android:name="android.permission.BODY_SENSORS" />
+    <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
 
     <application
         android:name=".MainApplication"

@@ -88,7 +88,7 @@ export async function storeEcgRecording(ecgData: {
 // --- AliveCor / Kardia SDK integration ---
 
 const ALIVECOR_BACKEND_URL =
-  import.meta.env.VITE_ALIVECOR_BACKEND_URL || 'http://localhost:8000';
+  import.meta.env.VITE_ALIVECOR_BACKEND_URL || 'https://alivecorapi.monitraq.com';
 
 /** Use either waveform_mv (single strip / interleaved) or waveform_leads (I–aVF object). */
 export interface AliveCorEcgData {
@@ -117,33 +117,74 @@ async function aliveCorFetch(path: string, body: Record<string, unknown>) {
   const accessToken = sessionData.session?.access_token;
   if (!accessToken) throw new Error('Not authenticated');
 
-  const res = await fetch(`${ALIVECOR_BACKEND_URL}${path}`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${accessToken}`,
-    },
-    body: JSON.stringify(body),
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 10000); // 10-second timeout
 
-  if (!res.ok) {
-    const errBody = await res.json().catch(() => ({})) as { error?: string; detail?: string | string[] };
-    const msg =
-      errBody.error ||
-      (Array.isArray(errBody.detail) ? errBody.detail.join(', ') : errBody.detail) ||
-      `AliveCor backend error ${res.status}`;
-    throw new Error(msg);
+  try {
+    const res = await fetch(`${ALIVECOR_BACKEND_URL}${path}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+
+    if (!res.ok) {
+      const errBody = await res.json().catch(() => ({})) as { error?: string; detail?: string | string[] };
+      const msg =
+        errBody.error ||
+        (Array.isArray(errBody.detail) ? errBody.detail.join(', ') : errBody.detail) ||
+        `AliveCor backend error ${res.status}`;
+      throw new Error(msg);
+    }
+    return res.json();
+  } finally {
+    clearTimeout(timeoutId);
   }
-  return res.json();
+}
+
+/** GET helper for the AliveCor backend (no request body) */
+export async function aliveCorGet(path: string) {
+  const { data: sessionData } = await supabase.auth.getSession();
+  const accessToken = sessionData.session?.access_token;
+  if (!accessToken) throw new Error('Not authenticated');
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+  try {
+    const res = await fetch(`${ALIVECOR_BACKEND_URL}${path}`, {
+      method: 'GET',
+      headers: { Authorization: `Bearer ${accessToken}` },
+      signal: controller.signal,
+    });
+
+    if (!res.ok) {
+      const errBody = await res.json().catch(() => ({})) as { error?: string; detail?: string | string[] };
+      const msg =
+        errBody.error ||
+        (Array.isArray(errBody.detail) ? errBody.detail.join(', ') : errBody.detail) ||
+        `AliveCor backend error ${res.status}`;
+      throw new Error(msg);
+    }
+    return res.json();
+  } finally {
+    clearTimeout(timeoutId);
+  }
 }
 
 /**
  * Request a Kardia SDK JWT via the AliveCor backend proxy.
  * The backend forwards the request to the kardia-auth-server container.
  */
-export async function getAliveCorToken(patientId: string): Promise<string> {
+export async function getAliveCorToken(patientId: string): Promise<{ jwt: string; patientMrn: string }> {
   const result = await aliveCorFetch('/api/alivecor/token', { patientId });
-  return result.jwt;
+  return {
+    jwt: result.jwt,
+    patientMrn: result.patientMrn || patientId.replace(/-/g, '') // Fallback to stripping hyphens just in case
+  };
 }
 
 /**
@@ -166,6 +207,35 @@ export async function storeAliveCorRecording(
     throw new Error('AliveCor ECG: duration_seconds required when using waveform_mv')
   }
   return aliveCorFetch('/api/alivecor/ecg', data as unknown as Record<string, unknown>)
+}
+
+/**
+ * Fetch past ECG recordings for a patient from the AliveCor backend.
+ */
+export async function getAliveCorRecordings(patientMrn: string, limit: number = 20): Promise<any> {
+  return aliveCorGet(`/api/alivecor/recordings/${patientMrn}?limit=${limit}`);
+}
+
+/**
+ * Fetch detailed ECG recording (including waveform) for a specific record ID.
+ */
+export async function getAliveCorRecordingDetail(recordingId: string): Promise<any> {
+  return aliveCorGet(`/api/alivecor/recording/${recordingId}`);
+}
+
+/**
+ * Check if the AliveCor backend is reachable (no auth required).
+ * Uses: GET https://alivecorapi.monitraq.com/api/health
+ */
+export async function checkAliveCorBackendHealth(): Promise<{ ok: boolean; configured: boolean }> {
+  try {
+    const res = await fetch(`${ALIVECOR_BACKEND_URL}/api/health`, { signal: AbortSignal.timeout(5000) });
+    if (!res.ok) return { ok: false, configured: false };
+    const data = await res.json();
+    return { ok: true, configured: data.alivecor_configured === true };
+  } catch {
+    return { ok: false, configured: false };
+  }
 }
 
 const ECG_AI_ANALYZE_URL =

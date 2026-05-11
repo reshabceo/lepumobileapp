@@ -1,0 +1,11 @@
+.wave {
+  fill: none;
+  stroke: #564345;
+  stroke-width: 1.25px;
+  stroke-linejoin: round;
+}
+
+.leadText {
+  font-family: "Roboto", sans-serif;
+  fill: #fff;
+}
