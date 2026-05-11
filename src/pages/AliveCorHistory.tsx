@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip } from "recharts";
+import { Download, Star, X, Info } from "lucide-react";
 
 const AliveCorHistory = () => {
   const navigate = useNavigate();
@@ -22,6 +23,7 @@ const AliveCorHistory = () => {
   const [selectedRecording, setSelectedRecording] = useState<any | null>(null);
   const [isDetailLoading, setIsDetailLoading] = useState(false);
   const [recordingDetail, setRecordingDetail] = useState<any | null>(null);
+  const [selectedLead, setSelectedLead] = useState<string>("I");
 
   const fetchRecordings = async () => {
     if (!user) return;
@@ -54,36 +56,69 @@ const AliveCorHistory = () => {
 
   const handleCardClick = async (rec: any) => {
     setSelectedRecording(rec);
+    setSelectedLead("I");
+
+    // Check if data is already available in the nested ecg_recordings object
+    const hasWaves = rec.ecg_recordings?.mv_data_json || rec.raw_ecg_json || rec.waveform_mv;
+    
+    if (hasWaves) {
+      console.log("[AliveCorHistory] Data present in list response, skipping fetch.");
+      setRecordingDetail(rec);
+      setIsDetailLoading(false);
+      return;
+    }
+
     setRecordingDetail(null);
     setIsDetailLoading(true);
-    try {
-      const data = await getAliveCorRecordingDetail(rec.id);
-      setRecordingDetail(data.recording || data);
-    } catch (err: any) {
-      console.error("[AliveCorHistory] Detail Fetch Error:", err);
+    
+    // Try multiple possible IDs to be safe
+    const idsToTry = [rec.id, rec.ecg_recording_id].filter(Boolean);
+    let success = false;
+
+    for (const id of idsToTry) {
+      try {
+        console.log(`[AliveCorHistory] Fetching detail for ID: ${id}`);
+        // Pass patient_id for authorization
+        const data = await getAliveCorRecordingDetail(rec.patient_id, id);
+        const detail = data.recording || data.data || data;
+        setRecordingDetail(detail);
+        success = true;
+        break;
+      } catch (err: any) {
+        console.warn(`[AliveCorHistory] Detail Fetch Error for ID ${id}:`, err);
+      }
+    }
+
+    if (!success) {
       toast({
-        title: "Error",
-        description: "Failed to load detailed waveform data.",
+        title: "Access Restricted",
+        description: "Could not load high-resolution waves. (Permissions or Not Found)",
         variant: "destructive",
       });
-    } finally {
-      setIsDetailLoading(false);
     }
+    setIsDetailLoading(false);
   };
 
-  const prepareChartData = (rawJson: any) => {
-    if (!rawJson) return [];
+  const prepareChartData = (detail: any, lead: string = "I") => {
+    if (!detail) return [];
     
-    // AliveCor raw_ecg_json often contains a "leads" object with arrays
-    // or a single array if it's a single-lead recording.
+    // The data might be in different nested locations depending on the API version
+    const ecg = detail.ecg_recordings || detail;
+    const waveform = ecg.mv_data_json || ecg.raw_ecg_json || ecg.waveform_mv || ecg.waveform_leads || ecg;
+    
     let samples: number[] = [];
     
-    if (Array.isArray(rawJson)) {
-      samples = rawJson;
-    } else if (rawJson.leads?.I) {
-      samples = rawJson.leads.I;
-    } else if (rawJson.waveform_mv) {
-      samples = rawJson.waveform_mv;
+    if (Array.isArray(waveform)) {
+      samples = waveform;
+    } else if (waveform[lead]) {
+      samples = waveform[lead];
+    } else if (waveform.leads?.[lead]) {
+      samples = waveform.leads[lead];
+    } else if (waveform.waveform_mv && lead === "I") {
+      samples = waveform.waveform_mv;
+    } else if (waveform.I && lead === "I") {
+       // Fallback for direct lead access
+       samples = waveform.I;
     }
     
     // Limit to first 1500 points (~5 seconds at 300Hz) for performance
@@ -91,6 +126,18 @@ const AliveCorHistory = () => {
       time: idx,
       value: val
     }));
+  };
+
+  const getAvailableLeads = (detail: any) => {
+    if (!detail) return ["I"];
+    const ecg = detail.ecg_recordings || detail;
+    const waveform = ecg.mv_data_json || ecg.raw_ecg_json || ecg.waveform_mv || ecg.waveform_leads || ecg;
+    
+    if (Array.isArray(waveform)) return ["I"];
+    
+    const leads = waveform.leads || waveform;
+    const possibleLeads = ["I", "II", "III", "aVR", "aVL", "aVF"];
+    return possibleLeads.filter(l => !!leads[l]);
   };
 
   useEffect(() => {
@@ -222,108 +269,149 @@ const AliveCorHistory = () => {
         )}
       </div>
 
-      {/* Detailed ECG View Modal */}
+      {/* Detailed ECG View Modal - Pro UI */}
       <Dialog open={!!selectedRecording} onOpenChange={(open) => !open && setSelectedRecording(null)}>
-        <DialogContent className="max-w-2xl bg-[#121214] border-white/10 text-white p-0 overflow-hidden">
-          <div className="p-6 pb-0">
-            <DialogHeader>
-              <div className="flex justify-between items-start mb-2">
-                <div className="space-y-1">
-                  <Badge className={selectedRecording?.determination === 'NORMAL_SINUS_RHYTHM' ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' : 'bg-orange-500/20 text-orange-400 border-orange-500/30'}>
+        <DialogContent className="max-w-md w-[95vw] bg-white text-slate-900 p-0 overflow-hidden rounded-3xl border-none shadow-2xl h-[90vh] flex flex-col">
+          {/* Header Area */}
+          <div className="p-5 border-b border-slate-100 bg-white sticky top-0 z-20">
+            <DialogHeader className="text-left space-y-0">
+              <div className="flex justify-between items-center mb-4">
+                <div className="flex items-center gap-2">
+                  <div className={`w-3 h-3 rounded-full ${
+                    selectedRecording?.determination === 'NORMAL_SINUS_RHYTHM' ? 'bg-emerald-500' : 'bg-amber-500'
+                  }`} />
+                  <DialogTitle className="text-xl font-bold text-slate-800">
                     {selectedRecording?.determination?.replace(/_/g, ' ') || 'UNCLASSIFIED'}
-                  </Badge>
-                  <DialogTitle className="text-xl font-bold text-white">
-                    {selectedRecording && formatDate(selectedRecording.created_at)}
                   </DialogTitle>
                 </div>
-                {selectedRecording?.average_heart_rate && (
-                  <div className="text-right">
-                    <div className="flex items-center gap-1 text-rose-500 font-bold text-2xl">
-                      <Heart className="w-5 h-5 fill-current" />
-                      {selectedRecording.average_heart_rate}
-                    </div>
-                    <span className="text-xs text-gray-500 uppercase tracking-wider">Average BPM</span>
-                  </div>
-                )}
+                <div className="flex items-center gap-4 text-slate-400">
+                  <Download className="w-5 h-5 cursor-pointer hover:text-slate-600 transition-colors" />
+                  <Star className="w-5 h-5 cursor-pointer hover:text-slate-600 transition-colors" />
+                </div>
               </div>
-              <DialogDescription className="text-gray-400 text-sm">
-                Recorded using {selectedRecording?.device_type?.replace(/_/g, ' ') || 'KardiaMobile'} · {selectedRecording?.lead_config === 'six' ? '6-Lead Mode' : 'Single Lead Mode'}
+              <DialogDescription className="sr-only">
+                Detailed ECG waveform and clinical analysis
               </DialogDescription>
             </DialogHeader>
+            
+            <div className="flex items-center gap-3 text-slate-500 text-sm">
+              <div className="flex items-center gap-1.5">
+                <div className="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center">
+                  <Activity size={14} className="text-slate-600" />
+                </div>
+                <span className="font-medium text-slate-700">Md Sahil</span>
+              </div>
+              <div className="flex items-center gap-1.5 ml-auto">
+                <Calendar size={14} />
+                <span>{selectedRecording && formatDate(selectedRecording.created_at)}</span>
+              </div>
+            </div>
           </div>
 
-          <div className="p-6 pt-4 space-y-6">
-            {/* Graph Container */}
-            <div className="bg-black/40 rounded-2xl border border-white/5 p-4 h-[240px] relative overflow-hidden">
+          {/* ECG Grid Content */}
+          <div className="flex-1 overflow-y-auto bg-[#F8F9FA] relative scrollbar-hide">
+            {/* Calibration Marker */}
+            <div className="sticky top-2 left-1/2 -translate-x-1/2 z-10">
+              <div className="bg-white/90 backdrop-blur shadow-sm border border-slate-100 rounded-full px-3 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-tighter">
+                25mm/s, 10mm/mV
+              </div>
+            </div>
+
+            <div className="ecg-paper-grid min-h-full py-4">
               {isDetailLoading ? (
-                <div className="absolute inset-0 flex flex-col items-center justify-center space-y-3 bg-black/20 backdrop-blur-sm">
-                  <RefreshCw className="w-8 h-8 text-rose-500 animate-spin" />
-                  <p className="text-xs text-gray-400">Fetching high-resolution waveform...</p>
+                <div className="absolute inset-0 flex flex-col items-center justify-center space-y-3 bg-white/60 backdrop-blur-sm z-30">
+                  <RefreshCw className="w-10 h-10 text-rose-500 animate-spin" />
+                  <p className="text-sm font-bold text-slate-400 animate-pulse uppercase tracking-widest">Processing Waveform...</p>
                 </div>
-              ) : recordingDetail?.raw_ecg_json || recordingDetail?.waveform_mv || recordingDetail?.waveform_leads ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={prepareChartData(recordingDetail.raw_ecg_json || recordingDetail.waveform_mv || recordingDetail.waveform_leads)}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#ffffff08" vertical={false} />
-                    <XAxis dataKey="time" hide />
-                    <YAxis hide domain={['auto', 'auto']} />
-                    <Tooltip 
-                      contentStyle={{ backgroundColor: '#1A1A1A', border: '1px solid #333', borderRadius: '8px' }}
-                      itemStyle={{ color: '#E11D48' }}
-                      labelStyle={{ display: 'none' }}
-                    />
-                    <Line 
-                      type="monotone" 
-                      dataKey="value" 
-                      stroke="#E11D48" 
-                      strokeWidth={1.5} 
-                      dot={false} 
-                      isAnimationActive={true}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
+              ) : recordingDetail ? (
+                <div className="space-y-0 px-2">
+                  {getAvailableLeads(recordingDetail).map((lead) => (
+                    <div key={lead} className="h-[120px] relative border-b border-slate-100/50 last:border-none">
+                      <div className="absolute top-1/2 -translate-y-1/2 left-2 z-10">
+                        <span className="text-xs font-black text-slate-900 opacity-60">
+                          {lead}
+                        </span>
+                      </div>
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart 
+                          data={prepareChartData(recordingDetail, lead)}
+                          margin={{ top: 10, right: 10, left: 10, bottom: 10 }}
+                        >
+                          <XAxis dataKey="time" hide />
+                          <YAxis hide domain={['auto', 'auto']} />
+                          <Line 
+                            type="monotone" 
+                            dataKey="value" 
+                            stroke="#334155" 
+                            strokeWidth={1.2} 
+                            dot={false} 
+                            isAnimationActive={false}
+                          />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+                  ))}
+                </div>
               ) : (
-                <div className="absolute inset-0 flex flex-col items-center justify-center space-y-2 text-gray-500">
-                  <Activity className="w-8 h-8 opacity-20" />
-                  <p className="text-sm">Waveform data not available for this record</p>
+                <div className="flex flex-col items-center justify-center py-40 text-slate-300">
+                  <Activity size={48} className="opacity-20 mb-4" />
+                  <p className="text-sm font-bold">Waveform Data Unavailable</p>
+                </div>
+              )}
+
+              {/* Heart Rate Badge Overlay */}
+              {selectedRecording?.average_heart_rate && !isDetailLoading && (
+                <div className="sticky bottom-4 right-4 ml-auto w-fit z-20">
+                  <div className="bg-white shadow-xl border border-slate-100 rounded-full px-4 py-2 flex items-center gap-2">
+                    <Heart size={16} className="text-rose-500 fill-rose-500" />
+                    <span className="font-bold text-slate-800">{selectedRecording.average_heart_rate}</span>
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">bpm</span>
+                  </div>
                 </div>
               )}
             </div>
+          </div>
 
-            {/* Stats Grid */}
-            <div className="grid grid-cols-3 gap-4">
-              <div className="bg-white/5 rounded-xl p-3 border border-white/5">
-                <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">Duration</p>
-                <div className="flex items-center gap-2">
-                  <Timer className="w-4 h-4 text-rose-400" />
-                  <span className="font-semibold">{selectedRecording?.ecg_recordings?.duration_seconds || '--'}s</span>
-                </div>
+          {/* Footer Controls */}
+          <div className="p-6 bg-white border-t border-slate-100 space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-bold text-slate-800">Enhance</p>
+                <p className="text-[10px] text-slate-400">On</p>
               </div>
-              <div className="bg-white/5 rounded-xl p-3 border border-white/5">
-                <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">Sample Rate</p>
-                <div className="flex items-center gap-2">
-                  <Activity className="w-4 h-4 text-rose-400" />
-                  <span className="font-semibold">{selectedRecording?.ecg_recordings?.sample_rate || '--'}Hz</span>
-                </div>
-              </div>
-              <div className="bg-white/5 rounded-xl p-3 border border-white/5">
-                <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">Lead Type</p>
-                <div className="flex items-center gap-2">
-                  <Badge variant="outline" className="text-[10px] border-rose-500/30 text-rose-400 h-5">
-                    {selectedRecording?.lead_config?.toUpperCase() || 'SINGLE'}
-                  </Badge>
-                </div>
+              <div className="w-12 h-6 bg-slate-100 rounded-full p-1 cursor-pointer">
+                <div className="w-4 h-4 bg-rose-500 rounded-full ml-auto shadow-md" />
               </div>
             </div>
-
-            <Button 
-              className="w-full bg-rose-600 hover:bg-rose-500 text-white h-12 rounded-xl font-bold transition-all"
+            
+            <button 
+              className="w-full bg-[#1A2B3B] hover:bg-[#121E2A] text-white h-14 rounded-xl font-bold text-sm tracking-widest uppercase transition-all shadow-lg active:scale-[0.98]"
               onClick={() => setSelectedRecording(null)}
             >
-              Done
-            </Button>
+              Close
+            </button>
           </div>
         </DialogContent>
       </Dialog>
+
+      <style>{`
+        .ecg-paper-grid {
+          background-color: #F8F9FA;
+          background-image: 
+            linear-gradient(to right, #E2E8F0 1px, transparent 1px),
+            linear-gradient(to bottom, #E2E8F0 1px, transparent 1px),
+            linear-gradient(to right, #CBD5E1 1px, transparent 1px),
+            linear-gradient(to bottom, #CBD5E1 1px, transparent 1px);
+          background-size: 5px 5px, 5px 5px, 25px 25px, 25px 25px;
+        }
+        .scrollbar-hide::-webkit-scrollbar {
+          display: none;
+        }
+        .scrollbar-hide {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+        }
+      `}</style>
     </div>
   );
 };
