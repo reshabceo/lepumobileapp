@@ -589,7 +589,7 @@ export const SignupWizard: React.FC<SignupWizardProps> = ({ onSwitchToLogin, onS
       />
 
       {/* Step Content */}
-      <div className="backdrop-blur-xl bg-black/20 border border-white/20 rounded-3xl p-8 shadow-2xl shadow-black/20 mb-6">
+      <div className="backdrop-blur-xl bg-black/20 border border-white/20 rounded-3xl p-4 sm:p-8 shadow-2xl shadow-black/20 mb-6 mx-2 sm:mx-0">
         {renderStep()}
       </div>
 
