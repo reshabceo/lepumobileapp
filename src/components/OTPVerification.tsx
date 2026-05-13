@@ -202,49 +202,59 @@ export const OTPVerification: React.FC<OTPVerificationProps> = ({
   };
 
   const otpContent = (
-    <div className={embedded ? "space-y-6" : ""}>
+    <div className={embedded ? "space-y-4 sm:space-y-6" : ""}>
       {/* Email Icon */}
-      <div className={`flex justify-center ${embedded ? "mb-4" : "mb-6"}`}>
-        <div className={`${embedded ? "w-16 h-16" : "w-20 h-20"} bg-blue-600/20 rounded-2xl flex items-center justify-center backdrop-blur-sm border border-blue-500/30`}>
-          <Mail className={`${embedded ? "w-8 h-8" : "w-10 h-10"} text-blue-400`} />
+      <div className={`flex justify-center ${embedded ? "mb-2 sm:mb-4" : "mb-6"}`}>
+        <div className={`${embedded ? "w-12 h-12 sm:w-16 sm:h-16" : "w-16 h-16 sm:w-20 sm:h-20"} bg-blue-600/20 rounded-2xl flex items-center justify-center backdrop-blur-sm border border-blue-500/30`}>
+          <Mail className={`${embedded ? "w-6 h-6 sm:w-8 sm:h-8" : "w-8 h-8 sm:w-10 sm:h-10"} text-blue-400`} />
         </div>
       </div>
 
       {/* Title */}
-      <h2 className={`${embedded ? "text-xl" : "text-3xl"} ${embedded ? "font-semibold" : "font-bold"} text-white text-center mb-2`}>
+      <h2 className={`${embedded ? "text-lg sm:text-xl" : "text-2xl sm:text-3xl"} ${embedded ? "font-semibold" : "font-bold"} text-white text-center mb-2`}>
         Verify Your Email
       </h2>
       {embedded ? (
-        <>
-          <p className="text-gray-400 text-sm mb-1">
+        <div className="text-center mb-6">
+          <p className="text-gray-400 text-xs sm:text-sm">
             We've sent a 6-digit code to
           </p>
-          <p className="text-blue-400 font-medium text-sm mb-6">{email}</p>
-        </>
+          <p className="text-blue-400 font-medium text-xs sm:text-sm truncate px-4">{email}</p>
+        </div>
       ) : (
-        <p className="text-gray-400 text-center mb-8">
+        <p className="text-gray-400 text-center text-sm sm:text-base mb-8">
           We've sent a 6-digit code to<br />
-          <span className="text-blue-400 font-medium">{email}</span>
+          <span className="text-blue-400 font-medium break-all">{email}</span>
         </p>
       )}
 
-      {/* OTP Input */}
-      <div className={`flex ${embedded ? "gap-2" : "gap-3"} justify-center ${embedded ? "mb-6" : "mb-8"}`}>
-        {otp.map((digit, index) => (
-          <input
-            key={index}
-            ref={el => inputRefs.current[index] = el}
-            type="text"
-            inputMode="numeric"
-            maxLength={1}
-            value={digit}
-            onChange={e => handleOtpChange(index, e.target.value)}
-            onKeyDown={e => handleKeyDown(index, e)}
-            onPaste={index === 0 ? handlePaste : undefined}
-            className={`${embedded ? "w-12 h-12 text-xl" : "w-14 h-14 text-2xl"} text-center font-bold bg-black/30 backdrop-blur-sm text-white border border-white/20 rounded-xl focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all duration-300`}
-            disabled={loading}
-          />
-        ))}
+      {/* OTP Input Container */}
+      <div className="flex justify-center w-full overflow-hidden mb-6 sm:mb-8">
+        <div className={`flex ${embedded ? "gap-1 sm:gap-2" : "gap-1.5 sm:gap-3"} justify-center items-center max-w-full`}>
+          {otp.map((digit, index) => (
+            <input
+              key={index}
+              ref={el => inputRefs.current[index] = el}
+              type="text"
+              inputMode="numeric"
+              maxLength={1}
+              value={digit}
+              onChange={e => handleOtpChange(index, e.target.value)}
+              onKeyDown={e => handleKeyDown(index, e)}
+              onPaste={index === 0 ? handlePaste : undefined}
+              className={`
+                ${embedded 
+                  ? "w-9 h-11 sm:w-12 sm:h-14 text-lg" 
+                  : "w-10 h-12 sm:w-14 sm:h-16 text-xl sm:text-2xl"
+                } 
+                text-center font-bold bg-black/30 backdrop-blur-sm text-white 
+                border border-white/20 rounded-xl focus:ring-2 focus:ring-blue-500/50 
+                focus:border-blue-500/50 transition-all duration-300 outline-none
+              `}
+              disabled={loading}
+            />
+          ))}
+        </div>
       </div>
 
       {/* Loading State */}
@@ -258,14 +268,14 @@ export const OTPVerification: React.FC<OTPVerificationProps> = ({
       {/* Resend Button */}
       <div className={`text-center ${embedded ? "mb-4" : "mb-6"}`}>
         {timer > 0 ? (
-          <p className="text-gray-400 text-sm">
+          <p className="text-gray-400 text-xs sm:text-sm">
             Resend code in <span className="text-blue-400 font-medium">{timer}s</span>
           </p>
         ) : (
           <button
             onClick={handleResendOTP}
             disabled={resending}
-            className="text-blue-400 hover:text-blue-300 text-sm font-medium transition-colors disabled:opacity-50"
+            className="text-blue-400 hover:text-blue-300 text-xs sm:text-sm font-medium transition-colors disabled:opacity-50"
           >
             {resending ? (
               <span className="flex items-center gap-2">
@@ -280,8 +290,8 @@ export const OTPVerification: React.FC<OTPVerificationProps> = ({
       </div>
 
       {/* Help Text */}
-      <p className="text-gray-500 text-xs text-center">
-        Didn't receive the code? Check your spam folder or click resend.
+      <p className="text-gray-500 text-[10px] sm:text-xs text-center leading-relaxed">
+        Didn't receive the code? Check your spam folder<br className="sm:hidden" /> or click resend.
       </p>
     </div>
   );
@@ -298,14 +308,14 @@ export const OTPVerification: React.FC<OTPVerificationProps> = ({
         {/* Back Button */}
         <button
           onClick={onBack}
-          className="mb-6 flex items-center gap-2 text-gray-300 hover:text-white transition-colors"
+          className="mb-4 sm:mb-6 flex items-center gap-2 text-gray-300 hover:text-white transition-colors"
         >
-          <ArrowLeft size={20} />
-          <span>Back</span>
+          <ArrowLeft size={18} />
+          <span className="text-sm sm:text-base">Back</span>
         </button>
 
         {/* Glassmorphic Form Container */}
-        <div className="backdrop-blur-xl bg-black/20 border border-white/10 rounded-3xl p-8 shadow-2xl shadow-black/40">
+        <div className="backdrop-blur-xl bg-black/20 border border-white/10 rounded-3xl p-6 sm:p-8 shadow-2xl shadow-black/40">
           {otpContent}
         </div>
       </div>
