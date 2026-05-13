@@ -30,164 +30,124 @@ export const SignupStep2: React.FC<SignupStep2Props> = ({
 }) => {
   const [isRequestingLocation, setIsRequestingLocation] = useState(false);
   const [locationRequested, setLocationRequested] = useState(false);
+  const [detectionTimedOut, setDetectionTimedOut] = useState(false);
   const { toast } = useToast();
 
-  // Request location permission and autofill address on component mount
-  useEffect(() => {
-    const requestLocationAndAutofill = async () => {
-      // Only request once
-      if (locationRequested || formData.address) {
-        return;
-      }
+  const detectLocation = async () => {
+    try {
+      setIsRequestingLocation(true);
+      setDetectionTimedOut(false);
 
-      try {
-        setIsRequestingLocation(true);
-        setLocationRequested(true);
+      // Set a safety timeout for the UI
+      const timeoutId = setTimeout(() => {
+        if (isRequestingLocation) {
+          setDetectionTimedOut(true);
+          setIsRequestingLocation(false);
+          toast({
+            title: "Location Detection Timeout",
+            description: "Detection is taking longer than expected. Please enter your address manually.",
+            variant: "default",
+          });
+        }
+      }, 10000);
 
-        let position: { latitude: number; longitude: number } | null = null;
+      let position: { latitude: number; longitude: number } | null = null;
 
-        // Use Capacitor Geolocation for native apps, fallback to browser API for web
-        if (Capacitor.isNativePlatform()) {
-          // Request permissions first
-          const permissionStatus = await Geolocation.requestPermissions();
-          
-          if (permissionStatus.location === 'granted' || permissionStatus.location === 'prompt') {
-            const location = await Geolocation.getCurrentPosition({
-              enableHighAccuracy: true,
-              timeout: 10000,
-            });
-            position = {
-              latitude: location.coords.latitude,
-              longitude: location.coords.longitude,
-            };
-          } else {
-            toast({
-              title: "Location Permission Denied",
-              description: "You can manually enter your address.",
-              variant: "default",
-            });
-            setIsRequestingLocation(false);
-            return;
-          }
+      // Use Capacitor Geolocation for native apps, fallback to browser API for web
+      if (Capacitor.isNativePlatform()) {
+        const permissionStatus = await Geolocation.requestPermissions();
+        
+        if (permissionStatus.location === 'granted' || permissionStatus.location === 'prompt') {
+          const location = await Geolocation.getCurrentPosition({
+            enableHighAccuracy: true,
+            timeout: 8000, // Slightly less than our 10s UI timeout
+          });
+          position = {
+            latitude: location.coords.latitude,
+            longitude: location.coords.longitude,
+          };
         } else {
-          // Browser geolocation API
-          if (navigator.geolocation) {
-            position = await new Promise<{ latitude: number; longitude: number }>((resolve, reject) => {
-              navigator.geolocation.getCurrentPosition(
-                (pos) => {
-                  resolve({
-                    latitude: pos.coords.latitude,
-                    longitude: pos.coords.longitude,
-                  });
-                },
-                (err) => {
-                  console.warn('Geolocation error:', err);
-                  reject(err);
-                },
-                {
-                  enableHighAccuracy: true,
-                  timeout: 10000,
-                  maximumAge: 0,
-                }
-              );
-            });
-          }
+          toast({
+            title: "Permission Denied",
+            description: "Please enter your address manually.",
+            variant: "default",
+          });
+          clearTimeout(timeoutId);
+          setIsRequestingLocation(false);
+          return;
         }
-
-        if (position) {
-          // Reverse geocoding to get address from coordinates using OpenStreetMap Nominatim
-          try {
-            const addressResponse = await fetch(
-              `https://nominatim.openstreetmap.org/reverse?format=json&lat=${position.latitude}&lon=${position.longitude}&zoom=18&addressdetails=1`,
-              {
-                headers: {
-                  'User-Agent': 'MonitraqApp/1.0', // Required by Nominatim
-                },
-              }
+      } else {
+        if (navigator.geolocation) {
+          position = await new Promise<{ latitude: number; longitude: number }>((resolve, reject) => {
+            navigator.geolocation.getCurrentPosition(
+              (pos) => resolve({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
+              (err) => reject(err),
+              { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
             );
-            
-            if (addressResponse.ok) {
-              const addressData = await addressResponse.json();
-              if (addressData.display_name) {
-                // Format the address nicely
-                let formattedAddress = addressData.display_name;
-                
-                // Try to create a more concise address if possible
-                if (addressData.address) {
-                  const addr = addressData.address;
-                  const parts = [];
-                  if (addr.house_number && addr.road) {
-                    parts.push(`${addr.house_number} ${addr.road}`);
-                  } else if (addr.road) {
-                    parts.push(addr.road);
-                  }
-                  if (addr.city || addr.town || addr.village) {
-                    parts.push(addr.city || addr.town || addr.village);
-                  }
-                  if (addr.state) {
-                    parts.push(addr.state);
-                  }
-                  if (addr.postcode) {
-                    parts.push(addr.postcode);
-                  }
-                  if (addr.country) {
-                    parts.push(addr.country);
-                  }
-                  
-                  if (parts.length > 0) {
-                    formattedAddress = parts.join(', ');
-                  }
-                }
-                
-                updateFormData({ address: formattedAddress });
-                toast({
-                  title: "Location Detected",
-                  description: "Address has been auto-filled from your location.",
-                  variant: "default",
-                });
-              } else {
-                throw new Error('No address data in response');
-              }
-            } else {
-              throw new Error('Reverse geocoding request failed');
-            }
-          } catch (geocodeError) {
-            console.warn('Reverse geocoding failed:', geocodeError);
-            // Fallback: Use coordinates as address if reverse geocoding fails
-            updateFormData({ 
-              address: `${position.latitude.toFixed(6)}, ${position.longitude.toFixed(6)}` 
-            });
-            toast({
-              title: "Location Detected",
-              description: "Coordinates have been added. Please edit the address field with your full address.",
-              variant: "default",
-            });
-          }
+          });
         }
-      } catch (error) {
-        console.warn('Location request failed:', error);
-        toast({
-          title: "Location Access",
-          description: "Could not access location. Please enter your address manually.",
-          variant: "default",
-        });
-      } finally {
-        setIsRequestingLocation(false);
       }
-    };
 
-    requestLocationAndAutofill();
-  }, [locationRequested, formData.address, updateFormData, toast]);
+      clearTimeout(timeoutId);
+
+      if (position) {
+        try {
+          const addressResponse = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${position.latitude}&lon=${position.longitude}&zoom=18&addressdetails=1`,
+            { headers: { 'User-Agent': 'MonitraqApp/1.0' } }
+          );
+          
+          if (addressResponse.ok) {
+            const addressData = await addressResponse.json();
+            if (addressData.display_name) {
+              let formattedAddress = addressData.display_name;
+              if (addressData.address) {
+                const addr = addressData.address;
+                const parts = [];
+                if (addr.house_number && addr.road) parts.push(`${addr.house_number} ${addr.road}`);
+                else if (addr.road) parts.push(addr.road);
+                if (addr.city || addr.town || addr.village) parts.push(addr.city || addr.town || addr.village);
+                if (addr.state) parts.push(addr.state);
+                if (addr.postcode) parts.push(addr.postcode);
+                if (addr.country) parts.push(addr.country);
+                if (parts.length > 0) formattedAddress = parts.join(', ');
+              }
+              updateFormData({ address: formattedAddress });
+              toast({
+                title: "Location Detected",
+                description: "Address has been auto-filled.",
+              });
+            }
+          }
+        } catch (geocodeError) {
+          console.warn('Reverse geocoding failed:', geocodeError);
+          updateFormData({ address: `${position.latitude.toFixed(6)}, ${position.longitude.toFixed(6)}` });
+        }
+      }
+    } catch (error) {
+      console.warn('Location request failed:', error);
+    } finally {
+      setIsRequestingLocation(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!locationRequested && !formData.address) {
+      setLocationRequested(true);
+      detectLocation();
+    }
+  }, [locationRequested, formData.address]);
+
   return (
-    <div className="space-y-6">
-      <div className="text-center mb-6">
-        <h3 className="text-xl font-semibold text-white mb-2">Personal Details</h3>
-        <p className="text-gray-400 text-sm">Tell us more about yourself</p>
+    <div className="space-y-4 sm:space-y-6">
+      <div className="text-center mb-4 sm:mb-6">
+        <h3 className="text-lg sm:text-xl font-semibold text-white mb-1">Personal Details</h3>
+        <p className="text-gray-400 text-xs sm:text-sm">Tell us more about yourself</p>
       </div>
 
       {/* Date of Birth */}
-      <div>
-        <label className="text-sm font-medium text-gray-300 ml-1 mb-1 block">Date of Birth</label>
+      <div className="space-y-1">
+        <label className="text-xs font-medium text-gray-400 ml-1 block uppercase tracking-wider">Date of Birth</label>
         <ScrollDatePicker
           value={formData.dateOfBirth}
           onChange={(date) => updateFormData({ dateOfBirth: date })}
@@ -195,66 +155,61 @@ export const SignupStep2: React.FC<SignupStep2Props> = ({
         />
       </div>
 
-      {/* Gender */}
-      <div className="relative group">
-        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-          <User className="text-gray-400 group-focus-within:text-blue-400 transition-colors duration-300" size={20} />
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {/* Gender */}
+        <div className="relative group">
+          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <User className="text-gray-400 group-focus-within:text-blue-400 transition-colors" size={18} />
+          </div>
+          <select
+            name="gender"
+            value={formData.gender}
+            onChange={(e) => updateFormData({ gender: e.target.value })}
+            className={`w-full pl-10 pr-3 py-3 bg-black/30 backdrop-blur-sm text-white border border-white/20 rounded-xl focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all text-sm ${
+              errors.gender ? 'border-red-500/50' : ''
+            }`}
+            required
+          >
+            <option value="" className="bg-black">Gender</option>
+            <option value="male" className="bg-black">Male</option>
+            <option value="female" className="bg-black">Female</option>
+            <option value="other" className="bg-black">Other</option>
+          </select>
+          {errors.gender && <p className="text-red-400 text-[10px] mt-1 ml-1">{errors.gender}</p>}
         </div>
-        <select
-          name="gender"
-          value={formData.gender}
-          onChange={(e) => updateFormData({ gender: e.target.value })}
-          className={`w-full pl-12 pr-4 py-4 bg-black/30 backdrop-blur-sm text-white border border-white/20 rounded-2xl focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all duration-300 ${
-            errors.gender ? 'border-red-500/50 focus:ring-red-500/50 focus:border-red-500/50' : ''
-          }`}
-          aria-label="Gender"
-          required
-        >
-          <option value="" className="bg-black text-white">Select Gender</option>
-          <option value="male" className="bg-black text-white">Male</option>
-          <option value="female" className="bg-black text-white">Female</option>
-          <option value="other" className="bg-black text-white">Other</option>
-          <option value="prefer-not-to-say" className="bg-black text-white">Prefer not to say</option>
-        </select>
-        {errors.gender && (
-          <p className="text-red-300 text-xs mt-2 ml-1">{errors.gender}</p>
-        )}
-      </div>
 
-      {/* Blood Type */}
-      <div className="relative group">
-        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-          <Droplets className="text-gray-400 group-focus-within:text-blue-400 transition-colors duration-300" size={20} />
+        {/* Blood Type */}
+        <div className="relative group">
+          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <Droplets className="text-gray-400 group-focus-within:text-blue-400 transition-colors" size={18} />
+          </div>
+          <select
+            name="bloodType"
+            value={formData.bloodType}
+            onChange={(e) => updateFormData({ bloodType: e.target.value })}
+            className={`w-full pl-10 pr-3 py-3 bg-black/30 backdrop-blur-sm text-white border border-white/20 rounded-xl focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all text-sm ${
+              errors.bloodType ? 'border-red-500/50' : ''
+            }`}
+            required
+          >
+            <option value="" className="bg-black">Blood Type</option>
+            <option value="A+" className="bg-black">A+</option>
+            <option value="A-" className="bg-black">A-</option>
+            <option value="B+" className="bg-black">B+</option>
+            <option value="B-" className="bg-black">B-</option>
+            <option value="AB+" className="bg-black">AB+</option>
+            <option value="AB-" className="bg-black">AB-</option>
+            <option value="O+" className="bg-black">O+</option>
+            <option value="O-" className="bg-black">O-</option>
+          </select>
+          {errors.bloodType && <p className="text-red-400 text-[10px] mt-1 ml-1">{errors.bloodType}</p>}
         </div>
-        <select
-          name="bloodType"
-          value={formData.bloodType}
-          onChange={(e) => updateFormData({ bloodType: e.target.value })}
-          className={`w-full pl-12 pr-4 py-4 bg-black/30 backdrop-blur-sm text-white border border-white/20 rounded-2xl focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all duration-300 ${
-            errors.bloodType ? 'border-red-500/50 focus:ring-red-500/50 focus:border-red-500/50' : ''
-          }`}
-          aria-label="Blood Type"
-          required
-        >
-          <option value="" className="bg-black text-white">Select Blood Type</option>
-          <option value="A+" className="bg-black text-white">A+</option>
-          <option value="A-" className="bg-black text-white">A-</option>
-          <option value="B+" className="bg-black text-white">B+</option>
-          <option value="B-" className="bg-black text-white">B-</option>
-          <option value="AB+" className="bg-black text-white">AB+</option>
-          <option value="AB-" className="bg-black text-white">AB-</option>
-          <option value="O+" className="bg-black text-white">O+</option>
-          <option value="O-" className="bg-black text-white">O-</option>
-        </select>
-        {errors.bloodType && (
-          <p className="text-red-300 text-xs mt-2 ml-1">{errors.bloodType}</p>
-        )}
       </div>
 
       {/* Phone Number */}
       <div className="relative group">
-        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-          <Phone className="text-gray-400 group-focus-within:text-blue-400 transition-colors duration-300" size={20} />
+        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+          <Phone className="text-gray-400 group-focus-within:text-blue-400 transition-colors" size={18} />
         </div>
         <input
           type="tel"
@@ -262,45 +217,52 @@ export const SignupStep2: React.FC<SignupStep2Props> = ({
           value={formData.phoneNumber}
           onChange={(e) => updateFormData({ phoneNumber: e.target.value })}
           placeholder="Phone Number"
-          className={`w-full pl-12 pr-4 py-4 bg-black/30 backdrop-blur-sm text-white border border-white/20 rounded-2xl focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 placeholder-gray-400 transition-all duration-300 ${
-            errors.phoneNumber ? 'border-red-500/50 focus:ring-red-500/50 focus:border-red-500/50' : ''
+          className={`w-full pl-10 pr-4 py-3 bg-black/30 backdrop-blur-sm text-white border border-white/20 rounded-xl focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 placeholder-gray-500 transition-all text-sm ${
+            errors.phoneNumber ? 'border-red-500/50' : ''
           }`}
-          aria-label="Phone Number"
           required
         />
-        {errors.phoneNumber && (
-          <p className="text-red-300 text-xs mt-2 ml-1">{errors.phoneNumber}</p>
-        )}
+        {errors.phoneNumber && <p className="text-red-400 text-[10px] mt-1 ml-1">{errors.phoneNumber}</p>}
       </div>
 
       {/* Address */}
-      <div className="relative group">
-        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-          <MapPin className="text-gray-400 group-focus-within:text-blue-400 transition-colors duration-300" size={20} />
-        </div>
-        <div className="relative">
+      <div className="space-y-2">
+        <div className="relative group">
+          <div className="absolute top-4 left-3 pointer-events-none">
+            <MapPin className="text-gray-400 group-focus-within:text-blue-400 transition-colors" size={18} />
+          </div>
           <textarea
             name="address"
             value={formData.address}
             onChange={(e) => updateFormData({ address: e.target.value })}
-            placeholder={isRequestingLocation ? "Detecting your location..." : "Full Address"}
-            rows={3}
-            disabled={isRequestingLocation}
-            className={`w-full pl-12 pr-20 py-4 bg-black/30 backdrop-blur-sm text-white border border-white/20 rounded-2xl focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 placeholder-gray-400 transition-all duration-300 resize-none disabled:opacity-50 disabled:cursor-not-allowed ${
-              errors.address ? 'border-red-500/50 focus:ring-red-500/50 focus:border-red-500/50' : ''
+            placeholder={isRequestingLocation ? "Detecting location..." : "Enter Full Address"}
+            rows={2}
+            className={`w-full pl-10 pr-4 py-3 bg-black/30 backdrop-blur-sm text-white border border-white/20 rounded-xl focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 placeholder-gray-500 transition-all text-sm resize-none ${
+              errors.address ? 'border-red-500/50' : ''
             }`}
-            aria-label="Address"
             required
           />
           {isRequestingLocation && (
-            <div className="absolute right-4 top-4">
+            <div className="absolute right-3 top-3">
               <Loader2 className="w-4 h-4 text-blue-400 animate-spin" />
             </div>
           )}
         </div>
-        {errors.address && (
-          <p className="text-red-300 text-xs mt-2 ml-1">{errors.address}</p>
-        )}
+        
+        <div className="flex items-center justify-between px-1">
+          <button
+            type="button"
+            onClick={detectLocation}
+            disabled={isRequestingLocation}
+            className="flex items-center gap-1.5 text-[11px] font-medium text-blue-400 hover:text-blue-300 transition-colors disabled:opacity-50"
+          >
+            <MapPin size={12} />
+            {isRequestingLocation ? "Detecting..." : "Detect Location Automatically"}
+          </button>
+          <span className="text-[10px] text-gray-500 italic">or enter manually</span>
+        </div>
+        
+        {errors.address && <p className="text-red-400 text-[10px] mt-1 ml-1">{errors.address}</p>}
       </div>
     </div>
   );
