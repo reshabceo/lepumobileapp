@@ -108,7 +108,11 @@ const PatientInvoices: React.FC = () => {
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (user) loadInvoices();
+    if (user) {
+      loadInvoices();
+    } else {
+      setLoading(false); // don't leave spinner while auth is initializing
+    }
   }, [user]);
 
   const loadInvoices = async () => {

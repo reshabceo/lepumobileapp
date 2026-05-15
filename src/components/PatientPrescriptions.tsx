@@ -49,6 +49,7 @@ export const PatientPrescriptions = () => {
       
       if (!user) {
         toast.error('Please login to view prescriptions');
+        setLoading(false);
         return;
       }
 
@@ -61,6 +62,7 @@ export const PatientPrescriptions = () => {
 
       if (!patientData) {
         toast.error('Patient profile not found');
+        setLoading(false);
         return;
       }
 

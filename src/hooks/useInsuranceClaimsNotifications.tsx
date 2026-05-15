@@ -17,12 +17,13 @@ export const useInsuranceClaimsNotifications = () => {
 
   useEffect(() => {
     let subscription: any;
+    let isMounted = true;
 
     const setupNotifications = async () => {
       // Get current user
       const { data: { user } } = await supabase.auth.getUser();
-      
-      if (!user) return;
+
+      if (!user || !isMounted) return;
 
       // Get count of claims created in last 24 hours (unread)
       const twentyFourHoursAgo = new Date();
@@ -35,7 +36,7 @@ export const useInsuranceClaimsNotifications = () => {
         .gte('created_at', twentyFourHoursAgo.toISOString())
         .order('created_at', { ascending: false });
 
-      if (!error && recentClaims) {
+      if (!error && recentClaims && isMounted) {
         setUnreadCount(recentClaims.length);
         if (recentClaims.length > 0) {
           setLatestClaim(recentClaims[0]);
@@ -72,7 +73,7 @@ export const useInsuranceClaimsNotifications = () => {
             const currencySymbol = newClaim.currency === 'INR' ? '₹' : 'AED';
             toast({
               title: '🏥 New Insurance Claim',
-              description: `Claim #${newClaim.claim_number} - ${currencySymbol} ${newClaim.total_charge.toFixed(2)}`,
+              description: `Claim #${newClaim.claim_number} - ${currencySymbol} ${(newClaim.total_charge ?? 0).toFixed(2)}`,
               duration: 5000,
             });
           }
@@ -84,6 +85,7 @@ export const useInsuranceClaimsNotifications = () => {
 
     // Cleanup subscription on unmount
     return () => {
+      isMounted = false;
       if (subscription) {
         supabase.removeChannel(subscription);
       }

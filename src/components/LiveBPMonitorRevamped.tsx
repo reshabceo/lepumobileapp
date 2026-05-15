@@ -796,13 +796,15 @@ export const LiveBPMonitorRevamped: React.FC = () => {
       }
       
       // 2. Save to localStorage for app access (add to beginning for latest first)
-      const existingResults = JSON.parse(localStorage.getItem('bpResults') || '[]');
+      let existingResults: any[] = [];
+      try { existingResults = JSON.parse(localStorage.getItem('bpResults') || '[]'); } catch { localStorage.removeItem('bpResults'); }
       existingResults.unshift(dataToSave); // Add to beginning
       localStorage.setItem('bpResults', JSON.stringify(existingResults.slice(0, 50))); // Keep last 50
-      
+
       // FIXED: Also save to storedFilesInApp for reports page (single source of truth)
       try {
-        const existingReports = JSON.parse(localStorage.getItem('storedFilesInApp') || '[]');
+        let existingReports: any[] = [];
+        try { existingReports = JSON.parse(localStorage.getItem('storedFilesInApp') || '[]'); } catch { localStorage.removeItem('storedFilesInApp'); }
         
         // Remove duplicate BP reports (same systolic/diastolic within 5 minutes)
         const fiveMinutesAgo = Date.now() - (5 * 60 * 1000);

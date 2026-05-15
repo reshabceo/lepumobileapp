@@ -4,7 +4,8 @@ import { supabase } from '@/lib/supabase';
 export const WEBRTC_SERVER_URL =
   import.meta.env.VITE_WEBRTC_SERVER_URL || 'wss://web-m4g9.onrender.com';
 
-export const WEBRTC_SERVER_URL_DEV = 'ws://localhost:3000';
+// WEBRTC_SERVER_URL_DEV intentionally removed — localhost:3000 crashes on real devices.
+// Always use getWebRTCServerURL() which always resolves to the production wss:// URL.
 
 export const getWebRTCServerURL = () => {
   if (import.meta.env.PROD) {

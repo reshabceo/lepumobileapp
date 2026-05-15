@@ -199,23 +199,30 @@ export default function ViewReports() {
       // Load BP results from localStorage
       const savedBPResults = localStorage.getItem('bpResults');
       if (savedBPResults) {
-        const bpResults = JSON.parse(savedBPResults);
-        allResults.push(...bpResults);
-        console.log('📊 Loaded BP results from localStorage:', bpResults.length);
+        try {
+          const bpResults = JSON.parse(savedBPResults);
+          allResults.push(...bpResults);
+          console.log('📊 Loaded BP results from localStorage:', bpResults.length);
+        } catch {
+          console.warn('⚠️ Failed to parse bpResults from localStorage — clearing corrupt data');
+          localStorage.removeItem('bpResults');
+        }
       }
 
       // Load ECG results from localStorage (from HealthDashboard)
       const savedECGResults = localStorage.getItem('storedFilesInApp');
       if (savedECGResults) {
-        const ecgResults = JSON.parse(savedECGResults);
-        console.log('📊 Raw storedFilesInApp data:', ecgResults);
-
-        // Filter only ECG results
-        const filteredECGResults = ecgResults.filter((item: any) => item.type === 'ecg');
-        console.log('📊 Filtered ECG results:', filteredECGResults);
-
-        allResults.push(...filteredECGResults);
-        console.log('📊 Loaded ECG results from localStorage:', filteredECGResults.length);
+        try {
+          const ecgResults = JSON.parse(savedECGResults);
+          console.log('📊 Raw storedFilesInApp data:', ecgResults);
+          const filteredECGResults = ecgResults.filter((item: any) => item.type === 'ecg');
+          console.log('📊 Filtered ECG results:', filteredECGResults);
+          allResults.push(...filteredECGResults);
+          console.log('📊 Loaded ECG results from localStorage:', filteredECGResults.length);
+        } catch {
+          console.warn('⚠️ Failed to parse storedFilesInApp — clearing corrupt data');
+          localStorage.removeItem('storedFilesInApp');
+        }
       }
 
       // Also try to load from device storage

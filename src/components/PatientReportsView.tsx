@@ -663,12 +663,15 @@ const PatientReportsView: React.FC = () => {
         } catch (err: any) {
             console.error('❌ [Reports] Unexpected error:', err);
             if (err.message?.includes('timeout')) {
-                toast.error('Connection slow. Reports loading timed out.');
+                toast.error('Connection slow. Tap retry to load reports.');
             }
-        } finally {
+            // On error/timeout: leave reportsLoaded=false so the retry button shows,
+            // not the "no reports found" empty state (which would be misleading)
             setLoading(false);
-            setReportsLoaded(true);
+            return;
         }
+        setLoading(false);
+        setReportsLoaded(true);
     };
 
     // Filter reports based on active tab

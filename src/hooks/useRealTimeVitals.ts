@@ -29,12 +29,29 @@ export interface PatientProfile {
     emergency_contact_phone?: string;
 }
 
+// Read the localStorage cache synchronously so patientProfile is available on the very first
+// render — prevents HealthDashboard from showing a spinner while patientProfile is null
+// even when we have a perfectly fresh cached copy.
+function readCachedProfile(userId: string): PatientProfile | null {
+    try {
+        const raw = localStorage.getItem(`patient_profile_${userId}`);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        const cacheTime = parsed._cached_at || 0;
+        if (Date.now() - cacheTime < 5 * 60 * 1000) return parsed as PatientProfile;
+    } catch { /* ignore */ }
+    return null;
+}
+
 export const useRealTimeVitals = () => {
-    const [vitals, setVitals] = useState<VitalSign[]>([]);
-    const [patientProfile, setPatientProfile] = useState<PatientProfile | null>(null);
-    const [loading, setLoading] = useState(false); // Start as false - only true when actually fetching
-    const [error, setError] = useState<string | null>(null);
     const { user } = useAuth();
+    const [vitals, setVitals] = useState<VitalSign[]>([]);
+    // Initialize synchronously from cache so the dashboard never flashes a spinner for cached users
+    const [patientProfile, setPatientProfile] = useState<PatientProfile | null>(
+        () => user ? readCachedProfile(user.id) : null
+    );
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
     // Fetch patient profile and initial vitals
     useEffect(() => {

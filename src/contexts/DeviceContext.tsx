@@ -76,6 +76,7 @@ export const DeviceProvider: React.FC<DeviceProviderProps> = ({ children }) => {
 
     // Initialize SDK and set up callbacks
     useEffect(() => {
+        let isMounted = true;
         const initializeSDK = async () => {
             try {
                 console.log('🚀 DeviceContext: Starting SDK initialization...');
@@ -249,6 +250,7 @@ export const DeviceProvider: React.FC<DeviceProviderProps> = ({ children }) => {
         };
 
         initializeSDK();
+        return () => { isMounted = false; };
     }, []);
     
     // Polling for AliveCor (Kardia) status - merged and safety added

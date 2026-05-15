@@ -835,7 +835,8 @@ const ECGMonitor: React.FC = () => {
             "🫀 [ECG SAVE] Existing reports (raw):",
             existingReportsRaw ? `${existingReportsRaw.length} chars` : "null"
           );
-          const existingReports = JSON.parse(existingReportsRaw || "[]");
+          let existingReports: any[] = [];
+          try { existingReports = JSON.parse(existingReportsRaw || '[]'); } catch { localStorage.removeItem('storedFilesInApp'); }
           console.log(
             "🫀 [ECG SAVE] Existing reports count:",
             existingReports.length
@@ -1537,10 +1538,8 @@ const ECGMonitor: React.FC = () => {
       const clearOldStoredData = () => {
         try {
           // FIXED: Single source of truth - only clear storedFilesInApp (reports)
-
-          const storedFiles = JSON.parse(
-            localStorage.getItem("storedFilesInApp") || "[]"
-          );
+          let storedFiles: any[] = [];
+          try { storedFiles = JSON.parse(localStorage.getItem("storedFilesInApp") || "[]"); } catch { localStorage.removeItem("storedFilesInApp"); }
 
           const oldECGFiles = storedFiles.filter(
             (item: any) =>
@@ -1594,9 +1593,8 @@ const ECGMonitor: React.FC = () => {
 
       // FIXED: Single source of truth - load from reports (storedFilesInApp) instead of old ecgRhythms
 
-      const existingReports = JSON.parse(
-        localStorage.getItem("storedFilesInApp") || "[]"
-      );
+      let existingReports: any[] = [];
+      try { existingReports = JSON.parse(localStorage.getItem("storedFilesInApp") || "[]"); } catch { localStorage.removeItem("storedFilesInApp"); }
 
       console.log(
         "📚 [ECG] Found existing reports in storedFilesInApp:",
@@ -2606,10 +2604,8 @@ const ECGMonitor: React.FC = () => {
 
             try {
               // Save to storedFilesInApp for reports page (primary storage)
-
-              const existingReports = JSON.parse(
-                localStorage.getItem("storedFilesInApp") || "[]"
-              );
+              let existingReports: any[] = [];
+              try { existingReports = JSON.parse(localStorage.getItem("storedFilesInApp") || "[]"); } catch { localStorage.removeItem("storedFilesInApp"); }
 
               // Remove duplicate ECG reports (same heart rate within 5 minutes)
 
@@ -3676,7 +3672,8 @@ const ECGMonitor: React.FC = () => {
         return;
       }
 
-      const existingReports = JSON.parse(existingReportsRaw);
+      let existingReports: any[] = [];
+      try { existingReports = JSON.parse(existingReportsRaw ?? '[]'); } catch { localStorage.removeItem('storedFilesInApp'); }
       console.log(
         "📚 [ECG] Found",
         existingReports.length,
@@ -5573,7 +5570,8 @@ const ECGMonitor: React.FC = () => {
       const savedRhythms = localStorage.getItem("ecgRhythms");
 
       if (savedRhythms) {
-        const parsedRhythms = JSON.parse(savedRhythms);
+        let parsedRhythms: any = null;
+        try { parsedRhythms = JSON.parse(savedRhythms); } catch { localStorage.removeItem('ecgRhythms'); }
 
         if (Array.isArray(parsedRhythms) && parsedRhythms.length > 0) {
           console.log(
