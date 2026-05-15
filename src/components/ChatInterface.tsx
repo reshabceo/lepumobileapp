@@ -203,12 +203,12 @@ export const ChatInterface = () => {
   const doctorAvatar = currentConversation?.doctor_avatar;
 
   return (
-        <div className="bg-gradient-to-br from-gray-900 via-black to-gray-900 h-screen text-white font-inter flex flex-col">
-            {/* Status Bar Spacing */}
-            <div className="h-12 flex-shrink-0"></div>
-            
-            {/* Header */}
-            <header className="bg-white/10 backdrop-blur-md border-b border-white/20 px-4 py-4 flex items-center justify-between flex-shrink-0">
+    <div className="bg-gradient-to-br from-gray-900 via-black to-gray-900 h-screen text-white font-inter flex flex-col">
+      {/* Status Bar Spacing */}
+      <div className="h-12 flex-shrink-0"></div>
+
+      {/* Header */}
+      <header className="bg-white/10 backdrop-blur-md border-b border-white/20 px-4 py-4 flex items-center justify-between flex-shrink-0">
         <div className="flex items-center">
           <button
             onClick={handleBack}
@@ -244,12 +244,13 @@ export const ChatInterface = () => {
         </div>
 
         <div className="flex items-center space-x-2">
-          <button className="p-2 bg-white/10 backdrop-blur-sm border border-white/20 hover:bg-white/20 rounded-xl transition-all duration-200">
+          {/* <button className="p-2 bg-white/10 backdrop-blur-sm border border-white/20 hover:bg-white/20 rounded-xl transition-all duration-200">
             <Phone className="w-5 h-5 text-gray-300" />
           </button>
           <button className="p-2 bg-white/10 backdrop-blur-sm border border-white/20 hover:bg-white/20 rounded-xl transition-all duration-200">
             <Video className="w-5 h-5 text-gray-300" />
-          </button>
+          </button> */}
+
           <button className="p-2 bg-white/10 backdrop-blur-sm border border-white/20 hover:bg-white/20 rounded-xl transition-all duration-200">
             <MoreVertical className="w-5 h-5 text-gray-300" />
           </button>

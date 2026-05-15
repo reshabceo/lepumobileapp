@@ -63,7 +63,16 @@ serve(async (req) => {
             await supabase.from('appointments').insert(appointment);
             await supabase.from('emergency_alerts').insert(alert);
         } else if (type === 'ai_doctor_text' || type === 'ai_doctor_voice') {
-            await supabase.from('ai_doctor_consultations').insert(metadata.consultation);
+            const { session_id, consult_mode } = metadata;
+            const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+            await supabase.from('ai_doctor_sessions')
+                .update({ 
+                    payment_status: 'paid', 
+                    expires_at: expiresAt,
+                    consult_mode: consult_mode || (type === 'ai_doctor_voice' ? 'voice' : 'text'),
+                    paid_amount_paise: metadata.amount_paise
+                })
+                .eq('id', session_id);
         } else if (type.startsWith('appointment_')) {
             await supabase.from('appointments').insert(metadata.appointment);
         } else if (type === 'radiologist_review') {

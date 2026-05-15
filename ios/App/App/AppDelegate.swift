@@ -1,44 +1,17 @@
 import UIKit
 import Capacitor
+import CoreBluetooth
 
 @UIApplicationMain
 class AppDelegate: UIResponder, UIApplicationDelegate {
 
     var window: UIWindow?
+    private var btKickstarter: BluetoothKickstarter?
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        // Override point for customization after application launch.
-        
-        // CRITICAL: Force WellueSDK class to load BEFORE Capacitor initializes
-        // This ensures the plugin is available when Capacitor builds its plugin registry
-        // Multiple references ensure the class is fully loaded and linked
-        
-        // Reference 1: Direct class reference
-        _ = WellueSDK.self
-        if #available(iOS 15.0, *) {
-            _ = IAPPlugin.self
-        }
-        
-        // Reference 2: Type metadata access
-        let _ = String(describing: type(of: WellueSDK.self))
-        if #available(iOS 15.0, *) {
-            let _ = String(describing: type(of: IAPPlugin.self))
-        }
-        
-        // Reference 3: Force class initialization
-        if WellueSDK.self.responds(to: #selector(WellueSDK.initialize(_:))) {
-            // WellueSDK is properly loaded
-        }
-        
-        if #available(iOS 15.0, *) {
-            if IAPPlugin.self.responds(to: NSSelectorFromString("loadProducts:")) {
-                // IAPPlugin is properly loaded
-            }
-        }
-        
-        // Note: Safari Web Inspector works automatically in Debug builds
-        // No additional code needed - just enable Safari's Develop menu
-        
+        // Kickstart Bluetooth permission prompt as early as possible
+        btKickstarter = BluetoothKickstarter()
+        btKickstarter?.start()
         return true
     }
 
@@ -77,4 +50,21 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         return ApplicationDelegateProxy.shared.application(application, continue: userActivity, restorationHandler: restorationHandler)
     }
 
+}
+
+// Minimal CoreBluetooth helper to trigger iOS Bluetooth permission prompt on first launch
+private class BluetoothKickstarter: NSObject, CBCentralManagerDelegate {
+    private var manager: CBCentralManager?
+
+    func start() {
+        // Creating CBCentralManager with a delegate triggers state updates which prompt for permission when needed
+        manager = CBCentralManager(delegate: self, queue: nil, options: [CBCentralManagerOptionShowPowerAlertKey: true])
+    }
+
+    func centralManagerDidUpdateState(_ central: CBCentralManager) {
+        // Accessing state forces the system to evaluate authorization; no-op otherwise
+        _ = central.state
+        // Once we got a state update, we can release the manager; plugin will manage Bluetooth afterwards
+        manager = nil
+    }
 }

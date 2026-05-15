@@ -27,6 +27,7 @@ end
 target 'App' do
   capacitor_pods
   pod 'VTMProductLib', :path => '../../VTProductLib_Pods'
+  pod 'AliveCorKitLite', :path => 'Frameworks'
 end
 
 post_install do |installer|

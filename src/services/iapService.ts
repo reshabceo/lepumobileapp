@@ -6,7 +6,7 @@ export interface IAPTransaction {
   receipt: string;
 }
 
-const IAP = registerPlugin<any>('IAP');
+const IAP = registerPlugin<any>('IAPPlugin');
 
 class IAPService {
   private get plugin() {
@@ -27,9 +27,11 @@ class IAPService {
 
   async purchase(productId: string): Promise<IAPTransaction | null> {
     if (!productId) throw new Error('ProductId is required');
+    console.log(`🛒 [IAP] Service: Initiating purchase for ${productId}`);
     
     try {
       const result = await this.plugin.purchase({ productId });
+      console.log(`🛒 [IAP] Service: Native result:`, result);
       if (result.success && result.transaction) {
         return result.transaction;
       }
@@ -37,6 +39,16 @@ class IAPService {
     } catch (e: any) {
       console.error('Purchase failed:', e);
       throw e;
+    }
+  }
+
+  async restorePurchases(): Promise<any[]> {
+    try {
+      const { transactions } = await this.plugin.restorePurchases();
+      return transactions || [];
+    } catch (e) {
+      console.error('Restore failed:', e);
+      return [];
     }
   }
 }

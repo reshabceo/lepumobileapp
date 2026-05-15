@@ -486,16 +486,16 @@ export const AppointmentBooking = () => {
   }
 
   return (
-    <div className="space-y-4 p-4 max-w-full overflow-hidden">
-      <Card className="glass border-white/10 bg-gradient-to-br from-emerald-950/50 via-green-900/30 to-emerald-950/50">
-        <CardHeader className="space-y-4">
+    <div className="space-y-4 p-4 w-full">
+      <Card className="glass border-white/10 bg-gradient-to-br from-emerald-950/50 via-green-900/30 to-emerald-950/50 w-full overflow-visible">
+        <CardHeader className="space-y-4 px-4 sm:px-6">
           {/* Back Button - Mobile First */}
           <div className="flex items-center gap-3">
             <Button
               variant="ghost"
               size="sm"
               onClick={() => navigate('/dashboard')}
-              className="text-emerald-300 hover:bg-emerald-600/20 hover:text-emerald-100 p-2"
+              className="text-emerald-300 hover:bg-emerald-600/20 hover:text-emerald-100 p-2 -ml-2"
             >
               <ArrowLeft className="w-5 h-5" />
             </Button>
@@ -514,14 +514,15 @@ export const AppointmentBooking = () => {
           <div className="flex justify-end">
             <Button
               variant="outline"
+              size="sm"
               onClick={() => setShowMyAppointments(!showMyAppointments)}
-              className="border-emerald-500/30 text-emerald-300 hover:bg-emerald-600/20 text-sm sm:text-base whitespace-nowrap"
+              className="border-emerald-500/30 text-emerald-300 hover:bg-emerald-600/20 text-xs sm:text-sm whitespace-nowrap"
             >
               {showMyAppointments ? 'Hide' : 'Show'} My Appointments
             </Button>
           </div>
         </CardHeader>
-        <CardContent className="space-y-6 p-4 sm:p-6 overflow-x-hidden">
+        <CardContent className="space-y-6 p-3 sm:p-6 overflow-x-hidden">
           {showMyAppointments && myAppointments.length > 0 && (
             <div className="border border-emerald-500/20 rounded-xl p-4 bg-gradient-to-br from-emerald-900/20 to-green-900/10">
               <h3 className="font-semibold mb-3 text-emerald-100">My Upcoming Appointments</h3>
@@ -563,7 +564,7 @@ export const AppointmentBooking = () => {
               }}
               min={getMinDate()}
               max={getMaxDate()}
-              className="bg-emerald-950/40 border-emerald-500/30 text-emerald-100 focus:border-emerald-400"
+              className="bg-emerald-950/40 border-emerald-500/30 text-emerald-100 focus:border-emerald-400 w-full"
             />
             <p className="text-xs text-emerald-300/60">
               Select a date between tomorrow and 90 days from now
