@@ -245,7 +245,7 @@ export const RecommendationsDashboard: React.FC = () => {
     const priorityStyle = priorityColors[selectedRec.priority] || priorityColors.medium;
 
     return (
-      <div className="bg-[#101010] min-h-screen text-white p-4">
+      <div className="bg-[#101010] min-h-screen text-white p-4 pt-safe-top">
         <div className="max-w-2xl mx-auto">
           {/* Header */}
           <div className="flex items-center gap-4 mb-6">
@@ -387,7 +387,7 @@ export const RecommendationsDashboard: React.FC = () => {
 
   // List view
   return (
-    <div className="bg-[#101010] min-h-screen text-white p-4">
+    <div className="bg-[#101010] min-h-screen text-white p-4 pt-safe-top">
       <div className="max-w-2xl mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">

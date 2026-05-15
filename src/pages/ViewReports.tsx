@@ -291,11 +291,8 @@ export default function ViewReports() {
 
   return (
     <MobileAppContainer>
-      <div className="bg-[#161B22] min-h-screen text-white font-inter">
+      <div className="bg-[#161B22] min-h-screen text-white font-inter pt-safe-top">
         <div className="max-w-sm mx-auto min-h-screen bg-[#1C2128] flex flex-col relative">
-
-          {/* Status Bar Spacing */}
-          <div className="h-6"></div>
 
           {/* Header */}
           <header className="flex items-center justify-between p-4 border-b border-gray-700 flex-shrink-0">

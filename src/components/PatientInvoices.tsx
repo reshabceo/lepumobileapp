@@ -330,7 +330,7 @@ const PatientInvoices: React.FC = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#0D1117] via-[#161B22] to-[#0D1117] text-white">
       {/* Header */}
-      <div className="sticky top-0 z-20 bg-[#161B22]/95 backdrop-blur-md border-b border-[#30363D] px-4 py-3">
+      <div className="sticky top-0 z-20 bg-[#161B22]/95 backdrop-blur-md border-b border-[#30363D] px-4 pt-safe-top pb-3">
         <div className="flex items-center gap-3">
           <button
             onClick={() => navigate("/dashboard")}

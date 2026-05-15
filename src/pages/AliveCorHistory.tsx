@@ -168,7 +168,7 @@ const AliveCorHistory = () => {
   };
 
   return (
-    <div className="bg-[#0a0a0f] min-h-screen text-white p-4 font-inter">
+    <div className="bg-[#0a0a0f] min-h-screen text-white p-4 pt-safe-top font-inter">
       <div className="max-w-sm mx-auto space-y-6 pb-10">
         {/* Header */}
         <header className="flex items-center gap-3 mb-6">
