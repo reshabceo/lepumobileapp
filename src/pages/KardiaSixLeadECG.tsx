@@ -350,7 +350,7 @@ const KardiaSixLeadECG: React.FC = () => {
       : "border-amber-500/30 bg-amber-500/10";
 
   return (
-    <div className="bg-[#0a0a0f] min-h-screen text-white p-4 font-inter">
+    <div className="bg-[#0a0a0f] min-h-screen text-white p-4 pt-safe-top font-inter">
       <div className="max-w-sm mx-auto">
 
         {/* ── Header ─────────────────────────────────────────────────────── */}

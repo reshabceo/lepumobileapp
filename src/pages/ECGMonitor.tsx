@@ -44,7 +44,7 @@ import { Bp2, getEcgDataInMv, int16ArrayToMv } from "@/plugins/bp2";
 import { supabase, storeEcgRecording } from "@/lib/supabase";
 import EcgChartWithControls from "@/components/EcgChartWithControls";
 import EcgFullScreenChart from "@/components/EcgFullScreenChart";
-import { AliveCorEcgCard } from "@/components/AliveCorEcgCard";
+
 
 import { Capacitor } from "@capacitor/core";
 
@@ -5648,7 +5648,7 @@ const ECGMonitor: React.FC = () => {
         {/* Content */}
 
         <div className="p-4">
-          <AliveCorEcgCard />
+
 
           {/* Connected Device Card - New BP UI Style */}
 

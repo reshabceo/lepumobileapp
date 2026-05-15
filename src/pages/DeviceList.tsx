@@ -184,10 +184,8 @@ const DeviceList = () => {
   if (loading) {
     return (
         <MobileAppContainer>
-            <div className="bg-[#101010] min-h-screen text-white p-4 font-inter">
+            <div className="bg-[#101010] min-h-screen text-white p-4 pt-safe-top font-inter">
                 <div className="max-w-sm mx-auto">
-                    {/* Status Bar Spacing */}
-                    <div className="h-6"></div>
 
                     {/* Header */}
                     <header className="flex items-center justify-between mb-6">
@@ -375,10 +373,8 @@ const DeviceList = () => {
 
   return (
     <MobileAppContainer>
-      <div className="bg-[#101010] min-h-screen text-white p-4 font-inter">
+      <div className="bg-[#101010] min-h-screen text-white p-4 pt-safe-top font-inter">
         <div className="max-w-sm mx-auto">
-          {/* Status Bar Spacing */}
-          <div className="h-6"></div>
 
           {/* Header */}
           <header className="flex items-center justify-between mb-6">

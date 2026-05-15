@@ -15,10 +15,8 @@ export const DoctorAssignmentPage: React.FC = () => {
     };
 
     return (
-        <div className="bg-[#101010] min-h-screen text-white p-4">
+        <div className="bg-[#101010] min-h-screen text-white p-4 pt-safe-top">
             <div className="max-w-sm mx-auto">
-                {/* Status Bar Spacing */}
-                <div className="h-6"></div>
 
                 {/* Header */}
                 <header className="flex items-center justify-between mb-6">
