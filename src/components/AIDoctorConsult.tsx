@@ -678,6 +678,10 @@ export const AIDoctorConsult: React.FC = () => {
     }
 
     try {
+      if (!navigator.mediaDevices?.getUserMedia) {
+        toast({ title: 'Microphone not supported', description: 'Your device or browser does not support audio recording.', variant: 'destructive' });
+        return;
+      }
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       audioStreamRef.current = stream;
 
@@ -776,6 +780,7 @@ export const AIDoctorConsult: React.FC = () => {
   };
 
   const getBestVoice = useCallback((lang: string): SpeechSynthesisVoice | null => {
+    if (!('speechSynthesis' in window)) return null;
     const voices = window.speechSynthesis.getVoices();
     if (voices.length === 0) return null;
 

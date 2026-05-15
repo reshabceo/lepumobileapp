@@ -288,7 +288,8 @@ export const usePatientWebRTCCall = (patientId: string | null): UsePatientWebRTC
     };
 
     return () => {
-      if (ws.readyState === WebSocket.OPEN) {
+      // Close regardless of state — CONNECTING sockets left open become zombie sockets
+      if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
         ws.close();
       }
     };

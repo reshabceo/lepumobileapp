@@ -161,7 +161,12 @@ export const useWebRTC = (config: WebRTCConfig = DEFAULT_CONFIG): UseWebRTCRetur
   const initializeMedia = useCallback(async (video: boolean = true, audio: boolean = true): Promise<boolean> => {
     try {
       console.log('[WebRTC] Requesting media access...', { video, audio });
-      
+
+      if (!navigator.mediaDevices?.getUserMedia) {
+        console.error('[WebRTC] navigator.mediaDevices.getUserMedia not available');
+        return false;
+      }
+
       const stream = await navigator.mediaDevices.getUserMedia({
         video: video ? {
           width: { ideal: 1280 },

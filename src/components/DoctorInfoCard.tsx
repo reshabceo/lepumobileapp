@@ -64,6 +64,7 @@ export const DoctorInfoCard: React.FC = React.memo(() => {
     const fetchDoctorInfo = async () => {
       // Skip if no user or already fetching
       if (!user || fetchingRef.current) {
+        if (!user) setLoading(false); // don't leave spinner while auth is initializing
         return;
       }
 
@@ -119,7 +120,15 @@ export const DoctorInfoCard: React.FC = React.memo(() => {
           .eq("auth_user_id", user.id)
           .single();
 
-        if (patientError || !patientProfile?.assigned_doctor_id) {
+        if (patientError) {
+          clearTimeout(timeoutId);
+          // Show a network/DB error rather than "No doctor assigned" — it's a fetch failure, not a real unassigned state
+          setError("Could not load doctor info. Check your connection and try again.");
+          setLoading(false);
+          fetchingRef.current = false;
+          return;
+        }
+        if (!patientProfile?.assigned_doctor_id) {
           clearTimeout(timeoutId);
           setError("No doctor assigned yet. Please contact support.");
           setLoading(false);
