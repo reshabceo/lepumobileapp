@@ -1705,54 +1705,14 @@ const ECGMonitor: React.FC = () => {
     );
   };
 
-  // Start device status monitoring
-
+  // Device status monitoring is driven purely by the native Capacitor plugin stream.
+  // The legacy localhost:3000 polling was removed — it caused crashes when the
+  // local Lepu device server wasn't running and surfaced a misleading
+  // "Make sure the backend server is running on port 3000" error to users.
   const startDeviceStatusMonitoring = () => {
-    const statusInterval = setInterval(async () => {
-      if (!isMonitoring) {
-        clearInterval(statusInterval);
-
-        return;
-      }
-
-      try {
-        const statusResponse = await fetch(
-          `http://localhost:3000/api/devices/${selectedDevice}/status`
-        );
-
-        if (statusResponse.ok) {
-          const statusData = await statusResponse.json();
-
-          if (statusData.device && statusData.device.status) {
-            if (statusData.device.status === "measuring") {
-              toast({
-                title: "ECG Measurement in Progress",
-
-                description:
-                  "ECG rhythm analysis is currently being performed. Please remain still.",
-              });
-            } else if (statusData.device.status === "idle") {
-              setIsMonitoring(false);
-
-              setMonitoringStatus("listening");
-
-              toast({
-                title: "ECG Analysis Completed",
-
-                description:
-                  "ECG rhythm analysis completed successfully. You can start a new analysis anytime.",
-              });
-
-              clearInterval(statusInterval);
-            }
-          }
-        }
-      } catch (error) {
-        console.error("ECG status check error:", error);
-      }
-    }, 1000);
-
-    return () => clearInterval(statusInterval);
+    // No-op: native device events are received via the Capacitor plugin listeners
+    // already set up in this component (onDeviceDataUpdate, etc.).
+    return () => {};
   };
 
   // Simulator removed: UI is driven only by native device stream
