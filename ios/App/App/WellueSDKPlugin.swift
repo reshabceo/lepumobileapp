@@ -4,1505 +4,1110 @@ import CoreBluetooth
 import VTMProductLib
 
 @objc(WellueSDK)
-public class WellueSDK: CAPPlugin, CBPeripheralDelegate {
-    private enum BPCmd: UInt8 {
-        case getRealPressure = 0x05
-        case getRealStatus = 0x06
-        case getRealWave = 0x07
-        case getRealData = 0x08
-        case switchState = 0x09
-        case batteryInfo = 0xE4
-        case deviceInfo = 0xE1
-        // File protocol commands (Viatom File Parse Protocol)
-        case getFileList = 0xF1
-        case readFileStart = 0xF2
-        case readFileContent = 0xF3
-        case readFileEnd = 0xF4
-    }
-
-    private let targetServiceUUID = CBUUID(string: "14839AC4-7D7E-415C-9A42-167340CF2339")
-    private let targetNamePrefixes = ["BP2", "Wellue", "Viatom"]
-    private let bluetoothQueue = DispatchQueue(label: "com.monitraq.wellue.bluetooth", qos: .userInitiated)
-
+public class WellueSDK: CAPPlugin, CBCentralManagerDelegate, CBPeripheralDelegate, VTMURATDeviceDelegate, VTMURATUtilsDelegate {
     private var centralManager: CBCentralManager?
-    private var viatomUtils: VTMURATUtils?
-
-    private var discoveredDevices: [UUID: CBPeripheral] = [:]
-    private var currentDevice: CBPeripheral?
-
-    private var pendingInitializeCall: CAPPluginCall?
-    private var pendingConnectCall: CAPPluginCall?
-    private var pendingDisconnectCall: CAPPluginCall?
-    private var pendingBatteryCall: CAPPluginCall?
-
-    private var deploymentTimer: Timer?
-    private var deploymentRetryCount = 0
-    private let maxDeploymentRetries = 3
-    private var isSdkDeployed = false
-
-    private var healthTimer: Timer?
-    private var lastDataTimestamp: Date?
-    private let healthCheckInterval: TimeInterval = 3.0
-    private let dataTimeoutInterval: TimeInterval = 10.0
-
+    private var isBluetoothEnabled = false
+    private var discoveredDevices: [String: CBPeripheral] = [:]
+    private var connectedDevice: CBPeripheral?
     private var isScanning = false
-    private var scanStopTimer: Timer?
-    // SIMPLIFIED: Single status polling timer
-    private var statusPollingTimer: Timer?
-    private let idlePollingInterval: TimeInterval = 1.0 // Fast polling when idle (1s)
-    private let measuringPollingInterval: TimeInterval = 3.0 // SLOW polling during measurement (3s) - prevents device overload
+    private var pendingScan = false
     
-    // Simple measurement tracking
-    private var previousStatus: UInt8 = 0
-    private var justCompletedMeasurement: Bool = false
-    private var measurementCompletionTime: Date?
+    // Viatom SDK integration
+    private var viatomUtils: VTMURATUtils?
+    private var currentDevice: CBPeripheral?
+    private var isConnected = false
     private var isMeasuring = false
-    private var measurementStartTime: Date?
-    private let measurementTimeout: TimeInterval = 60.0 // Force completion after 60 seconds
-    private var isCurrentlyDeflating = false // ✅ Track deflation state to suppress status 3 events
+    private var pendingConnectCall: CAPPluginCall?  // Store connect call until SDK deploys
+    private var pendingBatteryCall: CAPPluginCall?  // Store battery call until delegate returns
     
-    // File reading state
-    private var downloadingFileName: String?
-    private var downloadData: NSMutableData?
-    private var expectedFileLength: UInt32 = 0
-    private var fileReadAttempts = 0
-    private let maxFileReadAttempts = 3
-    private var isFileReadInProgress = false // ✅ Prevent multiple file reads
-    private var hasCompletedCurrentMeasurement = false // ✅ Prevent duplicate completeMeasurement calls
+    // 🔥 Real-time data streaming timer
+    private var realTimeDataTimer: Timer?
+    private var isSdkDeployed = false  // Track if SDK handshake is complete
+    private var deploymentTimer: Timer?  // Timeout for SDK deployment
+    private var deploymentRetryCount = 0  // Track retry attempts
+    private let MAX_DEPLOYMENT_RETRIES = 3
     
-    // ECG file reading state
-    private var isReadingECGFile = false // ✅ Track if reading ECG file
-    private var ecgFileReadAttempts = 0
-    private let maxECGFileReadAttempts = 3
-
-    // MARK: - Lifecycle
+    // 🔥 SDK Health Monitoring (Watchdog)
+    private var lastDataReceivedTime: Date?  // Track when we last received data
+    private var healthCheckTimer: Timer?  // Periodic health check
+    private let HEALTH_CHECK_INTERVAL = 3.0  // Check every 3 seconds
+    private let DATA_TIMEOUT_THRESHOLD = 10.0  // If no data for 10 seconds, SDK is dead
+    
+    // BP2 Service and Characteristic UUIDs (from Viatom LepuDemo + Android implementation)
+    private let BP2_SERVICE_UUID = CBUUID(string: "14839AC4-7D7E-415C-9A42-167340CF2339")
+    private let BP2_WRITE_CHAR_UUID = CBUUID(string: "8B00ACE7-EB0B-49B0-BBE9-9AEE0A26E1A3")
+    private let BP2_NOTIFY_CHAR_UUID = CBUUID(string: "0734594A-A8E7-4B1A-A6B1-CD5243059A57")
+    
+    // Alternative approach: Scan with BP2 service UUID filter (like Android does)
+    private var scanWithServiceFilter = false  // Set to true to enable UUID filtering
+    
+    private var bp2WriteCharacteristic: CBCharacteristic?
+    private var bp2NotifyCharacteristic: CBCharacteristic?
+    
+    // Debug logging
+    private let debugPrefix = "🔵 [WELLUE SDK]"
+    private let errorPrefix = "❌ [WELLUE SDK]"
+    private let successPrefix = "✅ [WELLUE SDK]"
+    private let warningPrefix = "⚠️ [WELLUE SDK]"
 
     public override func load() {
-        super.load()
-        NSLog("🔧 [WELLUE SDK] ===== load() METHOD CALLED =====")
-        NSLog("🔧 [WELLUE SDK] Plugin class: \(type(of: self))")
-        NSLog("🔧 [WELLUE SDK] Plugin identifier: \(self.pluginId ?? "nil")")
-        logInfo("Plugin loaded - starting initialization")
-
-        centralManager = CBCentralManager(delegate: self, queue: bluetoothQueue)
+        NSLog("🚀🚀🚀🚀🚀 [WELLUE LOAD] ===========================================")
+        NSLog("🚀🚀🚀🚀🚀 [WELLUE LOAD] PLUGIN LOAD() METHOD EXECUTED!!!!!!!!")
+        NSLog("🚀🚀🚀🚀🚀 [WELLUE LOAD] ===========================================")
+        print("🚀🚀🚀🚀🚀 [WELLUE LOAD] PLUGIN LOAD() METHOD EXECUTED!!!!!!!!")
+        debugLog("Plugin loaded - Starting initialization")
+        centralManager = CBCentralManager(delegate: self, queue: nil)
+        debugLog("CBCentralManager initialized")
+        
+        // Initialize Viatom SDK
         viatomUtils = VTMURATUtils()
         viatomUtils?.delegate = self
-        viatomUtils?.deviceDelegate = self
-        viatomUtils?.notifyDeviceRSSI = true
-        NSLog("🔧 [WELLUE SDK] ✅ Plugin initialization complete")
+        debugLog("Viatom SDK initialized successfully")
+        debugLog("SDK version check: \(String(describing: viatomUtils))")
+        NSLog("🚀🚀🚀🚀🚀 [WELLUE LOAD] Load method completed")
+    }
+    
+    // MARK: - Debug Logging
+    private func debugLog(_ message: String, function: String = #function, line: Int = #line) {
+        print("\(debugPrefix) [\(function):\(line)] \(message)")
+    }
+    
+    private func errorLog(_ message: String, function: String = #function, line: Int = #line) {
+        print("\(errorPrefix) [\(function):\(line)] \(message)")
+    }
+    
+    private func successLog(_ message: String, function: String = #function, line: Int = #line) {
+        print("\(successPrefix) [\(function):\(line)] \(message)")
+    }
+    
+    private func warningLog(_ message: String, function: String = #function, line: Int = #line) {
+        print("\(warningPrefix) [\(function):\(line)] \(message)")
+    }
+    
+    private func startCoreBluetoothScanIfPossible() {
+        guard let centralManager = centralManager else {
+            errorLog("CBCentralManager not initialized in startCoreBluetoothScanIfPossible")
+            return
+        }
+        guard centralManager.state == .poweredOn else {
+            warningLog("Bluetooth not powered on yet; deferring scan")
+            pendingScan = true
+            return
+        }
+        if isScanning {
+            warningLog("Scan already in progress (startCoreBluetoothScanIfPossible)")
+            return
+        }
+        discoveredDevices.removeAll()
+        debugLog("Starting Core Bluetooth scan (auto)")
+        centralManager.scanForPeripherals(withServices: nil, options: [CBCentralManagerScanOptionAllowDuplicatesKey: true])
+        isScanning = true
+        successLog("Bluetooth scan started (auto)")
+    }
+    
+    private func getBluetoothStateDescription(_ state: CBManagerState) -> String {
+        switch state {
+        case .unknown: return "Unknown"
+        case .resetting: return "Resetting"
+        case .unsupported: return "Unsupported"
+        case .unauthorized: return "Unauthorized"
+        case .poweredOff: return "Powered Off"
+        case .poweredOn: return "Powered On"
+        @unknown default: return "Unknown State"
+        }
     }
 
-    // MARK: - Public API
+    // MARK: - CBCentralManagerDelegate
+    public func centralManagerDidUpdateState(_ central: CBCentralManager) {
+        let isEnabled = (central.state == .poweredOn)
+        isBluetoothEnabled = isEnabled
+        debugLog("Bluetooth state changed to: \(isEnabled) (state=\(central.state.rawValue))")
+        debugLog("Bluetooth state details: \(getBluetoothStateDescription(central.state))")
+        var result = JSObject()
+        result["enabled"] = isEnabled
+        notifyListeners("bluetoothStatusChanged", data: result)
+        
+        // If a scan was requested before power-on, start it now
+        if isEnabled && pendingScan {
+            debugLog("Pending scan detected after power-on; starting scan now")
+            pendingScan = false
+            startCoreBluetoothScanIfPossible()
+        }
+    }
+    
+    public func centralManager(_ central: CBCentralManager, didDiscover peripheral: CBPeripheral, advertisementData: [String : Any], rssi: NSNumber) {
+        let advLocalName = advertisementData[CBAdvertisementDataLocalNameKey] as? String
+        let rawPeripheralName = peripheral.name
+        let resolvedName = (advLocalName?.trimmingCharacters(in: .whitespacesAndNewlines)).flatMap { $0.isEmpty ? nil : $0 }
+            ?? (rawPeripheralName?.trimmingCharacters(in: .whitespacesAndNewlines)).flatMap { $0.isEmpty ? nil : $0 }
+            ?? "Unknown Device"
+        let deviceId = peripheral.identifier.uuidString
 
-    @objc public func initialize(_ call: CAPPluginCall) {
-        logInfo("Initialize called from JavaScript")
-        if isBluetoothReady {
-            call.resolve(["success": true])
+        NSLog("📱📱📱 [BLE DISCOVERY] Device: \(resolvedName) UUID: \(deviceId) RSSI: \(rssi)")
+        debugLog("Discovered device: \(resolvedName) (ID: \(deviceId))  RSSI=\(rssi)")
+        if let advLocalName = advLocalName { 
+            NSLog("📱 [BLE DISCOVERY] Adv name: \(advLocalName)")
+            debugLog("Adv local name: \(advLocalName)") 
+        }
+
+        // Heuristic match for Wellue/Viatom BP devices using name
+        let nameLower = resolvedName.lowercased()
+        // More precise matching: BP2 at start/end, or wellue/viatom brand, but NOT airpods/headphones
+        let startsWithBP = nameLower.hasPrefix("bp") || nameLower.hasPrefix("wellue") || nameLower.hasPrefix("viatom")
+        let containsBP2 = nameLower.contains("bp2") || nameLower.contains("bp-2")
+        let isBrandMatch = nameLower.contains("wellue") || nameLower.contains("viatom")
+        let isNotAudio = !nameLower.contains("airpod") && !nameLower.contains("headphone") && !nameLower.contains("earbud")
+        let looksLikeWellue = (startsWithBP || containsBP2 || isBrandMatch) && isNotAudio
+
+        // Track peripheral so we can connect when requested
+        discoveredDevices[deviceId] = peripheral
+
+        // Only emit Wellue/BP2 devices to avoid connecting to random Bluetooth devices
+        if looksLikeWellue {
+            var deviceData = JSObject()
+            deviceData["id"] = deviceId
+            deviceData["deviceId"] = deviceId
+            deviceData["address"] = deviceId
+            deviceData["name"] = resolvedName
+            deviceData["deviceName"] = resolvedName
+            deviceData["rssi"] = rssi.intValue
+            deviceData["wellueHint"] = true
+            
+            NSLog("✅ [BLE DISCOVERY] Wellue device detected, emitting to JS: \(resolvedName)")
+            debugLog("Notifying listeners of discovered Wellue device (deviceFound)")
+            notifyListeners("deviceFound", data: deviceData)
         } else {
-            pendingInitializeCall = call
-            logWarn("Bluetooth not powered on yet - deferring initialization")
+            NSLog("⏭️ [BLE DISCOVERY] Skipping non-Wellue device: \(resolvedName)")
+            debugLog("Skipping non-Wellue device: \(resolvedName)")
         }
     }
-
-    @objc public func isBluetoothEnabled(_ call: CAPPluginCall) {
-        call.resolve(["enabled": isBluetoothReady])
-    }
-
-    @objc public func startScan(_ call: CAPPluginCall) {
-        guard ensureBluetoothReady(for: call) else { return }
-
-        bluetoothQueue.async {
-            if self.isScanning {
-                self.stopScanInternal()
-            }
-
-            self.discoveredDevices.removeAll()
-            self.isScanning = true
-            self.logInfo("Starting CoreBluetooth scan for Wellue devices")
-
-            self.centralManager?.scanForPeripherals(withServices: nil, options: [
-                CBCentralManagerScanOptionAllowDuplicatesKey: false
-            ])
-
-            self.scheduleScanTimeout()
-            DispatchQueue.main.async {
-                call.resolve(["success": true])
-            }
-        }
-    }
-
-    @objc public func stopScan(_ call: CAPPluginCall) {
-        bluetoothQueue.async {
-            self.stopScanInternal()
-            DispatchQueue.main.async {
-                call.resolve(["success": true])
-            }
-        }
-    }
-
-    @objc public func connect(_ call: CAPPluginCall) {
-        guard ensureBluetoothReady(for: call) else { return }
-        guard let identifier = call.getString("address") ?? call.getString("deviceId"),
-              let uuid = UUID(uuidString: identifier) else {
-            call.reject("Device identifier is required")
-            return
-        }
-
-        bluetoothQueue.async {
-            var peripheral = self.discoveredDevices[uuid]
-            if peripheral == nil {
-                let retrieved = self.centralManager?.retrievePeripherals(withIdentifiers: [uuid])
-                peripheral = retrieved?.first
-            }
-
-            guard let target = peripheral else {
-                DispatchQueue.main.async {
-                    call.reject("Device not found. Please scan first.")
-                }
-                return
-            }
-
-            self.logInfo("Attempting to connect to device: \(target.name ?? "Unknown") (\(identifier))")
-            self.pendingConnectCall = call
-            self.currentDevice = target
-            target.delegate = self
-
-            self.viatomUtils?.peripheral = target
-            self.centralManager?.connect(target, options: nil)
-            self.triggerSDKDeployment()
-        }
-    }
-
-    @objc public func disconnect(_ call: CAPPluginCall) {
-        bluetoothQueue.async {
-            guard let device = self.currentDevice else {
-                DispatchQueue.main.async { call.resolve(["success": true]) }
-                return
-            }
-            self.pendingDisconnectCall = call
-            self.centralManager?.cancelPeripheralConnection(device)
-        }
-    }
-
-    @objc public func startBPMeasurement(_ call: CAPPluginCall) {
-        guard ensureSDKReady(for: call) else { return }
-        viatomUtils?.requestChangeBPState(0)
-        viatomUtils?.requestBPRealData()
-        viatomUtils?.bp_requestRealStatus()
-        notifyListeners("bpLifecycle", data: ["state": "starting"])
-        call.resolve(["success": true])
-    }
-
-    @objc public func startECGMeasurement(_ call: CAPPluginCall) {
-        guard ensureSDKReady(for: call) else { return }
-        viatomUtils?.requestChangeBPState(1)
-        call.resolve(["success": true])
-        notifyListeners("ecgLifecycle", data: ["state": "start"])
-    }
-
-    @objc public func stopMeasurement(_ call: CAPPluginCall) {
-        guard ensureBluetoothReady(for: call) else { return }
-        viatomUtils?.requestChangeBPState(4)
-        viatomUtils?.bp_requestRealStatus()
-        call.resolve(["success": true])
-    }
-
-    @objc public func startRtTaskForConnectedDevice(_ call: CAPPluginCall) {
-        logInfo("🚀 [STATUS POLLING] Starting simple status monitoring")
+    
+    public func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {
+        successLog("Successfully connected to device: \(peripheral.name ?? "Unknown")")
+        isConnected = true
+        connectedDevice = peripheral
+        currentDevice = peripheral
         
-        // ✅ FIX 6: If SDK not ready, trigger deployment and retry
-        guard ensureBluetoothReady(for: call) else {
-            logError("❌ [STATUS POLLING] Bluetooth not ready")
+        // Hand-off connection/session management to Viatom SDK
+        if let utils = viatomUtils {
+            utils.peripheral = peripheral
+            utils.deviceDelegate = self
+            debugLog("Handing over to Viatom SDK after OS-level connect")
+            // SDK will perform its proprietary handshake; no manual service discovery here
+        }
+        
+        var result = JSObject()
+        result["deviceId"] = peripheral.identifier.uuidString
+        result["deviceName"] = peripheral.name ?? "Unknown Device"
+        result["connected"] = true
+        
+        debugLog("Notifying listeners of successful connection")
+        notifyListeners("deviceConnected", data: result)
+    }
+    
+    public func centralManager(_ central: CBCentralManager, didFailToConnect peripheral: CBPeripheral, error: Error?) {
+        errorLog("Failed to connect to device: \(peripheral.name ?? "Unknown")")
+        if let error = error {
+            errorLog("Connection error: \(error.localizedDescription)")
+        }
+        
+        var result = JSObject()
+        result["deviceId"] = peripheral.identifier.uuidString
+        result["deviceName"] = peripheral.name ?? "Unknown Device"
+        result["connected"] = false
+        result["error"] = error?.localizedDescription ?? "Unknown error"
+        
+        debugLog("Notifying listeners of connection failure")
+        notifyListeners("deviceConnectionFailed", data: result)
+    }
+    
+    public func centralManager(_ central: CBCentralManager, didDisconnectPeripheral peripheral: CBPeripheral, error: Error?) {
+        warningLog("Device disconnected: \(peripheral.name ?? "Unknown")")
+        if let error = error {
+            warningLog("Disconnection error: \(error.localizedDescription)")
+        }
+        
+        isConnected = false
+        connectedDevice = nil
+        currentDevice = nil
+        isSdkDeployed = false  // Reset deployment flag on disconnect
+        
+        var result = JSObject()
+        result["deviceId"] = peripheral.identifier.uuidString
+        result["deviceName"] = peripheral.name ?? "Unknown Device"
+        result["connected"] = false
+        result["error"] = error?.localizedDescription
+        
+        debugLog("Notifying listeners of disconnection")
+        notifyListeners("deviceDisconnected", data: result)
+    }
+
+    // MARK: - SDK Health Monitoring
+    private func startHealthMonitoring() {
+        NSLog("🏥 [HEALTH] Starting SDK health monitoring (check every \(HEALTH_CHECK_INTERVAL)s)")
+        
+        // Stop any existing health check
+        healthCheckTimer?.invalidate()
+        
+        // Initialize last data time
+        lastDataReceivedTime = Date()
+        
+        // Start periodic health check
+        healthCheckTimer = Timer.scheduledTimer(withTimeInterval: HEALTH_CHECK_INTERVAL, repeats: true) { [weak self] _ in
+            guard let self = self else { return }
+            self.performHealthCheck()
+        }
+    }
+    
+    private func stopHealthMonitoring() {
+        NSLog("🏥 [HEALTH] Stopping SDK health monitoring")
+        healthCheckTimer?.invalidate()
+        healthCheckTimer = nil
+        lastDataReceivedTime = nil
+    }
+    
+    private func performHealthCheck() {
+        guard let lastDataTime = lastDataReceivedTime else {
+            NSLog("🏥 [HEALTH] No baseline data received yet")
             return
         }
         
-        guard currentDevice?.state == .connected else {
-            call.reject("Device is not connected")
-            return
-        }
+        let timeSinceLastData = Date().timeIntervalSince(lastDataTime)
         
-        // ✅ FIX 6: If SDK not deployed, trigger deployment first
-        if !isSdkDeployed {
-            logWarn("⚠️ [STATUS POLLING] SDK not deployed yet - triggering deployment...")
-            if let device = currentDevice {
-                viatomUtils?.peripheral = device
+        if timeSinceLastData > DATA_TIMEOUT_THRESHOLD {
+            NSLog("⚠️ [HEALTH] SDK TIMEOUT! No data for \(Int(timeSinceLastData)) seconds")
+            NSLog("🔄 [HEALTH] SDK appears dead - triggering auto-recovery...")
+            
+            // Auto-recovery: Re-deploy SDK
+            if isSdkDeployed {
+                NSLog("🔄 [HEALTH] Marking SDK as not deployed, forcing re-deployment...")
+                isSdkDeployed = false
                 triggerSDKDeployment()
             }
             
-            // Wait for SDK deployment with retry
+            // Notify JavaScript layer
+            var result = JSObject()
+            result["error"] = "SDK timeout detected"
+            result["timeSinceLastData"] = timeSinceLastData
+            notifyListeners("sdkHealthWarning", data: result)
+        } else {
+            // SDK is healthy
+            NSLog("✅ [HEALTH] SDK healthy - last data \(Int(timeSinceLastData))s ago")
+        }
+    }
+    
+    private func markDataReceived() {
+        // Update timestamp whenever we receive ANY data from SDK
+        lastDataReceivedTime = Date()
+    }
+    
+    // MARK: - SDK Deployment Management
+    private func triggerSDKDeployment() {
+        guard let device = currentDevice else {
+            NSLog("❌ [SDK DEPLOY] No device to deploy SDK for")
+            return
+        }
+        
+        guard let utils = viatomUtils else {
+            NSLog("❌ [SDK DEPLOY] viatomUtils not initialized")
+            return
+        }
+        
+        NSLog("🔄 [SDK DEPLOY] Triggering SDK deployment for device: \(device.name ?? "Unknown")")
+        NSLog("🔄 [SDK DEPLOY] Retry count: \(deploymentRetryCount)/\(MAX_DEPLOYMENT_RETRIES)")
+        
+        // Cancel existing deployment timer
+        deploymentTimer?.invalidate()
+        
+        // Set a 5-second timeout for deployment completion
+        deploymentTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: false) { [weak self] _ in
+            guard let self = self else { return }
+            
+            if !self.isSdkDeployed {
+                NSLog("⏰ [SDK DEPLOY] Timeout! utilDeployCompletion not called within 5 seconds")
+                
+                if self.deploymentRetryCount < self.MAX_DEPLOYMENT_RETRIES {
+                    self.deploymentRetryCount += 1
+                    NSLog("🔄 [SDK DEPLOY] Retrying deployment... (\(self.deploymentRetryCount)/\(self.MAX_DEPLOYMENT_RETRIES))")
+                    
+                    // Re-trigger deployment by re-setting peripheral
+                    if let device = self.currentDevice {
+                        utils.peripheral = device
+                        self.triggerSDKDeployment()  // Recursive retry with new timer
+                    }
+                } else {
+                    NSLog("❌ [SDK DEPLOY] Max retries reached. Deployment failed.")
+                    // Notify JavaScript layer of failure
+                    var result = JSObject()
+                    result["error"] = "SDK deployment failed after \(self.MAX_DEPLOYMENT_RETRIES) attempts"
+                    self.notifyListeners("sdkDeploymentFailed", data: result)
+                }
+            }
+        }
+        
+        NSLog("⏰ [SDK DEPLOY] Deployment timeout timer started (5 seconds)")
+    }
+    
+    // MARK: - VTMURATDeviceDelegate & VTMURATUtilsDelegate
+    public func utilDeployCompletion(_ util: VTMURATUtils) {
+        NSLog("🎉🎉🎉 [VIATOM SDK] DEPLOYMENT COMPLETED! SDK IS READY!")
+        successLog("Viatom SDK deployment completion callback received")
+        
+        // Cancel deployment timeout timer
+        deploymentTimer?.invalidate()
+        deploymentTimer = nil
+        deploymentRetryCount = 0  // Reset retry counter
+        NSLog("✅ [SDK DEPLOY] Deployment successful, timer cancelled")
+        
+        viatomUtils = util
+        isSdkDeployed = true  // ✅ SDK is now ready to accept commands
+        
+        // 🔥 Start health monitoring to ensure SDK stays alive
+        startHealthMonitoring()
+        
+        // NOW resolve the pending connect call with device info
+        if let call = pendingConnectCall, let device = currentDevice {
+            var result = JSObject()
+            result["deviceId"] = device.identifier.uuidString
+            result["deviceName"] = device.name ?? "Unknown Device"
+            result["name"] = device.name ?? "Unknown Device"
+            result["address"] = device.identifier.uuidString
+            result["model"] = "BP2"
+            result["connected"] = true
+            
+            NSLog("🎉 [VIATOM SDK] Resolving pending connect call with device data: \(result)")
+            call.resolve(result)
+            pendingConnectCall = nil
+            
+            // Emit deviceConnected event
+            notifyListeners("deviceConnected", data: result)
+        }
+        
+        debugLog("Requesting device info to verify connection")
+        viatomUtils?.requestDeviceInfo()
+        
+        // Begin real-time BP stream immediately so device-initiated measurements are detected
+        debugLog("Requesting BP real-time data stream after deployment")
+        viatomUtils?.requestBPRealData()
+
+        // Request periodic status updates (battery, measuring state)
+        viatomUtils?.bp_requestRealStatus()
+    }
+
+    // MARK: - VTMURATUtilsDelegate (generic command callbacks)
+    public func util(_ util: VTMURATUtils, commandCompletion cmdType: UInt8, deviceType: VTMDeviceType, response: Data?) {
+        // 🏥 Mark data as received (SDK is alive!)
+        markDataReceived()
+        
+        debugLog("📊 [UTIL] ========================================")
+        debugLog("📊 [UTIL] Command completion received!")
+        debugLog("📊 [UTIL] cmdType: 0x\(String(format: "%02X", cmdType))")
+        debugLog("📊 [UTIL] deviceType: \(deviceType.rawValue)")
+        debugLog("📊 [UTIL] response data: \(response != nil ? "\(response!.count) bytes" : "nil")")
+        debugLog("📊 [UTIL] ========================================")
+
+        guard deviceType == VTMDeviceTypeBP else {
+            debugLog("📊 [UTIL] ❌ Not a BP device, ignoring")
+            return
+        }
+
+        guard let data = response else {
+            errorLog("📊 [UTIL] ❌ No response data!")
+            return
+        }
+
+        // Dispatch by command type
+        switch cmdType {
+        case VTMBPCmdGetRealData.rawValue: // 0x08 - measuring data
+            let measure = VTMBLEParser.parseBPMeasuring(data)
+            var realTime = JSObject()
+            realTime["deviceId"] = currentDevice?.identifier.uuidString
+            realTime["pressure"] = Int(measure.pressure)
+            realTime["pulse"] = Int(measure.pulse_rate)
+            realTime["isDeflating"] = Int(measure.is_deflating) == 1
+            debugLog("📊 [0x08] Parsed BP measuring data: pressure=\(measure.pressure) pulse=\(measure.pulse_rate) isDeflating=\(measure.is_deflating)")
+            debugLog("📊 [0x08] Sending bp2Rt event with data: \(realTime)")
+            notifyListeners("bp2Rt", data: realTime)
+            debugLog("📊 [0x08] ✅ bp2Rt event sent!")
+
+        case VTMBPCmdGetRealStatus.rawValue: // 0x06 - run status + battery
+            let status = VTMBLEParser.parseBPRealTimeStatus(data)
+            var statusData = JSObject()
+            statusData["deviceId"] = currentDevice?.identifier.uuidString
+            statusData["status"] = Int(status.status)
+            statusData["batteryPercent"] = Int(status.battery.percent)
+            debugLog("📊 [0x06] Parsed BP status: status=\(status.status) battery=\(status.battery.percent)%")
+            debugLog("📊 [0x06] Sending bp2Rt event with data: \(statusData)")
+            notifyListeners("bp2Rt", data: statusData)
+            debugLog("📊 [0x06] ✅ bp2Rt event sent!")
+
+        case VTMBPCmdGetRealPressure.rawValue: // 0x05 - pressure only
+            let p = VTMBLEParser.parseBPRealTimePressure(data)
+            var obj = JSObject()
+            obj["deviceId"] = currentDevice?.identifier.uuidString
+            obj["pressure"] = Int(p.pressure)
+            debugLog("📊 [0x05] Parsed BP pressure: pressure=\(p.pressure)")
+            debugLog("📊 [0x05] Sending bp2Rt event with data: \(obj)")
+            notifyListeners("bp2Rt", data: obj)
+            debugLog("📊 [0x05] ✅ bp2Rt event sent!")
+
+        case VTMBLECmdGetBattery.rawValue: // 0xE4 - battery info
+            let bat = VTMBLEParser.parseBatteryInfo(data)
+            var batteryData = JSObject()
+            batteryData["batteryLevel"] = Int(bat.percent)
+            batteryData["deviceId"] = currentDevice?.identifier.uuidString
+            notifyListeners("batteryInfo", data: batteryData)
+            if let call = pendingBatteryCall {
+                call.resolve(["batteryLevel": Int(bat.percent)])
+                pendingBatteryCall = nil
+            }
+
+        default:
+            // Try to parse possible end-of-measure payloads
+            let end = VTMBLEParser.parseBPEndMeasure(data)
+            // Heuristic: non-zero systolic/diastolic indicates end result
+            if end.systolic_pressure != 0 && end.diastolic_pressure != 0 {
+                isMeasuring = false
+                var finalResult = JSObject()
+                finalResult["systolic"] = Int(end.systolic_pressure)
+                finalResult["diastolic"] = Int(end.diastolic_pressure)
+                finalResult["pulse"] = Int(end.pulse_rate)
+                finalResult["state"] = Int(end.state_code)
+                finalResult["deviceId"] = currentDevice?.identifier.uuidString
+                successLog("Parsed BP end result: SYS=\(end.systolic_pressure) DIA=\(end.diastolic_pressure) PR=\(end.pulse_rate)")
+                notifyListeners("bpMeasurement", data: finalResult)
+            }
+        }
+    }
+
+    public func util(_ util: VTMURATUtils, commandFailed cmdType: UInt8, deviceType: VTMDeviceType, failedType: VTMBLEPkgType) {
+        errorLog("Command failed. cmdType=\(cmdType) deviceType=\(deviceType) failedType=\(failedType.rawValue)")
+    }
+    
+    public func deviceInfo(_ deviceInfo: VTMDeviceInfo) {
+        successLog("Device Info received")
+        debugLog("Device type: \(deviceInfo.device_type)")
+        debugLog("Firmware version(raw): \(deviceInfo.fw_version)")
+        debugLog("Hardware version(raw): \(deviceInfo.hw_version)")
+
+        var infoData = JSObject()
+        infoData["deviceId"] = currentDevice?.identifier.uuidString
+        infoData["deviceType"] = Int(deviceInfo.device_type)
+        infoData["firmwareVersion"] = Int(deviceInfo.fw_version)
+        infoData["hardwareVersion"] = Int(deviceInfo.hw_version)
+
+        debugLog("Notifying listeners of device info")
+        notifyListeners("deviceInfo", data: infoData)
+    }
+    
+    public func batteryInfo(_ batteryLevel: Int) {
+        successLog("Battery info received: \(batteryLevel)%")
+        
+        var batteryData = JSObject()
+        batteryData["batteryLevel"] = batteryLevel
+        batteryData["deviceId"] = currentDevice?.identifier.uuidString
+        
+        debugLog("Notifying listeners of battery info")
+        notifyListeners("batteryInfo", data: batteryData)
+        
+        // If there's a pending direct request, resolve it now
+        if let call = pendingBatteryCall {
+            call.resolve(["batteryLevel": batteryLevel])
+            pendingBatteryCall = nil
+        }
+    }
+    
+    public func bpRealData(_ realData: VTMBPRealTimeData) {
+        NSLog("🔥🔥🔥 [BP REAL DATA] AUTOMATIC DELEGATE FIRED! 🔥🔥🔥")
+        NSLog("📊 [BP REAL DATA] Status: \(realData.run_status.status)")
+        NSLog("📊 [BP REAL DATA] Battery: \(realData.run_status.battery.percent)%")
+        NSLog("📊 [BP REAL DATA] Waveform type: \(realData.rt_wav.type)")
+        
+        // Mark data received for health monitoring
+        markDataReceived()
+        
+        let status = Int(realData.run_status.status)
+        let battery = Int(realData.run_status.battery.percent)
+        let waveType = Int(realData.rt_wav.type)
+
+        var realTimeData = JSObject()
+        realTimeData["status"] = status
+        realTimeData["batteryPercent"] = battery
+        realTimeData["waveType"] = waveType
+        realTimeData["deviceId"] = currentDevice?.identifier.uuidString
+
+        NSLog("📊 [BP REAL DATA] Sending bp2Rt event with status=\(status) battery=\(battery)%")
+        notifyListeners("bp2Rt", data: realTimeData)
+        NSLog("✅ [BP REAL DATA] bp2Rt event sent to JavaScript!")
+        
+        // When status changes to 4 (measuring), start requesting real-time pressure data
+        if status == 4 {
+            NSLog("🚀 [BP REAL DATA] Status=4 detected! Device is measuring, requesting real-time pressure data...")
+            viatomUtils?.bp_requestRealStatus()
+            viatomUtils?.requestBPRealData()
+        }
+    }
+    
+    public func bpMeasurementResult(_ result: VTMBPEndMeasureData) {
+        successLog("BP Measurement completed")
+        debugLog("Final result - Systolic: \(result.systolic_pressure), Diastolic: \(result.diastolic_pressure)")
+        debugLog("Pulse: \(result.pulse_rate), State: \(result.state_code)")
+
+        isMeasuring = false
+
+        var finalResult = JSObject()
+        finalResult["systolic"] = Int(result.systolic_pressure)
+        finalResult["diastolic"] = Int(result.diastolic_pressure)
+        finalResult["pulse"] = Int(result.pulse_rate)
+        finalResult["state"] = Int(result.state_code)
+        finalResult["deviceId"] = currentDevice?.identifier.uuidString
+
+        debugLog("Notifying listeners of final BP result (bpMeasurement)")
+        notifyListeners("bpMeasurement", data: finalResult)
+    }
+    
+    // MARK: - ECG Delegate Methods
+    // NOTE: ECG delegates commented out - VTMProductLib SDK doesn't expose ECG types yet
+    // These will be re-enabled once we confirm the correct type names from the SDK
+    
+    /* Commented out until SDK types are confirmed
+    public func ecgRealData(_ realData: VTMECGRealTimeData) {
+        debugLog("ECG Real Data received")
+        
+        var waveformArray: [Int] = []
+        
+        if let waveDataPointer = realData.ecg_wav_data {
+            let sampleCount = Int(realData.ecg_wav_num)
+            for i in 0..<sampleCount {
+                waveformArray.append(Int(waveDataPointer[i]))
+            }
+        }
+        
+        var ecgData = JSObject()
+        ecgData["waveform"] = waveformArray
+        ecgData["heartRate"] = Int(realData.heart_rate)
+        ecgData["sampleRate"] = 125
+        ecgData["mvPerCount"] = 1
+        ecgData["deviceId"] = currentDevice?.identifier.uuidString
+        
+        debugLog("Notifying listeners of ECG real-time data (ecgData) - HR: \(realData.heart_rate), Samples: \(waveformArray.count)")
+        notifyListeners("ecgData", data: ecgData)
+    }
+    
+    public func ecgMeasurementResult(_ result: VTMECGEndMeasureData) {
+        successLog("ECG Measurement completed")
+        debugLog("Final ECG result - HR: \(result.heart_rate), State: \(result.state_code)")
+        
+        isMeasuring = false
+        
+        var finalResult = JSObject()
+        finalResult["heartRate"] = Int(result.heart_rate)
+        finalResult["state"] = Int(result.state_code)
+        finalResult["deviceId"] = currentDevice?.identifier.uuidString
+        
+        var lifecycleData = JSObject()
+        lifecycleData["state"] = "stop"
+        lifecycleData["deviceId"] = currentDevice?.identifier.uuidString
+        notifyListeners("ecgLifecycle", data: lifecycleData)
+        
+        debugLog("Notifying listeners of final ECG result and lifecycle stop")
+    }
+    */
+
+    // MARK: - Plugin API
+    @objc public func initialize(_ call: CAPPluginCall) {
+        NSLog("🚀🚀🚀 [WELLUE INIT] INITIALIZE CALLED FROM JAVASCRIPT 🚀🚀🚀")
+        print("🚀🚀🚀 [WELLUE INIT] INITIALIZE CALLED FROM JAVASCRIPT 🚀🚀🚀")
+        debugLog("Initialize called from JavaScript")
+        
+        if centralManager == nil {
+            debugLog("Creating new CBCentralManager instance")
+            centralManager = CBCentralManager(delegate: self, queue: nil)
+        } else {
+            debugLog("Using existing CBCentralManager instance")
+        }
+        
+        let isEnabled = (centralManager?.state == .poweredOn)
+        debugLog("Bluetooth state after initialization: \(isEnabled) (state=\(centralManager?.state.rawValue ?? 0))")
+        
+        var result = JSObject()
+        result["enabled"] = isEnabled
+        notifyListeners("bluetoothStatusChanged", data: result)
+        
+        successLog("Initialization completed successfully")
+        call.resolve()
+    }
+
+    @objc public func isBluetoothEnabled(_ call: CAPPluginCall) {
+        let enabled = (centralManager?.state == .poweredOn)
+        debugLog("Bluetooth status check requested: \(enabled) (state=\(centralManager?.state.rawValue ?? 0))")
+        call.resolve(["enabled": enabled])
+    }
+
+    @objc public func startScan(_ call: CAPPluginCall) {
+        NSLog("🔍🔍🔍 [WELLUE SCAN] START SCAN CALLED FROM JAVASCRIPT 🔍🔍🔍")
+        print("🔍🔍🔍 [WELLUE SCAN] START SCAN CALLED FROM JAVASCRIPT 🔍🔍🔍")
+        debugLog("Start scan called from JavaScript")
+        
+        guard let centralManager = centralManager else {
+            errorLog("CBCentralManager not initialized")
+            call.reject("Bluetooth not initialized", "BLUETOOTH_NOT_INITIALIZED")
+            return
+        }
+        
+        if centralManager.state != .poweredOn {
+            warningLog("Bluetooth not enabled yet (state=\(centralManager.state.rawValue)); will start scan when powered on")
+            pendingScan = true
+            // Mark scanning as in progress so UI shows feedback
+            isScanning = true
+            // Proactively emit status so UI can reflect current state
+            var status = JSObject()
+            status["enabled"] = false
+            notifyListeners("bluetoothStatusChanged", data: status)
+            call.resolve()
+            return
+        }
+        
+        if isScanning {
+            warningLog("Scan already in progress")
+            call.resolve()
+            return
+        }
+        
+        discoveredDevices.removeAll()
+        debugLog("Starting Core Bluetooth scan for Wellue devices")
+        // Allow duplicates to improve discovery stability on some devices/firmware
+        centralManager.scanForPeripherals(withServices: nil, options: [CBCentralManagerScanOptionAllowDuplicatesKey: true])
+        isScanning = true
+        successLog("Bluetooth scan started successfully")
+        call.resolve()
+    }
+
+    @objc public func stopScan(_ call: CAPPluginCall) {
+        debugLog("Stop scan called from JavaScript")
+        
+        guard let centralManager = centralManager else {
+            errorLog("CBCentralManager not initialized")
+            call.reject("Bluetooth not initialized", "BLUETOOTH_NOT_INITIALIZED")
+            return
+        }
+        
+        if !isScanning {
+            warningLog("No scan in progress")
+            call.resolve()
+            return
+        }
+        
+        centralManager.stopScan()
+        isScanning = false
+        successLog("Bluetooth scan stopped successfully")
+        call.resolve()
+    }
+
+    @objc public func connect(_ call: CAPPluginCall) {
+        NSLog("🔗🔗🔗 [WELLUE CONNECT] CONNECT CALLED FROM JAVASCRIPT 🔗🔗🔗")
+        print("🔗🔗🔗 [WELLUE CONNECT] CONNECT CALLED FROM JAVASCRIPT 🔗🔗🔗")
+        
+        guard let deviceId = call.getString("deviceId") else {
+            NSLog("❌ [WELLUE CONNECT] No device ID provided")
+            errorLog("No device ID provided for connection")
+            call.reject("Device ID required", "MISSING_DEVICE_ID")
+            return
+        }
+        
+        NSLog("🔗 [WELLUE CONNECT] Device ID: \(deviceId)")
+        debugLog("Connect called for device: \(deviceId)")
+        
+        var targetPeripheral: CBPeripheral? = discoveredDevices[deviceId]
+        if targetPeripheral == nil {
+            // Try to retrieve a known peripheral by UUID to avoid scan race conditions
+            if let uuid = UUID(uuidString: deviceId) {
+                let retrieved = centralManager?.retrievePeripherals(withIdentifiers: [uuid]) ?? []
+                targetPeripheral = retrieved.first
+                if let p = targetPeripheral {
+                    debugLog("Retrieved peripheral by UUID: \(p.name ?? "Unknown")")
+                    discoveredDevices[deviceId] = p
+                } else {
+                    warningLog("Could not retrieve peripheral by UUID: \(deviceId)")
+                }
+            } else {
+                warningLog("Invalid UUID string for deviceId: \(deviceId)")
+            }
+        }
+        guard let peripheral = targetPeripheral else {
+            errorLog("Device not found: \(deviceId)")
+            call.reject("Device not found", "DEVICE_NOT_FOUND")
+            return
+        }
+        
+        guard let centralManager = centralManager else {
+            errorLog("CBCentralManager not initialized")
+            call.reject("Bluetooth not initialized", "BLUETOOTH_NOT_INITIALIZED")
+            return
+        }
+        
+        // Stop scan before initiating connection, mirroring Android behavior
+        if isScanning { 
+            centralManager.stopScan()
+            isScanning = false
+            debugLog("Stopped scan prior to connect") 
+        }
+        
+        debugLog("Attempting SDK-managed connect to device: \(peripheral.name ?? "Unknown")")
+        
+        // Set peripheral on Viatom SDK BEFORE CoreBluetooth connect
+        // SDK will auto-discover services and call utilDeployCompletion when ready
+        if let utils = viatomUtils {
+            utils.peripheral = peripheral
+            utils.deviceDelegate = self
+            debugLog("Set peripheral on VTMURATUtils - SDK will handle service discovery after OS connect")
+        } else {
+            errorLog("Viatom SDK not initialized for connect")
+        }
+        
+        // Store the call to resolve later after SDK deployment completes
+        pendingConnectCall = call
+        
+        // Now initiate OS-level BLE connection
+        // The SDK's peripheral property triggers internal observers that handle GATT setup
+        centralManager.connect(peripheral, options: nil)
+        connectedDevice = peripheral
+        currentDevice = peripheral
+        debugLog("OS-level connection request sent")
+        NSLog("🔗 [WELLUE CONNECT] Connection initiated, waiting for utilDeployCompletion before resolving...")
+        
+        // 🔥 Start deployment timeout monitoring
+        triggerSDKDeployment()
+        
+        // NOTE: We do NOT call.resolve() here!
+        // The resolve happens in utilDeployCompletion() delegate after SDK is ready
+    }
+
+    @objc public func disconnect(_ call: CAPPluginCall) {
+        debugLog("Disconnect called from JavaScript")
+        
+        // Stop real-time data polling timer
+        realTimeDataTimer?.invalidate()
+        realTimeDataTimer = nil
+        debugLog("📊 [DISCONNECT] Stopped real-time data polling timer")
+        
+        // Stop health monitoring
+        stopHealthMonitoring()
+        
+        guard let centralManager = centralManager else {
+            errorLog("CBCentralManager not initialized")
+            call.reject("Bluetooth not initialized", "BLUETOOTH_NOT_INITIALIZED")
+            return
+        }
+        
+        guard let peripheral = connectedDevice else {
+            warningLog("No device connected to disconnect")
+            call.resolve()
+            return
+        }
+        
+        debugLog("Disconnecting from device: \(peripheral.name ?? "Unknown")")
+        centralManager.cancelPeripheralConnection(peripheral)
+        call.resolve()
+    }
+
+    @objc public func startBPMeasurement(_ call: CAPPluginCall) {
+        debugLog("Start BP measurement called from JavaScript")
+        
+        guard let device = currentDevice else {
+            errorLog("No device connected for BP measurement")
+            call.reject("No device connected", "NO_DEVICE_CONNECTED")
+            return
+        }
+        
+        guard let viatomUtils = viatomUtils else {
+            errorLog("Viatom SDK not initialized")
+            call.reject("SDK not initialized", "SDK_NOT_INITIALIZED")
+            return
+        }
+        
+        if isMeasuring {
+            warningLog("Measurement already in progress")
+            call.resolve()
+            return
+        }
+        
+        debugLog("Starting BP measurement on device: \(device.name ?? "Unknown")")
+        // Switch device state to BP measurement and request streams
+        viatomUtils.requestChangeBPState(0) // enter BP measure
+        viatomUtils.bp_requestRealStatus()
+        viatomUtils.requestBPRealData()
+        isMeasuring = true
+        successLog("BP measurement started successfully")
+        call.resolve()
+    }
+
+    @objc public func startECGMeasurement(_ call: CAPPluginCall) {
+        debugLog("Start ECG measurement called from JavaScript")
+        
+        guard let device = currentDevice else {
+            errorLog("No device connected for ECG measurement")
+            call.reject("No device connected", "NO_DEVICE_CONNECTED")
+            return
+        }
+        
+        guard let viatomUtils = viatomUtils else {
+            errorLog("Viatom SDK not initialized")
+            call.reject("SDK not initialized", "SDK_NOT_INITIALIZED")
+            return
+        }
+        
+        if isMeasuring {
+            warningLog("Measurement already in progress")
+            call.resolve()
+            return
+        }
+        
+        debugLog("Starting ECG measurement on device: \(device.name ?? "Unknown")")
+        debugLog("Note: ECG delegates not yet implemented - awaiting SDK type definitions")
+        viatomUtils.requestECGRealData()
+        isMeasuring = true
+        
+        successLog("ECG measurement request sent (delegates pending)")
+        call.resolve()
+    }
+
+    @objc public func stopMeasurement(_ call: CAPPluginCall) {
+        debugLog("Stop measurement called from JavaScript")
+        
+        if !isMeasuring {
+            warningLog("No measurement in progress to stop")
+            call.resolve()
+            return
+        }
+        
+        isMeasuring = false
+        successLog("Measurement stopped successfully")
+        call.resolve()
+    }
+    
+    @objc public func startRtTaskForConnectedDevice(_ call: CAPPluginCall) {
+        debugLog("📊 [RT TASK] Start real-time task called from JavaScript")
+        
+        guard let device = currentDevice else {
+            errorLog("No device connected for RT task")
+            call.reject("No device connected", "NO_DEVICE_CONNECTED")
+            return
+        }
+        
+        guard viatomUtils != nil else {
+            errorLog("Viatom SDK not initialized")
+            call.reject("SDK not initialized", "SDK_NOT_INITIALIZED")
+            return
+        }
+        
+        // 🔥 CRITICAL FIX: Check SDK deployment status
+        if !isSdkDeployed {
+            NSLog("⚠️ [RT TASK] SDK not deployed yet!")
+            NSLog("🔄 [RT TASK] Triggering lazy SDK deployment...")
+            
+            // Trigger deployment if not already in progress
+            if deploymentTimer == nil {
+                triggerSDKDeployment()
+            }
+            
+            NSLog("⚠️ [RT TASK] SDK deployment in progress, will retry in 2 seconds...")
+            
+            // Wait 2 seconds and retry
             DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
                 guard let self = self else { return }
+                
                 if self.isSdkDeployed {
-                    self.logInfo("✅ [STATUS POLLING] SDK deployed, starting polling")
-                    self.statusPollingTimer?.invalidate()
-                    self.startStatusPolling()
-                    call.resolve(["success": true])
+                    NSLog("✅ [RT TASK] SDK deployed! Starting RT monitoring now...")
+                    self.startRtTaskForConnectedDevice(call)  // Recursive retry
                 } else {
-                    self.logError("❌ [STATUS POLLING] SDK deployment timeout - rejecting call")
-                    call.reject("SDK deployment timeout. Please ensure device is connected.")
+                    NSLog("❌ [RT TASK] SDK still not deployed after 2 seconds")
+                    call.reject("SDK not ready", "SDK_NOT_DEPLOYED")
                 }
             }
             return
         }
         
-        // Stop any existing timer
-        statusPollingTimer?.invalidate()
+        NSLog("📊 [RT TASK] ✅ SDK is deployed! Ready to receive automatic real-time data for device: \(device.name ?? "Unknown")")
+        NSLog("📊 [RT TASK] The bpRealData delegate will automatically fire when device button is pressed")
+        debugLog("📊 [RT TASK] No continuous polling needed - SDK sends data automatically during measurement")
         
-        // Start simple status polling (1 second interval)
-        startStatusPolling()
+        // No continuous polling needed! The bpRealData(_:) delegate fires automatically
+        // when the device button is pressed and during active measurement
         
-        call.resolve(["success": true])
-        logInfo("✅ [STATUS POLLING] Status monitoring started (1s interval)")
-    }
-    
-    // SIMPLIFIED: Just poll status every 1 second
-    private func stopStatusPolling() {
-        logInfo("🛑 [STATUS POLLING] Stopping")
-        DispatchQueue.main.async { [weak self] in
-            self?.statusPollingTimer?.invalidate()
-            self?.statusPollingTimer = nil
-        }
-    }
-    
-    private func startStatusPolling() {
-        // Use slow interval during measurement to prevent device overload!
-        let interval = isMeasuring ? measuringPollingInterval : idlePollingInterval
-        logInfo("✅ [STATUS POLLING] Starting (interval: \(interval)s, measuring: \(isMeasuring))")
-        
-        // Request initial data immediately (use getRealData to get full state)
-        bluetoothQueue.async { [weak self] in
-            guard let self = self else { return }
-            self.logInfo("📡 [INITIAL] Requesting initial data...")
-            
-            // Diagnostic checks
-            guard let utils = self.viatomUtils else {
-                self.logError("❌ [INITIAL] viatomUtils is nil!")
-                return
-            }
-            
-            // Use getRealData initially to get full device state (pressure + status)
-            utils.requestBPRealData()
-            self.logInfo("📡 [INITIAL] requestBPRealData() called")
-        }
-        
-        // Create timer on main thread with appropriate interval
-        DispatchQueue.main.async { [weak self] in
-            guard let self = self else { return }
-            
-            self.logInfo("⏱️ [TIMER] Creating status polling timer...")
-            
-            self.statusPollingTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] timer in
-                guard let self = self else {
-                    timer.invalidate()
-                return
-            }
-                
-                self.logInfo("⏱️ [TIMER] 🔔 Timer fired - requesting data...")
-                
-                // Request data on bluetooth queue
-            self.bluetoothQueue.async {
-                    // Diagnostic checks
-                    guard let utils = self.viatomUtils else {
-                        self.logError("❌ [TIMER] viatomUtils is nil!")
-                        return
-                    }
-                    if utils.peripheral.state != .connected {
-                        self.logError("❌ [TIMER] peripheral not connected (state: \(utils.peripheral.state.rawValue))")
-                        return
-                    }
-                    
-                    // ONLY request BP data during measurement - no other commands to avoid overload!
-                    if self.isMeasuring {
-                        self.logInfo("📡 [TIMER] Calling requestBPRealData() (3s interval)...")
-                self.viatomUtils?.requestBPRealData()
-                        self.logInfo("📡 [TIMER] requestBPRealData() sent")
-                    } else {
-                        self.logInfo("📡 [TIMER] Calling bp_requestRealStatus() (1s interval)...")
-                        self.viatomUtils?.bp_requestRealStatus()
-                        self.logInfo("📡 [TIMER] bp_requestRealStatus() sent")
-                    }
-                }
-            }
-            
-            // Add to run loop
-            if let timer = self.statusPollingTimer {
-                RunLoop.main.add(timer, forMode: .common)
-                self.logInfo("✅ [TIMER] Timer created and added to run loop (interval: \(interval)s)")
-            } else {
-                self.logError("❌ [TIMER] Failed to create timer!")
-            }
-        }
+        call.resolve()
     }
 
     @objc public func getBatteryLevel(_ call: CAPPluginCall) {
-        guard ensureSDKReady(for: call) else { return }
-        pendingBatteryCall = call
-        viatomUtils?.requestBatteryInfo()
-    }
-
-    @objc public func getConnectedDevices(_ call: CAPPluginCall) {
-        let devices = currentDevice.map { device -> JSObject in
-            return [
-                "deviceId": device.identifier.uuidString,
-                "name": device.name ?? "Unknown",
-                "address": device.identifier.uuidString,
-                "isConnected": device.state == .connected
-            ]
+        debugLog("Get battery level called from JavaScript")
+        
+        guard let viatomUtils = viatomUtils else {
+            errorLog("Viatom SDK not initialized")
+            call.reject("SDK not initialized", "SDK_NOT_INITIALIZED")
+            return
         }
-
-        call.resolve(["devices": devices != nil ? [devices!] : []])
-    }
-
-    @objc public func isDeviceConnected(_ call: CAPPluginCall) {
-        let connected = currentDevice?.state == .connected && isSdkDeployed
-        call.resolve(["connected": connected])
+        
+        debugLog("Requesting battery info from device")
+        pendingBatteryCall = call
+        viatomUtils.requestBatteryInfo()
     }
 
     @objc public func getBondedDevices(_ call: CAPPluginCall) {
+        debugLog("Get bonded devices called from JavaScript")
+        // iOS doesn't have a direct equivalent to Android's bonded devices
+        // Return empty array for now
         call.resolve(["devices": []])
     }
 
+    @objc public func getConnectedDevices(_ call: CAPPluginCall) {
+        debugLog("Get connected devices called from JavaScript")
+        
+        if let device = connectedDevice {
+            var deviceData = JSObject()
+            deviceData["id"] = device.identifier.uuidString
+            deviceData["name"] = device.name ?? "Unknown Device"
+            deviceData["connected"] = true
+            
+            call.resolve(["devices": [deviceData]])
+        } else {
+            call.resolve(["devices": []])
+        }
+    }
+
+    @objc public func isDeviceConnected(_ call: CAPPluginCall) {
+        let connected = (connectedDevice != nil)
+        debugLog("Device connection status: \(connected)")
+        call.resolve(["connected": connected])
+    }
+
     @objc public func getBp2FileList(_ call: CAPPluginCall) {
+        debugLog("Get BP2 file list called from JavaScript")
+        
+        guard let viatomUtils = viatomUtils else {
+            errorLog("Viatom SDK not initialized")
+            call.reject("SDK not initialized", "SDK_NOT_INITIALIZED")
+            return
+        }
+        
+        debugLog("Requesting file list from device")
+        viatomUtils.requestFilelist()
+        // NOTE: The SDK returns the file list asynchronously via delegate callbacks.
+        // Until those are wired, resolve with an empty list to avoid breaking callers.
         call.resolve(["files": []])
     }
 
     @objc public func bp2ReadFile(_ call: CAPPluginCall) {
+        debugLog("BP2 read file called from JavaScript")
+        
+        guard let fileName = call.getString("fileName") else {
+            errorLog("No file name provided for reading")
+            call.reject("File name required", "MISSING_FILE_NAME")
+            return
+        }
+        
+        guard let viatomUtils = viatomUtils else {
+            errorLog("Viatom SDK not initialized")
+            call.reject("SDK not initialized", "SDK_NOT_INITIALIZED")
+            return
+        }
+        
+        debugLog("Preparing to read file: \(fileName)")
+        viatomUtils.prepareReadFile(fileName)
+        // NOTE: The SDK provides file data asynchronously via delegate callbacks.
+        // Until those are wired, resolve with an empty payload to match bridge expectations.
         call.resolve(["fileType": 0, "fileContent": ""])
     }
-
-    // MARK: - Helpers
-
-    private var isBluetoothReady: Bool {
-        centralManager?.state == .poweredOn
-    }
-
-    private func ensureBluetoothReady(for call: CAPPluginCall) -> Bool {
-        guard isBluetoothReady else {
-            call.reject("Bluetooth is not powered on")
-            return false
-        }
-        return true
-    }
-
-    private func ensureSDKReady(for call: CAPPluginCall) -> Bool {
-        guard ensureBluetoothReady(for: call) else { return false }
-        guard isSdkDeployed else {
-            call.reject("SDK not ready yet. Please wait for deployment to finish.")
-            return false
-        }
-        guard currentDevice?.state == .connected else {
-            call.reject("Device is not connected")
-            return false
-        }
-        return true
-    }
-
-    private func stopScanInternal() {
-        guard isScanning else { return }
-        scanStopTimer?.invalidate()
-        scanStopTimer = nil
-        isScanning = false
-        centralManager?.stopScan()
-        logInfo("Stopped CoreBluetooth scan")
-    }
-
-    private func scheduleScanTimeout() {
-        scanStopTimer?.invalidate()
-        scanStopTimer = Timer.scheduledTimer(withTimeInterval: 15.0, repeats: false) { [weak self] _ in
-            self?.bluetoothQueue.async {
-                self?.stopScanInternal()
-            }
-        }
-    }
-
-    private func triggerSDKDeployment() {
-        bluetoothQueue.async {
-            self.isSdkDeployed = false
-            self.deploymentTimer?.invalidate()
-            self.deploymentTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: false) { [weak self] _ in
-                guard let self else { return }
-                if !self.isSdkDeployed {
-                    self.logWarn("SDK deployment timeout")
-                    if self.deploymentRetryCount < self.maxDeploymentRetries {
-                        self.deploymentRetryCount += 1
-                        self.logWarn("Retrying SDK deployment (\(self.deploymentRetryCount)/\(self.maxDeploymentRetries))")
-                        if let device = self.currentDevice {
-                            self.viatomUtils?.peripheral = device
-                        }
-                        self.triggerSDKDeployment()
-                    } else {
-                        self.notifyListeners("sdkDeploymentFailed", data: ["error": "Deployment timeout"])
-                        self.pendingConnectCall?.reject("SDK deployment failed")
-                        self.pendingConnectCall = nil
-                    }
-                }
-            }
-        }
-    }
-
-    private func startHealthMonitoring() {
-        healthTimer?.invalidate()
-        lastDataTimestamp = Date()
-        healthTimer = Timer.scheduledTimer(withTimeInterval: healthCheckInterval, repeats: true) { [weak self] _ in
-            self?.performHealthCheck()
-        }
-    }
-
-    private func performHealthCheck() {
-        guard isSdkDeployed, let lastData = lastDataTimestamp else { return }
-        let delta = Date().timeIntervalSince(lastData)
-        if delta > dataTimeoutInterval {
-            logWarn("SDK health check timeout detected (\(Int(delta))s without data)")
-            notifyListeners("sdkHealthWarning", data: ["timeSinceLastData": delta])
-            triggerSDKDeployment()
-        }
-    }
-
-    private func markDataReceived() {
-        lastDataTimestamp = Date()
-    }
-
-    // SIMPLIFIED: Clean status-based detection
-    private func handleStatusUpdate(_ status: VTMBPRunStatus) {
-        logInfo("📊 [HANDLE STATUS] handleStatusUpdate called with status: \(status.status), isMeasuring: \(isMeasuring), previousStatus: \(previousStatus), hasCompleted: \(hasCompletedCurrentMeasurement)")
-        
-        // ✅ CRITICAL FIX: Check if we should suppress status 3 (ready) events
-        var shouldSuppressReadyEvent = false
-        var shouldEmitStatus = true
-        
-        // ✅ FIX: Check if status 5 should be suppressed (already completed)
-        if status.status == 5 && hasCompletedCurrentMeasurement {
-            logInfo("⚠️ [SUPPRESS STATUS] Status 5 already processed - suppressing status emission to prevent UI reset")
-            shouldEmitStatus = false
+    
+    // MARK: - CBPeripheralDelegate (Service/Characteristic Discovery)
+    
+    public func peripheral(_ peripheral: CBPeripheral, didDiscoverServices error: Error?) {
+        if let error = error {
+            errorLog("Service discovery failed: \(error.localizedDescription)")
+            return
         }
         
-        // Check if this is a spurious status 3 during measurement
-        if status.status == 3 {
-            logInfo("🔍 [STATUS 3 CHECK] Status 3 detected - isMeasuring: \(isMeasuring), previousStatus: \(previousStatus), hasCompleted: \(hasCompletedCurrentMeasurement), isDeflating: \(isCurrentlyDeflating)")
+        debugLog("Services discovered: \(peripheral.services?.count ?? 0)")
+        
+        guard let services = peripheral.services else {
+            warningLog("No services found on peripheral")
+            return
+        }
+        
+        for service in services {
+            debugLog("Found service: \(service.uuid.uuidString)")
             
-            // ✅ SIMPLE & ROBUST FIX: Ignore ALL status 3 while measurement is in progress
-            // Once measurement starts (status 4), ignore status 3 until results are obtained (status 5 + file read)
-            if isMeasuring {
-                // Measurement is in progress - suppress ALL status 3 events until results are shown
-                logInfo("⚠️ [SUPPRESS] Status 3 received during measurement (isMeasuring=true) - ignoring throughout entire measurement until results shown")
-                shouldSuppressReadyEvent = true
-                shouldEmitStatus = false
-            } else if previousStatus == 4 {
-                // We were just in status 4 (measuring) - suppress status 3 to prevent UI reset
-                // This covers edge cases where isMeasuring might be false but we just finished measuring
-                logInfo("⚠️ [SUPPRESS] Status 3 received after status 4 (just finished measuring) - suppressing to prevent UI reset")
-                shouldSuppressReadyEvent = true
-                shouldEmitStatus = false
-            } else if hasCompletedCurrentMeasurement {
-                // Results are already displayed - suppress status 3 to keep results visible
-                logInfo("✅ [SUPPRESS] Status 3 received after results displayed - suppressing to preserve results")
-                shouldSuppressReadyEvent = true
-                shouldEmitStatus = false
-            } else if isCurrentlyDeflating {
-                // Device is actively deflating - suppress status 3 to prevent UI reset
-                logInfo("⚠️ [SUPPRESS] Status 3 received during DEFLATION - suppressing to prevent UI reset")
-                shouldSuppressReadyEvent = true
-                shouldEmitStatus = false
-            } else if justCompletedMeasurement {
-                // Just completed measurement - suppress status 3 for 10 seconds to prevent UI reset
-                if let completionTime = measurementCompletionTime {
-                    let elapsed = Date().timeIntervalSince(completionTime)
-                    if elapsed < 10.0 {
-                        logInfo("✅ [SUPPRESS] Status 3 received within 10s of completion (elapsed: \(Int(elapsed))s) - suppressing to preserve results")
-                        shouldSuppressReadyEvent = true
-                        shouldEmitStatus = false
-                    } else {
-                        // Grace period expired, allow status 3
-                        justCompletedMeasurement = false
-                        measurementCompletionTime = nil
-                    }
-                }
-            } else if previousStatus == 5 {
-                // Device returned to ready after completion - suppress it
-                logInfo("✅ [SUPPRESS] Status 5→3 transition - suppressing ready event to preserve results")
-                shouldSuppressReadyEvent = true
-                shouldEmitStatus = false
+            if service.uuid == BP2_SERVICE_UUID {
+                successLog("BP2 service found! Discovering characteristics...")
+                peripheral.discoverCharacteristics([BP2_WRITE_CHAR_UUID, BP2_NOTIFY_CHAR_UUID], for: service)
             }
-            if shouldSuppressReadyEvent {
-                logInfo("✅ [STATUS 3 SUPPRESSED] Suppressing status 3 event (shouldSuppressReadyEvent=true)")
-            }
+        }
+    }
+    
+    public func peripheral(_ peripheral: CBPeripheral, didDiscoverCharacteristicsFor service: CBService, error: Error?) {
+        if let error = error {
+            errorLog("Characteristic discovery failed: \(error.localizedDescription)")
+            return
         }
         
-        // Emit status to JS (only if not suppressed)
-        if shouldEmitStatus {
-        var statusPayload = JSObject()
-        statusPayload["deviceId"] = currentDevice?.identifier.uuidString
-        statusPayload["status"] = Int(status.status)
-        statusPayload["batteryPercent"] = Int(status.battery.percent)
-        statusPayload["batteryState"] = Int(status.battery.state)
-        statusPayload["batteryVoltage"] = Int(status.battery.voltage)
-        notifyListeners("bp2Rt", data: statusPayload)
-            logInfo("📊 [HANDLE STATUS] Status emitted to JS: \(status.status)")
+        debugLog("Characteristics discovered for service: \(service.uuid.uuidString)")
+        
+        guard let characteristics = service.characteristics else {
+            warningLog("No characteristics found")
+            return
         }
-
-        // Map status to lifecycle state
-        let lifecycleState: String
-        switch status.status {
-        case 0: lifecycleState = "sleep"
-        case 1: lifecycleState = "memory"
-        case 2: lifecycleState = "charge"
-        case 3:
-            // 🚨 FIX: If measurement is in progress, don't set lifecycle to "ready"
-            // Ready state should only be shown at start or after measurement completes
-            if isMeasuring {
-                // Status 3 received during measurement - keep current state (measuring)
-                // Don't change lifecycle state, it will be handled in the switch below
-                lifecycleState = "measuring" // Keep measuring state instead of ready
-                logInfo("⚠️ [LIFECYCLE] Status 3 during measurement - keeping 'measuring' state instead of 'ready'")
-            } else {
-            lifecycleState = "ready"
-            }
-        case 4: lifecycleState = "measuring"
-        case 5: lifecycleState = "complete"
-        case 6: 
-            lifecycleState = "ecgMeasuring"
-            // 🆕 ECG: Emit ecgLifecycle when ECG measurement starts on device
-            logInfo("🫀 [ECG] ===== STATUS 6 DETECTED - ECG MEASURING STARTED ON DEVICE =====")
-            logInfo("🫀 [ECG] Previous status: \(previousStatus) → Current status: 6 (ecgMeasuring)")
-            logInfo("🫀 [ECG] Emitting ecgLifecycle event with state: 'start'")
-            logInfo("🫀 [ECG] Emitting bpLifecycle event with state: 'ecgMeasuring'")
-            notifyListeners("ecgLifecycle", data: ["state": "start"])
-            logInfo("🫀 [ECG] ✅ ecgLifecycle('start') event emitted successfully")
-        case 7: 
-            lifecycleState = "ecgComplete"
-            // 🆕 ECG: Emit ecgLifecycle when ECG measurement completes on device
-            logInfo("🫀 [ECG] ===== STATUS 7 DETECTED - ECG MEASUREMENT COMPLETED ON DEVICE =====")
-            logInfo("🫀 [ECG] Previous status: \(previousStatus) → Current status: 7 (ecgComplete)")
-            logInfo("🫀 [ECG] Emitting ecgLifecycle event with state: 'stop'")
-            logInfo("🫀 [ECG] Emitting bpLifecycle event with state: 'ecgComplete'")
-            notifyListeners("ecgLifecycle", data: ["state": "stop"])
-            logInfo("🫀 [ECG] ✅ ecgLifecycle('stop') event emitted successfully")
+        
+        for characteristic in characteristics {
+            debugLog("Found characteristic: \(characteristic.uuid.uuidString)")
             
-            // 🆕 ECG: Read ECG file from device to get final results
-            // ✅ FIX: Check if we just entered status 7 (previousStatus != 7) and haven't read the file yet
-            if previousStatus != 7 && !isReadingECGFile {
-                logInfo("🫀 [ECG] STATUS transition to 7 detected (previous: \(previousStatus) → 7) - reading ECG file from device...")
-                readLatestECGFile()
-            } else if previousStatus == 7 {
-                logInfo("🫀 [ECG] STATUS 7 repeated (previous: 7 → 7, isReadingECGFile=\(isReadingECGFile)) - skipping file read")
-            } else if isReadingECGFile {
-                logInfo("🫀 [ECG] STATUS 7 detected but ECG file read already in progress - skipping duplicate request")
+            if characteristic.uuid == BP2_WRITE_CHAR_UUID {
+                successLog("BP2 Write characteristic found!")
+                bp2WriteCharacteristic = characteristic
+            } else if characteristic.uuid == BP2_NOTIFY_CHAR_UUID {
+                successLog("BP2 Notify characteristic found! Enabling notifications...")
+                bp2NotifyCharacteristic = characteristic
+                peripheral.setNotifyValue(true, for: characteristic)
             }
-        default: lifecycleState = "idle"
         }
         
-        // ✅ CRITICAL FIX: Only emit lifecycle event if NOT suppressed AND not during measurement
-        // Double check: if status is 3 and we're measuring, don't emit ready lifecycle
-        if status.status == 3 && isMeasuring {
-            // 🚨 FIX: Status 3 received during active measurement - suppress lifecycle event
-            // Keep the app in "measuring" state instead of switching to "ready"
-            logInfo("⚠️ [SUPPRESS] Suppressing bpLifecycle('ready') event - measurement in progress (isMeasuring=true)")
-            // Don't emit lifecycle event - keep current measuring state
-        } else if !shouldSuppressReadyEvent {
-        notifyListeners("bpLifecycle", data: ["state": lifecycleState])
+        // Check if we have both characteristics
+        if bp2WriteCharacteristic != nil && bp2NotifyCharacteristic != nil {
+            successLog("BP2 device fully configured and ready!")
+            
+            var readyData = JSObject()
+            readyData["deviceId"] = peripheral.identifier.uuidString
+            readyData["status"] = "ready"
+            readyData["service"] = service.uuid.uuidString
+            notifyListeners("deviceReady", data: readyData)
+        }
+    }
+    
+    public func peripheral(_ peripheral: CBPeripheral, didUpdateNotificationStateFor characteristic: CBCharacteristic, error: Error?) {
+        if let error = error {
+            errorLog("Failed to enable notifications: \(error.localizedDescription)")
+            return
+        }
+        
+        if characteristic.isNotifying {
+            successLog("Notifications enabled for characteristic: \(characteristic.uuid.uuidString)")
         } else {
-            logInfo("⚠️ [SUPPRESS] Suppressed bpLifecycle('ready') event to prevent UI reset")
-        }
-        
-        // Log only status changes
-        if status.status != previousStatus {
-            logInfo("📊 [STATUS] \(previousStatus) → \(status.status) (\(lifecycleState))")
-        }
-        
-        // SIMPLE LOGIC: Handle each status
-        switch status.status {
-        case 3: // Ready
-            logInfo("🔍 [STATUS 3 PROCESSING] Processing status 3 - isMeasuring: \(isMeasuring), previousStatus: \(previousStatus), shouldSuppress: \(shouldSuppressReadyEvent)")
-            // ✅ CRITICAL FIX: Check if actively measuring FIRST - this prevents reset during deflation
-            if isMeasuring {
-                logInfo("🔍 [STATUS 3 DURING MEASURE] isMeasuring=true, previousStatus: \(previousStatus)")
-                if previousStatus == 4 {
-                    // Normal completion: 4→3 transition
-                    logInfo("✅ [STATUS 3] 4→3 transition detected - calling completeMeasurement()")
-                    completeMeasurement()
-                } else {
-                    // Status 3 received DURING active measurement (device glitch) - ignore it!
-                    logInfo("⚠️ [IGNORE] Status 3 received during active measurement (previous: \(previousStatus)) - ignoring to prevent UI reset")
-                    previousStatus = status.status
-                    return // Exit early - don't emit status 3 or process it
-                }
-            } else if shouldSuppressReadyEvent {
-                logInfo("✅ [STATUS 3 SUPPRESSED] Suppressing status 3 event (shouldSuppressReadyEvent=true)")
-                // Already suppressed above, just update previous status
-                previousStatus = status.status
-                return
-            } else if hasCompletedCurrentMeasurement {
-                // Already completed - don't process status 3
-                logInfo("✅ [IGNORE] Status 3 after completion - ignoring to preserve results")
-                previousStatus = status.status
-                return
-            }
-            
-        case 4: // Measuring
-            // ✅ FIX: Reset completion flag when new measurement starts
-            if previousStatus != 4 {
-                hasCompletedCurrentMeasurement = false
-                isFileReadInProgress = false
-            }
-            
-            // ✅ FIX: Prevent starting new measurement if we just completed one (5→4 transition)
-            if previousStatus == 5 {
-                logInfo("⚠️ [STATUS] Status 5→4 transition - device resetting after completion, ignoring as new measurement")
-                previousStatus = status.status
-                return // Exit early - don't treat this as a new measurement
-            }
-            
-            // ✅ FIX 3: Prevent duplicate starts
-            if !isMeasuring {
-                logInfo("🎬 [START] Measurement started")
-                startMeasurement()
-            } else {
-                // Already measuring - just check timeout
-                logInfo("⏱️ [MEASURING] Measurement in progress, checking timeout...")
-                checkMeasurementTimeout()
-            }
-            
-        case 5: // Complete
-            logInfo("🔍 [STATUS 5 PROCESSING] Processing status 5 - hasCompletedCurrentMeasurement: \(hasCompletedCurrentMeasurement), isMeasuring: \(isMeasuring)")
-            // ✅ CRITICAL FIX: Prevent duplicate completeMeasurement() calls and file reads
-            if !hasCompletedCurrentMeasurement {
-                logInfo("✅ [COMPLETE] Status 5 detected - calling completeMeasurement()")
-                completeMeasurement()
-                // Note: completeMeasurement() now sets hasCompletedCurrentMeasurement internally
-            } else {
-                logInfo("⚠️ [IGNORE] Status 5 already processed - ignoring duplicate (results already shown). NOT emitting status or lifecycle event.")
-                // ✅ FIX: Don't emit status OR lifecycle event for duplicate status 5
-                shouldEmitStatus = false // Prevent status emission
-                previousStatus = status.status
-                return // Exit early - don't emit status or lifecycle event
-            }
-            
-        default:
-            break
-        }
-        
-        previousStatus = status.status
-    }
-    
-    // Start measurement tracking
-    private func startMeasurement() {
-        // ✅ FIX 3: Guard against duplicate starts
-        guard !isMeasuring else {
-            logInfo("⚠️ [START] Already measuring, skipping duplicate start")
-            return
-        }
-        
-        // ✅ Reset completion and file read flags for new measurement
-        hasCompletedCurrentMeasurement = false
-        isFileReadInProgress = false
-        fileReadAttempts = 0
-        isCurrentlyDeflating = false // ✅ Reset deflation state for new measurement
-            
-        isMeasuring = true
-        measurementStartTime = Date()
-        logInfo("⏱️ [START] Measurement timer started")
-        
-        // Restart polling with slower interval (3s) to prevent device overload
-        stopStatusPolling()
-        startStatusPolling()
-    }
-    
-    // Check if measurement has been running too long
-    private func checkMeasurementTimeout() {
-        guard let startTime = measurementStartTime else { return }
-        let elapsed = Date().timeIntervalSince(startTime)
-        
-        if elapsed > measurementTimeout {
-            logWarn("⏱️ [TIMEOUT] Measurement stuck in status 4 for \(Int(elapsed))s - forcing completion")
-            completeMeasurement()
+            warningLog("Notifications disabled for characteristic: \(characteristic.uuid.uuidString)")
         }
     }
     
-    // Complete measurement and read results
-    private func completeMeasurement() {
-        // ✅ CRITICAL FIX: If already completed, don't process again
-        guard !hasCompletedCurrentMeasurement else {
-            logInfo("⚠️ [COMPLETE] Already completed - ignoring duplicate completion")
+    public func peripheral(_ peripheral: CBPeripheral, didUpdateValueFor characteristic: CBCharacteristic, error: Error?) {
+        if let error = error {
+            errorLog("Failed to read characteristic value: \(error.localizedDescription)")
             return
         }
         
-        guard isMeasuring else {
-            // If not measuring, might be old result - only read if we haven't read it yet
-            if previousStatus == 5 && !hasCompletedCurrentMeasurement && !isFileReadInProgress {
-                logInfo("📖 [OLD RESULT] Reading stored measurement")
-                readLatestStoredBPMeasurement()
-                hasCompletedCurrentMeasurement = true // Mark as completed to prevent duplicate reads
-            }
+        guard let value = characteristic.value else {
+            debugLog("Characteristic updated but no value")
             return
         }
         
-        // ✅ CRITICAL FIX: DON'T set isMeasuring = false here!
-        // Keep it true until results are actually emitted (in emitBPMeasurementResult)
-        // This ensures status 3 is ignored throughout the entire measurement until results are shown
-        measurementStartTime = nil
+        debugLog("Received data on characteristic \(characteristic.uuid.uuidString): \(value.count) bytes")
         
-        // ✅ CRITICAL FIX: Mark completion BEFORE reading file to prevent duplicate reads
-        hasCompletedCurrentMeasurement = true
-        
-        // ✅ CRITICAL FIX: Keep deflation flag true until results are shown - this prevents status 3 from resetting UI
-        // We'll clear it after results are displayed or after a timeout
-        // Note: isCurrentlyDeflating might already be false if deflation completed, but we keep it suppressed
-        
-        // ✅ CRITICAL FIX: Mark that we just completed measurement to suppress status 3 events
-        justCompletedMeasurement = true
-        measurementCompletionTime = Date()
-        
-        logInfo("📖 [COMPLETE] Reading BP file from device...")
-        readLatestStoredBPMeasurement()
-        
-        // ✅ CRITICAL FIX: Clear deflation state after a delay to allow results to be displayed
-        // This ensures status 3 suppression continues until results are shown
-        DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) { [weak self] in
-            self?.isCurrentlyDeflating = false
-            self?.logInfo("✅ [DEFLATION] Cleared deflation state after results timeout")
-        }
-        
-        // Restart polling with faster interval (1s) now that measurement is done
-        stopStatusPolling()
-        startStatusPolling()
-        
-        // ✅ CRITICAL FIX: DON'T send requestChangeBPState(0) - it causes device to report status 3
-        // This was causing the UI reset! Let the device naturally reset on its own
-        logInfo("✅ [COMPLETE] Measurement complete - NOT resetting device state to avoid triggering status 3")
-    }
-    
-    // Track measurement start time and set timeout
-    // Read latest BP measurement using Viatom File Protocol (more reliable than waiting for waveform type 1)
-    private func readLatestStoredBPMeasurement() {
-        // ✅ CRITICAL FIX: Prevent multiple simultaneous file reads
-        guard !isFileReadInProgress else {
-            logInfo("⚠️ [FILE] File read already in progress - skipping duplicate request")
-            return
-        }
-        
-        guard isSdkDeployed, currentDevice?.state == .connected else {
-            logWarn("⚠️ [FILE] Cannot read files - SDK not ready")
-            return
-        }
-        
-        guard fileReadAttempts < maxFileReadAttempts else {
-            logWarn("⚠️ [FILE] Max file read attempts reached")
-            isFileReadInProgress = false // ✅ Reset flag when max attempts reached
-            return
-        }
-        
-        isFileReadInProgress = true
-        fileReadAttempts += 1
-        logInfo("📖 [FILE] Requesting file list from device (attempt \(fileReadAttempts)/\(maxFileReadAttempts))...")
-        
-        bluetoothQueue.async { [weak self] in
-            self?.viatomUtils?.requestFilelist()
-        }
-    }
-    
-    // 🆕 ECG: Read latest ECG file from device after measurement completes
-    private func readLatestECGFile() {
-        // ✅ Prevent multiple simultaneous ECG file reads
-        guard !isReadingECGFile else {
-            logInfo("⚠️ [ECG FILE] ECG file read already in progress - skipping duplicate request")
-            return
-        }
-        
-        guard isSdkDeployed, currentDevice?.state == .connected else {
-            logWarn("⚠️ [ECG FILE] Cannot read ECG files - SDK not ready")
-            return
-        }
-        
-        guard ecgFileReadAttempts < maxECGFileReadAttempts else {
-            logWarn("⚠️ [ECG FILE] Max ECG file read attempts reached")
-            isReadingECGFile = false
-            return
-        }
-        
-        isReadingECGFile = true
-        ecgFileReadAttempts += 1
-        logInfo("🫀 [ECG FILE] Requesting file list from device for ECG (attempt \(ecgFileReadAttempts)/\(maxECGFileReadAttempts))...")
-        
-        bluetoothQueue.async { [weak self] in
-            self?.viatomUtils?.requestFilelist()
-        }
-    }
-    
-    // SIMPLIFIED: Just emit pressure data (no stability detection)
-    private func emitBPMeasuringData(_ data: VTMBPMeasuringData) {
-        // ✅ CRITICAL FIX: Track deflation state to suppress status 3 events during deflation
-        let wasDeflating = isCurrentlyDeflating
-        isCurrentlyDeflating = data.is_deflating == 1 || data.is_deflating_2 == 1
-        
-        // Log deflation state changes for debugging
-        if wasDeflating != isCurrentlyDeflating {
-            if isCurrentlyDeflating {
-                logInfo("🔄 [DEFLATION] Deflation started - will suppress status 3 events until results shown")
-            } else {
-                logInfo("🔄 [DEFLATION] Deflation ended")
-            }
-        }
-        
-        var progress = JSObject()
-        progress["deviceId"] = currentDevice?.identifier.uuidString
-        progress["pressure"] = Int(data.pressure)
-        progress["pulse"] = Int(data.pulse_rate)
-        progress["isDeflating"] = isCurrentlyDeflating
-        progress["isGetPulse"] = data.is_get_pulse == 1
-        notifyListeners("bpProgress", data: progress)
-        notifyListeners("bp2Rt", data: progress)
-    }
-
-    private func emitBPEndData(_ data: VTMBPEndMeasureData) {
-        var payload = JSObject()
-        payload["deviceId"] = currentDevice?.identifier.uuidString
-        payload["systolic"] = Int(data.systolic_pressure)
-        payload["diastolic"] = Int(data.diastolic_pressure)
-        payload["mean"] = Int(data.mean_pressure)
-        payload["pulse"] = Int(data.pulse_rate)
-        payload["stateCode"] = Int(data.state_code)
-        payload["medicalResult"] = Int(data.medical_result)
-        notifyListeners("bpMeasurement", data: payload)
-        notifyListeners("bpLifecycle", data: ["state": "complete"])
-        
-        // ✅ CRITICAL: Only now that results are emitted, clear isMeasuring flag
-        // This ensures status 3 is ignored throughout entire measurement until results are shown
-        isMeasuring = false
-        logInfo("✅ [RESULTS SHOWN] Measurement complete - isMeasuring set to false, status 3 will now be allowed")
-    }
-
-    private func emitECGMeasuring(_ data: VTMECGMeasuringData) {
-        var payload = JSObject()
-        payload["deviceId"] = currentDevice?.identifier.uuidString
-        payload["heartRate"] = Int(data.pulse_rate)
-        payload["duration"] = Int(data.duration)
-        payload["weakSignal"] = (data.special_status & 0x1) == 0x1
-        payload["leadOff"] = (data.special_status & 0x2) == 0x2
-        payload["timestamp"] = Date().timeIntervalSince1970 * 1000
-        notifyListeners("ecgData", data: payload)
-    }
-
-    private func emitECGEnd(_ data: VTMECGEndMeasureData) {
-        var payload = JSObject()
-        payload["deviceId"] = currentDevice?.identifier.uuidString
-        payload["heartRate"] = Int(data.hr)
-        payload["result"] = Int(data.result)
-        payload["qrs"] = Int(data.qrs)
-        payload["pvcs"] = Int(data.pvcs)
-        payload["qtc"] = Int(data.qtc)
-        notifyListeners("ecgData", data: payload)
-        notifyListeners("ecgLifecycle", data: ["state": "stop"])
-    }
-
-    private func notifyBluetoothState(_ state: CBManagerState) {
-        let enabled = state == .poweredOn
-        notifyListeners("bluetoothStatusChanged", data: ["enabled": enabled])
-        if enabled, let initCall = pendingInitializeCall {
-            initCall.resolve(["success": true])
-            pendingInitializeCall = nil
-        }
-    }
-
-    private func logInfo(_ message: String) {
-        NSLog("🔵 [WELLUE SDK] \(message)")
-        // Also emit to JavaScript console for visibility
-        notifyListeners("nativeLog", data: ["level": "info", "message": message])
-    }
-
-    private func logWarn(_ message: String) {
-        NSLog("⚠️ [WELLUE SDK] \(message)")
-        notifyListeners("nativeLog", data: ["level": "warn", "message": message])
-    }
-
-    private func logError(_ message: String) {
-        NSLog("❌ [WELLUE SDK] \(message)")
-        notifyListeners("nativeLog", data: ["level": "error", "message": message])
+        // Forward to Viatom SDK if it needs raw data
+        // The VTMProductLib should handle parsing via its delegates
     }
 }
-
-// MARK: - CBCentralManagerDelegate
-
-extension WellueSDK: CBCentralManagerDelegate {
-    public func centralManagerDidUpdateState(_ central: CBCentralManager) {
-        bluetoothQueue.async {
-            switch central.state {
-            case .poweredOn:
-                self.logInfo("Bluetooth state changed: poweredOn")
-            case .poweredOff:
-                self.logWarn("Bluetooth state changed: poweredOff")
-                self.stopScanInternal()
-                self.isSdkDeployed = false
-            case .unauthorized:
-                self.logWarn("Bluetooth state unauthorized")
-            case .unsupported:
-                self.logError("Bluetooth unsupported on this device")
-            case .resetting:
-                self.logWarn("Bluetooth resetting")
-            case .unknown:
-                fallthrough
-            @unknown default:
-                self.logWarn("Bluetooth state unknown")
-            }
-
-            DispatchQueue.main.async {
-                self.notifyBluetoothState(central.state)
-            }
-        }
-    }
-
-    public func centralManager(_ central: CBCentralManager,
-                               didDiscover peripheral: CBPeripheral,
-                               advertisementData: [String: Any],
-                               rssi RSSI: NSNumber) {
-        discoveredDevices[peripheral.identifier] = peripheral
-
-        let matchesName = (peripheral.name.map { name in
-            targetNamePrefixes.contains { name.uppercased().hasPrefix($0.uppercased()) }
-        }) ?? false
-
-        let services = advertisementData[CBAdvertisementDataServiceUUIDsKey] as? [CBUUID]
-        let matchesService = services?.contains(targetServiceUUID) ?? false
-
-        guard matchesName || matchesService else { return }
-
-        var payload = JSObject()
-        payload["deviceId"] = peripheral.identifier.uuidString
-        payload["address"] = peripheral.identifier.uuidString
-        payload["deviceName"] = peripheral.name ?? "Unknown"
-        payload["model"] = "BP2"
-        payload["rssi"] = RSSI.intValue
-
-        notifyListeners("deviceFound", data: payload)
-    }
-
-    public func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {
-        bluetoothQueue.async {
-            self.logInfo("Connected to peripheral: \(peripheral.name ?? "Unknown")")
-            self.viatomUtils?.peripheral = peripheral
-            self.currentDevice = peripheral
-            self.deploymentRetryCount = 0
-
-            var payload = JSObject()
-            payload["deviceId"] = peripheral.identifier.uuidString
-            payload["deviceName"] = peripheral.name ?? "Unknown"
-            payload["connected"] = true
-            payload["address"] = peripheral.identifier.uuidString
-            self.notifyListeners("deviceConnected", data: payload)
-        }
-    }
-
-    public func centralManager(_ central: CBCentralManager,
-                               didFailToConnect peripheral: CBPeripheral,
-                               error: Error?) {
-        bluetoothQueue.async {
-            self.logError("Failed to connect to device: \(error?.localizedDescription ?? "unknown error")")
-            self.pendingConnectCall?.reject("Connection failed: \(error?.localizedDescription ?? "Unknown error")")
-            self.pendingConnectCall = nil
-        }
-    }
-
-    public func centralManager(_ central: CBCentralManager,
-                               didDisconnectPeripheral peripheral: CBPeripheral,
-                               error: Error?) {
-        bluetoothQueue.async {
-            self.logWarn("Disconnected from device: \(peripheral.name ?? "Unknown") - \(error?.localizedDescription ?? "normal")")
-            self.isSdkDeployed = false
-            self.currentDevice = nil
-            self.healthTimer?.invalidate()
-            self.deploymentTimer?.invalidate()
-            self.statusPollingTimer?.invalidate()
-            self.isMeasuring = false
-            self.measurementStartTime = nil
-
-            var payload = JSObject()
-            payload["deviceId"] = peripheral.identifier.uuidString
-            payload["address"] = peripheral.identifier.uuidString
-            payload["deviceName"] = peripheral.name ?? "Unknown"
-            payload["error"] = error?.localizedDescription
-            self.notifyListeners("deviceDisconnected", data: payload)
-
-            self.pendingDisconnectCall?.resolve(["success": true])
-            self.pendingDisconnectCall = nil
-        }
-    }
-}
-
-// MARK: - VTMURATDeviceDelegate & VTMURATUtilsDelegate
-
-extension WellueSDK: VTMURATDeviceDelegate, VTMURATUtilsDelegate {
-    public func utilDeployCompletion(_ util: VTMURATUtils) {
-        bluetoothQueue.async {
-            self.logInfo("✅ [DEPLOY] SDK deployment completed successfully")
-            self.deploymentTimer?.invalidate()
-            self.deploymentRetryCount = 0
-            self.isSdkDeployed = true
-            self.markDataReceived()
-            self.startHealthMonitoring()
-
-            self.logInfo("📡 [DEPLOY] Requesting initial device data...")
-            self.viatomUtils?.requestBPRealData()
-            self.logInfo("📡 [DEPLOY] Requesting initial status...")
-            self.viatomUtils?.bp_requestRealStatus()
-            self.logInfo("📡 [DEPLOY] Requesting device info...")
-            self.viatomUtils?.requestDeviceInfo()
-
-            if let call = self.pendingConnectCall {
-                var payload = JSObject()
-                payload["deviceId"] = self.currentDevice?.identifier.uuidString
-                payload["deviceName"] = self.currentDevice?.name ?? "Unknown"
-                payload["connected"] = true
-                call.resolve(payload)
-                self.pendingConnectCall = nil
-            }
-        }
-    }
-
-    public func utilDeployFailed(_ util: VTMURATUtils) {
-        bluetoothQueue.async {
-            self.logError("SDK deployment failed")
-            self.isSdkDeployed = false
-            self.pendingConnectCall?.reject("SDK deployment failed")
-            self.pendingConnectCall = nil
-            self.notifyListeners("sdkDeploymentFailed", data: ["error": "Deployment failed"])
-        }
-    }
-
-    public func util(_ util: VTMURATUtils, updateDeviceRSSI RSSI: NSNumber) {
-        notifyListeners("deviceRSSI", data: [
-            "deviceId": currentDevice?.identifier.uuidString ?? "",
-            "rssi": RSSI.intValue
-        ])
-    }
-
-    public func util(_ util: VTMURATUtils,
-                     commandSendFailed errorCode: UInt8) {
-        var message = "Unknown"
-        switch errorCode {
-        case 0: message = "Peripheral unavailable"
-        case 1: message = "Write characteristic unavailable"
-        case 2: message = "Peripheral not connected"
-        case 3: message = "Command timeout"
-        default: break
-        }
-        logError("❌ [COMMAND] Command send failed - Error code: \(errorCode), Message: \(message)")
-        notifyListeners("commandError", data: ["error": message])
-    }
-
-    public func util(_ util: VTMURATUtils,
-                     commandFailed cmdType: UInt8,
-                     deviceType: VTMDeviceType,
-                     failedType: VTMBLEPkgType) {
-        logError("❌ [COMMAND] Command 0x\(String(format: "%02X", cmdType)) failed - DeviceType: \(deviceType.rawValue), FailedType: \(failedType.rawValue)")
-        notifyListeners("commandError", data: [
-            "cmdType": Int(cmdType),
-            "error": failedType.rawValue
-        ])
-    }
-
-    public func util(_ util: VTMURATUtils,
-                     commandCompletion cmdType: UInt8,
-                     deviceType: VTMDeviceType,
-                     response: Data?) {
-        markDataReceived()
-        
-        // DIAGNOSTIC: Always log command completion to see what's arriving
-        logInfo("📥 [DELEGATE] commandCompletion called - CMD: 0x\(String(format: "%02X", cmdType)), Size: \(response?.count ?? 0) bytes")
-        
-        guard let response else {
-            logWarn("⚠️ [COMMAND] No response data for command 0x\(String(format: "%02X", cmdType))")
-            return
-        }
-        
-        switch cmdType {
-        case BPCmd.getRealStatus.rawValue:
-            logInfo("📊 [DELEGATE] Parsing status response (0x06)...")
-            let status = VTMBLEParser.parseBPRealTimeStatus(response)
-            logInfo("📊 [DELEGATE] Status parsed: \(status.status)")
-            handleStatusUpdate(status)
-        case BPCmd.getRealData.rawValue:
-            // Parse complete real-time data structure
-            let realTimeData = VTMBLEParser.parseBPRealTime(response)
-            
-            // Handle status update
-            handleStatusUpdate(realTimeData.run_status)
-            
-            // Extract waveform data
-            var waveform = realTimeData.rt_wav
-            
-            // Extract data array - BP data is 20 bytes according to SDK protocol
-            // waveform.data is a tuple of 20 UInt8 values, convert to Data
-            let waveformData = withUnsafeBytes(of: &waveform.data) { Data($0) }
-            
-            // Parse based on waveform type
-            switch waveform.type {
-            case 0:  // BP measuring
-                let measuring = VTMBLEParser.parseBPMeasuring(waveformData)
-                // Log every 10 mmHg to diagnose pressure parsing
-                if measuring.pressure > 0 && measuring.pressure % 10 == 0 {
-                    logInfo("🩺 Measuring - Pressure: \(measuring.pressure) mmHg, Pulse: \(measuring.pulse_rate) bpm, Deflating: \(measuring.is_deflating), GetPulse: \(measuring.is_get_pulse)")
-                }
-                emitBPMeasuringData(measuring)
-            case 1:  // BP measure finished (documented path)
-                let end = VTMBLEParser.parseBPEndMeasure(waveformData)
-                logInfo("✅ [RESULT] SYS: \(end.systolic_pressure), DIA: \(end.diastolic_pressure), Mean: \(end.mean_pressure), Pulse: \(end.pulse_rate)")
-                emitBPEndData(end)
-                // Mark measurement as complete
-                isMeasuring = false
-                measurementStartTime = nil
-            case 2:  // ECG measuring
-                logInfo("🫀 [ECG] ===== WAVEFORM TYPE 2 - ECG MEASURING DATA RECEIVED =====")
-                logInfo("🫀 [ECG] Waveform data size: \(waveformData.count) bytes")
-                let ecg = VTMBLEParser.parseECGMeasuring(waveformData)
-                logInfo("🫀 [ECG] Parsed ECG measuring data - HR: \(ecg.pulse_rate), Duration: \(ecg.duration)")
-                logInfo("🫀 [ECG] Weak signal: \((ecg.special_status & 0x1) == 0x1), Lead off: \((ecg.special_status & 0x2) == 0x2)")
-                emitECGMeasuring(ecg)
-                logInfo("🫀 [ECG] ✅ ECG measuring data emitted to JavaScript")
-            case 3:  // ECG measure finished
-                logInfo("🫀 [ECG] ===== WAVEFORM TYPE 3 - ECG MEASUREMENT FINISHED =====")
-                logInfo("🫀 [ECG] Waveform data size: \(waveformData.count) bytes")
-                let ecgEnd = VTMBLEParser.parseECGEndMeasure(waveformData)
-                logInfo("🫀 [ECG] ===== FINAL ECG RESULT PARSED =====")
-                logInfo("🫀 [ECG] Heart Rate: \(ecgEnd.hr) BPM")
-                logInfo("🫀 [ECG] Result Code: \(ecgEnd.result)")
-                logInfo("🫀 [ECG] QRS Duration: \(ecgEnd.qrs) ms")
-                logInfo("🫀 [ECG] PVCs: \(ecgEnd.pvcs)")
-                logInfo("🫀 [ECG] QTC: \(ecgEnd.qtc) ms")
-                emitECGEnd(ecgEnd)
-                logInfo("🫀 [ECG] ✅ Final ECG result emitted to JavaScript")
-            default:
-                // Ignore unknown waveform types silently (type 255 is common when device is idle)
-                break
-            }
-            
-        case BPCmd.getRealPressure.rawValue:
-            let pressure = VTMBLEParser.parseBPRealTimePressure(response)
-            notifyListeners("bp2Rt", data: [
-                "deviceId": currentDevice?.identifier.uuidString ?? "",
-                "pressure": Int(pressure.pressure)
-            ])
-        case BPCmd.deviceInfo.rawValue:
-            let info = VTMBLEParser.parseDeviceInfo(response)
-            notifyListeners("deviceInfo", data: [
-                "deviceId": currentDevice?.identifier.uuidString ?? "",
-                "hardwareVersion": Int(info.hw_version),
-                "firmwareVersion": Int(info.fw_version),
-                "bootloaderVersion": Int(info.bl_version),
-                "deviceType": Int(info.device_type),
-                "protocolVersion": Int(info.protocol_version)
-            ])
-        case BPCmd.batteryInfo.rawValue:
-            let battery = VTMBLEParser.parseBatteryInfo(response)
-            let level = Int(battery.percent)
-            notifyListeners("batteryUpdate", data: [
-                "deviceId": currentDevice?.identifier.uuidString ?? "",
-                "battery": level
-            ])
-            pendingBatteryCall?.resolve(["batteryLevel": level])
-            pendingBatteryCall = nil
-            
-        // FILE PROTOCOL - Robust result retrieval
-        case BPCmd.getFileList.rawValue:
-            handleFileListResponse(response)
-        case BPCmd.readFileStart.rawValue:
-            handleReadFileStart(response)
-        case BPCmd.readFileContent.rawValue:
-            handleReadFileContent(response)
-        case BPCmd.readFileEnd.rawValue:
-            handleReadFileEnd()
-        default:
-            break
-        }
-    }
-    
-    // MARK: - File Protocol Handlers (Robust Result Retrieval)
-    
-    private func handleFileListResponse(_ response: Data) {
-        let fileList = VTMBLEParser.parseFileList(response)
-        logInfo("📂 [FILE] Received file list - \(fileList.file_num) files")
-        
-        // 🆕 ECG: If reading ECG file, look for ECG files (start with '.')
-        if isReadingECGFile {
-            var ecgFiles: [String] = []
-            var allFileNames: [String] = [] // 🆕 DEBUG: Track all file names
-            
-            // Use Mirror to iterate through the tuple elements
-            let mirror = Mirror(reflecting: fileList.fileName)
-            var index = 0
-            for child in mirror.children {
-                if index >= Int(fileList.file_num) { break }
-                
-                if var fileName = child.value as? VTMFileName {
-                    let fileNameData = withUnsafeBytes(of: &fileName.str) { Data($0) }
-                    if let fileNameStr = String(data: fileNameData, encoding: .utf8)?.trimmingCharacters(in: CharacterSet(charactersIn: "\0")) {
-                        // 🆕 DEBUG: Log all file names
-                        allFileNames.append(fileNameStr)
-                        logInfo("🫀 [ECG FILE DEBUG] File \(index): '\(fileNameStr)' (length: \(fileNameStr.count), first char: '\(fileNameStr.first ?? Character("?"))')")
-                        
-                        // ECG files start with '.'
-                        if fileNameStr.hasPrefix(".") && !fileNameStr.isEmpty {
-                            ecgFiles.append(fileNameStr)
-                            logInfo("🫀 [ECG FILE] Found ECG file: \(fileNameStr)")
-                        }
-                    } else {
-                        logWarn("🫀 [ECG FILE DEBUG] File \(index): Failed to decode filename")
-                    }
-                }
-                index += 1
-            }
-            
-            // 🆕 DEBUG: Log summary
-            logInfo("🫀 [ECG FILE DEBUG] Total files parsed: \(allFileNames.count), ECG files found: \(ecgFiles.count)")
-            if allFileNames.count > 0 && ecgFiles.count == 0 {
-                logWarn("🫀 [ECG FILE DEBUG] ⚠️ No ECG files found! First 10 file names: \(Array(allFileNames.prefix(10)))")
-            }
-            
-            // Sort by filename (which is timestamp) and get the latest
-            let sortedECGFiles = ecgFiles.sorted().reversed()
-            if let latestECGFile = sortedECGFiles.first {
-                logInfo("🫀 [ECG FILE] Latest ECG file: \(latestECGFile)")
-                downloadingFileName = latestECGFile
-                downloadData = NSMutableData()
-                expectedFileLength = 0
-                
-                bluetoothQueue.async { [weak self] in
-                    self?.logInfo("🫀 [ECG FILE] Preparing to read ECG file: \(latestECGFile)")
-                    self?.viatomUtils?.prepareReadFile(latestECGFile)
-                }
-            } else {
-                logWarn("⚠️ [ECG FILE] No ECG files found on device (files starting with '.')")
-                logInfo("🫀 [ECG FILE] Attempting fallback: Reading latest file regardless of name...")
-                
-                // 🆕 FALLBACK: If no ECG files found, try reading the latest file (might be ECG with different naming)
-                let sortedAllFiles = allFileNames.sorted().reversed()
-                if let latestFile = sortedAllFiles.first {
-                    logInfo("🫀 [ECG FILE] Fallback: Reading latest file: \(latestFile)")
-                    downloadingFileName = latestFile
-                    downloadData = NSMutableData()
-                    expectedFileLength = 0
-                    
-                    bluetoothQueue.async { [weak self] in
-                        self?.logInfo("🫀 [ECG FILE] Preparing to read latest file (fallback): \(latestFile)")
-                        self?.viatomUtils?.prepareReadFile(latestFile)
-                    }
-                } else {
-                    logError("❌ [ECG FILE] No files found at all on device")
-                    isReadingECGFile = false
-                    ecgFileReadAttempts = 0
-                }
-            }
-            return
-        }
-        
-        // BP file reading logic (existing)
-        // Find latest BP file (format: "yyyyMMddhhmmss")
-        var bpFiles: [String] = []
-        
-        // Use Mirror to iterate through the tuple elements
-        let mirror = Mirror(reflecting: fileList.fileName)
-        var index = 0
-        for child in mirror.children {
-            if index >= Int(fileList.file_num) { break }
-            
-            if var fileName = child.value as? VTMFileName {
-                let fileNameData = withUnsafeBytes(of: &fileName.str) { Data($0) }
-                if let fileNameStr = String(data: fileNameData, encoding: .utf8)?.trimmingCharacters(in: CharacterSet(charactersIn: "\0")) {
-                    // BP files don't have extension, ECG files start with '.'
-                    if !fileNameStr.hasPrefix(".") && !fileNameStr.isEmpty {
-                        bpFiles.append(fileNameStr)
-                        logInfo("📂 [FILE] Found BP file: \(fileNameStr)")
-                    }
-                }
-            }
-            index += 1
-        }
-        
-        // Sort by filename (which is timestamp) and get the latest
-        let sortedFiles = bpFiles.sorted().reversed()
-        if let latestFile = sortedFiles.first {
-            logInfo("📂 [FILE] Latest BP file: \(latestFile)")
-            downloadingFileName = latestFile
-            downloadData = NSMutableData()
-            expectedFileLength = 0
-            
-            bluetoothQueue.async { [weak self] in
-                self?.logInfo("📖 [FILE] Preparing to read file: \(latestFile)")
-                self?.viatomUtils?.prepareReadFile(latestFile)
-            }
-        } else {
-            logWarn("⚠️ [FILE] No BP files found on device")
-        }
-    }
-    
-    private func handleReadFileStart(_ response: Data) {
-        let fileInfo = VTMBLEParser.parseFileLength(response)
-        expectedFileLength = fileInfo.file_size
-        logInfo("📖 [FILE] File size: \(expectedFileLength) bytes, starting read...")
-        
-        if expectedFileLength == 0 {
-            logWarn("⚠️ [FILE] File is empty, aborting")
-            bluetoothQueue.async { [weak self] in
-                self?.viatomUtils?.endReadFile()
-            }
-            return
-        }
-        
-        downloadData = NSMutableData()
-        bluetoothQueue.async { [weak self] in
-            self?.viatomUtils?.readFile(0)
-        }
-    }
-    
-    private func handleReadFileContent(_ response: Data) {
-        downloadData?.append(response)
-        let currentLength = downloadData?.length ?? 0
-        
-        logInfo("📥 [FILE] Downloaded \(currentLength)/\(expectedFileLength) bytes")
-        
-        if currentLength >= expectedFileLength {
-            // File download complete
-            bluetoothQueue.async { [weak self] in
-                self?.viatomUtils?.endReadFile()
-            }
-        } else {
-            // Request next chunk
-            bluetoothQueue.async { [weak self] in
-                self?.viatomUtils?.readFile(UInt32(currentLength))
-            }
-        }
-    }
-    
-    private func handleReadFileEnd() {
-        guard let fileData = downloadData, fileData.length > 0 else {
-            logError("❌ [FILE] File read completed but no data received")
-            if isReadingECGFile {
-                isReadingECGFile = false
-                ecgFileReadAttempts = 0
-            }
-            return
-        }
-        
-        // 🆕 ECG: Check if this is an ECG file
-        if isReadingECGFile {
-            logInfo("🫀 [ECG FILE] ECG file downloaded successfully (\(fileData.length) bytes), parsing ECG result...")
-            
-            // Parse ECG file structure according to Viatom File Parse Protocol
-            // ECG file structure: VTMBPECGResult header + waveform points
-            if fileData.length >= MemoryLayout<VTMBPECGResult>.size {
-                let ecgResult = VTMBLEParser.parseECGResult(fileData.subdata(with: NSRange(location: 0, length: MemoryLayout<VTMBPECGResult>.size)))
-                logInfo("🫀 [ECG FILE RESULT] ⭐ Heart Rate: \(ecgResult.hr), Result: \(ecgResult.result), QRS: \(ecgResult.qrs), PVCs: \(ecgResult.pvcs), QTC: \(ecgResult.qtc) ⭐")
-                
-                // ✅ FIX: Parse ECG waveform points manually (matching web portal byte order)
-                // Web portal: value = (bytes[i + 1] << 8) | bytes[i] (little-endian)
-                // parseBPPoints might not work correctly for ECG files - parse raw bytes instead
-                var ecgPointsArray: [Int] = []
-                if fileData.length > MemoryLayout<VTMBPECGResult>.size {
-                    let waveformData = fileData.subdata(with: NSRange(location: MemoryLayout<VTMBPECGResult>.size, length: fileData.length - MemoryLayout<VTMBPECGResult>.size))
-                    let bytes = [UInt8](waveformData)
-                    
-                    // Parse as little-endian Int16 (matching web portal)
-                    // Web portal: value = (bytes[i + 1] << 8) | bytes[i]
-                    for i in stride(from: 0, to: bytes.count - 1, by: 2) {
-                        let lowByte = UInt16(bytes[i])
-                        let highByte = UInt16(bytes[i + 1])
-                        let value = Int16(bitPattern: UInt16((highByte << 8) | lowByte))
-                        ecgPointsArray.append(Int(value))
-                    }
-                    
-                    logInfo("🫀 [ECG FILE] Parsed \(ecgPointsArray.count) ECG waveform points (manual parsing)")
-                    
-                    // Log first few non-zero points
-                    var nonZeroLogged = 0
-                    for (index, value) in ecgPointsArray.enumerated() {
-                        if value != 0 && nonZeroLogged < 5 {
-                            logInfo("🫀 [ECG FILE DEBUG] Point \(index): raw Int16=\(value)")
-                            nonZeroLogged += 1
-                        }
-                    }
-                }
-                
-                // Emit ECG result
-                var payload = JSObject()
-                payload["deviceId"] = currentDevice?.identifier.uuidString
-                payload["heartRate"] = Int(ecgResult.hr)
-                payload["result"] = Int(ecgResult.result)
-                payload["qrs"] = Int(ecgResult.qrs)
-                payload["pvcs"] = Int(ecgResult.pvcs)
-                payload["qtc"] = Int(ecgResult.qtc)
-                payload["source"] = "file" // Mark as file-based result
-                
-                // ✅ FIX: ecgPointsArray already populated above with manual parsing
-                let nonZeroCount = ecgPointsArray.filter { $0 != 0 }.count
-                logInfo("🫀 [ECG FILE DEBUG] Sending \(ecgPointsArray.count) raw Int16 samples, \(nonZeroCount) non-zero values")
-                payload["ecgData"] = ecgPointsArray
-                payload["scaleUvPerLsb"] = 3.098 // BP2 scale factor (μV/LSB) - chart will convert
-                payload["sampleRate"] = 125 // BP2 sample rate (Hz)
-                
-                logInfo("🫀 [ECG FILE] Emitting ECG result with HR: \(ecgResult.hr) BPM, QRS: \(ecgResult.qrs), QTC: \(ecgResult.qtc)")
-                notifyListeners("ecgData", data: payload)
-                // 🆕 FIX: Include all ECG result data in ecgLifecycle event
-                notifyListeners("ecgLifecycle", data: [
-                    "state": "stop",
-                    "finalHeartRate": Int(ecgResult.hr),
-                    "ecgQrsDuration": Int(ecgResult.qrs),
-                    "ecgQtInterval": Int(ecgResult.qtc),
-                    "ecgPrInterval": 160, // Default if not available
-                    "ecgRhythm": ecgResult.result == 0 ? "normal" : "abnormal",
-                    "ecgResult": Int(ecgResult.result),
-                    "ecgPvcs": Int(ecgResult.pvcs),
-                    "ecgData": ecgPointsArray,
-                    "scaleUvPerLsb": 3.098, // BP2 scale factor (μV/LSB)
-                    "sampleRate": 125
-                ])
-                
-                // Reset ECG file reading state
-                isReadingECGFile = false
-                ecgFileReadAttempts = 0
-                downloadingFileName = nil
-                downloadData = nil
-                return
-            } else {
-                logError("❌ [ECG FILE] Invalid ECG file size: \(fileData.length) bytes (expected at least \(MemoryLayout<VTMBPECGResult>.size))")
-                isReadingECGFile = false
-                ecgFileReadAttempts = 0
-                return
-            }
-        }
-        
-        // BP file parsing (existing logic)
-        logInfo("✅ [FILE] File downloaded successfully (\(fileData.length) bytes), parsing BP result...")
-        
-        // Parse BP file structure according to Viatom File Parse Protocol
-        if fileData.length >= MemoryLayout<VTMBPBPResult>.size {
-            let bpResult = VTMBLEParser.parseBPResult(fileData as Data)
-            logInfo("✅ [FILE RESULT] ⭐ SYS: \(bpResult.systolic_pressure), DIA: \(bpResult.diastolic_pressure), Mean: \(bpResult.mean_pressure), Pulse: \(bpResult.pulse_rate) ⭐")
-            
-            // Emit result using same format as waveform type 1
-            var payload = JSObject()
-            payload["deviceId"] = currentDevice?.identifier.uuidString
-            payload["systolic"] = Int(bpResult.systolic_pressure)
-            payload["diastolic"] = Int(bpResult.diastolic_pressure)
-            payload["mean"] = Int(bpResult.mean_pressure)
-            payload["pulse"] = Int(bpResult.pulse_rate)
-            payload["stateCode"] = Int(bpResult.status_code)
-            payload["medicalResult"] = Int(bpResult.medical_result)
-            payload["source"] = "file" // Mark as file-based result
-            
-            notifyListeners("bpMeasurement", data: payload)
-            notifyListeners("bpLifecycle", data: ["state": "complete"])
-            
-            // ✅ CRITICAL: Only now that results are emitted, clear isMeasuring flag
-            // This ensures status 3 is ignored throughout entire measurement until results are shown
-            isMeasuring = false
-            logInfo("✅ [RESULTS SHOWN] Measurement complete (file-based) - isMeasuring set to false, status 3 will now be allowed")
-            
-            // ✅ Reset file reading state
-            isFileReadInProgress = false
-            fileReadAttempts = 0
-            downloadingFileName = nil
-            downloadData = nil
-        } else {
-            logError("❌ [FILE] Invalid file size: \(fileData.length) bytes")
-        }
-    }
-}
-

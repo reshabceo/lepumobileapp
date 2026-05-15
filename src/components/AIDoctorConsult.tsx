@@ -404,22 +404,46 @@ export const AIDoctorConsult: React.FC = () => {
 
   // --- Payment ---
   const handlePayForConsult = async (mode: "text" | "voice") => {
-    if (!patientContext.id || !sessionId || !pricing) return;
+    // Ensure we have a session ID before proceeding
+    let currentSessionId = sessionId;
+    if (!currentSessionId && patientContext.id) {
+      console.log("🔄 [DEBUG] Session ID missing, attempting to create one...");
+      try {
+        const state = await getOrCreateSession(patientContext.id);
+        currentSessionId = state.sessionId;
+        setSessionId(currentSessionId);
+      } catch (err) {
+        console.error("❌ [DEBUG] Failed to create session on the fly:", err);
+      }
+    }
+
+    if (!patientContext.id || !currentSessionId || !pricing) {
+      console.warn("⚠️ [DEBUG] Cannot proceed with payment: Missing context", { 
+        patientId: patientContext.id, 
+        sessionId: currentSessionId, 
+        pricing: !!pricing 
+      });
+      toast({
+        title: "Session Error",
+        description: "Your consultation session is not ready. Please try again in a moment.",
+        variant: "destructive"
+      });
+      return;
+    }
 
     setPayingMode(mode);
     setIsPaymentLoading(true);
-
-    const amountPaise = mode === "voice" ? pricing.price_voice_paise : pricing.price_text_paise;
-    const paymentType = mode === "voice" ? "ai_doctor_voice" : "ai_doctor_text";
+    console.log("💳 [DEBUG] Initiating payAndFulfil for session:", currentSessionId);
 
     try {
       await payAndFulfil({
         type: paymentType as any,
         amount_paise: amountPaise,
         metadata: {
-          session_id: sessionId,
+          session_id: currentSessionId,
           patient_id: patientContext.id,
           amount_paise: amountPaise,
+          consult_mode: mode
         },
         onSuccess: async () => {
           // Refresh session state after payment
@@ -427,18 +451,21 @@ export const AIDoctorConsult: React.FC = () => {
           setPaymentStatus("paid");
           setSessionExpiresAt(expiresAt);
           setConsultMode(mode);
+          setIsPaymentLoading(false);
           toast({
             title: "Payment successful",
             description: `AI Doctor ${mode} consultation unlocked for 24 hours.`,
           });
         },
         onDismiss: () => {
+          setIsPaymentLoading(false);
           toast({
             title: "Payment cancelled",
             description: "You can pay anytime to start your consultation.",
           });
         },
         onError: (err) => {
+          setIsPaymentLoading(false);
           toast({
             title: "Payment failed",
             description: err.message || "Something went wrong. Please try again.",
@@ -1116,7 +1143,7 @@ export const AIDoctorConsult: React.FC = () => {
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#050816] via-[#050816] to-black text-white flex flex-col">
       {/* ========== HEADER ========== */}
-      <div className="px-4 pt-4 pb-2 border-b border-white/5 bg-black/40 backdrop-blur-md">
+      <div className="px-4 pt-safe-top pb-2 border-b border-white/5 bg-black/40 backdrop-blur-md">
         <div className="flex items-center gap-3 mb-3">
           <Button
             variant="ghost"

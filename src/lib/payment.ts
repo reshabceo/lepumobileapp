@@ -170,16 +170,18 @@ export async function payAndFulfil(options: CheckoutOptions): Promise<void> {
 
   // iOS Compliance: Use In-App Purchase for digital services
   if (Capacitor.getPlatform() === 'ios') {
+    console.log("🍎 [DEBUG] iOS Platform detected, switching to IAP flow for type:", type);
     let productId: string | undefined;
 
     if (type === 'radiologist_review') {
-      // For radiologists, we use the tiered product selection
       const { getRadiologistTier } = await import('../config/iap-products');
       productId = getRadiologistTier(amount_paise).productId;
     } else {
       const product = getIAPProduct(type as any);
       productId = product?.productId;
     }
+
+    console.log("🍎 [DEBUG] Resolved IAP Product ID:", productId);
 
     if (productId) {
       try {
@@ -194,9 +196,14 @@ export async function payAndFulfil(options: CheckoutOptions): Promise<void> {
           });
           onSuccess();
           return;
+        } else {
+          console.log("🍎 [DEBUG] IAP Purchase returned null (cancelled)");
+          onDismiss?.();
+          return;
         }
       } catch (err) {
         const e = err instanceof Error ? err : new Error(String(err));
+        console.error("🍎 [DEBUG] IAP Purchase Error:", e);
         onError?.(e);
         return;
       }

@@ -1,4 +1,5 @@
 PODS:
+  - AliveCorKitLite (1.6.10)
   - Capacitor (7.4.3):
     - CapacitorCordova
   - CapacitorApp (7.1.1):
@@ -31,6 +32,7 @@ PODS:
   - VTMProductLib (1.5.2)
 
 DEPENDENCIES:
+  - AliveCorKitLite (from `Frameworks`)
   - "Capacitor (from `../../node_modules/@capacitor/ios`)"
   - "CapacitorApp (from `../../node_modules/@capacitor/app`)"
   - "CapacitorCamera (from `../../node_modules/@capacitor/camera`)"
@@ -52,6 +54,8 @@ SPEC REPOS:
     - IONGeolocationLib
 
 EXTERNAL SOURCES:
+  AliveCorKitLite:
+    :path: Frameworks
   Capacitor:
     :path: "../../node_modules/@capacitor/ios"
   CapacitorApp:
@@ -82,6 +86,7 @@ EXTERNAL SOURCES:
     :path: "../../VTProductLib_Pods"
 
 SPEC CHECKSUMS:
+  AliveCorKitLite: 3dca155cb84ededdcf974d53c4260c82a0eb44d2
   Capacitor: 28d6c01026a9a3f7156529498ec1f389a2a28dbc
   CapacitorApp: 63b237168fc869e758481dba283315a85743ee78
   CapacitorCamera: 6746827d82376f31cea9224945c0458c9fd0b0b2
@@ -99,6 +104,6 @@ SPEC CHECKSUMS:
   IONGeolocationLib: 20f9d0248a0b5264511fb57a37e25dd2badf797a
   VTMProductLib: 94eacd7389ab1ec8bed661eb465fe1ffbd731409
 
-PODFILE CHECKSUM: 90825e6823d3d557818895a4ea41387c91ea67a8
+PODFILE CHECKSUM: fe422a49a265b01eff22484aeda39c62275735c1
 
 COCOAPODS: 1.16.2

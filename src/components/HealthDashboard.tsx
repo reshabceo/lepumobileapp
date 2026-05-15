@@ -45,13 +45,13 @@ import { useRealTimeVitals } from "@/hooks/useRealTimeVitals";
 import { DoctorInfoCard } from "./DoctorInfoCard";
 import { EmergencyButton } from "./EmergencyButton";
 import { getPatientRiskCriteria } from "@/lib/supabase";
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogHeader, 
-  DialogTitle, 
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
   DialogDescription,
-  DialogFooter 
+  DialogFooter
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { useInsuranceClaimsNotifications } from "@/hooks/useInsuranceClaimsNotifications";
@@ -335,7 +335,7 @@ export const HealthDashboard = () => {
             .select('id')
             .eq('auth_user_id', user.id)
             .single();
-            
+
           if (patient) {
             const { data: riskData } = await getPatientRiskCriteria(patient.id);
             if (riskData && riskData.is_high_risk) {
@@ -1433,6 +1433,7 @@ export const HealthDashboard = () => {
             <FileText size={20} className="text-purple-400" />
             <span className="text-xs">Reports</span>
           </button>
+
           <button
             onClick={() => navigate("/doctor-assignment")}
             className="bg-blue-900/60 backdrop-blur-sm hover:bg-blue-800/70 text-white font-bold py-4 rounded-xl flex flex-col items-center justify-center gap-1 transition-all duration-200 hover:scale-105 active:scale-95 border border-blue-400/40 hover:border-blue-400/60"
@@ -1440,6 +1441,7 @@ export const HealthDashboard = () => {
             <Stethoscope size={20} className="text-blue-400" />
             <span className="text-xs">Doctor</span>
           </button>
+
           <button
             onClick={() => navigate("/appointments")}
             className="bg-orange-900/60 backdrop-blur-sm hover:bg-orange-800/70 text-white font-bold py-4 rounded-xl flex flex-col items-center justify-center gap-1 transition-all duration-200 hover:scale-105 active:scale-95 border border-orange-400/40 hover:border-orange-400/60"
@@ -1447,6 +1449,7 @@ export const HealthDashboard = () => {
             <Calendar size={20} className="text-orange-400" />
             <span className="text-xs">Book</span>
           </button>
+
           <button
             onClick={() => navigate("/ai-doctor")}
             className="bg-emerald-900/60 backdrop-blur-sm hover:bg-emerald-800/70 text-white font-bold py-4 rounded-xl flex flex-col items-center justify-center gap-1 transition-all duration-200 hover:scale-105 active:scale-95 border border-emerald-400/40 hover:border-emerald-400/60"
@@ -1454,6 +1457,7 @@ export const HealthDashboard = () => {
             <Stethoscope size={20} className="text-emerald-400" />
             <span className="text-xs">AI Health Assistant</span>
           </button>
+
           <button
             onClick={() => {
               markClaimsAsRead();
@@ -1469,6 +1473,7 @@ export const HealthDashboard = () => {
             <FileCheck size={20} className="text-cyan-400" />
             <span className="text-xs">Claims</span>
           </button>
+
           <button
             onClick={() => navigate("/invoices")}
             className="bg-amber-900/60 backdrop-blur-sm hover:bg-amber-800/70 text-white font-bold py-4 rounded-xl flex flex-col items-center justify-center gap-1 transition-all duration-200 hover:scale-105 active:scale-95 border border-amber-400/40 hover:border-amber-400/60"
@@ -1476,6 +1481,7 @@ export const HealthDashboard = () => {
             <Receipt size={20} className="text-amber-400" />
             <span className="text-xs">Invoices</span>
           </button>
+
           <button
             onClick={() => navigate("/alivecor-history")}
             className="bg-rose-900/60 backdrop-blur-sm hover:bg-rose-800/70 text-white font-bold py-4 rounded-xl flex flex-col items-center justify-center gap-1 transition-all duration-200 hover:scale-105 active:scale-95 border border-rose-400/40 hover:border-rose-400/60"
