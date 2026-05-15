@@ -408,7 +408,8 @@ export const SignupWizard: React.FC<SignupWizardProps> = ({ onSwitchToLogin, onS
       const pendingDoctorCode = localStorage.getItem('pending_doctor_code');
       const pendingUserName = localStorage.getItem('pending_user_name');
       const pendingPatientDataStr = localStorage.getItem('pending_patient_data');
-      const pendingPatientData = pendingPatientDataStr ? JSON.parse(pendingPatientDataStr) : null;
+      let pendingPatientData = null;
+      try { pendingPatientData = pendingPatientDataStr ? JSON.parse(pendingPatientDataStr) : null; } catch { localStorage.removeItem('pending_patient_data'); }
 
       console.log('📋 Retrieved pending data:', { pendingDoctorCode, pendingUserName, hasPendingData: !!pendingPatientData });
 

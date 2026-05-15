@@ -353,11 +353,21 @@ const PatientMonitor = () => {
     const { patientId } = useParams<{ patientId: string }>();
     const { toast } = useToast();
 
-    // Fetch patient data
+    // Fetch patient data directly from Supabase (apiService was removed — use supabase directly)
     const { data: patientData, isLoading, error } = useQuery({
         queryKey: ['patient-monitor', patientId],
-        queryFn: () => patientId ? apiService.getPatient(patientId) : Promise.reject('No patient ID'),
-        refetchInterval: 3000, // Real-time updates every 3 seconds
+        queryFn: async () => {
+            if (!patientId) throw new Error('No patient ID');
+            const { supabase } = await import('@/lib/supabase');
+            const { data, error } = await supabase
+                .from('patients')
+                .select('*, vital_signs(device_type, data, reading_timestamp)')
+                .eq('id', patientId)
+                .single();
+            if (error) throw error;
+            return { patient: data };
+        },
+        refetchInterval: 10000, // Refresh every 10 seconds
     });
 
     // Use measurements from patient data instead of fetching separately

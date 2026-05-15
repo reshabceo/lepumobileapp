@@ -46,12 +46,13 @@ export const useHealthRecommendationsNotifications = () => {
 
   useEffect(() => {
     let subscription: any;
+    let isMounted = true;
 
     const setupNotifications = async () => {
       // Get current user
       const { data: { user } } = await supabase.auth.getUser();
-      
-      if (!user) return;
+
+      if (!user || !isMounted) return;
 
       // Get patient ID
       const { data: patient } = await supabase
@@ -74,7 +75,7 @@ export const useHealthRecommendationsNotifications = () => {
         .eq('status', 'active')
         .order('created_at', { ascending: false });
 
-      if (!error && recentRecs) {
+      if (!error && recentRecs && isMounted) {
         setUnreadCount(recentRecs.length);
         if (recentRecs.length > 0) {
           setLatestRecommendation(recentRecs[0]);
@@ -126,6 +127,7 @@ export const useHealthRecommendationsNotifications = () => {
 
     // Cleanup subscription on unmount
     return () => {
+      isMounted = false;
       if (subscription) {
         supabase.removeChannel(subscription);
       }

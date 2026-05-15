@@ -43,6 +43,7 @@ export const PatientVitalsHistory = () => {
       
       if (!user) {
         toast.error('Please login to view vitals');
+        setLoading(false);
         return;
       }
 
@@ -55,6 +56,7 @@ export const PatientVitalsHistory = () => {
 
       if (!patientData) {
         toast.error('Patient profile not found');
+        setLoading(false);
         return;
       }
 
