@@ -67,6 +67,7 @@ const PatientInsuranceClaims = () => {
           description: 'Please login to view claims',
           variant: 'destructive'
         });
+        setLoading(false);
         return;
       }
 
@@ -99,6 +100,7 @@ const PatientInsuranceClaims = () => {
           description: 'Failed to load insurance claims',
           variant: 'destructive'
         });
+        setLoading(false);
         return;
       }
 

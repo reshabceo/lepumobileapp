@@ -543,11 +543,12 @@ export default function DicomUploader({ onUploadComplete, patientProfile: propPr
           setTimeout(() => reject(new Error('Native DICOM DB Insert Timeout (25s)')), 25000)
         );
 
-        const projectRef = import.meta.env.VITE_SUPABASE_URL.split('//')[1].split('.')[0];
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL ?? '';
+        const projectRef = supabaseUrl.split('//')[1]?.split('.')[0] ?? '';
         const tokenKey = `sb-${projectRef}-auth-token`;
         const cachedSession = localStorage.getItem(tokenKey);
         let token = null;
-        
+
         if (cachedSession) {
           try {
             token = JSON.parse(cachedSession).access_token;

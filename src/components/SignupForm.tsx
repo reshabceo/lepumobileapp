@@ -335,7 +335,8 @@ export const SignupForm: React.FC<SignupFormProps> = ({ onSwitchToLogin }) => {
       const pendingDoctorCode = localStorage.getItem('pending_doctor_code');
       const pendingUserName = localStorage.getItem('pending_user_name');
       const pendingPatientDataStr = localStorage.getItem('pending_patient_data');
-      const pendingPatientData = pendingPatientDataStr ? JSON.parse(pendingPatientDataStr) : null;
+      let pendingPatientData = null;
+      try { pendingPatientData = pendingPatientDataStr ? JSON.parse(pendingPatientDataStr) : null; } catch { localStorage.removeItem('pending_patient_data'); }
 
       // Get current user (should be authenticated after OTP verification)
       const { data: { user }, error: userError } = await supabase.auth.getUser();
