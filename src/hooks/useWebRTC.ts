@@ -41,18 +41,33 @@ export interface UseWebRTCReturn extends WebRTCConnection {
 }
 
 // Initialize ICE servers with Twilio TURN as backup
-let DEFAULT_ICE_SERVERS: RTCIceServer[] = [
+const STUN_ONLY_ICE_SERVERS: RTCIceServer[] = [
   { urls: 'stun:stun.l.google.com:19302' },
   { urls: 'stun:stun1.l.google.com:19302' },
   { urls: 'stun:stun2.l.google.com:19302' }
 ];
 
 const DEFAULT_CONFIG: WebRTCConfig = {
-  iceServers: DEFAULT_ICE_SERVERS
+  iceServers: STUN_ONLY_ICE_SERVERS
 };
 
 export const useWebRTC = (config: WebRTCConfig = DEFAULT_CONFIG): UseWebRTCReturn => {
   const pcRef = useRef<RTCPeerConnection | null>(null);
+  // Fetch Twilio TURN credentials once on mount.
+  // iceReadyRef holds the pending Promise so initializeMedia can await it before
+  // creating the RTCPeerConnection — ensuring TURN servers are always included.
+  // Without TURN, calls fail on mobile networks behind symmetric NAT.
+  const iceServersRef = useRef<RTCIceServer[]>(STUN_ONLY_ICE_SERVERS);
+  const iceReadyRef = useRef<Promise<void>>(Promise.resolve());
+  useEffect(() => {
+    iceReadyRef.current = import('@/config/webrtc')
+      .then(({ getICEServers }) => getICEServers())
+      .then(servers => {
+        iceServersRef.current = servers;
+        console.log('[WebRTC] TURN credentials loaded, ICE servers:', servers.length);
+      })
+      .catch(e => console.warn('[WebRTC] Failed to fetch TURN credentials, using STUN only:', e));
+  }, []);
   const [peerConnection, setPeerConnection] = useState<RTCPeerConnection | null>(null);
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
@@ -105,9 +120,9 @@ export const useWebRTC = (config: WebRTCConfig = DEFAULT_CONFIG): UseWebRTCRetur
     if (pcRef.current && pcRef.current.signalingState !== 'closed') {
       return pcRef.current;
     }
-    console.log('[WebRTC] Creating peer connection (STUN-only)...');
+    console.log('[WebRTC] Creating peer connection with', iceServersRef.current.length, 'ICE servers...');
     const pc = new RTCPeerConnection({
-      iceServers: DEFAULT_ICE_SERVERS,
+      iceServers: iceServersRef.current,
       iceCandidatePoolSize: 10
     });
     setupPcHandlers(pc);
@@ -161,6 +176,11 @@ export const useWebRTC = (config: WebRTCConfig = DEFAULT_CONFIG): UseWebRTCRetur
   const initializeMedia = useCallback(async (video: boolean = true, audio: boolean = true): Promise<boolean> => {
     try {
       console.log('[WebRTC] Requesting media access...', { video, audio });
+
+      // Wait for TURN credentials to load before creating the RTCPeerConnection.
+      // getOrCreatePc() is called below — if it ran before this await, the PC
+      // would be created with STUN-only servers and TURN would never be used.
+      await iceReadyRef.current;
 
       if (!navigator.mediaDevices?.getUserMedia) {
         console.error('[WebRTC] navigator.mediaDevices.getUserMedia not available');
@@ -327,9 +347,8 @@ export const useWebRTC = (config: WebRTCConfig = DEFAULT_CONFIG): UseWebRTCRetur
     trackCallbackRef.current = callback;
   }, []);
 
-  // Create peer connection eagerly on mount
+  // Cleanup peer connection on unmount
   useEffect(() => {
-    getOrCreatePc();
     return () => {
       if (pcRef.current) {
         pcRef.current.close();

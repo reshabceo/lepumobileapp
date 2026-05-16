@@ -373,7 +373,11 @@ export const usePatientWebRTCCall = (patientId: string | null): UsePatientWebRTC
         status: 'connected' as const,
         startedAt: new Date()
       };
-      
+
+      // Update ref synchronously so that ICE candidates arriving in the same
+      // event-loop turn (before React re-renders and fires the sync useEffect)
+      // are applied immediately rather than buffered and never flushed.
+      activeCallRef.current = newActiveCall;
       setActiveCall(newActiveCall);
       setIncomingCall(null);
       

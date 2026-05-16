@@ -30,6 +30,7 @@ import EcgDemo from "./pages/EcgDemo";
 import VideoCallPage from "./pages/VideoCall";
 import WaitingForDoctor from "./pages/WaitingForDoctor";
 import { GlobalVideoCallNotification } from "./components/GlobalVideoCallNotification";
+import { PatientIncomingCallOverlay } from "./components/PatientIncomingCallOverlay";
 import { AppointmentBookingPage } from "./pages/AppointmentBookingPage";
 import { ChatSupport } from "./components/ChatSupport";
 import AIDoctorPage from "./pages/AIDoctorPage";
@@ -71,6 +72,11 @@ const App = () => (
           <BrowserRouter>
             <BackButtonHandler />
             <GlobalVideoCallNotification />
+            {/* PatientIncomingCallOverlay MUST be mounted globally so the WebSocket
+                is connected before the call arrives. Without this, the OFFER is sent
+                while the patient has no socket registered on the server → USER_OFFLINE
+                → call ends immediately before media can flow. */}
+            <PatientIncomingCallOverlay />
             <ChatSupportOnDashboard />
             <Routes>
               {/* Public routes */}

@@ -857,25 +857,29 @@ const PatientReportsView: React.FC = () => {
     };
 
     const getReportTypeLabel = (type: string) => {
-        const types = {
+        const types: Record<string, string> = {
             medical_report: 'Medical Report',
             test_results: 'Test Results',
             prescription: 'Prescription',
             consultation_notes: 'Consultation Notes',
-            discharge_summary: 'Discharge Summary'
+            discharge_summary: 'Discharge Summary',
+            weekly_vitals_report: 'Weekly Vitals Report',
+            rpm_compliance_report: 'RPM Compliance Report',
         };
-        return types[type as keyof typeof types] || type;
+        return types[type] || type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
     };
 
     const getReportTypeColor = (type: string) => {
-        const colors = {
+        const colors: Record<string, string> = {
             medical_report: 'bg-blue-100 text-blue-800',
             test_results: 'bg-green-100 text-green-800',
             prescription: 'bg-purple-100 text-purple-800',
             consultation_notes: 'bg-yellow-100 text-yellow-800',
-            discharge_summary: 'bg-red-100 text-red-800'
+            discharge_summary: 'bg-red-100 text-red-800',
+            weekly_vitals_report: 'bg-cyan-100 text-cyan-800',
+            rpm_compliance_report: 'bg-orange-100 text-orange-800',
         };
-        return colors[type as keyof typeof colors] || 'bg-gray-100 text-gray-800';
+        return colors[type] || 'bg-gray-100 text-gray-800';
     };
 
     // Show loading state — only block if we're still fetching the profile AND have nothing cached
