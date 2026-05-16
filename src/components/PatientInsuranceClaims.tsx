@@ -60,13 +60,25 @@ const PatientInsuranceClaims = () => {
       
       // Get current patient
       const { data: { user } } = await supabase.auth.getUser();
-      
+
       if (!user) {
         toast({
           title: 'Error',
           description: 'Please login to view claims',
           variant: 'destructive'
         });
+        setLoading(false);
+        return;
+      }
+
+      // Resolve auth UID → patients.id
+      const { data: patientRow } = await supabase
+        .from('patients')
+        .select('id')
+        .eq('auth_user_id', user.id)
+        .single();
+
+      if (!patientRow) {
         setLoading(false);
         return;
       }
@@ -90,7 +102,7 @@ const PatientInsuranceClaims = () => {
           patient_insurance_id,
           doctors!doctor_id(full_name)
         `)
-        .eq('patient_id', user.id)
+        .eq('patient_id', patientRow.id)
         .order('created_at', { ascending: false });
 
       if (claimsError) {
