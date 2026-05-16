@@ -47,15 +47,29 @@ const RAZORPAY_SCRIPT = 'https://checkout.razorpay.com/v1/checkout.js';
 let scriptLoaded: Promise<void> | null = null;
 
 export function loadRazorpayScript(): Promise<void> {
+  console.log("🌐 [Razorpay] Checking if script is already loaded...");
   if (typeof window === 'undefined') return Promise.reject(new Error('No window'));
-  if (window.Razorpay) return Promise.resolve();
-  if (scriptLoaded) return scriptLoaded;
+  if (window.Razorpay) {
+    console.log("🌐 [Razorpay] Script already present in window");
+    return Promise.resolve();
+  }
+  if (scriptLoaded) {
+    console.log("🌐 [Razorpay] Script is currently loading...");
+    return scriptLoaded;
+  }
+  console.log("🌐 [Razorpay] Appending script tag to document head: " + RAZORPAY_SCRIPT);
   scriptLoaded = new Promise((resolve, reject) => {
     const script = document.createElement('script');
     script.src = RAZORPAY_SCRIPT;
     script.async = true;
-    script.onload = () => resolve();
-    script.onerror = () => reject(new Error('Failed to load Razorpay'));
+    script.onload = () => {
+      console.log("🌐 [Razorpay] Script loaded successfully");
+      resolve();
+    };
+    script.onerror = (e) => {
+      console.error("🌐 [Razorpay] Script load failed", e);
+      reject(new Error('Failed to load Razorpay'));
+    };
     document.head.appendChild(script);
   });
   return scriptLoaded;
@@ -210,19 +224,30 @@ export async function payAndFulfil(options: CheckoutOptions): Promise<void> {
     }
   }
 
+  console.log("🌐 [Razorpay] Loading script...");
   await loadRazorpayScript();
 
   if (!Number.isFinite(amount_paise) || amount_paise < 100) {
     throw new Error('Invalid amount. Fetch price from doctor or radiologist.');
   }
 
+  console.log("🌐 [Razorpay] Creating order on backend...");
   const order = await createOrder({
     type,
     amount_paise,
     metadata,
   });
 
+  console.log("🌐 [Razorpay] Order created:", order.order_id);
+
   return new Promise((resolve, reject) => {
+    if (!window.Razorpay) {
+      console.error("🌐 [Razorpay] window.Razorpay is undefined even after script load!");
+      reject(new Error("Razorpay SDK not loaded"));
+      return;
+    }
+
+    console.log("🌐 [Razorpay] Initializing checkout modal...");
     const rzp = new window.Razorpay({
       key: order.key_id,
       amount: order.amount,
@@ -236,6 +261,7 @@ export async function payAndFulfil(options: CheckoutOptions): Promise<void> {
         : type === 'ai_doctor_voice' ? 'AI Doctor – Voice consultation (24h)'
         : 'Emergency consultation',
       handler: async (response: { razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string }) => {
+        console.log("🌐 [Razorpay] Payment success, verifying...");
         try {
           await verifyPayment({
             razorpay_order_id: response.razorpay_order_id,
@@ -244,21 +270,29 @@ export async function payAndFulfil(options: CheckoutOptions): Promise<void> {
             type,
             metadata,
           });
+          console.log("🌐 [Razorpay] Verification success");
           onSuccess();
           resolve();
         } catch (err) {
           const e = err instanceof Error ? err : new Error(String(err));
+          console.error("🌐 [Razorpay] Verification error:", e);
           onError?.(e);
           reject(e);
         }
       },
-      modal: { ondismiss: () => { onDismiss?.(); resolve(); } },
+      modal: { ondismiss: () => { 
+        console.log("🌐 [Razorpay] Modal dismissed by user");
+        onDismiss?.(); 
+        resolve(); 
+      } },
     });
     rzp.on('payment.failed', (data: any) => {
+      console.error("🌐 [Razorpay] Payment failed event:", data);
       const err = new Error(data.error?.description || 'Payment failed');
       onError?.(err);
       reject(err);
     });
+    console.log("🌐 [Razorpay] Opening checkout modal...");
     rzp.open();
   });
 }

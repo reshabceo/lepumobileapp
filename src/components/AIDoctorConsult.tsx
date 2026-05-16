@@ -431,13 +431,16 @@ export const AIDoctorConsult: React.FC = () => {
       return;
     }
 
+    const paymentType = mode === "text" ? "ai_doctor_text" : "ai_doctor_voice";
+    const amountPaise = mode === "text" ? pricing.price_text_paise : pricing.price_voice_paise;
+
     setPayingMode(mode);
     setIsPaymentLoading(true);
-    console.log("💳 [DEBUG] Initiating payAndFulfil for session:", currentSessionId);
+    console.log(`💳 [DEBUG] Initiating ${paymentType} payment for session: ${currentSessionId}, amount: ${amountPaise}`);
 
     try {
       await payAndFulfil({
-        type: paymentType as any,
+        type: paymentType,
         amount_paise: amountPaise,
         metadata: {
           session_id: currentSessionId,
