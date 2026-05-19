@@ -9,6 +9,12 @@ buildscript {
     dependencies {
         classpath 'com.android.tools.build:gradle:8.5.1'
         classpath 'com.google.gms:google-services:4.4.2'
+        // Kotlin Gradle plugin 2.2.0 — MUST match the Kotlin version the AliveCor SDK
+        // AAR was compiled with (confirmed from ThirdPartyAppSDKTest/build.gradle).
+        // Without this plugin applied to the app module, kotlin-stdlib classes (including
+        // SpillingKt introduced in Kotlin 2.0 for coroutine spilling optimization) are NOT
+        // compiled into the APK DEX even if they are resolved in the dependency graph.
+        classpath 'org.jetbrains.kotlin:kotlin-gradle-plugin:2.2.0'
 
         // NOTE: Do not place your application dependencies here; they belong
         // in the individual module build.gradle files
@@ -32,6 +38,20 @@ allprojects {
 
 // Align all projects to Java 21 and JVM target 21 for consistency
 subprojects {
+    // ── Fix: Duplicate Kotlin stdlib classes ─────────────────────────────────
+    // kotlin-stdlib 1.8+ merged jdk7/jdk8 into the main artifact.
+    // Transitive dependencies (Capacitor plugins, AliveCor SDK) still pull in
+    // the old split jars (kotlin-stdlib-jdk7:1.6.x, kotlin-stdlib-jdk8:1.6.x)
+    // causing duplicate class errors during checkDuplicateClasses.
+    // Force all three to the same version so Gradle picks one JAR only.
+    configurations.all {
+        resolutionStrategy {
+            force "org.jetbrains.kotlin:kotlin-stdlib:2.2.0"
+            force "org.jetbrains.kotlin:kotlin-stdlib-jdk7:2.2.0"
+            force "org.jetbrains.kotlin:kotlin-stdlib-jdk8:2.2.0"
+        }
+    }
+
     afterEvaluate { project ->
         if (project.hasProperty('android')) {
             project.android {

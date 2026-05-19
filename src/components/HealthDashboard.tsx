@@ -1511,6 +1511,14 @@ export const HealthDashboard = () => {
             <Target size={20} className="text-emerald-400" />
             <span className="text-xs">Health Plan</span>
           </button>
+
+          <button
+            onClick={() => navigate("/connect-camera")}
+            className="bg-indigo-900/60 backdrop-blur-sm hover:bg-indigo-800/70 text-white font-bold py-4 rounded-xl flex flex-col items-center justify-center gap-1 transition-all duration-200 hover:scale-105 active:scale-95 border border-indigo-400/40 hover:border-indigo-400/60"
+          >
+            <Video size={20} className="text-indigo-400" />
+            <span className="text-xs">Camera</span>
+          </button>
         </div>
 
         {/* Manual Vital Input Button - Basic Plan */}
