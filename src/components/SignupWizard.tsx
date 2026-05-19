@@ -35,9 +35,10 @@ interface SignupData {
 interface SignupWizardProps {
   onSwitchToLogin: () => void;
   onSignupSuccess?: (email: string) => void; // Made optional since we'll handle internally
+  embedded?: boolean;
 }
 
-export const SignupWizard: React.FC<SignupWizardProps> = ({ onSwitchToLogin, onSignupSuccess }) => {
+export const SignupWizard: React.FC<SignupWizardProps> = ({ onSwitchToLogin, onSignupSuccess, embedded = false }) => {
   // Restore currentStep from localStorage if in signup flow, otherwise default to 1
   const getInitialStep = () => {
     const awaitingOTP = localStorage.getItem('awaiting_otp_verification') === 'true';
@@ -580,8 +581,7 @@ export const SignupWizard: React.FC<SignupWizardProps> = ({ onSwitchToLogin, onS
   console.log('🎨 SignupWizard RENDER - currentStep:', currentStep, 'loading:', loading, 'awaitingOTP:', localStorage.getItem('awaiting_otp_verification'));
 
   return (
-    <div className="w-full max-w-2xl mx-auto">
-
+    <div className="w-full space-y-4">
       {/* Progress Indicator */}
       <ProgressIndicator
         currentStep={currentStep}
@@ -590,49 +590,49 @@ export const SignupWizard: React.FC<SignupWizardProps> = ({ onSwitchToLogin, onS
       />
 
       {/* Step Content */}
-      <div className="backdrop-blur-xl bg-black/20 border border-white/20 rounded-3xl p-4 sm:p-8 shadow-2xl shadow-black/20 mb-6 mx-2 sm:mx-0">
+      <div className={embedded ? "mb-4" : "backdrop-blur-xl bg-black/20 border border-white/20 rounded-3xl p-4 sm:p-8 shadow-2xl shadow-black/20 mb-6 mx-2 sm:mx-0"}>
         {renderStep()}
       </div>
 
       {/* Navigation */}
-      <div className="flex justify-between items-center">
+      <div className="flex justify-between items-center px-1">
         {/* Previous Button */}
         <button
           onClick={prevStep}
           disabled={currentStep === 1 || currentStep === 4}
-          className={`flex items-center gap-1 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-300 ${
+          className={`flex items-center gap-1 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all duration-300 ${
             currentStep === 1 || currentStep === 4
-              ? 'bg-white/10 text-gray-500 cursor-not-allowed'
-              : 'bg-white/10 text-white hover:bg-white/20 border border-white/20'
+              ? 'bg-white/5 text-gray-600 cursor-not-allowed border border-transparent'
+              : 'bg-white/10 text-white hover:bg-white/20 border border-white/10 active:scale-95'
           }`}
         >
-          <ArrowLeft className="w-3 h-3" />
+          <ArrowLeft className="w-3.5 h-3.5" />
           Previous
         </button>
 
         {/* Step Indicator */}
-        <div className="text-xs text-gray-400">
-          {currentStep} of {steps.length}
+        <div className="text-xs text-gray-400 font-medium">
+          Step {currentStep} of {steps.length}
         </div>
 
         {/* Next/Submit Button */}
         {currentStep < 3 ? (
           <button
             onClick={nextStep}
-            className="flex items-center gap-1 px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white text-sm font-medium rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all duration-300"
+            className="flex items-center gap-1 px-5 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 text-white text-xs font-semibold rounded-xl hover:from-blue-700 hover:to-blue-800 active:scale-95 transition-all duration-300 shadow-md shadow-blue-500/20"
           >
             Next
-            <ArrowRight className="w-3 h-3" />
+            <ArrowRight className="w-3.5 h-3.5" />
           </button>
         ) : currentStep === 3 ? (
           <button
             onClick={handleSubmit}
             disabled={loading}
-            className="flex items-center gap-1 px-4 py-2 bg-gradient-to-r from-green-600 to-green-700 text-white text-sm font-medium rounded-xl hover:from-green-700 hover:to-green-800 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex items-center gap-1.5 px-5 py-2.5 bg-gradient-to-r from-green-600 to-green-700 text-white text-xs font-semibold rounded-xl hover:from-green-700 hover:to-green-800 active:scale-95 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-green-500/20"
           >
             {loading ? (
               <>
-                <Loader2 className="w-3 h-3 animate-spin" />
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
                 Creating...
               </>
             ) : (

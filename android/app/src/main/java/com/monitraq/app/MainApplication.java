@@ -1,4 +1,4 @@
-package com.monitraq.mobile;
+package com.monitraq.app;
 
 import android.app.Application;
 import android.util.Log;
@@ -10,7 +10,8 @@ public class MainApplication extends Application {
     private static final String TAG = "MainApplication";
 
     @Override
-    public android.content.Intent registerReceiver(android.content.BroadcastReceiver receiver, android.content.IntentFilter filter) {
+    public android.content.Intent registerReceiver(android.content.BroadcastReceiver receiver,
+            android.content.IntentFilter filter) {
         if (android.os.Build.VERSION.SDK_INT >= 34) { // Android 14+
             // Fixes the LiveEventBus Android 14 RECEIVER_EXPORTED crash
             return super.registerReceiver(receiver, filter, android.content.Context.RECEIVER_EXPORTED);

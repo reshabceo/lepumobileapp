@@ -51,6 +51,7 @@ import KardiaSixLeadECG from "./pages/KardiaSixLeadECG";
 import RecommendationsDashboard from "./pages/RecommendationsDashboard";
 import PatientMessages from "./pages/PatientMessages";
 import AliveCorHistory from "./pages/AliveCorHistory";
+import ConnectCamera from "./pages/ConnectCamera";
 
 const queryClient = new QueryClient();
 
@@ -235,6 +236,11 @@ const App = () => (
               <Route path="/profile" element={
                 <ProtectedRoute>
                   <Profile />
+                </ProtectedRoute>
+              } />
+              <Route path="/connect-camera" element={
+                <ProtectedRoute>
+                  <ConnectCamera />
                 </ProtectedRoute>
               } />
 
