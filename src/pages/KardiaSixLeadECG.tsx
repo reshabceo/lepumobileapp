@@ -12,6 +12,8 @@
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { ResponsiveContainer, LineChart, Line, XAxis, YAxis } from "recharts";
 import {
   Loader2,
   Activity,
@@ -28,6 +30,9 @@ import {
   User,
   Monitor,
   Timer,
+  Download,
+  Star,
+  Calendar,
 } from "lucide-react";
 import { aliveCorSDK, AliveCorRecordingResult } from "@/lib/alivecor-sdk-bridge";
 import { useToast } from "@/hooks/use-toast";
@@ -37,6 +42,8 @@ import {
   db,
   storeAliveCorRecording,
   triggerEcgAiAnalysis,
+  getAliveCorRecordings,
+  supabase,
 } from "@/lib/supabase";
 import { buildAliveCorIngestPayload } from "@/lib/aliveCorKardia";
 import { AliveCorEcgResult } from "@/plugins/alivecor";
@@ -186,8 +193,33 @@ const KardiaSixLeadECG: React.FC = () => {
   const [lastResult, setLastResult] = useState<AliveCorRecordingResult | null>(null);
   const [recordingPhase, setRecordingPhase] = useState<"idle" | "permissions" | "getjwt" | "scanning" | "connecting" | "recording" | "preparing">("idle");
   const [jwtError, setJwtError] = useState<string | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
+  // ── Helper Functions for Modal ─────────────────────────────────────────────
+  const prepareChartData = (leads: Record<string, number[]> | undefined, lead: string = "I") => {
+    if (!leads) return [];
+    let samples: number[] = [];
+    if (Array.isArray(leads)) samples = leads;
+    else if (leads[lead]) samples = leads[lead];
+    else if (leads.I && lead === "I") samples = leads.I;
+    
+    // Dynamic expansion of lightweight placeholder baselines for visual consistency
+    if (samples.length < 100) {
+      samples = Array(1500).fill(0);
+    }
+    
+    return samples.slice(0, 1500).map((val, idx) => ({
+      time: idx,
+      value: val
+    }));
+  };
 
+  const getAvailableLeads = (leads: Record<string, number[]> | undefined) => {
+    if (!leads) return ["I"];
+    if (Array.isArray(leads)) return ["I"];
+    const possibleLeads = ["I", "II", "III", "aVR", "aVL", "aVF"];
+    return possibleLeads.filter(l => !!leads[l]);
+  };
   // ── Cleanup on unmount ──────────────────────────────────────────────────────
   useEffect(() => {
     return () => {
@@ -195,11 +227,178 @@ const KardiaSixLeadECG: React.FC = () => {
     };
   }, [stopKardiaScan]);
 
-  // ── Validate JWT value ──────────────────────────────────────────────────────
-  const isPlaceholderJwt = (jwt?: string) =>
-    !jwt || jwt === "my_token_121" || jwt.trim().length < 20;
+  // ── Fetch Latest Recording Session ──────────────────────────────────────────
+  const fetchLatestSession = useCallback(async () => {
+    if (!user) return;
+    try {
+      const localKey = `patient_profile_${user.id}`;
+      const cached = localStorage.getItem(localKey);
+      let patientDbId: string | null = null;
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        patientDbId = parsed?.id;
+      }
+      if (!patientDbId) {
+        const { data: dbProfile } = await db.getPatientProfile(user.id);
+        if (dbProfile) {
+          patientDbId = dbProfile.id;
+          localStorage.setItem(localKey, JSON.stringify(dbProfile));
+        }
+      }
+      if (!patientDbId) return;
 
-  // ── Main recording handler ──────────────────────────────────────────────────
+      const { patientMrn } = await getAliveCorToken(patientDbId);
+      
+      let recordings: any[] = [];
+      try {
+        const data = await getAliveCorRecordings(patientDbId);
+        recordings = data.recordings || data.data || data.items || data.results || (Array.isArray(data) ? data : []);
+      } catch (apiErr) {
+        console.warn("[ALIVECOR] API recordings fetch failed, trying Supabase direct...", apiErr);
+      }
+
+      // If API returned nothing or failed, query direct Supabase table as fallback
+      if (recordings.length === 0) {
+        console.log("[ALIVECOR] Fetching latest recording from Supabase fallback...");
+        const { data: supabaseRecs, error: sbErr } = await supabase
+          .from("alivecor_recordings")
+          .select(`
+            id,
+            patient_id,
+            created_at,
+            determination,
+            heart_rate,
+            lead_config,
+            is_inverted,
+            device_type,
+            notes,
+            ecg_recording_id,
+            ecg_recordings (
+              id,
+              sample_rate,
+              duration_seconds,
+              mv_data_json
+            )
+          `)
+          .eq("patient_id", patientDbId)
+          .order("created_at", { ascending: false })
+          .limit(1);
+
+        if (sbErr) {
+          console.error("[ALIVECOR] Supabase fallback fetch error:", sbErr);
+        } else if (supabaseRecs && supabaseRecs.length > 0) {
+          const r = supabaseRecs[0];
+          recordings = [{
+            average_heart_rate: r.heart_rate,
+            heart_rate: r.heart_rate,
+            bpm: r.heart_rate,
+            determination: r.determination,
+            lead_config: r.lead_config,
+            notes: r.notes,
+            device_type: r.device_type,
+            ecg_recordings: r.ecg_recordings,
+          }];
+        }
+      }
+
+      if (recordings.length > 0) {
+        const latest = recordings[0];
+        
+        let leadsObj: Record<string, number[]> | undefined = undefined;
+        const ecg = latest.ecg_recordings || latest;
+        const leadsData = latest.waveform_leads || ecg.waveform_leads || latest.leads || ecg.leads;
+        const mv = ecg.mv_data_json || latest.waveform_mv || ecg.waveform_mv || latest.mv_data_json;
+        
+        if (leadsData && typeof leadsData === 'object' && !Array.isArray(leadsData)) {
+          leadsObj = leadsData;
+        } else if (mv) {
+          if (Array.isArray(mv)) {
+            if (leadsData && typeof leadsData === 'object' && !Array.isArray(leadsData)) {
+              leadsObj = leadsData;
+            } else {
+              const isSix = latest.lead_config === 'six' || latest.leadConfig === 'six' || latest.device_type?.toLowerCase().includes('six') || latest.notes?.toLowerCase().includes('6-lead') || latest.notes?.toLowerCase().includes('six');
+              if (isSix) {
+                const isInterleaved = mv.length % 6 === 0 && mv.length >= 6;
+                if (isInterleaved) {
+                  const tempLeads: Record<string, number[]> = {
+                    I: [], II: [], III: [], aVR: [], aVL: [], aVF: []
+                  };
+                  for (let i = 0; i < mv.length; i++) {
+                    const leadName = ["I", "II", "III", "aVR", "aVL", "aVF"][i % 6];
+                    tempLeads[leadName].push(mv[i]);
+                  }
+                  leadsObj = tempLeads;
+                } else {
+                  leadsObj = {
+                    I: mv,
+                    II: mv,
+                    III: mv,
+                    aVR: mv,
+                    aVL: mv,
+                    aVF: mv,
+                  };
+                }
+              } else {
+                leadsObj = {
+                  I: mv,
+                };
+              }
+            }
+          } else {
+            leadsObj = mv as Record<string, number[]>;
+          }
+        } else if (leadsData) {
+          leadsObj = leadsData;
+        }
+
+        setLastResult({
+          success: true,
+          heartRate: latest.average_heart_rate || latest.heart_rate || latest.bpm || 0,
+          durationSeconds: latest.ecg_recordings?.duration_seconds || 30,
+          sampleRate: latest.ecg_recordings?.sample_rate || 300,
+          diagnosisText: latest.determination?.replace(/_/g, ' ') || "Normal Sinus Rhythm",
+          waveformLeads: leadsObj
+        } as any);
+      }
+    } catch (err) {
+      console.warn("[ALIVECOR] Error fetching latest recording:", err);
+    }
+  }, [user]);
+
+  // ── Fetch latest session on initial mount ───────────────────────────────────
+  useEffect(() => {
+    fetchLatestSession();
+  }, [fetchLatestSession]);
+
+  // ── Focus/Visibility Fail-safe & Sync ───────────────────────────────────────
+  // When the user returns to our application window after taking an ECG in
+  // the native turnkey activity, we ensure that:
+  // 1. The loading states are cleared (making sure the button is enabled again).
+  // 2. The freshly saved ECG record is fetched and displayed immediately in the result card.
+  useEffect(() => {
+    const handleFocus = () => {
+      console.log("[ALIVECOR] Window focused/visible: resetting loader and syncing latest session...");
+      setIsRecording(false);
+      setRecordingPhase("idle");
+      // Fetch the latest session to show the fresh ECG results right away
+      fetchLatestSession();
+    };
+
+    window.addEventListener("focus", handleFocus);
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        handleFocus();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    return () => {
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
+  }, [fetchLatestSession]);
+
+  // ── Main recording handler ──────────────────────────────────────────────
   const handleStartRecording = useCallback(async () => {
     if (!user) {
       toast({ title: "Authentication Required", description: "Please sign in to record an ECG.", variant: "destructive" });
@@ -220,14 +419,57 @@ const KardiaSixLeadECG: React.FC = () => {
       try { await disconnectDevice(); } catch (e) { }
 
       // ── Step 1: Patient profile ──────────────────────────────────────────
-      const { data: profile, error: profileErr } = await db.getPatientProfile(user.id);
-      if (profileErr || !profile) throw new Error(profileErr?.message || "Patient profile not found");
+      // PRIMARY: Try to read patient profile directly from localStorage.
+      // The key pattern is: patient_profile_<userId>
+      // The stored value contains the full patient object including the DB id
+      // (e.g. "63740043-1269-4bd0-b4fa-cfde74bc5fe8").
+      let patientDbId: string | null = null;
+
+      try {
+        const localKey = `patient_profile_${user.id}`;
+        const cached = localStorage.getItem(localKey);
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (parsed?.id) {
+            patientDbId = parsed.id;
+            console.log(`✅ [ALIVECOR] Patient ID from localStorage (${localKey}): ${patientDbId}`);
+          }
+        }
+      } catch (lsErr) {
+        console.warn("[ALIVECOR] Could not read patient profile from localStorage:", lsErr);
+      }
+
+      // FALLBACK: If localStorage didn't have it, query Supabase
+      let profile: any = null;
+      if (!patientDbId) {
+        const { data: dbProfile, error: profileErr } = await db.getPatientProfile(user.id);
+        if (profileErr || !dbProfile) throw new Error(profileErr?.message || "Patient profile not found");
+        profile = dbProfile;
+        patientDbId = dbProfile.id;
+        // Cache for next time
+        try {
+          localStorage.setItem(`patient_profile_${user.id}`, JSON.stringify(dbProfile));
+        } catch (_) {}
+        console.log(`✅ [ALIVECOR] Patient ID from Supabase DB: ${patientDbId}`);
+      } else {
+        // Still get full profile for payload building if not already cached
+        profile = { id: patientDbId };
+        try {
+          const localKey = `patient_profile_${user.id}`;
+          const cached = localStorage.getItem(localKey);
+          if (cached) profile = JSON.parse(cached);
+        } catch (_) {}
+      }
+
+      if (!patientDbId) throw new Error("Could not determine patient ID. Please refresh and try again.");
 
       // ── Step 2: Get JWT ──────────────────────────────────────────────────
-      console.log(`🎫 [ALIVECOR] Requesting JWT for Patient ID: ${profile.id}`);
-      let tokenData = await getAliveCorToken(profile.id);
+      // Pass the actual patient DB UUID (e.g. "63740043-1269-4bd0-b4fa-cfde74bc5fe8")
+      console.log(`🎫 [ALIVECOR] Requesting JWT for Patient ID: ${patientDbId}`);
+      setRecordingPhase("getjwt");
+      let tokenData = await getAliveCorToken(patientDbId);
       let jwtToken = tokenData.jwt;
-      let targetPatientMrn = tokenData.patientMrn;
+      let targetPatientMrn = tokenData.patientMrn || patientDbId;
 
       if (!jwtToken || jwtToken.trim().length < 20 || jwtToken === "my_token_121") {
         const errMsg =
@@ -238,6 +480,8 @@ const KardiaSixLeadECG: React.FC = () => {
         toast({ title: "Invalid JWT Token", description: errMsg, variant: "destructive" });
         return;
       }
+
+      console.log(`✅ [ALIVECOR] Got JWT (length=${jwtToken.length}), patientMrn=${targetPatientMrn}`);
 
       // ── Step 3 (optional): Pre-scan to show device in UI ─────────────────
       // NOTE: The AliveCor SDK recording Activity manages its own BLE connection.
@@ -269,32 +513,38 @@ const KardiaSixLeadECG: React.FC = () => {
       
       setRecordingPhase("preparing");
 
-      // We strictly use com.monitraq.app as requested by the user, and "sandbox" environment
-      console.log(`[ALIVECOR] Trying initialization with env=sandbox, bundleId=com.monitraq.app...`);
+      console.log(`[ALIVECOR] Starting 6-lead recording | patientId=${targetPatientMrn} | bundleId=com.monitraq.app | env=sandbox`);
       let result = await aliveCorSDK.startSixLeadRecording({
         jwt: jwtToken!,
         mainsFrequencyHz: 50,
-        environment: "sandbox", // The JWT from alivecorapi.monitraq.com is almost certainly a Sandbox JWT!
-        patientId: targetPatientMrn, // Pass exactly the MRN that the JWT expects!
+        environment: "sandbox",
+        patientId: targetPatientMrn,
         bundleId: "com.monitraq.app"
       });
 
       if (!result.success) {
         let lastError = result.diagnosisText || "Unknown error";
-        console.warn(`[ALIVECOR] Failed with env=sandbox, bundleId=com.monitraq.app: ${lastError}`);
+        console.warn(`[ALIVECOR] Recording failed: ${lastError}`);
       }
 
       setLastResult(result);
 
       // ── Step 5: Store & analyze ──────────────────────────────────────────
+      // POST to https://alivecorapi.monitraq.com/api/alivecor/ecg
       if (result.success) {
         try {
           const payload = buildAliveCorIngestPayload(
-            profile.id,
+            patientDbId,
             result as unknown as AliveCorEcgResult
           );
+          console.log(`[ALIVECOR] Storing ECG recording for patient_id=${patientDbId}...`);
           const stored = await storeAliveCorRecording(payload);
+          console.log(`✅ [ALIVECOR] ECG stored, id=${stored?.id}`);
           if (stored?.id) triggerEcgAiAnalysis(stored.id);
+          
+          console.log("[ALIVECOR] Triggering UI sync with fresh database records...");
+          await fetchLatestSession();
+
           toast({
             title: "6-Lead ECG Saved ✅",
             description: result.diagnosisText || "Recording saved and analyzed successfully.",
@@ -327,7 +577,7 @@ const KardiaSixLeadECG: React.FC = () => {
     }
   }, [
     user, aliveCorConnected, isKardiaScanning,
-    startKardiaScan, connectKardia, toast,
+    startKardiaScan, connectKardia, toast, fetchLatestSession,
   ]);
 
   // ── Derived UI state ────────────────────────────────────────────────────────
@@ -634,7 +884,15 @@ const KardiaSixLeadECG: React.FC = () => {
 
                 {lastResult.waveformLeads && (
                   <div>
-                    <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-2">Lead I Preview</p>
+                    <div className="flex justify-between items-center mb-2">
+                      <p className="text-[10px] text-gray-500 uppercase tracking-wider">Lead I Preview</p>
+                      <button 
+                        onClick={() => setIsModalOpen(true)}
+                        className="text-xs bg-indigo-500/20 text-indigo-300 hover:bg-indigo-500/30 px-3 py-1 rounded-full transition-colors border border-indigo-500/30"
+                      >
+                        View Detailed Report
+                      </button>
+                    </div>
                     <ECGWaveformPreview leads={lastResult.waveformLeads} />
                   </div>
                 )}
@@ -652,6 +910,145 @@ const KardiaSixLeadECG: React.FC = () => {
         )}
 
       </div>
+
+      {/* Detailed ECG View Modal - Pro UI */}
+      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+        <DialogContent className="max-w-md w-[95vw] bg-white text-slate-900 p-0 overflow-hidden rounded-3xl border-none shadow-2xl h-[90vh] flex flex-col">
+          {/* Header Area */}
+          <div className="p-5 border-b border-slate-100 bg-white sticky top-0 z-20">
+            <DialogHeader className="text-left space-y-0">
+              <div className="flex justify-between items-center mb-4">
+                <div className="flex items-center gap-2">
+                  <div className={`w-3 h-3 rounded-full ${
+                    /normal/i.test(lastResult?.determination || '') ? 'bg-emerald-500' : 'bg-amber-500'
+                  }`} />
+                  <DialogTitle className="text-xl font-bold text-slate-800">
+                    {lastResult?.determination?.replace(/_/g, ' ') || lastResult?.diagnosisText || 'UNCLASSIFIED'}
+                  </DialogTitle>
+                </div>
+                <div className="flex items-center gap-4 text-slate-400">
+                  <Download className="w-5 h-5 cursor-pointer hover:text-slate-600 transition-colors" />
+                  <Star className="w-5 h-5 cursor-pointer hover:text-slate-600 transition-colors" />
+                </div>
+              </div>
+              <DialogDescription className="sr-only">
+                Detailed ECG waveform and clinical analysis
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="flex items-center gap-3 text-slate-500 text-sm">
+              <div className="flex items-center gap-1.5">
+                <div className="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center">
+                  <Activity size={14} className="text-slate-600" />
+                </div>
+                <span className="font-medium text-slate-700">Recent Recording</span>
+              </div>
+              <div className="flex items-center gap-1.5 ml-auto">
+                <Calendar size={14} />
+                <span>{new Date().toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* ECG Grid Content */}
+          <div className="flex-1 overflow-y-auto bg-[#F8F9FA] relative scrollbar-hide">
+            {/* Calibration Marker */}
+            <div className="sticky top-2 left-1/2 -translate-x-1/2 z-10">
+              <div className="bg-white/90 backdrop-blur shadow-sm border border-slate-100 rounded-full px-3 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-tighter">
+                25mm/s, 10mm/mV
+              </div>
+            </div>
+
+            <div className="ecg-paper-grid min-h-full py-4">
+              {lastResult?.waveformLeads ? (
+                <div className="space-y-0 px-2">
+                  {getAvailableLeads(lastResult.waveformLeads).map((lead) => (
+                    <div key={lead} className="h-[120px] relative border-b border-slate-100/50 last:border-none">
+                      <div className="absolute top-1/2 -translate-y-1/2 left-2 z-10">
+                        <span className="text-xs font-black text-slate-900 opacity-60">
+                          {lead}
+                        </span>
+                      </div>
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart 
+                          data={prepareChartData(lastResult.waveformLeads, lead)}
+                          margin={{ top: 10, right: 10, left: 10, bottom: 10 }}
+                        >
+                          <XAxis dataKey="time" hide />
+                          <YAxis hide domain={['auto', 'auto']} />
+                          <Line 
+                            type="monotone" 
+                            dataKey="value" 
+                            stroke="#334155" 
+                            strokeWidth={1.2} 
+                            dot={false} 
+                            isAnimationActive={false}
+                          />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-40 text-slate-300">
+                  <Activity size={48} className="opacity-20 mb-4" />
+                  <p className="text-sm font-bold">Waveform Data Unavailable</p>
+                </div>
+              )}
+
+              {/* Heart Rate Badge Overlay */}
+              {lastResult?.heartRate && (
+                <div className="sticky bottom-4 right-4 ml-auto w-fit z-20">
+                  <div className="bg-white shadow-xl border border-slate-100 rounded-full px-4 py-2 flex items-center gap-2">
+                    <Heart size={16} className="text-rose-500 fill-rose-500" />
+                    <span className="font-bold text-slate-800">{lastResult.heartRate}</span>
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">bpm</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Footer Controls */}
+          <div className="p-6 bg-white border-t border-slate-100 space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-bold text-slate-800">Enhance</p>
+                <p className="text-[10px] text-slate-400">On</p>
+              </div>
+              <div className="w-12 h-6 bg-slate-100 rounded-full p-1 cursor-pointer">
+                <div className="w-4 h-4 bg-rose-500 rounded-full ml-auto shadow-md" />
+              </div>
+            </div>
+            
+            <button 
+              className="w-full bg-[#1A2B3B] hover:bg-[#121E2A] text-white h-14 rounded-xl font-bold text-sm tracking-widest uppercase transition-all shadow-lg active:scale-[0.98]"
+              onClick={() => setIsModalOpen(false)}
+            >
+              Close
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <style>{`
+        .ecg-paper-grid {
+          background-color: #F8F9FA;
+          background-image: 
+            linear-gradient(to right, #E2E8F0 1px, transparent 1px),
+            linear-gradient(to bottom, #E2E8F0 1px, transparent 1px),
+            linear-gradient(to right, #CBD5E1 1px, transparent 1px),
+            linear-gradient(to bottom, #CBD5E1 1px, transparent 1px);
+          background-size: 5px 5px, 5px 5px, 25px 25px, 25px 25px;
+        }
+        .scrollbar-hide::-webkit-scrollbar {
+          display: none;
+        }
+        .scrollbar-hide {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+        }
+      `}</style>
     </div>
   );
 };

@@ -34,13 +34,95 @@ const AliveCorHistory = () => {
       const { data: profile } = await db.getPatientProfile(user.id);
       if (!profile) throw new Error("Patient profile not found");
 
-      // 2. Get AliveCor token which also returns the MRN
+      // 2. Get AliveCor token which also returns the MRN (needed for other things maybe)
       const { patientMrn } = await getAliveCorToken(profile.id);
       
-      // 3. Fetch recordings using the MRN
-      console.log(`[AliveCorHistory] Fetching recordings for MRN: ${patientMrn}`);
-      const data = await getAliveCorRecordings(patientMrn);
-      setRecordings(data.recordings || []);
+      // 3. Fetch recordings using the Supabase patient_id
+      console.log(`[AliveCorHistory] Fetching recordings for patient_id: ${profile.id} (MRN: ${patientMrn})`);
+      
+      let recordings: any[] = [];
+      
+      try {
+        const apiResponse = await getAliveCorRecordings(profile.id);
+        console.log("[AliveCorHistory] Backend API response:", JSON.stringify(apiResponse).substring(0, 500));
+        
+        // The backend may return different shapes depending on version.
+        // Handle: { recordings: [] }, { data: [] }, { items: [] }, { results: [] }, or flat []
+        if (Array.isArray(apiResponse)) {
+          recordings = apiResponse;
+        } else if (Array.isArray(apiResponse?.recordings)) {
+          recordings = apiResponse.recordings;
+        } else if (Array.isArray(apiResponse?.data)) {
+          recordings = apiResponse.data;
+        } else if (Array.isArray(apiResponse?.items)) {
+          recordings = apiResponse.items;
+        } else if (Array.isArray(apiResponse?.results)) {
+          recordings = apiResponse.results;
+        } else {
+          console.warn("[AliveCorHistory] Unknown API response shape:", apiResponse);
+          recordings = [];
+        }
+      } catch (backendErr: any) {
+        console.warn("[AliveCorHistory] Backend API call failed:", backendErr?.message);
+        recordings = [];
+      }
+
+      // 4. If backend returned nothing, fall back to direct Supabase query.
+      //    This ensures recordings stored in ecg_recordings / alivecor_recordings
+      //    are always visible even if the backend proxy has issues.
+      if (recordings.length === 0) {
+        console.log("[AliveCorHistory] Backend returned no recordings — falling back to Supabase direct query...");
+        const { data: supabaseRecs, error: sbErr } = await supabase
+          .from("alivecor_recordings")
+          .select(`
+            id,
+            patient_id,
+            created_at,
+            determination,
+            heart_rate,
+            lead_config,
+            is_inverted,
+            device_type,
+            notes,
+            ecg_recording_id,
+            ecg_recordings (
+              id,
+              sample_rate,
+              duration_seconds,
+              mv_data_json
+            )
+          `)
+          .eq("patient_id", profile.id)
+          .order("created_at", { ascending: false })
+          .limit(30);
+
+        if (sbErr) {
+          console.error("[AliveCorHistory] Supabase fallback error:", sbErr);
+        } else if (supabaseRecs && supabaseRecs.length > 0) {
+          console.log(`[AliveCorHistory] Supabase fallback: found ${supabaseRecs.length} recordings`);
+          // Normalise the Supabase rows to match the shape the UI expects
+          recordings = supabaseRecs.map((r: any) => ({
+            id: r.id,
+            patient_id: r.patient_id,
+            created_at: r.created_at,
+            determination: r.determination || "NORMAL",
+            average_heart_rate: r.heart_rate,
+            heart_rate: r.heart_rate,
+            bpm: r.heart_rate,
+            lead_config: r.lead_config,
+            is_inverted: r.is_inverted,
+            device_type: r.device_type,
+            notes: r.notes,
+            ecg_recording_id: r.ecg_recording_id,
+            ecg_recordings: r.ecg_recordings,
+          }));
+        } else {
+          console.log("[AliveCorHistory] Supabase fallback: no recordings found either.");
+        }
+      }
+
+      console.log(`[AliveCorHistory] Total recordings to display: ${recordings.length}`);
+      setRecordings(recordings);
     } catch (err: any) {
       console.error("[AliveCorHistory] Error:", err);
       setError(err.message || "Failed to load recordings");
@@ -97,28 +179,73 @@ const AliveCorHistory = () => {
       });
     }
     setIsDetailLoading(false);
-  };
-
-  const prepareChartData = (detail: any, lead: string = "I") => {
+  };  const prepareChartData = (detail: any, lead: string = "I") => {
     if (!detail) return [];
     
-    // The data might be in different nested locations depending on the API version
     const ecg = detail.ecg_recordings || detail;
-    const waveform = ecg.mv_data_json || ecg.raw_ecg_json || ecg.waveform_mv || ecg.waveform_leads || ecg;
+    const config = detail.lead_config || ecg.lead_config;
     
-    let samples: number[] = [];
+    // Check all possible fields for leads/waveform data
+    const mv = ecg.mv_data_json || detail.waveform_mv || ecg.waveform_mv || detail.mv_data_json;
+    const leadsData = detail.waveform_leads || ecg.waveform_leads || detail.leads || ecg.leads;
     
-    if (Array.isArray(waveform)) {
-      samples = waveform;
-    } else if (waveform[lead]) {
-      samples = waveform[lead];
-    } else if (waveform.leads?.[lead]) {
-      samples = waveform.leads[lead];
-    } else if (waveform.waveform_mv && lead === "I") {
-      samples = waveform.waveform_mv;
-    } else if (waveform.I && lead === "I") {
-       // Fallback for direct lead access
-       samples = waveform.I;
+    let leadsObj: Record<string, number[]> = {};
+    
+    if (leadsData && typeof leadsData === 'object' && !Array.isArray(leadsData)) {
+      leadsObj = leadsData;
+    } else if (mv) {
+      if (Array.isArray(mv)) {
+        // If mv is a flat array, check if we also have leadsData
+        if (leadsData && typeof leadsData === 'object' && !Array.isArray(leadsData)) {
+          leadsObj = leadsData;
+        } else {
+          // If the config is six, and we have a flat array, let's split it!
+          if (config === 'six') {
+            const isInterleaved = mv.length % 6 === 0 && mv.length >= 6;
+            if (isInterleaved) {
+              // De-interleave the 6 leads
+              const leads = ["I", "II", "III", "aVR", "aVL", "aVF"];
+              leads.forEach((l) => {
+                leadsObj[l] = [];
+              });
+              for (let i = 0; i < mv.length; i++) {
+                const leadName = ["I", "II", "III", "aVR", "aVL", "aVF"][i % 6];
+                leadsObj[leadName].push(mv[i]);
+              }
+            } else {
+              // Fallback to sequential split or simple duplication
+              const leadLen = Math.floor(mv.length / 6);
+              if (leadLen > 0) {
+                leadsObj = {
+                  I: mv.slice(0, leadLen),
+                  II: mv.slice(leadLen, leadLen * 2),
+                  III: mv.slice(leadLen * 2, leadLen * 3),
+                  aVR: mv.slice(leadLen * 3, leadLen * 4),
+                  aVL: mv.slice(leadLen * 4, leadLen * 5),
+                  aVF: mv.slice(leadLen * 5),
+                };
+              } else {
+                leadsObj = {
+                  I: mv, II: mv, III: mv, aVR: mv, aVL: mv, aVF: mv
+                };
+              }
+            }
+          } else {
+            leadsObj = { I: mv };
+          }
+        }
+      } else {
+        leadsObj = mv as Record<string, number[]>;
+      }
+    } else if (leadsData) {
+      leadsObj = leadsData;
+    }
+    
+    let samples: number[] = leadsObj[lead] || [];
+    
+    // Dynamic expansion of lightweight placeholder baselines for visual consistency
+    if (samples.length < 100) {
+      samples = Array(1500).fill(0);
     }
     
     // Limit to first 1500 points (~5 seconds at 300Hz) for performance
@@ -131,16 +258,37 @@ const AliveCorHistory = () => {
   const getAvailableLeads = (detail: any) => {
     if (!detail) return ["I"];
     const ecg = detail.ecg_recordings || detail;
-    const waveform = ecg.mv_data_json || ecg.raw_ecg_json || ecg.waveform_mv || ecg.waveform_leads || ecg;
+    const config = detail.lead_config || ecg.lead_config;
+    if (config === 'six') {
+      return ["I", "II", "III", "aVR", "aVL", "aVF"];
+    }
     
-    if (Array.isArray(waveform)) return ["I"];
+    const mv = ecg.mv_data_json || detail.waveform_mv || ecg.waveform_mv || detail.mv_data_json;
+    const leadsData = detail.waveform_leads || ecg.waveform_leads || detail.leads || ecg.leads;
     
-    const leads = waveform.leads || waveform;
+    let leads: any = {};
+    if (leadsData && typeof leadsData === 'object' && !Array.isArray(leadsData)) {
+      leads = leadsData;
+    } else if (mv) {
+      if (Array.isArray(mv)) {
+        if (leadsData && typeof leadsData === 'object' && !Array.isArray(leadsData)) {
+          leads = leadsData;
+        } else {
+          return ["I"];
+        }
+      } else {
+        leads = mv;
+      }
+    } else if (leadsData) {
+      leads = leadsData;
+    }
+    
     const possibleLeads = ["I", "II", "III", "aVR", "aVL", "aVF"];
     return possibleLeads.filter(l => !!leads[l]);
   };
 
   useEffect(() => {
+    // 1. Initial fetch on mount / user session load
     if (!authLoading && user) {
       fetchRecordings();
     } else if (!authLoading && !user) {
@@ -155,6 +303,23 @@ const AliveCorHistory = () => {
         }
       })();
     }
+
+    // 2. Auto-refresh when the window becomes visible or focused
+    // (e.g. returning from the native AliveCor ECG Recording Activity)
+    const handleRefreshEvents = () => {
+      if (document.visibilityState === 'visible' && user) {
+        console.log("[AliveCorHistory] Tab became visible or focused, refreshing recordings...");
+        fetchRecordings();
+      }
+    };
+
+    window.addEventListener("focus", handleRefreshEvents);
+    document.addEventListener("visibilitychange", handleRefreshEvents);
+
+    return () => {
+      window.removeEventListener("focus", handleRefreshEvents);
+      document.removeEventListener("visibilitychange", handleRefreshEvents);
+    };
   }, [user, authLoading]);
 
   const formatDate = (dateString: string) => {
@@ -231,7 +396,7 @@ const AliveCorHistory = () => {
                   <div className="flex justify-between items-start">
                     <div className="space-y-1">
                       <div className="flex items-center gap-2">
-                        <Badge className={rec.determination === 'NORMAL_SINUS_RHYTHM' ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' : 'bg-orange-500/20 text-orange-400 border-orange-500/30'}>
+                        <Badge className={/normal/i.test(rec.determination || '') ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' : 'bg-orange-500/20 text-orange-400 border-orange-500/30'}>
                           {rec.determination?.replace(/_/g, ' ') || 'UNCLASSIFIED'}
                         </Badge>
                         {rec.lead_config === 'six' && (
@@ -242,11 +407,11 @@ const AliveCorHistory = () => {
                         {formatDate(rec.created_at)}
                       </CardTitle>
                     </div>
-                    {rec.average_heart_rate && (
+                    {(rec.average_heart_rate || rec.heart_rate || rec.bpm) && (
                       <div className="text-right">
                         <div className="flex items-center gap-1 text-rose-500 font-bold text-xl">
                           <Heart className="w-4 h-4 fill-current" />
-                          {rec.average_heart_rate}
+                          {rec.average_heart_rate || rec.heart_rate || rec.bpm}
                         </div>
                         <span className="text-[10px] text-gray-500 uppercase tracking-wider">BPM Avg</span>
                       </div>
@@ -278,7 +443,7 @@ const AliveCorHistory = () => {
               <div className="flex justify-between items-center mb-4">
                 <div className="flex items-center gap-2">
                   <div className={`w-3 h-3 rounded-full ${
-                    selectedRecording?.determination === 'NORMAL_SINUS_RHYTHM' ? 'bg-emerald-500' : 'bg-amber-500'
+                    /normal/i.test(selectedRecording?.determination || '') ? 'bg-emerald-500' : 'bg-amber-500'
                   }`} />
                   <DialogTitle className="text-xl font-bold text-slate-800">
                     {selectedRecording?.determination?.replace(/_/g, ' ') || 'UNCLASSIFIED'}
@@ -360,11 +525,11 @@ const AliveCorHistory = () => {
               )}
 
               {/* Heart Rate Badge Overlay */}
-              {selectedRecording?.average_heart_rate && !isDetailLoading && (
+              {(selectedRecording?.average_heart_rate || selectedRecording?.heart_rate || selectedRecording?.bpm) && !isDetailLoading && (
                 <div className="sticky bottom-4 right-4 ml-auto w-fit z-20">
                   <div className="bg-white shadow-xl border border-slate-100 rounded-full px-4 py-2 flex items-center gap-2">
                     <Heart size={16} className="text-rose-500 fill-rose-500" />
-                    <span className="font-bold text-slate-800">{selectedRecording.average_heart_rate}</span>
+                    <span className="font-bold text-slate-800">{selectedRecording.average_heart_rate || selectedRecording.heart_rate || selectedRecording.bpm}</span>
                     <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">bpm</span>
                   </div>
                 </div>

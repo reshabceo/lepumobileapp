@@ -1,7 +1,11 @@
 apply plugin: 'com.android.application'
+// Kotlin Android plugin - REQUIRED to include kotlin-stdlib (+ SpillingKt) in the APK DEX.
+// Without this, Kotlin runtime classes resolve in Gradle's dependency graph but are NOT
+// written into classes.dex, causing NoClassDefFoundError at runtime for Kotlin-compiled SDK code.
+apply plugin: 'kotlin-android'
 
 android {
-    namespace "com.monitraq.mobile"
+    namespace "com.monitraq.app"
     compileSdk rootProject.ext.compileSdkVersion
     
     compileOptions {
@@ -33,11 +37,11 @@ android {
     productFlavors {
         production {
             dimension "environment"
-            applicationId "com.monitraq.mobile"
+            applicationId "com.monitraq.app"
         }
         staging {
             dimension "environment"
-            applicationId "com.monitraq.mobile.staging"
+            applicationId "com.monitraq.app.staging"
         }
     }
     signingConfigs {
@@ -124,8 +128,21 @@ dependencies {
     // androidx.sqlite KMP library - required by Room 2.7+ for SQLiteConnection
     implementation 'androidx.sqlite:sqlite:2.5.1'
     implementation 'androidx.sqlite:sqlite-framework:2.5.1'
+    // Lottie - REQUIRED by AliveCor SDK's EKGRecordActivity result screen.
+    // Without this the app crashes with NoClassDefFoundError for LottieAnimationView
+    // immediately after every successful ECG recording.
+    implementation 'com.airbnb.android:lottie:6.4.0'
+    // Kotlin stdlib + coroutines - REQUIRED by AliveCor SDK.
+    // SDK was compiled with Kotlin 2.2.0 (confirmed from ThirdPartyAppSDKTest/build.gradle).
+    // SpillingKt (kotlin.coroutines.jvm.internal.SpillingKt) is a Kotlin 2.0+ class used
+    // for coroutine variable spilling optimization. Applying kotlin-android plugin ensures
+    // the stdlib classes are actually written into the APK DEX at build time.
+    implementation 'org.jetbrains.kotlin:kotlin-stdlib:2.2.0'
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2'
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2'
 
     implementation "androidx.appcompat:appcompat:$androidxAppCompatVersion"
+    implementation 'com.google.android.material:material:1.12.0'
     implementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"
     implementation "androidx.security:security-crypto:1.1.0-alpha06"
     implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
