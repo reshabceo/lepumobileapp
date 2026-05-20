@@ -54,74 +54,43 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     // Get initial session
     // Get initial session
     const initializeAuth = async () => {
-      console.log('🔄 [Auth] Starting initialization...');
-      const isNative = Capacitor.isNativePlatform();
-      
-      // Safety timeout: Ensure loading state is eventually released
-      const timeoutId = setTimeout(() => {
-        setIsLoading(current => {
-          if (current) {
-            console.warn('⚠️ [Auth] Initialization timed out - forcing release');
-            return false;
-          }
-          return current;
-        });
-      }, 10000);
-
       try {
-        // On native, give localStorage a moment to be ready
-        if (isNative) {
-          await new Promise(resolve => setTimeout(resolve, 500));
-        }
-
-        const { user, error: userError } = await auth.getCurrentUser();
-        
-        if (userError) {
-          console.error('❌ [Auth] Error getting current user:', userError);
-        }
-
-        if (user) {
-          console.log('👤 [Auth] User detected:', user.email);
-          const { data: { session: currentSession }, error: sessionError } = await supabase.auth.getSession();
-          
-          if (sessionError) {
-            console.error('❌ [Auth] Session fetch error:', sessionError);
-          }
-
-          if (currentSession) {
-            console.log('✅ [Auth] Session restored successfully');
-            setUser(user);
-            setSession(currentSession);
-          } else {
-            console.warn('⚠️ [Auth] User found but session missing - signing out');
-            await supabase.auth.signOut();
-            setUser(null);
-            setSession(null);
-          }
+        // getSession reads from localStorage — fast, no network call unless token expired
+        const { data: { session: currentSession } } = await supabase.auth.getSession();
+        if (currentSession) {
+          setUser(currentSession.user);
+          setSession(currentSession);
         } else {
-          console.log('ℹ️ [Auth] No user found');
           setUser(null);
           setSession(null);
         }
       } catch (error) {
-        console.error('❌ [Auth] Critical initialization failure:', error);
+        console.error('❌ [Auth] Initialization error:', error);
+        setUser(null);
+        setSession(null);
       } finally {
-        clearTimeout(timeoutId);
         setIsLoading(false);
       }
     };
 
     initializeAuth();
 
-    // Re-sync session when tab becomes visible (handles tab switching hang)
-    const handleVisibilityChange = async () => {
+    // Re-sync session when tab becomes visible — read localStorage directly to avoid
+    // acquiring the Supabase GoTrueClient lock (which blocks all concurrent DB queries)
+    const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
-        console.log('👁️ App visible - re-syncing auth session');
-        const { data: { session: currentSession } } = await supabase.auth.getSession();
-        if (currentSession) {
-          setSession(currentSession);
-          setUser(currentSession.user);
-        }
+        try {
+          const key = Object.keys(localStorage).find(k => k.startsWith('sb-') && k.endsWith('-auth-token'));
+          if (key) {
+            const stored = JSON.parse(localStorage.getItem(key) || 'null');
+            if (stored?.access_token && stored?.user && stored?.expires_at) {
+              if (Date.now() < stored.expires_at * 1000) {
+                setSession(stored);
+                setUser(stored.user);
+              }
+            }
+          }
+        } catch (e) { /* ignore parse errors */ }
       }
     };
     document.addEventListener('visibilitychange', handleVisibilityChange);
