@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, User, Mail, Phone, Calendar, MapPin, Droplet, Heart, AlertCircle, Pill, UserCircle, LogOut, Ruler, Scale, Edit2 } from 'lucide-react';
+import { ABHALinking } from '../components/ABHALinking';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase, getPatientRiskCriteria } from '../lib/supabase';
 import { Button } from '../components/ui/button';
@@ -28,6 +29,8 @@ interface PatientProfile {
   allergies?: string[];
   medical_conditions?: string[];
   current_medications?: string[];
+  abha_id?: string | null;
+  abha_address?: string | null;
   emergency_contact_name?: string;
   emergency_contact_phone?: string;
   profile_picture_url?: string;
@@ -604,6 +607,17 @@ const Profile = () => {
               </div>
             </CardContent>
           </Card>
+
+          {/* ABHA Health ID */}
+          {profile && (
+            <ABHALinking
+              patientId={profile.id}
+              currentAbha={profile.abha_id}
+              onLinked={(abhaNumber, abhaAddress) => {
+                setProfile(prev => prev ? { ...prev, abha_id: abhaNumber, abha_address: abhaAddress } : prev);
+              }}
+            />
+          )}
 
           {/* Logout Button */}
           <Card className="glass-card border-red-500/30 bg-red-500/10">
