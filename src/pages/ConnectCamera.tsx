@@ -35,16 +35,73 @@ export default function ConnectCamera() {
   const [saving, setSaving] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
-  // Load existing credentials from localStorage if they exist
+  // Load existing credentials from Supabase (with localStorage fallback)
   useEffect(() => {
-    const savedUsername = localStorage.getItem("tapo_camera_username") || "";
-    const savedIp = localStorage.getItem("tapo_camera_ip") || "";
-    setUsername(savedUsername);
-    setIpAddress(savedIp);
-    // Do not load password automatically for security, but we generate link if loaded
-    if (savedUsername && savedIp) {
-      generateLinks(savedUsername, "", savedIp);
-    }
+    let isMounted = true;
+    
+    const loadCameraDetails = async () => {
+      try {
+        const { data: userData } = await supabase.auth.getUser();
+        if (!userData?.user) return;
+
+        // Get patient profile ID
+        const { data: patientData, error: patientError } = await supabase
+          .from("patients")
+          .select("id")
+          .eq("auth_user_id", userData.user.id)
+          .single();
+
+        if (patientError || !patientData) {
+          console.warn("Could not retrieve patient profile from Supabase:", patientError);
+          loadFromLocalStorage();
+          return;
+        }
+
+        // Fetch camera settings
+        const { data: cameraData, error: cameraError } = await supabase
+          .from("patient_cameras")
+          .select("*")
+          .eq("patient_id", patientData.id)
+          .maybeSingle();
+
+        if (cameraError) {
+          console.warn("Could not retrieve camera settings from Supabase:", cameraError);
+          loadFromLocalStorage();
+          return;
+        }
+
+        if (cameraData && isMounted) {
+          setUsername(cameraData.camera_username || "");
+          setPassword(cameraData.camera_password || "");
+          setIpAddress(cameraData.ip_address || "");
+          if (cameraData.camera_username && cameraData.ip_address) {
+            generateLinks(cameraData.camera_username, cameraData.camera_password, cameraData.ip_address);
+          }
+        } else {
+          loadFromLocalStorage();
+        }
+      } catch (err) {
+        console.error("Failed to load camera settings:", err);
+        loadFromLocalStorage();
+      }
+    };
+
+    const loadFromLocalStorage = () => {
+      if (!isMounted) return;
+      const savedUsername = localStorage.getItem("tapo_camera_username") || "";
+      const savedIp = localStorage.getItem("tapo_camera_ip") || "";
+      setUsername(savedUsername);
+      setIpAddress(savedIp);
+      if (savedUsername && savedIp) {
+        generateLinks(savedUsername, "", savedIp);
+      }
+    };
+
+    loadCameraDetails();
+    
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   // Recalculate stream links whenever inputs change
@@ -118,47 +175,58 @@ export default function ConnectCamera() {
       localStorage.setItem("tapo_camera_rtsp_main", generatedRtsp);
       localStorage.setItem("tapo_camera_rtsp_sub", generatedRtspSub);
 
-      // Attempt to save to Supabase patients table (patient profile)
+      // Save to Supabase patient_cameras table
       const { data: userData } = await supabase.auth.getUser();
-      if (userData?.user) {
-        // We'll update the patient profile
-        // To prevent column-missing crashes, we can try-catch the query or run it dynamically
-        const { error } = await supabase
+      if (!userData?.user) {
+        throw new Error("User session not found. Please log in again.");
+      }
+
+      // Get patient profile
+      const { data: patientData, error: patientError } = await supabase
+        .from("patients")
+        .select("id")
+        .eq("auth_user_id", userData.user.id)
+        .single();
+
+      if (patientError || !patientData) {
+        throw new Error("Could not find patient profile associated with this user.");
+      }
+
+      // Upsert to patient_cameras
+      const { error: upsertError } = await supabase
+        .from("patient_cameras")
+        .upsert({
+          patient_id: patientData.id,
+          camera_username: username.trim(),
+          camera_password: password.trim(),
+          ip_address: ipAddress.trim(),
+          rtsp_url: generatedRtsp,
+          rtsp_url_sub: generatedRtspSub,
+          updated_at: new Date().toISOString()
+        }, {
+          onConflict: "patient_id"
+        });
+
+      if (upsertError) {
+        throw upsertError;
+      }
+
+      // Also try to update `camera_rtsp_url` if it exists in patients table as a redundant fallback
+      try {
+        await supabase
           .from("patients")
           .update({
-            // Save inside a structured camera_settings JSON column or camera_rtsp_url
-            // If the schema hasn't been migrated with the specific column, it might fail.
-            // We use 'notes' or a structured try to update, or catch gracefully!
-            // First we try to update `camera_rtsp_url` if it exists.
             camera_rtsp_url: generatedRtsp,
           } as any)
           .eq("auth_user_id", userData.user.id);
-
-        if (error) {
-          console.warn("DB Column camera_rtsp_url might not exist yet, trying general save...", error);
-
-          // Fallback: Store inside a general JSON update or notes
-          const { error: fallbackError } = await supabase
-            .from("patients")
-            .update({
-              address: `Camera IP: ${ipAddress.trim()} | RTSP Enabled`
-            } as any)
-            .eq("auth_user_id", userData.user.id);
-
-          if (fallbackError) {
-            console.error("All Supabase save attempts failed:", fallbackError);
-          } else {
-            console.log("Saved metadata in patient profile fallback");
-          }
-        } else {
-          console.log("RTSP stream link stored in patient profile successfully!");
-        }
+      } catch (err) {
+        console.warn("Secondary save to patients table failed (non-critical):", err);
       }
 
-      toast.success("Camera settings saved successfully!");
-    } catch (err) {
+      toast.success("Camera settings saved successfully to cloud!");
+    } catch (err: any) {
       console.error("Failed to store camera settings:", err);
-      toast.error("Failed to save to database, saved locally instead.");
+      toast.error(err?.message || "Failed to save to database, saved locally instead.");
     } finally {
       setSaving(false);
     }
