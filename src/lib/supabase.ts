@@ -261,7 +261,7 @@ export async function checkAliveCorBackendHealth(): Promise<{ ok: boolean; confi
 }
 
 const ECG_AI_ANALYZE_URL =
-  import.meta.env.VITE_ECG_AI_ANALYZE_URL || 'https://backend-m101.onrender.com'
+  import.meta.env.VITE_ECG_AI_ANALYZE_URL || 'https://ecg.monitraq.com'
 
 function buildEcgCsvFromMvJson(
   mv: unknown,
@@ -344,6 +344,7 @@ export function triggerEcgAiAnalysis(recordingId: string): void {
       const res = await fetch(`${ECG_AI_ANALYZE_URL.replace(/\/$/, '')}/analyze`, {
         method: 'POST',
         body: form,
+        signal: AbortSignal.timeout(90_000), // 90s — covers Render cold start
       })
       if (!res.ok) {
         const txt = await res.text().catch(() => '')

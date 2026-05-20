@@ -1061,6 +1061,8 @@ const ECGMonitor: React.FC = () => {
             "🫀 [ECG SAVE] ✅ Saved to Supabase database for doctor portal:",
             insertedData
           );
+
+
         } catch (error) {
           console.error(
             "🫀 [ECG SAVE] ❌ Failed to store ECG data in Supabase:",

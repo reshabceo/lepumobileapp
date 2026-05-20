@@ -58,6 +58,21 @@ const statusColors: Record<string, { bg: string; text: string; label: string }> 
   expired: { bg: 'bg-red-500/10', text: 'text-red-400', label: 'Expired' },
 };
 
+// Strip markdown formatting from AI-generated text
+const stripMarkdown = (text: string): string => {
+  if (!text) return text;
+  return text
+    .replace(/\*\*([^*]+)\*\*/g, '$1')   // **bold**
+    .replace(/\*([^*]+)\*/g, '$1')         // *italic*
+    .replace(/^#{1,6}\s+/gm, '')           // ## headings
+    .replace(/`([^`]+)`/g, '$1')           // `code`
+    .replace(/^\s*[-*+]\s+/gm, '')         // bullet points
+    .replace(/^\s*\d+\.\s+/gm, '')         // numbered lists
+    .replace(/__([^_]+)__/g, '$1')          // __bold__
+    .replace(/_([^_]+)_/g, '$1')            // _italic_
+    .trim();
+};
+
 export const RecommendationsDashboard: React.FC = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -266,7 +281,7 @@ export const RecommendationsDashboard: React.FC = () => {
                 <Icon className={`w-6 h-6 ${priorityStyle.text}`} />
               </div>
               <div className="flex-1">
-                <h2 className="text-xl font-bold mb-2">{selectedRec.title}</h2>
+                <h2 className="text-xl font-bold mb-2">{stripMarkdown(selectedRec.title)}</h2>
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className={`text-xs px-2 py-1 rounded-full ${priorityStyle.bg} ${priorityStyle.text}`}>
                     {selectedRec.priority.toUpperCase()}
@@ -281,7 +296,7 @@ export const RecommendationsDashboard: React.FC = () => {
             {/* Description */}
             <div className="mb-6">
               <h3 className="text-sm font-semibold text-gray-400 mb-2">Description</h3>
-              <p className="text-gray-300 leading-relaxed">{selectedRec.description}</p>
+              <p className="text-gray-300 leading-relaxed">{stripMarkdown(selectedRec.description)}</p>
             </div>
 
             {/* Action Items */}
@@ -496,8 +511,8 @@ export const RecommendationsDashboard: React.FC = () => {
                       <Icon className={`w-5 h-5 ${priorityStyle.text}`} />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-white mb-1 truncate">{rec.title}</h3>
-                      <p className="text-sm text-gray-400 line-clamp-2 mb-2">{rec.description}</p>
+                      <h3 className="font-semibold text-white mb-1 truncate">{stripMarkdown(rec.title)}</h3>
+                      <p className="text-sm text-gray-400 line-clamp-2 mb-2">{stripMarkdown(rec.description)}</p>
                       <div className="flex items-center gap-2 flex-wrap">
                         <span
                           className={`text-xs px-2 py-1 rounded-full ${priorityStyle.bg} ${priorityStyle.text}`}

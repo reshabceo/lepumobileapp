@@ -4,9 +4,9 @@ import { supabase } from '@/lib/supabase';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { 
-  FileText, 
-  DollarSign, 
+import {
+  FileText,
+  DollarSign,
   Calendar,
   User,
   CheckCircle2,
@@ -14,7 +14,9 @@ import {
   XCircle,
   ChevronDown,
   ChevronUp,
-  ArrowLeft
+  ArrowLeft,
+  AlertTriangle,
+  RefreshCw
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -33,6 +35,9 @@ interface Claim {
   tax_amount: number;
   doctor_name: string;
   insurance_provider_name: string;
+  denial_reason: string | null;
+  denied_at: string | null;
+  resubmit_count: number;
   procedures: {
     code: string;
     description: string;
@@ -99,6 +104,9 @@ const PatientInsuranceClaims = () => {
           country,
           created_at,
           updated_at,
+          denial_reason,
+          denied_at,
+          resubmit_count,
           patient_insurance_id,
           doctors!doctor_id(full_name)
         `)
@@ -192,7 +200,10 @@ const PatientInsuranceClaims = () => {
             insurance_provider_name: insuranceProviderName,
             procedures: procedures,
             patient_due: patientDue,
-            tax_amount: taxAmount
+            tax_amount: taxAmount,
+            denial_reason: claim.denial_reason ?? null,
+            denied_at: claim.denied_at ?? null,
+            resubmit_count: claim.resubmit_count ?? 0,
           };
         })
       );
@@ -211,26 +222,17 @@ const PatientInsuranceClaims = () => {
   };
 
   const getStatusBadge = (status: string) => {
-    const statusConfig = {
-      pending: {
-        icon: <Clock className="h-3 w-3 mr-1" />,
-        className: 'bg-yellow-500/20 text-yellow-200 border-yellow-500/30'
-      },
-      approved: {
-        icon: <CheckCircle2 className="h-3 w-3 mr-1" />,
-        className: 'bg-green-500/20 text-green-200 border-green-500/30'
-      },
-      rejected: {
-        icon: <XCircle className="h-3 w-3 mr-1" />,
-        className: 'bg-red-500/20 text-red-200 border-red-500/30'
-      },
-      processing: {
-        icon: <Clock className="h-3 w-3 mr-1" />,
-        className: 'bg-blue-500/20 text-blue-200 border-blue-500/30'
-      }
+    const statusConfig: Record<string, { icon: React.ReactNode; className: string }> = {
+      pending:    { icon: <Clock className="h-3 w-3 mr-1" />,        className: 'bg-yellow-500/20 text-yellow-200 border-yellow-500/30' },
+      submitted:  { icon: <Clock className="h-3 w-3 mr-1" />,        className: 'bg-blue-500/20 text-blue-200 border-blue-500/30' },
+      approved:   { icon: <CheckCircle2 className="h-3 w-3 mr-1" />, className: 'bg-green-500/20 text-green-200 border-green-500/30' },
+      paid:       { icon: <CheckCircle2 className="h-3 w-3 mr-1" />, className: 'bg-green-500/20 text-green-200 border-green-500/30' },
+      denied:     { icon: <XCircle className="h-3 w-3 mr-1" />,      className: 'bg-red-500/20 text-red-200 border-red-500/30' },
+      rejected:   { icon: <XCircle className="h-3 w-3 mr-1" />,      className: 'bg-red-500/20 text-red-200 border-red-500/30' },
+      processing: { icon: <Clock className="h-3 w-3 mr-1" />,        className: 'bg-blue-500/20 text-blue-200 border-blue-500/30' },
     };
 
-    const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.pending;
+    const config = statusConfig[status] ?? statusConfig.pending;
 
     return (
       <Badge variant="outline" className={`${config.className} flex items-center w-fit`}>
@@ -346,12 +348,14 @@ const PatientInsuranceClaims = () => {
           </Card>
         ) : (
           <div className="space-y-4">
-            {claims.map((claim) => (
-              <Card key={claim.id} className="bg-white/10 backdrop-blur-md border-white/20">
+            {claims.map((claim) => {
+              const isDenied = claim.status === 'denied' || claim.status === 'rejected';
+              return (
+              <Card key={claim.id} className={`bg-white/10 backdrop-blur-md ${isDenied ? 'border-red-500/40' : 'border-white/20'}`}>
                 <CardHeader>
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-2">
+                      <div className="flex items-center gap-3 mb-2 flex-wrap">
                         <CardTitle className="text-white">Claim #{claim.claim_number}</CardTitle>
                         {getStatusBadge(claim.status)}
                         {isNewClaim(claim.created_at) && (
@@ -359,7 +363,36 @@ const PatientInsuranceClaims = () => {
                             NEW
                           </Badge>
                         )}
+                        {claim.resubmit_count > 0 && (
+                          <Badge className="bg-blue-500/20 text-blue-200 border-blue-500/30 flex items-center gap-1">
+                            <RefreshCw className="h-2.5 w-2.5" /> Resubmitted {claim.resubmit_count}×
+                          </Badge>
+                        )}
                       </div>
+
+                      {/* Denial reason banner */}
+                      {isDenied && claim.denial_reason && (
+                        <div className="flex items-start gap-2 bg-red-500/20 border border-red-500/30 rounded-lg px-3 py-2 mb-2">
+                          <AlertTriangle className="h-4 w-4 text-red-300 mt-0.5 shrink-0" />
+                          <div>
+                            <p className="text-xs font-semibold text-red-300">Claim Denied</p>
+                            <p className="text-sm text-red-200 mt-0.5">{claim.denial_reason}</p>
+                            {claim.denied_at && (
+                              <p className="text-xs text-red-300/70 mt-1">
+                                {formatDate(claim.denied_at)}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {isDenied && !claim.denial_reason && (
+                        <div className="flex items-center gap-2 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-1.5 mb-2">
+                          <XCircle className="h-3.5 w-3.5 text-red-300" />
+                          <p className="text-xs text-red-200">This claim was denied. Contact your doctor for details.</p>
+                        </div>
+                      )}
+
                       <div className="flex flex-wrap gap-4 text-sm text-emerald-200/80">
                         <div className="flex items-center gap-1">
                           <Calendar className="h-4 w-4" />
@@ -484,7 +517,8 @@ const PatientInsuranceClaims = () => {
                   )}
                 </CardContent>
               </Card>
-            ))}
+            );
+            })}
           </div>
         )}
         </div>
