@@ -36,6 +36,7 @@ import { ChatSupport } from "./components/ChatSupport";
 import AIDoctorPage from "./pages/AIDoctorPage";
 import InvoicesPage from "./pages/InvoicesPage";
 import PatientInsuranceClaims from "./components/PatientInsuranceClaims";
+import { PatientInsuranceProfile } from "./components/PatientInsuranceProfile";
 import { ManualVitalInput } from "./components/ManualVitalInput";
 import { PatientPrescriptions } from "./components/PatientPrescriptions";
 import { PatientVitalsHistory } from "./components/PatientVitalsHistory";
@@ -205,6 +206,13 @@ const App = () => (
               <Route path="/insurance-claims" element={
                 <ProtectedRoute>
                   <PatientInsuranceClaims />
+                </ProtectedRoute>
+              } />
+              <Route path="/insurance-profile" element={
+                <ProtectedRoute>
+                  <div className="min-h-screen bg-background p-4">
+                    <PatientInsuranceProfile />
+                  </div>
                 </ProtectedRoute>
               } />
               <Route path="/manual-vitals" element={
