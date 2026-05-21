@@ -53,6 +53,7 @@ import RecommendationsDashboard from "./pages/RecommendationsDashboard";
 import PatientMessages from "./pages/PatientMessages";
 import AliveCorHistory from "./pages/AliveCorHistory";
 import ConnectCamera from "./pages/ConnectCamera";
+import MyThresholds from "./components/MyThresholds";
 
 const queryClient = new QueryClient();
 
@@ -249,6 +250,11 @@ const App = () => (
               <Route path="/connect-camera" element={
                 <ProtectedRoute>
                   <ConnectCamera />
+                </ProtectedRoute>
+              } />
+              <Route path="/my-thresholds" element={
+                <ProtectedRoute>
+                  <MyThresholds />
                 </ProtectedRoute>
               } />
 

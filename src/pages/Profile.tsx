@@ -619,6 +619,20 @@ const Profile = () => {
             />
           )}
 
+          {/* My Vital Thresholds */}
+          <Card className="glass-card border-blue-500/30 bg-blue-500/5 cursor-pointer hover:bg-blue-500/10 transition-colors" onClick={() => navigate('/my-thresholds')}>
+            <CardContent className="p-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Heart className="w-5 h-5 text-blue-400" />
+                <div>
+                  <p className="text-white font-medium">My Vital Thresholds</p>
+                  <p className="text-xs text-gray-400">View doctor-configured alert ranges</p>
+                </div>
+              </div>
+              <span className="text-gray-400 text-lg">›</span>
+            </CardContent>
+          </Card>
+
           {/* Logout Button */}
           <Card className="glass-card border-red-500/30 bg-red-500/10">
             <CardContent className="p-6">
