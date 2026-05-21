@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { FileText, Download, Calendar, User, ArrowLeft, Upload, Stethoscope, Plus, Loader2, FileDown, Image, Send, RotateCcw } from 'lucide-react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { FileText, Download, Calendar, User, ArrowLeft, Upload, Stethoscope, Plus, Loader2, FileDown, Image, Send, RotateCcw, Brain, CheckCircle2, XCircle, Clock } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase, db, supabaseUrl, supabaseAnonKey } from '@/lib/supabase';
 import { useRealTimeVitals } from '@/hooks/useRealTimeVitals';
@@ -573,6 +573,44 @@ const PatientReportsView: React.FC = () => {
         };
     }, [patientProfile]);
 
+    // ── Real-time subscription: update report status as analysis completes ────────
+    useEffect(() => {
+        if (!patientProfile?.id) return;
+
+        const channel = supabase
+            .channel(`patient_reports_status_${patientProfile.id}`)
+            .on(
+                'postgres_changes',
+                {
+                    event: 'UPDATE',
+                    schema: 'public',
+                    table: 'patient_reports',
+                    filter: `patient_id=eq.${patientProfile.id}`,
+                },
+                (payload) => {
+                    const updated = payload.new as PatientReport;
+                    setReports(prev =>
+                        prev.map(r => r.id === updated.id
+                            ? { ...r,
+                                analysis_status: updated.analysis_status,
+                                analysis_data: updated.analysis_data ?? r.analysis_data,
+                                sent_to_patient: updated.sent_to_patient ?? r.sent_to_patient,
+                                analyzed_at: (updated as any).analyzed_at ?? (r as any).analyzed_at,
+                              }
+                            : r
+                        )
+                    );
+                    // Toast when analysis finishes
+                    if (updated.analysis_status === 'completed' && updated.uploaded_by_patient) {
+                        toast({ title: 'Analysis complete', description: `"${updated.title}" has been analysed.` });
+                    }
+                }
+            )
+            .subscribe();
+
+        return () => { supabase.removeChannel(channel); };
+    }, [patientProfile?.id]);
+
     // 🚀 Persist active tab to handle Android process death/restarts
     useEffect(() => {
         localStorage.setItem('reports_active_tab', activeTab);
@@ -850,6 +888,7 @@ const PatientReportsView: React.FC = () => {
             discharge_summary: 'Discharge Summary',
             weekly_vitals_report: 'Weekly Vitals Report',
             rpm_compliance_report: 'RPM Compliance Report',
+            combined_weekly_report: 'Combined Weekly Report',
         };
         return types[type] || type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
     };
@@ -863,8 +902,46 @@ const PatientReportsView: React.FC = () => {
             discharge_summary: 'bg-red-100 text-red-800',
             weekly_vitals_report: 'bg-cyan-100 text-cyan-800',
             rpm_compliance_report: 'bg-orange-100 text-orange-800',
+            combined_weekly_report: 'bg-violet-100 text-violet-800',
         };
         return colors[type] || 'bg-gray-100 text-gray-800';
+    };
+
+    // ── Render analysis status badge for patient-uploaded reports ─────────────────
+    const renderAnalysisStatus = (report: PatientReport) => {
+        if (!report.uploaded_by_patient) return null;
+        switch (report.analysis_status) {
+            case 'processing':
+                return (
+                    <span className="flex items-center gap-1 text-xs bg-yellow-500/20 text-yellow-400 px-2 py-1 rounded-full">
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                        Analysing…
+                    </span>
+                );
+            case 'completed':
+                return (
+                    <span className="flex items-center gap-1 text-xs bg-emerald-500/20 text-emerald-400 px-2 py-1 rounded-full">
+                        <CheckCircle2 className="h-3 w-3" />
+                        AI Analysed
+                    </span>
+                );
+            case 'failed':
+                return (
+                    <span className="flex items-center gap-1 text-xs bg-red-500/20 text-red-400 px-2 py-1 rounded-full">
+                        <XCircle className="h-3 w-3" />
+                        Analysis failed
+                    </span>
+                );
+            case 'pending':
+                return (
+                    <span className="flex items-center gap-1 text-xs bg-gray-500/20 text-gray-400 px-2 py-1 rounded-full">
+                        <Clock className="h-3 w-3" />
+                        Pending
+                    </span>
+                );
+            default:
+                return null;
+        }
     };
 
     // Show loading state — only block if we're still fetching the profile AND have nothing cached
@@ -1162,19 +1239,16 @@ const PatientReportsView: React.FC = () => {
                             >
                                 <div className="flex items-start justify-between mb-3">
                                     <div className="flex-1">
-                                        <div className="flex items-center gap-2 mb-2">
+                                        <div className="flex items-center gap-2 mb-2 flex-wrap">
                                             {report.uploaded_by_patient ? (
-                                                <Upload className="h-5 w-5 text-green-500" />
+                                                <Upload className="h-5 w-5 text-green-500 shrink-0" />
                                             ) : (
-                                                <Stethoscope className="h-5 w-5 text-blue-500" />
+                                                <Stethoscope className="h-5 w-5 text-blue-500 shrink-0" />
                                             )}
-                                            <h3 className="font-semibold text-white">{report.title}</h3>
-                                            {report.uploaded_by_patient && !report.sent_to_patient && (
-                                                <span className="text-xs bg-green-500/20 text-green-400 px-2 py-1 rounded-full">
-                                                    My Upload
-                                                </span>
-                                            )}
-                                            {report.sent_to_patient && report.analysis_status === 'completed' && (
+                                            <h3 className="font-semibold text-white flex-1 min-w-0 truncate">{report.title}</h3>
+                                            {/* Live analysis status for patient uploads */}
+                                            {renderAnalysisStatus(report)}
+                                            {report.sent_to_patient && report.analysis_status === 'completed' && !report.uploaded_by_patient && (
                                                 <span className="text-xs bg-emerald-500/20 text-emerald-400 px-2 py-1 rounded-full">
                                                     Analyzed
                                                 </span>
@@ -1206,14 +1280,16 @@ const PatientReportsView: React.FC = () => {
                                         </div>
                                     </div>
 
-                                    <div className="flex gap-2">
-                                        {activeTab === 'my-uploads' && <button
+                                    <div className="flex gap-2 flex-wrap">
+                                        {/* Download original file */}
+                                        <button
                                             onClick={() => downloadReport(report)}
                                             className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors"
                                         >
                                             <Download className="h-4 w-4" />
                                             <span className="text-sm">Download</span>
-                                        </button>}
+                                        </button>
+                                        {/* Analysis PDF — for doctor-shared reports */}
                                         {activeTab === 'from-doctor' && report.sent_to_patient && report.analysis_status === 'completed' && report.analysis_data && (
                                             <button
                                                 onClick={() => downloadAnalysisAsPDF(report)}
@@ -1221,6 +1297,16 @@ const PatientReportsView: React.FC = () => {
                                             >
                                                 <FileDown className="h-4 w-4" />
                                                 <span className="text-sm">Analysis PDF</span>
+                                            </button>
+                                        )}
+                                        {/* Analysis PDF — for patient's own completed uploads */}
+                                        {activeTab === 'my-uploads' && report.analysis_status === 'completed' && report.analysis_data && (
+                                            <button
+                                                onClick={() => downloadAnalysisAsPDF(report)}
+                                                className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg transition-colors"
+                                            >
+                                                <Brain className="h-4 w-4" />
+                                                <span className="text-sm">AI Analysis</span>
                                             </button>
                                         )}
                                     </div>
