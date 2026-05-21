@@ -54,7 +54,7 @@ const generateReportHTML = (analysisData: any, reportTitle: string): string => {
 
     // Helper function to generate lab results table
     const generateLabResultsTable = () => {
-        if (!analysisData.labResults || analysisData.labResults.length === 0) return '';
+        if (!Array.isArray(analysisData.labResults) || analysisData.labResults.length === 0) return '';
 
         return `
       <div class="section">
@@ -97,7 +97,7 @@ const generateReportHTML = (analysisData: any, reportTitle: string): string => {
 
     // Helper function to generate findings list
     const generateFindingsList = () => {
-        if (!analysisData.analysis?.keyFindings || analysisData.analysis.keyFindings.length === 0) return '';
+        if (!Array.isArray(analysisData.analysis?.keyFindings) || analysisData.analysis.keyFindings.length === 0) return '';
 
         return `
       <div class="section">
@@ -120,7 +120,7 @@ const generateReportHTML = (analysisData: any, reportTitle: string): string => {
 
     // Helper function to generate critical risks
     const generateCriticalRisks = () => {
-        if (!analysisData.advancedReport?.criticalRisks || analysisData.advancedReport.criticalRisks.length === 0) return '';
+        if (!Array.isArray(analysisData.advancedReport?.criticalRisks) || analysisData.advancedReport.criticalRisks.length === 0) return '';
 
         return `
       <div class="section">
@@ -143,7 +143,7 @@ const generateReportHTML = (analysisData: any, reportTitle: string): string => {
 
     // Helper function to generate recommendations
     const generateRecommendations = () => {
-        if (!analysisData.analysis?.recommendations || analysisData.analysis.recommendations.length === 0) return '';
+        if (!Array.isArray(analysisData.analysis?.recommendations) || analysisData.analysis.recommendations.length === 0) return '';
 
         return `
       <div class="section">
@@ -444,7 +444,7 @@ const generateReportHTML = (analysisData: any, reportTitle: string): string => {
             </div>
           ` : ''}
 
-          ${analysisData.advancedReport.patientSummary.keyPoints && analysisData.advancedReport.patientSummary.keyPoints.length > 0 ? `
+          ${Array.isArray(analysisData.advancedReport.patientSummary.keyPoints) && analysisData.advancedReport.patientSummary.keyPoints.length > 0 ? `
             <div style="margin-bottom: 20px;">
               <h3 style="color: #22c55e; display: flex; align-items: center;">🔑 Key Points:</h3>
               ${analysisData.advancedReport.patientSummary.keyPoints.map((point: string) => `
@@ -456,7 +456,7 @@ const generateReportHTML = (analysisData: any, reportTitle: string): string => {
             </div>
           ` : ''}
 
-          ${analysisData.advancedReport.patientSummary.nextSteps && analysisData.advancedReport.patientSummary.nextSteps.length > 0 ? `
+          ${Array.isArray(analysisData.advancedReport.patientSummary.nextSteps) && analysisData.advancedReport.patientSummary.nextSteps.length > 0 ? `
             <div>
               <h3 style="color: #3b82f6; display: flex; align-items: center;">👣 Next Steps:</h3>
               ${analysisData.advancedReport.patientSummary.nextSteps.map((step: string) => `
@@ -629,49 +629,23 @@ const PatientReportsView: React.FC = () => {
         const activeProfile = profile || patientProfile;
         if (!activeProfile) return;
 
-        try {
-            setLoading(true);
-            console.log(`📡 [Reports] Fetching reports for patient: ${activeProfile.id}...`);
-            
-            // 🚀 Robust timeout for reports fetch
-            const timeoutPromise = new Promise<any>((_, reject) => 
-                setTimeout(() => reject(new Error('Reports fetch timeout (15s)')), 15000)
-            );
+        setLoading(true);
+        const { data } = await supabase
+            .from('patient_reports')
+            .select(`
+                *,
+                doctors!doctor_id(full_name)
+            `)
+            .eq('patient_id', activeProfile.id)
+            .order('created_at', { ascending: false });
 
-            const fetchPromise = supabase
-                .from('patient_reports')
-                .select(`
-                    *,
-                    doctors!doctor_id(full_name)
-                `)
-                .eq('patient_id', activeProfile.id)
-                .order('created_at', { ascending: false });
-
-            const { data, error } = await Promise.race([fetchPromise, timeoutPromise]);
-
-            if (error) {
-                console.error('❌ [Reports] Error fetching reports:', error);
-                toast.error('Failed to load reports. Please try again.');
-            } else {
-                console.log(`✅ [Reports] Successfully fetched ${data?.length || 0} reports`);
-                const formattedReports = data?.map((report: any) => ({
-                    ...report,
-                    doctor_name: report.doctors?.full_name || 'Unknown Doctor'
-                })) || [];
-                setReports(formattedReports);
-            }
-        } catch (err: any) {
-            console.error('❌ [Reports] Unexpected error:', err);
-            if (err.message?.includes('timeout')) {
-                toast.error('Connection slow. Tap retry to load reports.');
-            }
-            // On error/timeout: leave reportsLoaded=false so the retry button shows,
-            // not the "no reports found" empty state (which would be misleading)
-            setLoading(false);
-            return;
-        }
-        setLoading(false);
+        const formattedReports = (data || []).map((report: any) => ({
+            ...report,
+            doctor_name: report.doctors?.full_name || 'Unknown Doctor'
+        }));
+        setReports(formattedReports);
         setReportsLoaded(true);
+        setLoading(false);
     };
 
     // Filter reports based on active tab
@@ -804,8 +778,19 @@ const PatientReportsView: React.FC = () => {
         try {
             console.log('Generating PDF... Please wait.');
 
+            // Parse analysis_data if Supabase returned it as a JSON string
+            let analysisData = report.analysis_data;
+            if (typeof analysisData === 'string') {
+                try {
+                    analysisData = JSON.parse(analysisData);
+                } catch {
+                    alert('Analysis data is corrupted and cannot be exported.');
+                    return;
+                }
+            }
+
             // Generate HTML content
-            const htmlContent = generateReportHTML(report.analysis_data, report.title);
+            const htmlContent = generateReportHTML(analysisData, report.title);
 
             // Create a temporary element to hold the HTML
             const element = document.createElement('div');
