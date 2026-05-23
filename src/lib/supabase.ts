@@ -17,7 +17,43 @@ if (!supabaseUrl || !supabaseAnonKey) {
 console.log('🔍 Supabase Debug - URL:', supabaseUrl)
 console.log('🔍 Supabase Debug - Anon Key:', supabaseAnonKey.substring(0, 20) + '...')
 
+// Hardened fetch: no Supabase request can hang forever. The DB/API are fast
+// (verified ~0.1ms / ~90ms), but the JS client occasionally stalls a request in
+// its pipeline → the UI gets stuck loading with no error until a full reload.
+// This aborts any request that stalls past the timeout and retries idempotent
+// (GET/HEAD) requests once, so the app self-recovers instead of freezing.
+const REQUEST_TIMEOUT_MS = 15000
+const supabaseFetch: typeof fetch = async (input, init) => {
+  const method = (init?.method || 'GET').toUpperCase()
+  const isIdempotent = method === 'GET' || method === 'HEAD'
+  const run = async (): Promise<Response> => {
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
+    // Respect a caller-provided abort signal too (e.g. .abortSignal()).
+    if (init?.signal) {
+      if (init.signal.aborted) controller.abort()
+      else init.signal.addEventListener('abort', () => controller.abort(), { once: true })
+    }
+    try {
+      return await fetch(input as RequestInfo, { ...init, signal: controller.signal })
+    } finally {
+      clearTimeout(timer)
+    }
+  }
+  try {
+    return await run()
+  } catch (err) {
+    // Retry GET/HEAD once on abort/network error; never auto-retry writes.
+    if (isIdempotent) {
+      console.warn('⚠️ [Supabase] request stalled/aborted — retrying once')
+      return await run()
+    }
+    throw err
+  }
+}
+
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  global: { fetch: supabaseFetch },
   auth: {
     storage: {
       getItem: (key: string) => {
@@ -311,9 +347,11 @@ export async function getAliveCorRecordingDetail(patientId: string, recordingId:
  * Fetch radiologist reports for a patient from the radiologist_reports table.
  */
 export async function getRadiologistReports(patientId: string) {
+  // radiologist_reports is authored by a RADIOLOGIST (radiologist_id → radiologists),
+  // not a doctor. Embedding doctors!doctor_id fails with PGRST200 (no such FK).
   return supabase
     .from('radiologist_reports')
-    .select('*, doctors!doctor_id(full_name)')
+    .select('*, radiologists!radiologist_id(full_name)')
     .eq('patient_id', patientId)
     .order('created_at', { ascending: false });
 }
