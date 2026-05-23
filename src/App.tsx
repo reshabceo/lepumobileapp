@@ -53,6 +53,8 @@ import RecommendationsDashboard from "./pages/RecommendationsDashboard";
 import PatientMessages from "./pages/PatientMessages";
 import AliveCorHistory from "./pages/AliveCorHistory";
 import ConnectCamera from "./pages/ConnectCamera";
+import LiveMonitoringPage from "./pages/LiveMonitoring";
+import PiPairingPage from "./pages/PiPairing";
 import { ServicesRecords } from "./pages/ServicesRecords";
 import MyThresholds from "./components/MyThresholds";
 
@@ -256,6 +258,16 @@ const App = () => (
               <Route path="/connect-camera" element={
                 <ProtectedRoute>
                   <ConnectCamera />
+                </ProtectedRoute>
+              } />
+              <Route path="/live-monitoring" element={
+                <ProtectedRoute>
+                  <LiveMonitoringPage />
+                </ProtectedRoute>
+              } />
+              <Route path="/pair-pi" element={
+                <ProtectedRoute>
+                  <PiPairingPage />
                 </ProtectedRoute>
               } />
               <Route path="/my-thresholds" element={

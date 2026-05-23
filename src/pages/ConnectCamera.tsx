@@ -124,9 +124,9 @@ export default function ConnectCamera() {
     const displayUser = cleanUser || "YOUR_USERNAME";
     const displayIp = cleanIp || "YOUR_CAMERA_IP";
 
-    // Format: rtsp://username:password@CAMERA_IP:554/stream1
-    const mainStream = `rtsp://${displayUser}:${encodedPassword}@${displayIp}:554/stream1`;
-    const subStream = `rtsp://${displayUser}:${encodedPassword}@${displayIp}:554/stream2`;
+    // Reolink RTSP (E1 / E1 Outdoor / Go). Sub stream = low bandwidth.
+    const mainStream = `rtsp://${displayUser}:${encodedPassword}@${displayIp}:554/h264Preview_01_main`;
+    const subStream = `rtsp://${displayUser}:${encodedPassword}@${displayIp}:554/h264Preview_01_sub`;
 
     setGeneratedRtsp(mainStream);
     setGeneratedRtspSub(subStream);
@@ -202,6 +202,7 @@ export default function ConnectCamera() {
           ip_address: ipAddress.trim(),
           rtsp_url: generatedRtsp,
           rtsp_url_sub: generatedRtspSub,
+          camera_model: "reolink_e1_pro",
           updated_at: new Date().toISOString()
         }, {
           onConflict: "patient_id"
@@ -250,7 +251,7 @@ export default function ConnectCamera() {
               </div>
               <div>
                 <h1 className="text-xl font-bold">Connect Camera</h1>
-                <p className="text-xs text-gray-400">Configure your Tapo RTSP stream</p>
+                <p className="text-xs text-gray-400">Configure your Reolink RTSP stream</p>
               </div>
             </div>
             <button
@@ -271,7 +272,7 @@ export default function ConnectCamera() {
               <Video className="w-6 h-6 text-indigo-300 animate-pulse" />
             </div>
             <div className="space-y-1">
-              <h3 className="text-lg font-bold text-white">Tapo RTSP Connection</h3>
+              <h3 className="text-lg font-bold text-white">Reolink RTSP Connection</h3>
               <p className="text-gray-400 text-xs leading-relaxed font-medium">
                 Enter your camera credentials below to generate a secure
                 <span className="text-indigo-300 font-semibold"> RTSP stream URL</span>.
@@ -384,7 +385,7 @@ export default function ConnectCamera() {
             {/* Main HD Stream */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-xs text-gray-400 font-semibold">HD High Quality Stream (stream1)</span>
+                <span className="text-xs text-gray-400 font-semibold">Main stream — h264Preview_01_main</span>
                 {isCopiedMain ? (
                   <span className="text-[10px] text-green-400 flex items-center gap-1">
                     <Check className="w-3 h-3" /> Copied!
@@ -408,7 +409,7 @@ export default function ConnectCamera() {
             {/* Sub stream (low quality) */}
             <div className="space-y-2 pt-2 border-t border-slate-800">
               <div className="flex items-center justify-between">
-                <span className="text-xs text-gray-400 font-semibold">SD Low Quality Stream (stream2)</span>
+                <span className="text-xs text-gray-400 font-semibold">Sub stream — h264Preview_01_sub</span>
                 {isCopiedSub ? (
                   <span className="text-[10px] text-green-400 flex items-center gap-1">
                     <Check className="w-3 h-3" /> Copied!
@@ -450,10 +451,10 @@ export default function ConnectCamera() {
               <div className="space-y-1">
                 <h3 className="text-md font-bold flex items-center gap-2 text-indigo-300">
                   <Shield className="w-4 h-4" />
-                  Tapo Camera Setup Guide
+                  Reolink Camera Setup Guide
                 </h3>
                 <p className="text-gray-400 text-xs">
-                  Follow these steps inside your Tapo mobile application.
+                  Follow these steps inside your Reolink mobile application.
                 </p>
               </div>
               <button
@@ -475,7 +476,7 @@ export default function ConnectCamera() {
                   Create Camera Account
                 </h4>
                 <div className="pl-6 text-gray-300 text-[11px] space-y-1">
-                  <p>In your Tapo mobile app:</p>
+                  <p>In your Reolink mobile app:</p>
                   <p className="bg-[#121B32] p-3 rounded-xl border border-slate-700/40 text-[10px] font-mono break-all select-all text-emerald-300">
                     Camera Settings → Advanced Settings → Camera Account
                   </p>
@@ -505,7 +506,7 @@ export default function ConnectCamera() {
                   Find Camera IP Address
                 </h4>
                 <div className="pl-6 text-gray-300 text-[11px] space-y-1">
-                  <p>Locate your Camera IP address in the Tapo App under:</p>
+                  <p>Locate your Camera IP address in the Reolink App under:</p>
                   <p className="bg-[#121B32] p-3 rounded-xl border border-slate-700/40 text-[10px] font-mono break-all select-all text-emerald-300">
                     Camera Settings → Device Info → IP Address
                   </p>

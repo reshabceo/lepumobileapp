@@ -94,6 +94,7 @@ export const ServicesRecords = () => {
     { label: "Prescriptions", icon: Pill, color: "text-purple-400", path: "/prescriptions" },
     { label: "Health Plan", icon: Target, color: "text-emerald-400", path: "/recommendations", badge: recommendationsUnreadCount },
     { label: "Camera Setup", icon: Video, color: "text-indigo-400", path: "/connect-camera" },
+    { label: "Live RPM", icon: Video, color: "text-teal-300", path: "/live-monitoring" },
   ];
 
   return (

@@ -71,10 +71,14 @@ export const useRealTimeVitals = () => {
             const cacheKey = `patient_profile_${user.id}`;
             const cachedProfile = localStorage.getItem(cacheKey);
             let hasCache = false;
-            
+            // Keep ANY parsed cache around (even if stale) so we can fall back to it
+            // if the network fetch hangs/times out — prevents the app getting stuck.
+            let cachedParsed: any = null;
+
             if (cachedProfile) {
                 try {
                     const parsed = JSON.parse(cachedProfile);
+                    cachedParsed = parsed;
                     const cacheTime = parsed._cached_at || 0;
                     const now = Date.now();
                     // Use cache if less than 5 minutes old
@@ -92,17 +96,22 @@ export const useRealTimeVitals = () => {
                 }
             }
 
-            // Safety timeout to prevent infinite loading (increased to 30 seconds for mobile robustness)
+            // Safety timeout to prevent infinite loading. 12s is long enough for a
+            // slow mobile network but short enough that the user isn't stuck staring
+            // at a spinner. On fire we fall back to stale cache if we have it.
             timeoutId = setTimeout(() => {
                 if (isMounted) {
                     console.warn('⚠️ Loading timeout - forcing loading to false');
                     setLoading(false);
-                    // Don't show error if we at least have cache
-                    if (!hasCache) {
+                    if (cachedParsed) {
+                        console.warn('⚠️ Falling back to stale cached profile after timeout');
+                        setPatientProfile(cachedParsed);
+                        setError(null);
+                    } else if (!hasCache) {
                         setError('Loading took too long. Please check your connection.');
                     }
                 }
-            }, 30000);
+            }, 12000);
 
             try {
                 if (isMounted && !hasCache) {
@@ -110,16 +119,25 @@ export const useRealTimeVitals = () => {
                     setError(null);
                 }
 
-                // 🚀 OPTIMIZED: Fetch profile with timeout protection
-                const profilePromise = db.getPatientProfile(user.id);
-                const timeoutPromise = new Promise((_, reject) => 
-                    setTimeout(() => reject(new Error('Profile fetch timeout')), 30000)
-                );
+                // 🚀 OPTIMIZED: Fetch profile with timeout protection + one retry.
+                // The fetch is wrapped in a 10s timeout; if it hangs (common in
+                // mobile webviews after backgrounding) we retry once before giving up.
+                const fetchProfileWithTimeout = () => {
+                    const profilePromise = db.getPatientProfile(user.id);
+                    const timeoutPromise = new Promise((_, reject) =>
+                        setTimeout(() => reject(new Error('Profile fetch timeout')), 10000)
+                    );
+                    return Promise.race([
+                        Promise.resolve(profilePromise).then(result => ({ status: 'fulfilled' as const, value: result })),
+                        timeoutPromise.then(() => ({ status: 'rejected' as const, reason: new Error('Profile fetch timeout') }))
+                    ]);
+                };
 
-                const profileResult = await Promise.race([
-                    Promise.resolve(profilePromise).then(result => ({ status: 'fulfilled' as const, value: result })),
-                    timeoutPromise.then(() => ({ status: 'rejected' as const, reason: new Error('Timeout') }))
-                ]);
+                let profileResult = await fetchProfileWithTimeout();
+                if (profileResult.status === 'rejected' && isMounted) {
+                    console.warn('⚠️ Profile fetch timed out, retrying once...');
+                    profileResult = await fetchProfileWithTimeout();
+                }
 
                 // Handle profile result
                 if (profileResult.status === 'fulfilled') {
@@ -185,7 +203,15 @@ export const useRealTimeVitals = () => {
             } catch (err) {
                 console.error('Error fetching patient data:', err);
                 if (isMounted) {
-                    setError(err instanceof Error ? err.message : 'Failed to fetch patient data');
+                    // Never leave the app stuck: if we have ANY cached profile, use it
+                    // so the UI stays usable without a manual reload/app restart.
+                    if (cachedParsed) {
+                        console.warn('⚠️ Using stale cached profile after fetch failure');
+                        setPatientProfile(cachedParsed);
+                        setError(null);
+                    } else {
+                        setError(err instanceof Error ? err.message : 'Failed to fetch patient data');
+                    }
                     setLoading(false);
                 }
             } finally {
