@@ -217,32 +217,41 @@ const CGMMonitor: React.FC = () => {
   // Check if no device is connected
   if (!connectedDevice) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white">
+      <div className="min-h-screen bg-[#080D1A] text-white font-inter select-none">
         {/* Header */}
-        <div className="bg-slate-800/50 backdrop-blur-sm border-b border-slate-700">
-        <div className="relative flex items-center justify-between p-4 pt-safe-top">
-          <button
-            onClick={() => navigate(-1)}
-            className="flex items-center gap-2 px-3 py-2 text-white bg-blue-600 hover:bg-blue-700 transition-colors touch-manipulation rounded-lg"
-            style={{ minHeight: '40px', minWidth: '70px' }}
-          >
-            <ArrowLeft className="h-4 w-4" />
-            <span className="text-sm">Back</span>
-          </button>
-          <h1 className="absolute left-1/2 transform -translate-x-1/2 text-xl font-semibold">CGM Monitor</h1>
-          <div className="w-16" />
-        </div>
+        <div className="p-4 pt-safe-top">
+          <header className="flex items-center gap-3 mb-6">
+            <button
+              onClick={() => navigate(-1)}
+              className="p-2 rounded-full bg-white/5 hover:bg-white/10 transition-colors active:scale-95 text-white"
+            >
+              <ArrowLeft className="w-4 h-4" />
+            </button>
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-2xl bg-green-900/70 flex items-center justify-center border border-green-400/50">
+                <BarChart3 className="h-6 w-6 text-green-300" />
+              </div>
+              <div>
+                <h1 className="text-xl font-bold">CGM Monitor</h1>
+                <p className="text-xs text-gray-400">Continuous Glucose Monitoring</p>
+              </div>
+            </div>
+          </header>
         </div>
         
         {/* Content */}
         <div className="p-4">
           <div className="w-full max-w-md mx-auto">
-            <div className="text-center">
-              <h1 className="text-2xl font-bold mb-4">No Device Connected</h1>
-              <p className="text-gray-400 mb-6">Please connect a Dexcom CGM device first.</p>
-              <Button onClick={() => navigate('/wellue-scanner')} className="w-full">
-                Connect Device
-              </Button>
+            <div className="bg-[#1A243D] border border-slate-700/40 shadow-sm rounded-3xl p-6 text-center">
+              <AlertTriangle className="w-12 h-12 text-amber-500 mx-auto mb-4 animate-bounce" />
+              <h2 className="text-xl font-bold mb-2">No Device Connected</h2>
+              <p className="text-sm text-gray-400 mb-6">Continuous glucose monitoring requires connecting a compatible Dexcom sensor.</p>
+              <button 
+                onClick={() => navigate('/wellue-scanner')} 
+                className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3.5 px-4 rounded-xl transition-all shadow-lg active:scale-95"
+              >
+                Connect Dexcom Sensor
+              </button>
             </div>
           </div>
         </div>
@@ -251,143 +260,149 @@ const CGMMonitor: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white">
+    <div className="min-h-screen bg-[#080D1A] text-white font-inter select-none">
       {/* Header */}
-      <div className="bg-slate-800/50 backdrop-blur-sm border-b border-slate-700">
-        <div className="relative flex items-center justify-between p-4" style={{ paddingTop: 'max(1rem, env(safe-area-inset-top))' }}>
+      <div className="p-4 pt-safe-top">
+        <header className="flex items-center gap-3 mb-6">
           <button
             onClick={() => navigate(-1)}
-            className="flex items-center gap-2 px-3 py-2 text-white bg-blue-600 hover:bg-blue-700 transition-colors touch-manipulation rounded-lg"
-            style={{ minHeight: '40px', minWidth: '70px' }}
+            className="p-2 rounded-full bg-white/5 hover:bg-white/10 transition-colors active:scale-95 text-white"
           >
-            <ArrowLeft className="h-4 w-4" />
-            <span className="text-sm">Back</span>
+            <ArrowLeft className="w-4 h-4" />
           </button>
-          <h1 className="absolute left-1/2 transform -translate-x-1/2 text-xl font-semibold">CGM Monitor</h1>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-2xl bg-green-900/70 flex items-center justify-center border border-green-400/50">
+              <BarChart3 className="h-6 w-6 text-green-300" />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold">CGM Monitor</h1>
+              <p className="text-xs text-gray-400">Continuous Glucose Monitoring</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 ml-auto">
             <button
               onClick={handleRefresh}
               disabled={isLoading}
-              className="p-2 rounded-lg bg-blue-500/20 hover:bg-blue-500/30 transition-colors disabled:opacity-50"
+              className="p-2 rounded-lg bg-white/5 hover:bg-white/10 transition-colors disabled:opacity-50 text-white"
             >
               {isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <RefreshCw className="h-5 w-5" />}
             </button>
             <button
               onClick={handleDisconnect}
-              className="p-2 rounded-lg bg-red-500/20 hover:bg-red-500/30 transition-colors"
+              className="p-2 rounded-lg bg-red-500/20 hover:bg-red-500/30 transition-colors text-red-400"
             >
               <LogOut className="h-5 w-5" />
             </button>
           </div>
-        </div>
+        </header>
       </div>
 
-      <div className="p-4 space-y-6">
+      <div className="p-4 space-y-4 max-w-md mx-auto">
         {/* Current Glucose Reading */}
         {session.lastReading && (
-          <div className="bg-gradient-to-br from-blue-600/20 to-purple-600/20 rounded-2xl p-6 border border-blue-500/30">
-            <div className="text-center">
-              <div className="flex items-center justify-center gap-3 mb-4">
-                <BarChart3 className="h-8 w-8 text-blue-400" />
-                <h2 className="text-2xl font-bold">Current Glucose</h2>
+          <div className="bg-[#1A243D] border border-slate-700/40 shadow-sm rounded-3xl p-6 text-center">
+            <div className="flex items-center justify-center gap-3 mb-4">
+              <div className="h-10 w-10 rounded-2xl bg-green-900/50 flex items-center justify-center border border-green-500/30">
+                <BarChart3 className="h-6 w-6 text-green-400" />
               </div>
+              <h2 className="text-lg font-bold text-white">Current Glucose</h2>
+            </div>
 
-              <div className="mb-4">
-                <div className="text-6xl font-bold text-white mb-2">
-                  {session.lastReading.value}
-                </div>
-                <div className="text-lg text-gray-300">{session.lastReading.unit}</div>
+            <div className="mb-4">
+              <div className="text-6xl font-extrabold text-white mb-2 tracking-tight">
+                {session.lastReading.value}
               </div>
+              <div className="text-sm font-semibold text-gray-400 uppercase tracking-wider">{session.lastReading.unit}</div>
+            </div>
 
-              <div className="flex items-center justify-center gap-4 mb-4">
-                {getTrendIcon(session.lastReading.trend)}
-                <span className="text-lg text-gray-300">
-                  {session.lastReading.trend}
-                  {session.lastReading.trendRate && ` (${session.lastReading.trendRate} ${session.lastReading.unit}/min)`}
-                </span>
-              </div>
+            <div className="flex items-center justify-center gap-3 mb-4 bg-[#121B32] border border-slate-700/40 rounded-2xl p-3 max-w-[240px] mx-auto">
+              {getTrendIcon(session.lastReading.trend)}
+              <span className="text-sm font-medium text-gray-300">
+                {session.lastReading.trend}
+                {session.lastReading.trendRate && ` (${session.lastReading.trendRate} ${session.lastReading.unit}/min)`}
+              </span>
+            </div>
 
-              <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-full ${getGlucoseStatus(session.lastReading.value).bgColor} ${getGlucoseStatus(session.lastReading.value).borderColor} border`}>
-                {getGlucoseStatus(session.lastReading.value).status === 'Normal' ? (
-                  <CheckCircle className="h-4 w-4 text-green-500" />
-                ) : (
-                  <AlertTriangle className="h-4 w-4 text-orange-500" />
-                )}
-                <span className={`font-semibold ${getGlucoseStatus(session.lastReading.value).color}`}>
-                  {getGlucoseStatus(session.lastReading.value).status}
-                </span>
-              </div>
+            <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-full ${getGlucoseStatus(session.lastReading.value).bgColor} ${getGlucoseStatus(session.lastReading.value).borderColor} border`}>
+              {getGlucoseStatus(session.lastReading.value).status === 'Normal' ? (
+                <CheckCircle className="h-4 w-4 text-green-500" />
+              ) : (
+                <AlertTriangle className="h-4 w-4 text-orange-500" />
+              )}
+              <span className={`font-semibold ${getGlucoseStatus(session.lastReading.value).color}`}>
+                {getGlucoseStatus(session.lastReading.value).status}
+              </span>
             </div>
           </div>
         )}
 
         {/* Device Status */}
-        <div className="bg-slate-800/50 rounded-2xl p-4 border border-slate-700">
-          <h3 className="text-lg font-semibold mb-4">Device Status</h3>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="flex items-center gap-3 p-3 bg-slate-700/50 rounded-lg">
-              <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse" />
+        <div className="bg-[#1A243D] border border-slate-700/40 shadow-sm rounded-3xl p-5">
+          <h3 className="text-base font-bold mb-4 text-white">Device Status</h3>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="flex items-center gap-3 p-3 bg-[#121B32] border border-slate-700/40 rounded-2xl">
+              <div className="w-2.5 h-2.5 bg-green-500 rounded-full animate-pulse" />
               <div>
-                <p className="text-sm text-gray-400">Connection</p>
-                <p className="font-semibold text-green-400">Connected</p>
+                <p className="text-xs text-gray-400">Connection</p>
+                <p className="text-sm font-semibold text-green-400">Connected</p>
               </div>
             </div>
 
-            <div className="flex items-center gap-3 p-3 bg-slate-700/50 rounded-lg">
-              <Battery className="h-5 w-5 text-blue-400" />
+            <div className="flex items-center gap-3 p-3 bg-[#121B32] border border-slate-700/40 rounded-2xl">
+              <Battery className="h-4 w-4 text-green-400" />
               <div>
-                <p className="text-sm text-gray-400">Battery</p>
-                <p className="font-semibold text-white">{session.batteryLevel}%</p>
+                <p className="text-xs text-gray-400">Battery</p>
+                <p className="text-sm font-semibold text-white">{session.batteryLevel}%</p>
               </div>
             </div>
 
-            <div className="flex items-center gap-3 p-3 bg-slate-700/50 rounded-lg">
-              <Signal className="h-5 w-5 text-green-400" />
+            <div className="flex items-center gap-3 p-3 bg-[#121B32] border border-slate-700/40 rounded-2xl">
+              <Signal className="h-4 w-4 text-green-400" />
               <div>
-                <p className="text-sm text-gray-400">Signal</p>
-                <p className="font-semibold text-white">{session.signalStrength}%</p>
+                <p className="text-xs text-gray-400">Signal</p>
+                <p className="text-sm font-semibold text-white">{session.signalStrength}%</p>
               </div>
             </div>
 
-            <div className="flex items-center gap-3 p-3 bg-slate-700/50 rounded-lg">
-              <Clock className="h-5 w-5 text-yellow-400" />
+            <div className="flex items-center gap-3 p-3 bg-[#121B32] border border-slate-700/40 rounded-2xl">
+              <Clock className="h-4 w-4 text-green-400" />
               <div>
-                <p className="text-sm text-gray-400">Last Update</p>
-                <p className="font-semibold text-white">{session.lastUpdate}</p>
+                <p className="text-xs text-gray-400">Last Update</p>
+                <p className="text-sm font-semibold text-white">{session.lastUpdate}</p>
               </div>
             </div>
           </div>
         </div>
 
         {/* Statistics */}
-        <div className="grid grid-cols-3 gap-4">
-          <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700 text-center">
-            <div className="text-2xl font-bold text-blue-400">{session.averageGlucose}</div>
-            <div className="text-sm text-gray-400">Average</div>
+        <div className="grid grid-cols-3 gap-3">
+          <div className="bg-[#1A243D] border border-slate-700/40 shadow-sm rounded-3xl p-4 text-center">
+            <div className="text-2xl font-black text-green-400">{session.averageGlucose}</div>
+            <div className="text-[10px] font-bold text-gray-400 mt-1 uppercase tracking-wider">Average</div>
           </div>
 
-          <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700 text-center">
-            <div className="text-2xl font-bold text-green-400">{session.readingsCount}</div>
-            <div className="text-sm text-gray-400">Readings</div>
+          <div className="bg-[#1A243D] border border-slate-700/40 shadow-sm rounded-3xl p-4 text-center">
+            <div className="text-2xl font-black text-green-400">{session.readingsCount}</div>
+            <div className="text-[10px] font-bold text-gray-400 mt-1 uppercase tracking-wider">Readings</div>
           </div>
 
-          <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700 text-center">
-            <div className="text-2xl font-bold text-purple-400">5</div>
-            <div className="text-sm text-gray-400">Minutes</div>
+          <div className="bg-[#1A243D] border border-slate-700/40 shadow-sm rounded-3xl p-4 text-center">
+            <div className="text-2xl font-black text-green-400">5</div>
+            <div className="text-[10px] font-bold text-gray-400 mt-1 uppercase tracking-wider">Mins</div>
           </div>
         </div>
 
         {/* Time Range Selector */}
-        <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700">
-          <h3 className="text-lg font-semibold mb-4">Time Range</h3>
-          <div className="flex gap-2">
+        <div className="bg-[#1A243D] border border-slate-700/40 shadow-sm rounded-3xl p-4">
+          <h3 className="text-xs font-bold mb-3 text-white uppercase tracking-wider">Time Range</h3>
+          <div className="flex gap-2 bg-[#121B32] p-1 rounded-2xl border border-slate-700/40">
             {(['1h', '6h', '24h'] as const).map((range) => (
               <button
                 key={range}
                 onClick={() => handleTimeRangeChange(range)}
-                className={`px-4 py-2 rounded-lg font-medium transition-all ${selectedTimeRange === range
-                    ? 'bg-blue-500 text-white'
-                    : 'bg-slate-700 text-gray-300 hover:bg-slate-600'
+                className={`flex-1 py-2 rounded-xl font-bold text-xs transition-all ${selectedTimeRange === range
+                    ? 'bg-green-600 text-white shadow-md shadow-green-500/10'
+                    : 'text-gray-400 hover:text-white'
                   }`}
               >
                 {range}
@@ -397,27 +412,27 @@ const CGMMonitor: React.FC = () => {
         </div>
 
         {/* Glucose History Chart */}
-        <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700">
-          <h3 className="text-lg font-semibold mb-4">Glucose History</h3>
-          <div className="space-y-3">
+        <div className="bg-[#1A243D] border border-slate-700/40 shadow-sm rounded-3xl p-5">
+          <h3 className="text-base font-bold mb-4 text-white">Glucose History</h3>
+          <div className="space-y-2.5">
             {glucoseHistory.slice(-8).reverse().map((reading, index) => (
-              <div key={index} className="flex items-center justify-between p-3 bg-slate-700/50 rounded-lg">
+              <div key={index} className="flex items-center justify-between p-3 bg-[#121B32] border border-slate-700/40 rounded-2xl">
                 <div className="flex items-center gap-3">
-                  <div className={`w-3 h-3 rounded-full ${getGlucoseStatus(reading.value).status === 'Normal' ? 'bg-green-500' :
+                  <div className={`w-2.5 h-2.5 rounded-full ${getGlucoseStatus(reading.value).status === 'Normal' ? 'bg-green-500' :
                       getGlucoseStatus(reading.value).status === 'Low' ? 'bg-red-500' :
                         getGlucoseStatus(reading.value).status === 'High' ? 'bg-orange-500' : 'bg-yellow-500'
                     }`} />
                   <div>
-                    <div className="font-semibold text-white">{reading.value} {reading.unit}</div>
-                    <div className="text-sm text-gray-400">
-                      {new Date(reading.displayTime).toLocaleTimeString()}
+                    <div className="text-sm font-semibold text-white">{reading.value} <span className="text-[10px] text-gray-400">{reading.unit}</span></div>
+                    <div className="text-[11px] text-gray-500">
+                      {new Date(reading.displayTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </div>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-2">
                   {getTrendIcon(reading.trend)}
-                  <span className="text-sm text-gray-300">{reading.trend}</span>
+                  <span className="text-xs text-gray-400">{reading.trend}</span>
                 </div>
               </div>
             ))}

@@ -947,9 +947,9 @@ const PatientReportsView: React.FC = () => {
     // Show loading state — only block if we're still fetching the profile AND have nothing cached
     if (profileLoading && !patientProfile) {
         return (
-            <div className="bg-[#101010] min-h-screen text-white flex items-center justify-center">
+            <div className="bg-[#080D1A] min-h-screen text-white flex items-center justify-center">
                 <div className="flex flex-col items-center gap-4">
-                    <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+                    <Loader2 className="h-8 w-8 animate-spin text-purple-500" />
                     <p className="text-gray-400">Loading patient profile...</p>
                 </div>
             </div>
@@ -959,7 +959,7 @@ const PatientReportsView: React.FC = () => {
     // Show error state if no profile after loading
     if (!patientProfile) {
         return (
-            <div className="bg-[#101010] min-h-screen text-white flex items-center justify-center p-4">
+            <div className="bg-[#080D1A] min-h-screen text-white flex items-center justify-center p-4">
                 <div className="max-w-sm mx-auto text-center">
                     <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-6">
                         <FileText className="h-12 w-12 text-red-500 mx-auto mb-4" />
@@ -982,37 +982,40 @@ const PatientReportsView: React.FC = () => {
     }
 
     return (
-        <div className="bg-[#101010] min-h-screen text-white p-4">
+        <div className="bg-[#080D1A] min-h-screen text-white p-4">
             <div className="max-w-sm mx-auto">
                 {/* Status Bar Spacing (match scanner) */}
                 <div className="h-6"></div>
 
-                {/* Header (match scanner style) */}
-                <div className="flex items-center gap-4 mb-6">
+                {/* Header */}
+                <header className="flex items-center gap-3 mb-6">
                     <button
-                        onClick={() => navigate('/dashboard')}
-                        className="bg-gray-700/80 hover:bg-gray-600 p-2 rounded-lg transition-all duration-200"
+                        onClick={() => navigate(-1)}
+                        className="p-2 rounded-full bg-white/5 hover:bg-white/10 transition-colors active:scale-95"
                     >
-                        <ArrowLeft className="h-5 w-5" />
+                        <ArrowLeft className="w-4 h-4" />
                     </button>
-                    <div className="flex items-center flex-1">
-                        <FileText className="h-5 w-5 text-blue-500 mr-3" />
-                        <div className="flex-1">
-                            <h1 className="text-2xl font-bold text-white">My Reports</h1>
-                            <p className="text-sm text-gray-400">Medical reports and uploads</p>
+                    <div className="flex items-center gap-3 flex-1">
+                        <div className="h-10 w-10 rounded-2xl bg-purple-900/70 flex items-center justify-center border border-purple-400/50">
+                            <FileText className="h-6 w-6 text-purple-300" />
+                        </div>
+                        <div>
+                            <h1 className="text-xl font-bold">My Reports</h1>
+                            <p className="text-xs text-gray-400">Medical reports and uploads</p>
                         </div>
                     </div>
                     {/* Upload Button - Always visible when on "My Uploads" tab */}
                     {activeTab === 'my-uploads' && (
                         <button
                             onClick={() => navigate('/add-reports')}
-                            className="bg-blue-600 hover:bg-blue-700 text-white p-2.5 rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl"
+                            className="p-2 bg-blue-600 hover:bg-blue-500 rounded-full transition-all text-white border border-blue-400/30 flex items-center justify-center shadow-lg shadow-blue-600/25 active:scale-95"
+                            style={{ minHeight: "36px", minWidth: "36px" }}
                             title="Upload New Report"
                         >
-                            <Plus className="h-5 w-5" />
+                            <Plus className="h-4 w-4" />
                         </button>
                     )}
-                </div>
+                </header>
 
                 {/* Tabs - Responsive Grid */}
                 <div className="grid grid-cols-2 gap-2 bg-gray-800/50 rounded-lg p-1 mb-6">

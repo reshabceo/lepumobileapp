@@ -1139,7 +1139,7 @@ export const AIDoctorConsult: React.FC = () => {
   // Show loading while session initializes
   if (sessionLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-[#050816] via-[#050816] to-black text-white flex items-center justify-center">
+      <div className="min-h-screen bg-[#080D1A] text-white flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
           <Loader2 className="w-8 h-8 text-emerald-400 animate-spin" />
           <p className="text-sm text-white/60">Loading your consultation...</p>
@@ -1149,74 +1149,78 @@ export const AIDoctorConsult: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#050816] via-[#050816] to-black text-white flex flex-col">
+    <div className="min-h-screen bg-[#080D1A] text-white flex flex-col font-inter">
       {/* ========== HEADER ========== */}
-      <div className="px-4 pt-safe-top pb-2 border-b border-white/5 bg-black/40 backdrop-blur-md">
-        <div className="flex items-center gap-3 mb-3">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => (consultMode ? setConsultMode(null) : navigate("/dashboard"))}
-            className="text-emerald-300 hover:bg-emerald-500/20 hover:text-emerald-100 p-2 flex-shrink-0"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </Button>
-          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-500/10 text-emerald-400 flex-shrink-0">
-            <Stethoscope className="w-5 h-5" />
-          </div>
-          <div className="flex flex-col min-w-0 flex-1">
-            <div className="flex items-center gap-2">
-              <span className="text-sm uppercase tracking-[0.25em] text-emerald-400/80 truncate">
-                Dr. MonitraQ AI
-              </span>
-              {paymentStatus === "paid" && expiryCountdown && (
-                <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 font-medium whitespace-nowrap flex-shrink-0 flex items-center gap-1">
-                  <Timer className="w-2.5 h-2.5" />
-                  {expiryCountdown}
-                </span>
-              )}
-              {paymentStatus === "expired" && (
-                <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-red-500/15 text-red-400 font-medium flex-shrink-0">
-                  Expired
-                </span>
-              )}
+      <div className="px-4 pt-safe-top pb-3 border-b border-white/5 bg-[#080D1A]/80 backdrop-blur-md">
+        <header className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => (consultMode ? setConsultMode(null) : navigate(-1))}
+              className="p-2 rounded-full bg-white/5 hover:bg-white/10 transition-colors active:scale-95 text-white"
+            >
+              <ArrowLeft className="w-4 h-4" />
+            </button>
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-2xl bg-emerald-900/70 flex items-center justify-center border border-emerald-400/50">
+                <Stethoscope className="h-6 w-6 text-emerald-300" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h1 className="text-xl font-bold">Dr. MonitraQ AI</h1>
+                  {paymentStatus === "paid" && expiryCountdown && (
+                    <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 font-medium whitespace-nowrap flex-shrink-0 flex items-center gap-1">
+                      <Timer className="w-2.5 h-2.5" />
+                      {expiryCountdown}
+                    </span>
+                  )}
+                  {paymentStatus === "expired" && (
+                    <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-red-500/15 text-red-400 font-medium flex-shrink-0">
+                      Expired
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-gray-400">
+                  {consultMode === "voice"
+                    ? "Voice consultation"
+                    : consultMode === "text"
+                    ? "Text consultation"
+                    : paymentStatus === "unpaid"
+                    ? "Start a new session"
+                    : paymentStatus === "expired"
+                    ? "Session ended"
+                    : "Understand your symptoms safely"}
+                </p>
+              </div>
             </div>
-            <span className="text-lg font-semibold truncate">
-              {consultMode === "voice"
-                ? "Voice consultation"
-                : consultMode === "text"
-                ? "Text consultation"
-                : paymentStatus === "unpaid"
-                ? "Start a new session"
-                : paymentStatus === "expired"
-                ? "Session ended"
-                : "Understand your symptoms safely"}
-            </span>
           </div>
+
           {/* History + New consultation buttons */}
-          {allSessions.length > 0 && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={openHistoryViewer}
-              className="text-emerald-300 hover:bg-emerald-500/20 hover:text-emerald-100 p-2 flex-shrink-0"
-              title="Visit history"
-            >
-              <Clock className="w-5 h-5" />
-            </Button>
-          )}
-          {hasStarted && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleNewConsultation}
-              className="text-emerald-300 hover:bg-emerald-500/20 hover:text-emerald-100 p-2 flex-shrink-0"
-              title="New consultation"
-            >
-              <Plus className="w-5 h-5" />
-            </Button>
-          )}
-        </div>
+          <div className="flex items-center gap-2">
+            {allSessions.length > 0 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={openHistoryViewer}
+                className="text-emerald-300 hover:bg-emerald-500/20 hover:text-emerald-100 p-2 flex-shrink-0"
+                title="Visit history"
+              >
+                <Clock className="w-5 h-5" />
+              </Button>
+            )}
+            {hasStarted && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleNewConsultation}
+                className="text-emerald-300 hover:bg-emerald-500/20 hover:text-emerald-100 p-2 flex-shrink-0"
+                title="New consultation"
+              >
+                <Plus className="w-5 h-5" />
+              </Button>
+            )}
+          </div>
+        </header>
+
 
         {/* Info cards */}
         <div className="mt-3 grid gap-3 md:grid-cols-3">
@@ -1482,42 +1486,42 @@ export const AIDoctorConsult: React.FC = () => {
 
       {/* ========== HISTORY VIEWER (full-screen overlay) ========== */}
       {viewingHistory && (
-        <div className="fixed inset-0 z-50 bg-gradient-to-b from-[#050816] via-[#050816] to-black text-white flex flex-col">
+        <div className="fixed inset-0 z-50 bg-[#080D1A] text-white flex flex-col font-inter">
           {/* History header */}
-          <div className="px-4 pt-4 pb-3 border-b border-white/5 bg-black/40 backdrop-blur-md">
-            <div className="flex items-center gap-3">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  if (viewingSession) {
-                    setViewingSession(null);
-                    setHistoryMessages([]);
-                  } else {
-                    setViewingHistory(false);
-                  }
-                }}
-                className="text-emerald-300 hover:bg-emerald-500/20 hover:text-emerald-100 p-2 flex-shrink-0"
-              >
-                <ArrowLeft className="w-5 h-5" />
-              </Button>
-              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-500/10 text-emerald-400 flex-shrink-0">
-                <Clock className="w-5 h-5" />
-              </div>
-              <div className="flex flex-col min-w-0 flex-1">
-                <span className="text-sm uppercase tracking-[0.25em] text-emerald-400/80">
-                  Visit History
-                </span>
-                <span className="text-lg font-semibold truncate">
-                  {viewingSession
-                    ? new Date(viewingSession.created_at).toLocaleDateString(undefined, {
-                        weekday: "short",
-                        month: "short",
-                        day: "numeric",
-                        year: "numeric",
-                      })
-                    : `${allSessions.length} consultation${allSessions.length !== 1 ? "s" : ""}`}
-                </span>
+          <div className="px-4 pt-safe-top pb-3 border-b border-white/5 bg-[#080D1A]/80 backdrop-blur-md">
+            <header className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => {
+                    if (viewingSession) {
+                      setViewingSession(null);
+                      setHistoryMessages([]);
+                    } else {
+                      setViewingHistory(false);
+                    }
+                  }}
+                  className="p-2 rounded-full bg-white/5 hover:bg-white/10 transition-colors active:scale-95 text-white"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                </button>
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-2xl bg-emerald-900/70 flex items-center justify-center border border-emerald-400/50">
+                    <Clock className="h-6 w-6 text-emerald-300" />
+                  </div>
+                  <div>
+                    <h1 className="text-xl font-bold">Visit History</h1>
+                    <p className="text-xs text-gray-400">
+                      {viewingSession
+                        ? new Date(viewingSession.created_at).toLocaleDateString(undefined, {
+                            weekday: "short",
+                            month: "short",
+                            day: "numeric",
+                            year: "numeric",
+                          })
+                        : `${allSessions.length} consultation${allSessions.length !== 1 ? "s" : ""}`}
+                    </p>
+                  </div>
+                </div>
               </div>
               {viewingSession && (
                 <Button
@@ -1529,7 +1533,7 @@ export const AIDoctorConsult: React.FC = () => {
                   Continue
                 </Button>
               )}
-            </div>
+            </header>
           </div>
 
           {/* ---- Session list ---- */}

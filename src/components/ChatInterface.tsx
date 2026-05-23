@@ -190,10 +190,10 @@ export const ChatInterface = () => {
 
   if (loading && !conversationId) {
     return (
-      <div className="bg-[#101010] min-h-screen text-white flex items-center justify-center">
+      <div className="bg-[#080D1A] min-h-screen text-white flex items-center justify-center font-inter select-none">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-500 mx-auto mb-4"></div>
-          <p className="text-gray-400">Loading chat...</p>
+          <div className="animate-spin rounded-full h-8 w-8 border-4 border-blue-500/30 border-t-blue-500 mx-auto mb-4"></div>
+          <p className="text-slate-400 text-xs font-semibold">Loading chat...</p>
         </div>
       </div>
     );
@@ -203,18 +203,18 @@ export const ChatInterface = () => {
   const doctorAvatar = currentConversation?.doctor_avatar;
 
   return (
-    <div className="bg-gradient-to-br from-gray-900 via-black to-gray-900 h-screen text-white font-inter flex flex-col">
-      {/* Status Bar Spacing */}
-      <div className="h-12 flex-shrink-0"></div>
+    <div className="bg-[#080D1A] h-screen text-white font-inter flex flex-col select-none">
+      {/* Top spacing */}
+      <div className="h-6 flex-shrink-0"></div>
 
       {/* Header */}
-      <header className="bg-white/10 backdrop-blur-md border-b border-white/20 px-4 py-4 flex items-center justify-between flex-shrink-0">
+      <header className="bg-[#1A243D]/95 backdrop-blur-md border-b border-slate-700/40 px-4 py-3 flex items-center justify-between flex-shrink-0 shadow-md">
         <div className="flex items-center">
           <button
             onClick={handleBack}
-            className="mr-4 p-2 bg-white/10 backdrop-blur-sm border border-white/20 hover:bg-white/20 rounded-xl transition-all duration-200"
+            className="mr-3 p-2 rounded-full bg-white/5 hover:bg-white/10 transition-colors active:scale-95 text-white"
           >
-            <ArrowLeft className="w-5 h-5" />
+            <ArrowLeft className="w-4 h-4" />
           </button>
 
           <div className="flex items-center">
@@ -222,37 +222,42 @@ export const ChatInterface = () => {
               <img
                 src={doctorAvatar}
                 alt={doctorName}
-                className="w-10 h-10 rounded-full mr-3 object-cover"
+                className="w-10 h-10 rounded-full mr-3 object-cover border border-slate-700"
               />
             ) : (
-              <div className="w-10 h-10 rounded-full bg-green-500 flex items-center justify-center mr-3">
-                <span className="text-white font-semibold text-sm">
+              <div className="w-10 h-10 rounded-full bg-blue-900/70 border border-blue-400/50 flex items-center justify-center mr-3">
+                <span className="text-blue-300 font-semibold text-sm">
                   {doctorName.charAt(0).toUpperCase()}
                 </span>
               </div>
             )}
 
             <div>
-              <h1 className="text-lg font-semibold">{doctorName}</h1>
-              {isTyping && (
-                <p className="text-sm text-green-400">
-                  {typingUsers.length > 0 ? `${typingUsers.join(', ')} typing...` : 'Typing...'}
-                </p>
-              )}
+              <h1 className="text-sm font-extrabold text-white leading-tight">{doctorName}</h1>
+              <p className="text-[11px] text-slate-400">
+                {isTyping ? (
+                  <span className="text-emerald-400 animate-pulse font-medium">typing...</span>
+                ) : (
+                  <span className="flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                    Online
+                  </span>
+                )}
+              </p>
             </div>
           </div>
         </div>
 
         <div className="flex items-center space-x-2">
-          {/* <button className="p-2 bg-white/10 backdrop-blur-sm border border-white/20 hover:bg-white/20 rounded-xl transition-all duration-200">
-            <Phone className="w-5 h-5 text-gray-300" />
+          {/* <button className="p-2 bg-[#1A243D] hover:bg-[#121B32]/95 border border-slate-800/40 rounded-xl transition-all duration-200">
+            <Phone className="w-4 h-4 text-slate-300" />
           </button>
-          <button className="p-2 bg-white/10 backdrop-blur-sm border border-white/20 hover:bg-white/20 rounded-xl transition-all duration-200">
-            <Video className="w-5 h-5 text-gray-300" />
+          <button className="p-2 bg-[#1A243D] hover:bg-[#121B32]/95 border border-slate-800/40 rounded-xl transition-all duration-200">
+            <Video className="w-4 h-4 text-slate-300" />
           </button> */}
 
-          <button className="p-2 bg-white/10 backdrop-blur-sm border border-white/20 hover:bg-white/20 rounded-xl transition-all duration-200">
-            <MoreVertical className="w-5 h-5 text-gray-300" />
+          <button className="p-2 rounded-full bg-white/5 hover:bg-white/10 transition-colors text-slate-300">
+            <MoreVertical className="w-4 h-4" />
           </button>
         </div>
       </header>
@@ -262,18 +267,18 @@ export const ChatInterface = () => {
         {loading ? (
           <div className="flex items-center justify-center h-full">
             <div className="text-center">
-              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-green-500 mx-auto mb-2"></div>
-              <p className="text-gray-400 text-sm">Loading messages...</p>
+              <div className="animate-spin rounded-full h-6 w-6 border-2 border-blue-500/30 border-t-blue-500 mx-auto mb-2"></div>
+              <p className="text-slate-400 text-xs font-medium">Loading messages...</p>
             </div>
           </div>
         ) : messages.length === 0 ? (
           <div className="flex items-center justify-center h-full">
-            <div className="text-center">
-              <div className="w-16 h-16 rounded-full bg-gray-800 flex items-center justify-center mx-auto mb-4">
-                <MessageSquare className="w-8 h-8 text-gray-500" />
+            <div className="text-center p-6 bg-[#1A243D] border border-slate-700/40 rounded-3xl max-w-xs mx-auto shadow-sm">
+              <div className="w-12 h-12 rounded-2xl bg-blue-500/10 flex items-center justify-center mx-auto mb-3 border border-blue-500/20">
+                <MessageSquare className="w-6 h-6 text-blue-400" />
               </div>
-              <p className="text-gray-400 text-lg font-medium">Start a conversation</p>
-              <p className="text-gray-500 text-sm mt-1">Send a message to your doctor</p>
+              <p className="text-white text-sm font-extrabold">Start a conversation</p>
+              <p className="text-slate-400 text-[11px] mt-1 leading-relaxed">Send a message to update your primary care doctor.</p>
             </div>
           </div>
         ) : (
@@ -290,11 +295,11 @@ export const ChatInterface = () => {
                         <img
                           src={message.sender_avatar}
                           alt={message.sender_name}
-                          className="w-8 h-8 rounded-full object-cover"
+                          className="w-8 h-8 rounded-full object-cover border border-slate-700"
                         />
                       ) : (
-                        <div className="w-8 h-8 rounded-full bg-green-500 flex items-center justify-center">
-                          <span className="text-white font-semibold text-xs">
+                        <div className="w-8 h-8 rounded-full bg-blue-900/70 border border-blue-400/50 flex items-center justify-center">
+                          <span className="text-blue-300 font-semibold text-xs">
                             {(message.sender_name || 'D').charAt(0).toUpperCase()}
                           </span>
                         </div>
@@ -304,8 +309,8 @@ export const ChatInterface = () => {
 
                   <div
                     className={`px-4 py-3 rounded-2xl ${message.sender_type === 'patient'
-                      ? 'bg-green-500 text-white rounded-br-md'
-                      : 'bg-[#1E1E1E] text-white rounded-bl-md border border-gray-700'
+                      ? 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-br-md shadow-md shadow-indigo-950/20'
+                      : 'bg-[#1A243D] text-white rounded-bl-md border border-slate-700/40 shadow-sm'
                       }`}
                   >
                     {/* Render different content based on message type */}
@@ -343,8 +348,8 @@ export const ChatInterface = () => {
                       <p className="text-sm leading-relaxed">{message.content}</p>
                     )}
 
-                    <div className="flex items-center justify-between mt-2">
-                      <p className="text-xs text-gray-300 opacity-70">
+                    <div className="flex items-center justify-between mt-1.5 gap-4">
+                      <p className="text-[10px] text-slate-300 opacity-70">
                         {formatMessageTime(message.created_at)}
                       </p>
                       {getMessageStatus(message)}
@@ -358,14 +363,24 @@ export const ChatInterface = () => {
             {isTyping && (
               <div className="flex justify-start">
                 <div className="flex items-end space-x-2">
-                  <div className="w-8 h-8 rounded-full bg-green-500 flex items-center justify-center">
-                    <span className="text-white font-semibold text-xs">D</span>
-                  </div>
-                  <div className="bg-[#1E1E1E] border border-gray-700 px-4 py-3 rounded-2xl rounded-bl-md">
-                    <div className="flex space-x-1">
-                      <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                      <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                      <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                  {doctorAvatar ? (
+                    <img
+                      src={doctorAvatar}
+                      alt={doctorName}
+                      className="w-8 h-8 rounded-full object-cover border border-slate-700"
+                    />
+                  ) : (
+                    <div className="w-8 h-8 rounded-full bg-blue-900/70 border border-blue-400/50 flex items-center justify-center">
+                      <span className="text-blue-300 font-semibold text-xs">
+                        {doctorName.charAt(0).toUpperCase()}
+                      </span>
+                    </div>
+                  )}
+                  <div className="bg-[#1A243D] border border-slate-700/40 px-4 py-3 rounded-2xl rounded-bl-md shadow-sm">
+                    <div className="flex space-x-1.5 items-center h-2">
+                      <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce"></div>
+                      <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '0.15s' }}></div>
+                      <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '0.3s' }}></div>
                     </div>
                   </div>
                 </div>
@@ -378,14 +393,14 @@ export const ChatInterface = () => {
       </main>
 
       {/* Message Input Footer */}
-      <footer className="p-4 flex-shrink-0 bg-white/5 backdrop-blur-md border-t border-white/20">
+      <footer className="p-3 flex-shrink-0 bg-[#0F172A]/90 backdrop-blur-md border-t border-slate-800/60">
         <form onSubmit={handleSendMessage} className="flex items-center space-x-3">
           <button
             type="button"
             onClick={handleAttachFile}
-            className="p-2 bg-white/10 backdrop-blur-sm border border-white/20 hover:bg-white/20 rounded-xl transition-all duration-200"
+            className="p-2.5 bg-[#1A243D] hover:bg-[#1A243D]/80 border border-slate-700/40 rounded-xl transition-all duration-200 text-slate-300 hover:text-white"
           >
-            <Paperclip className="w-5 h-5 text-gray-300" />
+            <Paperclip className="w-4 h-4" />
           </button>
 
           <div className="flex-1 relative">
@@ -394,7 +409,7 @@ export const ChatInterface = () => {
               value={newMessage}
               onChange={handleInputChange}
               placeholder="Type a message..."
-              className="w-full px-4 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl text-white placeholder-gray-300 focus:outline-none focus:border-green-400 focus:ring-1 focus:ring-green-400 transition-all duration-200"
+              className="w-full px-4 py-2.5 bg-[#121B32] border border-slate-700/40 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all duration-200 text-sm"
               disabled={sending}
             />
           </div>
@@ -402,15 +417,15 @@ export const ChatInterface = () => {
           <button
             type="submit"
             disabled={!newMessage.trim() || sending || !conversationId}
-            className={`p-3 rounded-xl transition-all duration-200 ${newMessage.trim() && !sending && conversationId
-              ? 'bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white shadow-lg'
-              : 'bg-white/10 backdrop-blur-sm border border-white/20 text-gray-400 cursor-not-allowed'
+            className={`p-2.5 rounded-xl transition-all duration-200 ${newMessage.trim() && !sending && conversationId
+              ? 'bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white shadow-md shadow-indigo-950/30'
+              : 'bg-[#1A243D] border border-slate-800/60 text-slate-500 cursor-not-allowed'
               }`}
           >
             {sending ? (
-              <div className="w-5 h-5 animate-spin rounded-full border-2 border-gray-300 border-t-white"></div>
+              <div className="w-4 h-4 animate-spin rounded-full border-2 border-slate-300 border-t-white"></div>
             ) : (
-              <Send className="w-5 h-5" />
+              <Send className="w-4 h-4" />
             )}
           </button>
         </form>
