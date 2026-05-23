@@ -13,7 +13,7 @@ interface ECGResult {
 }
 
 export default function EcgResultScreen() {
-    const [ecg, setEcg] = useState<{s: Float32Array, sr: number, scale: number} | null>(null);
+    const [ecg, setEcg] = useState<{ s: Float32Array, sr: number, scale: number } | null>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [records, setRecords] = useState<string[]>([]);
@@ -21,7 +21,7 @@ export default function EcgResultScreen() {
     const [nonEcgFiles, setNonEcgFiles] = useState<Set<string>>(new Set());
     const [ecgResult, setEcgResult] = useState<ECGResult | null>(null);
     const [currentRecordId, setCurrentRecordId] = useState<string | null>(null);
-    
+
     // Use the same device context as the dashboard
     const {
         connectedDevice,
@@ -29,7 +29,7 @@ export default function EcgResultScreen() {
         isInitialized,
         error: deviceError,
     } = useDevice();
-    
+
     const { toast } = useToast();
 
     // Auto-load ECG records when device is connected
@@ -55,16 +55,16 @@ export default function EcgResultScreen() {
 
             setLoading(true);
             setError(null);
-            
+
             // Use the Bp2Plugin to get ECG records
             const result = await Bp2.listEcgRecords();
             const allRecords = result.records || [];
-            
+
             setRecords(allRecords);
-            
+
             // Initially show all records, filtering will happen on read attempt
             setFilteredRecords(allRecords);
-            
+
             if (allRecords.length === 0) {
                 setError('No files found on this device. Please record some measurements first.');
             } else {
@@ -94,19 +94,19 @@ export default function EcgResultScreen() {
             setLoading(true);
             setError(null);
             setCurrentRecordId(recordId);
-            
+
             // Use the Bp2Plugin to read ECG record
             const result = await Bp2.getEcgRecord({ recordId });
-            
+
             // Convert to mV format using our helper
             const ecgData = getEcgDataInMv(result);
-            
-            setEcg({ 
-                s: ecgData.samples, 
-                sr: ecgData.sampleRate, 
+
+            setEcg({
+                s: ecgData.samples,
+                sr: ecgData.sampleRate,
                 scale: 1.0 // Already in mV, no scaling needed
             });
-            
+
             // 🆕 Extract timestamp from recordId (usually format: yyyyMMddHHmmss)
             let timestamp = new Date().toISOString();
             try {
@@ -123,7 +123,7 @@ export default function EcgResultScreen() {
             } catch (e) {
                 console.warn('Could not parse timestamp from recordId:', e);
             }
-            
+
             // 🆕 Set ECG result (Android SDK doesn't provide these values, so using defaults/placeholders)
             // TODO: Update when Android SDK provides parsed ECG result values
             setEcgResult({
@@ -132,22 +132,22 @@ export default function EcgResultScreen() {
                 rhythm: 'normal', // Default, will be updated if Android SDK provides this
                 timestamp: timestamp
             });
-            
+
             toast({
                 title: 'ECG Loaded Successfully',
                 description: `Loaded ${ecgData.samples.length} samples at ${ecgData.sampleRate} Hz`,
             });
-            
+
             // Mark this file as successfully read ECG
             setNonEcgFiles(prev => {
                 const newSet = new Set(prev);
                 newSet.delete(recordId);
                 return newSet;
             });
-            
+
         } catch (err) {
             console.error('Failed to load ECG record:', err);
-            
+
             // Check if this is a "Not an ECG file" error
             if (err.toString().includes('Not an ECG file')) {
                 setNonEcgFiles(prev => new Set([...prev, recordId]));
@@ -250,7 +250,7 @@ export default function EcgResultScreen() {
                 <div className="bg-gray-800/50 rounded-lg shadow-md p-6 border border-gray-700">
                     <div className="flex justify-between items-center mb-4">
                         <h2 className="text-xl font-semibold text-white">ECG Records Only</h2>
-                        <button 
+                        <button
                             onClick={loadEcgRecords}
                             disabled={loading}
                             className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors flex items-center gap-2"
@@ -278,7 +278,7 @@ export default function EcgResultScreen() {
                     {filteredRecords.length > 0 ? (
                         <div className="grid gap-3">
                             {filteredRecords.map((record, index) => (
-                                <div 
+                                <div
                                     key={index}
                                     className="flex justify-between items-center p-3 border border-gray-700 rounded-lg hover:bg-gray-700 bg-gray-800/30"
                                 >
@@ -371,7 +371,7 @@ export default function EcgResultScreen() {
 
             {/* ECG Chart Display with Controls */}
             {ecg && (
-                <EcgChartWithControls 
+                <EcgChartWithControls
                     ecgData={ecg}
                 />
             )}

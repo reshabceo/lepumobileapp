@@ -15,6 +15,8 @@ import {
   ChevronDown,
   ChevronUp,
   ArrowLeft,
+  Loader2,
+  FileCheck
   AlertTriangle,
   RefreshCw
 } from 'lucide-react';
@@ -62,7 +64,7 @@ const PatientInsuranceClaims = () => {
   const loadClaims = async () => {
     try {
       setLoading(true);
-      
+
       // Get current patient
       const { data: { user } } = await supabase.auth.getUser();
 
@@ -131,7 +133,7 @@ const PatientInsuranceClaims = () => {
           let insuranceProviderName = 'Unknown Provider';
           let patientDue = 0;
           let taxAmount = 0;
-          
+
           // Try to load procedures
           try {
             const { data: proceduresData, error: proceduresError } = await supabase
@@ -223,13 +225,13 @@ const PatientInsuranceClaims = () => {
 
   const getStatusBadge = (status: string) => {
     const statusConfig: Record<string, { icon: React.ReactNode; className: string }> = {
-      pending:    { icon: <Clock className="h-3 w-3 mr-1" />,        className: 'bg-yellow-500/20 text-yellow-200 border-yellow-500/30' },
-      submitted:  { icon: <Clock className="h-3 w-3 mr-1" />,        className: 'bg-blue-500/20 text-blue-200 border-blue-500/30' },
-      approved:   { icon: <CheckCircle2 className="h-3 w-3 mr-1" />, className: 'bg-green-500/20 text-green-200 border-green-500/30' },
-      paid:       { icon: <CheckCircle2 className="h-3 w-3 mr-1" />, className: 'bg-green-500/20 text-green-200 border-green-500/30' },
-      denied:     { icon: <XCircle className="h-3 w-3 mr-1" />,      className: 'bg-red-500/20 text-red-200 border-red-500/30' },
-      rejected:   { icon: <XCircle className="h-3 w-3 mr-1" />,      className: 'bg-red-500/20 text-red-200 border-red-500/30' },
-      processing: { icon: <Clock className="h-3 w-3 mr-1" />,        className: 'bg-blue-500/20 text-blue-200 border-blue-500/30' },
+      pending: { icon: <Clock className="h-3 w-3 mr-1" />, className: 'bg-yellow-500/20 text-yellow-200 border-yellow-500/30' },
+      submitted: { icon: <Clock className="h-3 w-3 mr-1" />, className: 'bg-blue-500/20 text-blue-200 border-blue-500/30' },
+      approved: { icon: <CheckCircle2 className="h-3 w-3 mr-1" />, className: 'bg-green-500/20 text-green-200 border-green-500/30' },
+      paid: { icon: <CheckCircle2 className="h-3 w-3 mr-1" />, className: 'bg-green-500/20 text-green-200 border-green-500/30' },
+      denied: { icon: <XCircle className="h-3 w-3 mr-1" />, className: 'bg-red-500/20 text-red-200 border-red-500/30' },
+      rejected: { icon: <XCircle className="h-3 w-3 mr-1" />, className: 'bg-red-500/20 text-red-200 border-red-500/30' },
+      processing: { icon: <Clock className="h-3 w-3 mr-1" />, className: 'bg-blue-500/20 text-blue-200 border-blue-500/30' },
     };
 
     const config = statusConfig[status] ?? statusConfig.pending;
@@ -263,57 +265,57 @@ const PatientInsuranceClaims = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-white">Loading claims...</div>
+      <div className="min-h-screen bg-[#080D1A] text-white flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="w-8 h-8 text-cyan-400 animate-spin" />
+          <p className="text-sm text-white/60">Loading claims...</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-950 via-green-900 to-emerald-950">
-      {/* Header with Back Button */}
-      <div className="bg-slate-800/50 backdrop-blur-sm border-b border-slate-700">
-        <div className="relative flex items-center justify-between p-4 pt-safe-top">
+    <div className="min-h-screen bg-[#080D1A] text-white font-inter select-none p-4 pt-safe-top">
+      <div className="max-w-4xl mx-auto pb-20">
+        {/* Standardized Header */}
+        <header className="flex items-center gap-3 mb-6">
           <button
             onClick={() => navigate(-1)}
-            className="flex items-center gap-2 px-3 py-2 text-white bg-blue-600 hover:bg-blue-700 transition-colors touch-manipulation rounded-lg"
-            style={{ minHeight: '40px', minWidth: '70px' }}
+            className="p-2 rounded-full bg-white/5 hover:bg-white/10 transition-colors active:scale-95 text-white"
           >
-            <ArrowLeft className="h-4 w-4" />
-            <span className="text-sm">Back</span>
+            <ArrowLeft className="w-4 h-4" />
           </button>
-          <h1 className="absolute left-1/2 transform -translate-x-1/2 text-xl font-semibold text-white">Insurance Claims</h1>
-          <div className="w-16" />
-        </div>
-      </div>
-
-      <div className="p-6 pb-20">
-        <div className="max-w-4xl mx-auto">
-          {/* Header */}
-          <div className="mb-6">
-            <p className="text-emerald-200/80">View your submitted insurance claims and their status</p>
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-2xl bg-cyan-900/70 flex items-center justify-center border border-cyan-400/50">
+              <FileCheck className="h-6 w-6 text-cyan-300" />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold">Insurance Claims</h1>
+              <p className="text-xs text-gray-400">View your submitted insurance claims and their status</p>
+            </div>
           </div>
+        </header>
 
-          {/* Stats Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          <Card className="bg-white/10 backdrop-blur-md border-white/20">
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          <Card className="bg-[#1A243D] border border-slate-700/40 shadow-sm rounded-3xl">
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-emerald-200/80">Total Claims</p>
+                  <p className="text-sm text-gray-400">Total Claims</p>
                   <p className="text-2xl font-bold text-white">{claims.length}</p>
                 </div>
-                <FileText className="h-8 w-8 text-emerald-400" />
+                <FileText className="h-8 w-8 text-cyan-400" />
               </div>
             </CardContent>
           </Card>
 
-          <Card className="bg-white/10 backdrop-blur-md border-white/20">
+          <Card className="bg-[#1A243D] border border-slate-700/40 shadow-sm rounded-3xl">
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-emerald-200/80">Pending</p>
-                  <p className="text-2xl font-bold text-yellow-200">
+                  <p className="text-sm text-gray-400">Pending</p>
+                  <p className="text-2xl font-bold text-yellow-400">
                     {claims.filter(c => c.status === 'pending' || c.status === 'submitted').length}
                   </p>
                 </div>
@@ -322,12 +324,12 @@ const PatientInsuranceClaims = () => {
             </CardContent>
           </Card>
 
-          <Card className="bg-white/10 backdrop-blur-md border-white/20">
+          <Card className="bg-[#1A243D] border border-slate-700/40 shadow-sm rounded-3xl">
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-emerald-200/80">Approved</p>
-                  <p className="text-2xl font-bold text-green-200">
+                  <p className="text-sm text-gray-400">Approved</p>
+                  <p className="text-2xl font-bold text-green-400">
                     {claims.filter(c => c.status === 'approved' || c.status === 'paid').length}
                   </p>
                 </div>
@@ -335,28 +337,26 @@ const PatientInsuranceClaims = () => {
               </div>
             </CardContent>
           </Card>
-          </div>
+        </div>
 
-          {/* Claims List */}
-          {claims.length === 0 ? (
-          <Card className="bg-white/10 backdrop-blur-md border-white/20">
+        {/* Claims List */}
+        {claims.length === 0 ? (
+          <Card className="bg-[#1A243D] border border-slate-700/40 shadow-sm rounded-3xl">
             <CardContent className="py-12 text-center">
               <FileText className="h-16 w-16 text-white/40 mx-auto mb-4" />
               <p className="text-white text-lg mb-2">No Insurance Claims</p>
-              <p className="text-emerald-200/60">You don't have any insurance claims yet</p>
+              <p className="text-gray-400 text-sm">You don't have any insurance claims yet</p>
             </CardContent>
           </Card>
         ) : (
           <div className="space-y-4">
-            {claims.map((claim) => {
-              const isDenied = claim.status === 'denied' || claim.status === 'rejected';
-              return (
-              <Card key={claim.id} className={`bg-white/10 backdrop-blur-md ${isDenied ? 'border-red-500/40' : 'border-white/20'}`}>
+            {claims.map((claim) => (
+              <Card key={claim.id} className="bg-[#1A243D] border border-slate-700/40 shadow-sm rounded-3xl">
                 <CardHeader>
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-2 flex-wrap">
-                        <CardTitle className="text-white">Claim #{claim.claim_number}</CardTitle>
+                      <div className="flex items-center gap-3 mb-2">
+                        <CardTitle className="text-white text-lg">Claim #{claim.claim_number}</CardTitle>
                         {getStatusBadge(claim.status)}
                         {isNewClaim(claim.created_at) && (
                           <Badge className="bg-red-500/20 text-red-200 border-red-500/30 animate-pulse">
@@ -369,31 +369,7 @@ const PatientInsuranceClaims = () => {
                           </Badge>
                         )}
                       </div>
-
-                      {/* Denial reason banner */}
-                      {isDenied && claim.denial_reason && (
-                        <div className="flex items-start gap-2 bg-red-500/20 border border-red-500/30 rounded-lg px-3 py-2 mb-2">
-                          <AlertTriangle className="h-4 w-4 text-red-300 mt-0.5 shrink-0" />
-                          <div>
-                            <p className="text-xs font-semibold text-red-300">Claim Denied</p>
-                            <p className="text-sm text-red-200 mt-0.5">{claim.denial_reason}</p>
-                            {claim.denied_at && (
-                              <p className="text-xs text-red-300/70 mt-1">
-                                {formatDate(claim.denied_at)}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                      )}
-
-                      {isDenied && !claim.denial_reason && (
-                        <div className="flex items-center gap-2 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-1.5 mb-2">
-                          <XCircle className="h-3.5 w-3.5 text-red-300" />
-                          <p className="text-xs text-red-200">This claim was denied. Contact your doctor for details.</p>
-                        </div>
-                      )}
-
-                      <div className="flex flex-wrap gap-4 text-sm text-emerald-200/80">
+                      <div className="flex flex-wrap gap-4 text-sm text-gray-400">
                         <div className="flex items-center gap-1">
                           <Calendar className="h-4 w-4" />
                           {formatDate(claim.service_date)}
@@ -421,22 +397,22 @@ const PatientInsuranceClaims = () => {
 
                 <CardContent>
                   {/* Summary Info */}
-                  <div className="grid grid-cols-2 gap-4 mb-4">
+                  <div className="grid grid-cols-2 gap-4 mb-4 text-sm">
                     <div>
-                      <p className="text-xs text-emerald-200/60 mb-1">Insurance Provider</p>
-                      <p className="text-white">{claim.insurance_provider_name}</p>
+                      <p className="text-xs text-gray-400 mb-1">Insurance Provider</p>
+                      <p className="text-white font-medium">{claim.insurance_provider_name}</p>
                     </div>
                     <div>
-                      <p className="text-xs text-emerald-200/60 mb-1">Country</p>
-                      <p className="text-white">{claim.country}</p>
+                      <p className="text-xs text-gray-400 mb-1">Country</p>
+                      <p className="text-white font-medium">{claim.country}</p>
                     </div>
                   </div>
 
                   {/* Diagnosis */}
                   {(claim.primary_diagnosis || claim.diagnosis_codes) && (
-                    <div className="mb-4">
-                      <p className="text-xs text-emerald-200/60 mb-1">Diagnosis</p>
-                      <p className="text-white">
+                    <div className="mb-4 text-sm">
+                      <p className="text-xs text-gray-400 mb-1">Diagnosis</p>
+                      <p className="text-white font-medium">
                         {claim.primary_diagnosis || (claim.diagnosis_codes && claim.diagnosis_codes.length > 0 ? claim.diagnosis_codes.join(', ') : 'Not specified')}
                       </p>
                     </div>
@@ -447,19 +423,19 @@ const PatientInsuranceClaims = () => {
                     <div className="border-t border-white/10 pt-4 mt-4 space-y-4">
                       {/* Procedures */}
                       <div>
-                        <p className="text-sm font-semibold text-emerald-200 mb-2">Procedures</p>
+                        <p className="text-sm font-semibold text-white mb-2">Procedures</p>
                         <div className="space-y-2">
                           {claim.procedures.map((proc, idx) => (
-                            <div key={idx} className="bg-white/5 rounded p-3">
+                            <div key={idx} className="bg-[#121B32] border border-slate-700/40 rounded-xl p-3">
                               <div className="flex justify-between items-start">
                                 <div>
-                                  <p className="text-white font-medium">{proc.code}</p>
-                                  <p className="text-sm text-emerald-200/70">{proc.description}</p>
-                                  <p className="text-xs text-emerald-200/50 mt-1">
+                                  <p className="text-white font-semibold">{proc.code}</p>
+                                  <p className="text-sm text-gray-400">{proc.description}</p>
+                                  <p className="text-xs text-gray-500 mt-1">
                                     Quantity: {proc.quantity}
                                   </p>
                                 </div>
-                                <p className="text-white font-medium">
+                                <p className="text-white font-semibold text-sm">
                                   {getCurrencySymbol(claim.currency)} {proc.unit_charge.toFixed(2)}
                                 </p>
                               </div>
@@ -469,27 +445,26 @@ const PatientInsuranceClaims = () => {
                       </div>
 
                       {/* Financial Breakdown */}
-                      <div className="bg-emerald-500/10 rounded-lg p-4">
-                        <div className="space-y-2">
-                          <div className="flex justify-between text-emerald-200/80">
+                      <div className="bg-[#121B32] border border-slate-700/40 rounded-xl p-4">
+                        <div className="space-y-2 text-sm">
+                          <div className="flex justify-between text-gray-400">
                             <span>Total Charge:</span>
-                            <span>{getCurrencySymbol(claim.currency)} {claim.total_charge.toFixed(2)}</span>
+                            <span className="text-white font-medium">{getCurrencySymbol(claim.currency)} {claim.total_charge.toFixed(2)}</span>
                           </div>
-                          <div className="flex justify-between text-emerald-200/80">
+                          <div className="flex justify-between text-gray-400">
                             <span>Tax:</span>
-                            <span>{getCurrencySymbol(claim.currency)} {claim.tax_amount.toFixed(2)}</span>
+                            <span className="text-white font-medium">{getCurrencySymbol(claim.currency)} {claim.tax_amount.toFixed(2)}</span>
                           </div>
                           {claim.insurance_payment && (
-                            <div className="flex justify-between text-green-200">
+                            <div className="flex justify-between text-green-400">
                               <span>Insurance Payment:</span>
-                              <span>- {getCurrencySymbol(claim.currency)} {claim.insurance_payment.toFixed(2)}</span>
+                              <span className="font-medium">- {getCurrencySymbol(claim.currency)} {claim.insurance_payment.toFixed(2)}</span>
                             </div>
                           )}
-                          <div className="border-t border-white/20 pt-2 mt-2">
-                            <div className="flex justify-between text-white font-bold text-lg">
+                          <div className="border-t border-white/15 pt-2 mt-2">
+                            <div className="flex justify-between text-white font-bold text-base">
                               <span>You Pay:</span>
-                              <span className="flex items-center">
-                                <DollarSign className="h-5 w-5 mr-1" />
+                              <span className="flex items-center text-cyan-400">
                                 {getCurrencySymbol(claim.currency)} {claim.patient_due.toFixed(2)}
                               </span>
                             </div>
@@ -498,7 +473,7 @@ const PatientInsuranceClaims = () => {
                       </div>
 
                       {/* Timestamps */}
-                      <div className="text-xs text-emerald-200/50">
+                      <div className="text-xs text-gray-500 space-y-0.5">
                         <p>Submitted: {formatDate(claim.created_at)}</p>
                         <p>Last Updated: {formatDate(claim.updated_at)}</p>
                       </div>
@@ -508,9 +483,8 @@ const PatientInsuranceClaims = () => {
                   {/* Quick Summary */}
                   {expandedClaim !== claim.id && (
                     <div className="flex items-center justify-between pt-4 border-t border-white/10">
-                      <span className="text-sm text-emerald-200/70">Amount You Pay:</span>
-                      <span className="text-lg font-bold text-white flex items-center">
-                        <DollarSign className="h-4 w-4 mr-1" />
+                      <span className="text-sm text-gray-400">Amount You Pay:</span>
+                      <span className="text-base font-bold text-cyan-400 flex items-center">
                         {getCurrencySymbol(claim.currency)} {claim.patient_due.toFixed(2)}
                       </span>
                     </div>
@@ -521,7 +495,6 @@ const PatientInsuranceClaims = () => {
             })}
           </div>
         )}
-        </div>
       </div>
     </div>
   );

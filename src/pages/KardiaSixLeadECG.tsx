@@ -104,7 +104,7 @@ const ECGWaveformPreview: React.FC<{ leads?: Record<string, number[]> }> = ({ le
             width={160}
             height={60}
             className="w-full rounded-lg"
-            style={{ background: "rgba(99,102,241,0.04)", border: "1px solid rgba(99,102,241,0.1)" }}
+            style={{ background: "#121B32", border: "1px solid rgba(148, 163, 184, 0.15)" }}
           />
         </div>
       ))}
@@ -117,7 +117,7 @@ const MovingWaveform: React.FC<{ color?: string; height?: number; speed?: number
   color = "#6366f1", height = 40, speed = 2000, delay = 0
 }) => {
   return (
-    <div className="relative w-full overflow-hidden rounded-lg bg-white/5 border border-white/5" style={{ height }}>
+    <div className="relative w-full overflow-hidden rounded-lg bg-[#121B32] border border-slate-700/40" style={{ height }}>
       <div
         className="absolute inset-0 flex items-center"
         style={{
@@ -594,20 +594,20 @@ const KardiaSixLeadECG: React.FC = () => {
   };
 
   const statusColor = aliveCorConnected
-    ? "border-emerald-500/30 bg-emerald-500/10"
+    ? "border-emerald-500/30 bg-[#1A243D]"
     : isKardiaScanning
-      ? "border-indigo-500/30 bg-indigo-500/10"
-      : "border-amber-500/30 bg-amber-500/10";
+      ? "border-indigo-500/30 bg-[#1A243D]"
+      : "border-amber-500/30 bg-[#1A243D]";
 
   return (
-    <div className="bg-[#0a0a0f] min-h-screen text-white p-4 pt-safe-top font-inter">
-      <div className="max-w-sm mx-auto">
+    <div className="min-h-screen bg-[#080D1A] text-white font-inter select-none">
+      <div className="p-4 pt-safe-top max-w-sm mx-auto">
 
         {/* ── Header ─────────────────────────────────────────────────────── */}
         <header className="flex items-center gap-3 mb-6">
           <button
             onClick={() => navigate(-1)}
-            className="p-2 rounded-full bg-white/5 hover:bg-white/10 transition-colors active:scale-95"
+            className="p-2 rounded-full bg-white/5 hover:bg-white/10 transition-colors active:scale-95 text-white"
           >
             <ArrowLeft className="w-4 h-4" />
           </button>
@@ -640,7 +640,7 @@ const KardiaSixLeadECG: React.FC = () => {
         )}
 
         {/* ── Device Status Card ─────────────────────────────────────────── */}
-        <div className={`p-4 rounded-2xl border mb-4 flex items-center justify-between transition-all duration-300 ${statusColor}`}>
+        <div className={`p-4 rounded-3xl border mb-4 flex items-center justify-between transition-all duration-300 ${statusColor}`}>
           <div className="flex items-center gap-3">
             <div className={`p-2 rounded-xl ${aliveCorConnected ? "bg-emerald-500/20" : isKardiaScanning ? "bg-indigo-500/20" : "bg-amber-500/20"}`}>
               {aliveCorConnected
@@ -682,14 +682,14 @@ const KardiaSixLeadECG: React.FC = () => {
 
         {/* ── Found Devices List ─────────────────────────────────────────── */}
         {kardiaDevices.length > 0 && (
-          <div className="bg-[#141418] border border-indigo-500/20 rounded-2xl p-3 mb-4 space-y-2">
+          <div className="bg-[#1A243D] border border-slate-700/40 shadow-sm rounded-3xl p-3 mb-4 space-y-2">
             <p className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider">Found Nearby</p>
             {kardiaDevices.map((dev) => (
               <button
                 key={dev.deviceId}
                 onClick={() => connectKardia(dev.deviceId)}
                 disabled={busy}
-                className="w-full flex items-center justify-between bg-indigo-600/10 hover:bg-indigo-600/20 border border-indigo-500/20 rounded-xl px-3 py-2.5 transition-colors"
+                className="w-full flex items-center justify-between bg-[#121B32] hover:bg-[#121B32]/80 border border-slate-700/40 rounded-xl px-3 py-2.5 transition-colors"
               >
                 <div className="flex items-center gap-2">
                   <Heart className="w-4 h-4 text-indigo-400" />
@@ -702,7 +702,7 @@ const KardiaSixLeadECG: React.FC = () => {
         )}
 
         {/* ── Instructions ─────────────────────────────────────────────── */}
-        <div className="bg-[#141418] rounded-2xl p-4 mb-5 border border-slate-700/60 space-y-3">
+        <div className="bg-[#1A243D] border border-slate-700/40 shadow-sm rounded-3xl p-4 mb-5 space-y-3">
           <div className="flex items-center gap-2">
             <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
             <p className="text-[10px] font-bold text-amber-400 uppercase tracking-wider">How to Take a 6-Lead ECG</p>
@@ -714,7 +714,7 @@ const KardiaSixLeadECG: React.FC = () => {
             <li>Place your <strong>left ankle or knee</strong> on the bottom electrode</li>
             <li>Keep still for the full 30-second recording</li>
           </ol>
-          <div className="bg-indigo-500/10 border border-indigo-500/20 rounded-xl p-3 flex gap-2">
+          <div className="bg-[#121B32] border border-slate-700/40 rounded-2xl p-3 flex gap-2">
             <Wifi className="w-4 h-4 text-indigo-400 flex-shrink-0 mt-0.5" />
             <p className="text-xs text-indigo-200">
               You do <strong>not</strong> need to pair the device manually.
@@ -725,7 +725,7 @@ const KardiaSixLeadECG: React.FC = () => {
 
         {/* ── Recording progress indicator ─────────────────────────────── */}
         {busy && (
-          <div className="bg-[#141418] border border-indigo-500/30 rounded-2xl p-5 mb-5 shadow-2xl shadow-indigo-500/10">
+          <div className="bg-[#1A243D] border border-slate-700/40 shadow-sm rounded-3xl p-5 mb-5 shadow-2xl shadow-indigo-500/10">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
                 <div className="relative flex h-3 w-3">
@@ -740,13 +740,13 @@ const KardiaSixLeadECG: React.FC = () => {
 
             {/* Preparation / Holding Instructions (Show when not yet recording) */}
             {recordingPhase !== "recording" && (
-              <div className="bg-white/5 rounded-2xl p-6 mb-5 border border-white/10 flex flex-col items-center text-center space-y-4">
+              <div className="bg-[#121B32] border border-slate-700/40 rounded-2xl p-6 mb-5 flex flex-col items-center text-center space-y-4">
                 <div className="relative">
                   <div className="absolute inset-0 bg-indigo-500/20 blur-xl rounded-full animate-pulse" />
                   <div className="relative bg-indigo-500/10 p-4 rounded-full border border-indigo-500/30">
                     <User className="w-12 h-12 text-indigo-400" />
                   </div>
-                  <div className="absolute -right-1 -bottom-1 bg-amber-500 p-1.5 rounded-full border-2 border-[#1c1c21]">
+                  <div className="absolute -right-1 -bottom-1 bg-amber-500 p-1.5 rounded-full border-2 border-[#1A243D]">
                     <Zap className="w-3 h-3 text-white" />
                   </div>
                 </div>
@@ -784,7 +784,7 @@ const KardiaSixLeadECG: React.FC = () => {
               </div>
             )}
 
-            <div className="space-y-2 border-t border-white/5 pt-4">
+            <div className="space-y-2 border-t border-slate-700/40 pt-4">
               {(["permissions", "getjwt", "scanning", "connecting", "recording"] as const).map((phase, i) => {
                 const phases = ["permissions", "getjwt", "scanning", "connecting", "recording"];
                 const currentIdx = phases.indexOf(recordingPhase);
@@ -838,7 +838,7 @@ const KardiaSixLeadECG: React.FC = () => {
 
         {/* ── Last Result ────────────────────────────────────────────────── */}
         {lastResult && (
-          <div className="mt-5 bg-[#141418] border border-slate-700/60 rounded-2xl p-4 space-y-3">
+          <div className="mt-5 bg-[#1A243D] border border-slate-700/40 shadow-sm rounded-3xl p-4 space-y-3">
             <div className="flex items-center gap-2">
               <FileText className="w-4 h-4 text-indigo-300" />
               <h2 className="text-sm font-semibold">Last Session Result</h2>
@@ -853,21 +853,21 @@ const KardiaSixLeadECG: React.FC = () => {
               <>
                 <div className="grid grid-cols-3 gap-2">
                   {lastResult.heartRate && (
-                    <div className="bg-white/3 rounded-xl p-2.5 text-center border border-white/5">
+                    <div className="bg-[#121B32] border border-slate-700/40 rounded-xl p-2.5 text-center">
                       <p className="text-xs text-gray-400 mb-0.5">Heart Rate</p>
                       <p className="text-lg font-bold text-red-400">{lastResult.heartRate}</p>
                       <p className="text-[10px] text-gray-500">bpm</p>
                     </div>
                   )}
                   {lastResult.durationSeconds && (
-                    <div className="bg-white/3 rounded-xl p-2.5 text-center border border-white/5">
+                    <div className="bg-[#121B32] border border-slate-700/40 rounded-xl p-2.5 text-center">
                       <p className="text-xs text-gray-400 mb-0.5">Duration</p>
                       <p className="text-lg font-bold text-indigo-300">{lastResult.durationSeconds.toFixed(0)}</p>
                       <p className="text-[10px] text-gray-500">sec</p>
                     </div>
                   )}
                   {lastResult.sampleRate && (
-                    <div className="bg-white/3 rounded-xl p-2.5 text-center border border-white/5">
+                    <div className="bg-[#121B32] border border-slate-700/40 rounded-xl p-2.5 text-center">
                       <p className="text-xs text-gray-400 mb-0.5">Sample Rate</p>
                       <p className="text-lg font-bold text-purple-300">{lastResult.sampleRate}</p>
                       <p className="text-[10px] text-gray-500">Hz</p>
@@ -876,7 +876,7 @@ const KardiaSixLeadECG: React.FC = () => {
                 </div>
 
                 {lastResult.diagnosisText && (
-                  <div className="bg-indigo-500/10 border border-indigo-500/20 rounded-xl p-3">
+                  <div className="bg-[#121B32] border border-slate-700/40 rounded-xl p-3">
                     <p className="text-[10px] text-indigo-400 font-bold uppercase tracking-wider mb-1">AI Diagnosis</p>
                     <p className="text-sm text-gray-200">{lastResult.diagnosisText}</p>
                   </div>
@@ -913,22 +913,22 @@ const KardiaSixLeadECG: React.FC = () => {
 
       {/* Detailed ECG View Modal - Pro UI */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="max-w-md w-[95vw] bg-white text-slate-900 p-0 overflow-hidden rounded-3xl border-none shadow-2xl h-[90vh] flex flex-col">
+        <DialogContent className="max-w-md w-[95vw] bg-[#1A243D] text-white p-0 overflow-hidden rounded-3xl border border-slate-700/40 shadow-2xl h-[90vh] flex flex-col">
           {/* Header Area */}
-          <div className="p-5 border-b border-slate-100 bg-white sticky top-0 z-20">
+          <div className="p-5 border-b border-slate-700/40 bg-[#1A243D] sticky top-0 z-20">
             <DialogHeader className="text-left space-y-0">
               <div className="flex justify-between items-center mb-4">
                 <div className="flex items-center gap-2">
                   <div className={`w-3 h-3 rounded-full ${
                     /normal/i.test(lastResult?.determination || '') ? 'bg-emerald-500' : 'bg-amber-500'
                   }`} />
-                  <DialogTitle className="text-xl font-bold text-slate-800">
+                  <DialogTitle className="text-xl font-bold text-white">
                     {lastResult?.determination?.replace(/_/g, ' ') || lastResult?.diagnosisText || 'UNCLASSIFIED'}
                   </DialogTitle>
                 </div>
-                <div className="flex items-center gap-4 text-slate-400">
-                  <Download className="w-5 h-5 cursor-pointer hover:text-slate-600 transition-colors" />
-                  <Star className="w-5 h-5 cursor-pointer hover:text-slate-600 transition-colors" />
+                <div className="flex items-center gap-4 text-gray-400">
+                  <Download className="w-5 h-5 cursor-pointer hover:text-white transition-colors" />
+                  <Star className="w-5 h-5 cursor-pointer hover:text-white transition-colors" />
                 </div>
               </div>
               <DialogDescription className="sr-only">
@@ -936,12 +936,12 @@ const KardiaSixLeadECG: React.FC = () => {
               </DialogDescription>
             </DialogHeader>
             
-            <div className="flex items-center gap-3 text-slate-500 text-sm">
+            <div className="flex items-center gap-3 text-gray-400 text-sm">
               <div className="flex items-center gap-1.5">
-                <div className="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center">
-                  <Activity size={14} className="text-slate-600" />
+                <div className="w-6 h-6 rounded-full bg-[#121B32] flex items-center justify-center border border-slate-700/40">
+                  <Activity size={14} className="text-indigo-400" />
                 </div>
-                <span className="font-medium text-slate-700">Recent Recording</span>
+                <span className="font-medium text-gray-300">Recent Recording</span>
               </div>
               <div className="flex items-center gap-1.5 ml-auto">
                 <Calendar size={14} />
@@ -951,10 +951,10 @@ const KardiaSixLeadECG: React.FC = () => {
           </div>
 
           {/* ECG Grid Content */}
-          <div className="flex-1 overflow-y-auto bg-[#F8F9FA] relative scrollbar-hide">
+          <div className="flex-1 overflow-y-auto bg-[#080D1A] relative scrollbar-hide">
             {/* Calibration Marker */}
             <div className="sticky top-2 left-1/2 -translate-x-1/2 z-10">
-              <div className="bg-white/90 backdrop-blur shadow-sm border border-slate-100 rounded-full px-3 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-tighter">
+              <div className="bg-[#121B32]/90 backdrop-blur shadow-sm border border-slate-700/40 rounded-full px-3 py-1 text-[10px] font-bold text-gray-400 uppercase tracking-tighter">
                 25mm/s, 10mm/mV
               </div>
             </div>
@@ -963,9 +963,9 @@ const KardiaSixLeadECG: React.FC = () => {
               {lastResult?.waveformLeads ? (
                 <div className="space-y-0 px-2">
                   {getAvailableLeads(lastResult.waveformLeads).map((lead) => (
-                    <div key={lead} className="h-[120px] relative border-b border-slate-100/50 last:border-none">
+                    <div key={lead} className="h-[120px] relative border-b border-slate-700/20 last:border-none">
                       <div className="absolute top-1/2 -translate-y-1/2 left-2 z-10">
-                        <span className="text-xs font-black text-slate-900 opacity-60">
+                        <span className="text-xs font-black text-white opacity-60">
                           {lead}
                         </span>
                       </div>
@@ -979,7 +979,7 @@ const KardiaSixLeadECG: React.FC = () => {
                           <Line 
                             type="monotone" 
                             dataKey="value" 
-                            stroke="#334155" 
+                            stroke="#6366f1" 
                             strokeWidth={1.2} 
                             dot={false} 
                             isAnimationActive={false}
@@ -990,7 +990,7 @@ const KardiaSixLeadECG: React.FC = () => {
                   ))}
                 </div>
               ) : (
-                <div className="flex flex-col items-center justify-center py-40 text-slate-300">
+                <div className="flex flex-col items-center justify-center py-40 text-gray-500">
                   <Activity size={48} className="opacity-20 mb-4" />
                   <p className="text-sm font-bold">Waveform Data Unavailable</p>
                 </div>
@@ -999,10 +999,10 @@ const KardiaSixLeadECG: React.FC = () => {
               {/* Heart Rate Badge Overlay */}
               {lastResult?.heartRate && (
                 <div className="sticky bottom-4 right-4 ml-auto w-fit z-20">
-                  <div className="bg-white shadow-xl border border-slate-100 rounded-full px-4 py-2 flex items-center gap-2">
+                  <div className="bg-[#121B32] shadow-xl border border-slate-700/40 rounded-full px-4 py-2 flex items-center gap-2">
                     <Heart size={16} className="text-rose-500 fill-rose-500" />
-                    <span className="font-bold text-slate-800">{lastResult.heartRate}</span>
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">bpm</span>
+                    <span className="font-bold text-white">{lastResult.heartRate}</span>
+                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">bpm</span>
                   </div>
                 </div>
               )}
@@ -1010,19 +1010,19 @@ const KardiaSixLeadECG: React.FC = () => {
           </div>
 
           {/* Footer Controls */}
-          <div className="p-6 bg-white border-t border-slate-100 space-y-4">
+          <div className="p-6 bg-[#1A243D] border-t border-slate-700/40 space-y-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-bold text-slate-800">Enhance</p>
-                <p className="text-[10px] text-slate-400">On</p>
+                <p className="text-sm font-bold text-white">Enhance</p>
+                <p className="text-[10px] text-gray-400">On</p>
               </div>
-              <div className="w-12 h-6 bg-slate-100 rounded-full p-1 cursor-pointer">
-                <div className="w-4 h-4 bg-rose-500 rounded-full ml-auto shadow-md" />
+              <div className="w-12 h-6 bg-[#121B32] rounded-full p-1 cursor-pointer border border-slate-700/40">
+                <div className="w-4 h-4 bg-emerald-500 rounded-full ml-auto shadow-md" />
               </div>
             </div>
             
             <button 
-              className="w-full bg-[#1A2B3B] hover:bg-[#121E2A] text-white h-14 rounded-xl font-bold text-sm tracking-widest uppercase transition-all shadow-lg active:scale-[0.98]"
+              className="w-full bg-indigo-600 hover:bg-indigo-700 text-white h-14 rounded-xl font-bold text-sm tracking-widest uppercase transition-all shadow-lg active:scale-[0.98]"
               onClick={() => setIsModalOpen(false)}
             >
               Close
@@ -1033,12 +1033,12 @@ const KardiaSixLeadECG: React.FC = () => {
 
       <style>{`
         .ecg-paper-grid {
-          background-color: #F8F9FA;
+          background-color: #080D1A;
           background-image: 
-            linear-gradient(to right, #E2E8F0 1px, transparent 1px),
-            linear-gradient(to bottom, #E2E8F0 1px, transparent 1px),
-            linear-gradient(to right, #CBD5E1 1px, transparent 1px),
-            linear-gradient(to bottom, #CBD5E1 1px, transparent 1px);
+            linear-gradient(to right, rgba(99, 102, 241, 0.05) 1px, transparent 1px),
+            linear-gradient(to bottom, rgba(99, 102, 241, 0.05) 1px, transparent 1px),
+            linear-gradient(to right, rgba(99, 102, 241, 0.15) 1px, transparent 1px),
+            linear-gradient(to bottom, rgba(99, 102, 241, 0.15) 1px, transparent 1px);
           background-size: 5px 5px, 5px 5px, 25px 25px, 25px 25px;
         }
         .scrollbar-hide::-webkit-scrollbar {

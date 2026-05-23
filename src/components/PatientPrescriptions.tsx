@@ -225,45 +225,42 @@ export const PatientPrescriptions = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-emerald-900 to-slate-900 flex items-center justify-center">
-        <div className="w-8 h-8 border-4 border-emerald-400/30 border-t-emerald-400 rounded-full animate-spin"></div>
+      <div className="min-h-screen bg-[#080D1A] text-white flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-purple-500/30 border-t-purple-500 rounded-full animate-spin"></div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-emerald-900 to-slate-900">
-      {/* Header with Back Button */}
-      <div className="bg-slate-800/50 backdrop-blur-sm border-b border-slate-700">
-        <div className="relative flex items-center justify-between p-4 pt-safe-top">
+    <div className="min-h-screen bg-[#080D1A] text-white font-inter select-none p-4 pt-safe-top">
+      <div className="max-w-4xl mx-auto pb-20">
+        {/* Standardized Header */}
+        <header className="flex items-center gap-3 mb-6">
           <button
             onClick={() => navigate(-1)}
-            className="flex items-center gap-2 px-3 py-2 text-white bg-blue-600 hover:bg-blue-700 transition-colors touch-manipulation rounded-lg"
-            style={{ minHeight: '40px', minWidth: '70px' }}
+            className="p-2 rounded-full bg-white/5 hover:bg-white/10 transition-colors active:scale-95 text-white"
           >
-            <ArrowLeft className="h-4 w-4" />
-            <span className="text-sm">Back</span>
+            <ArrowLeft className="w-4 h-4" />
           </button>
-          <h1 className="absolute left-1/2 transform -translate-x-1/2 text-xl font-semibold text-white">Prescriptions</h1>
-          <div className="w-16" />
-        </div>
-      </div>
-
-      <div className="p-4 pb-20">
-        <div className="max-w-4xl mx-auto">
-          {/* Header */}
-          <div className="mb-6">
-            <p className="text-emerald-200/80 mt-2">View and manage your medication prescriptions</p>
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-2xl bg-purple-900/70 flex items-center justify-center border border-purple-400/50">
+              <Pill className="h-6 w-6 text-purple-300" />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold">Prescriptions</h1>
+              <p className="text-xs text-gray-400">View and manage your medication prescriptions</p>
+            </div>
           </div>
+        </header>
 
         {/* Tabs */}
         <div className="flex gap-2 mb-6">
           <button
             onClick={() => setActiveTab('active')}
-            className={`flex-1 py-3 px-4 rounded-xl font-semibold transition-all duration-300 ${
+            className={`flex-1 py-3 px-4 rounded-2xl font-semibold transition-all duration-300 border ${
               activeTab === 'active'
-                ? 'bg-gradient-to-r from-emerald-500 to-green-500 text-white shadow-lg'
-                : 'bg-white/10 text-emerald-200 hover:bg-white/20'
+                ? 'bg-purple-500/20 text-purple-300 border-purple-500/40 shadow-sm'
+                : 'bg-[#1A243D] text-gray-400 border-slate-700/40 hover:text-gray-200'
             }`}
           >
             <div className="flex items-center justify-center gap-2">
@@ -273,10 +270,10 @@ export const PatientPrescriptions = () => {
           </button>
           <button
             onClick={() => setActiveTab('expired')}
-            className={`flex-1 py-3 px-4 rounded-xl font-semibold transition-all duration-300 ${
+            className={`flex-1 py-3 px-4 rounded-2xl font-semibold transition-all duration-300 border ${
               activeTab === 'expired'
-                ? 'bg-gradient-to-r from-red-500 to-orange-500 text-white shadow-lg'
-                : 'bg-white/10 text-emerald-200 hover:bg-white/20'
+                ? 'bg-red-500/20 text-red-300 border-red-500/40 shadow-sm'
+                : 'bg-[#1A243D] text-gray-400 border-slate-700/40 hover:text-gray-200'
             }`}
           >
             <div className="flex items-center justify-center gap-2">
@@ -288,9 +285,9 @@ export const PatientPrescriptions = () => {
 
         {/* Prescriptions List */}
         {displayPrescriptions.length === 0 ? (
-          <div className="glass-card p-8 rounded-xl border border-emerald-500/30 bg-emerald-500/10 text-center">
-            <Pill className="w-16 h-16 text-emerald-400/50 mx-auto mb-4" />
-            <p className="text-emerald-200/60 text-lg">
+          <div className="bg-[#1A243D] border border-slate-700/40 rounded-3xl p-8 text-center">
+            <Pill className="w-16 h-16 text-purple-400/50 mx-auto mb-4" />
+            <p className="text-gray-400 text-lg">
               {activeTab === 'active' 
                 ? 'No active prescriptions'
                 : 'No expired prescriptions'}
@@ -306,67 +303,64 @@ export const PatientPrescriptions = () => {
               return (
                 <div
                   key={prescription.id}
-                  className={`glass-card p-4 sm:p-6 rounded-xl border transition-all duration-300 ${
+                  className={`bg-[#1A243D] border border-slate-700/40 shadow-sm rounded-3xl p-4 sm:p-6 transition-all duration-300 ${
                     expired
-                      ? 'border-red-500/30 bg-red-500/10'
-                      : 'border-emerald-500/30 bg-emerald-500/10 hover:border-emerald-400/50'
+                      ? 'border-red-500/30 bg-red-500/5'
+                      : 'hover:border-purple-500/30'
                   }`}
                 >
                   {/* Header */}
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        <Pill className={`w-5 h-5 ${expired ? 'text-red-400' : 'text-emerald-400'}`} />
-                        <h3 className="text-xl font-bold text-white">{prescription.medication_name}</h3>
+                      <div className="flex items-center gap-2 mb-1">
+                        <Pill className={`w-5 h-5 ${expired ? 'text-red-400' : 'text-purple-400'}`} />
+                        <h3 className="text-lg font-bold text-white">{prescription.medication_name}</h3>
                       </div>
                       {prescription.doctor && (
-                        <p className="text-sm text-emerald-200/70">
+                        <p className="text-xs text-gray-400">
                           Prescribed by Dr. {prescription.doctor.full_name}
                         </p>
                       )}
                     </div>
 
-                    {/* Expired Badge */}
-                    {expired && (
-                      <div className="px-3 py-1 rounded-full bg-red-500/20 border border-red-500/30">
-                        <span className="text-xs font-semibold text-red-300">EXPIRED</span>
+                    {/* Status Badges */}
+                    {expired ? (
+                      <div className="px-2.5 py-0.5 rounded-full bg-red-500/15 border border-red-500/30">
+                        <span className="text-[10px] font-semibold text-red-300">EXPIRED</span>
                       </div>
-                    )}
-
-                    {/* Active Badge */}
-                    {!expired && (
-                      <div className="px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/30">
-                        <span className="text-xs font-semibold text-emerald-300">ACTIVE</span>
+                    ) : (
+                      <div className="px-2.5 py-0.5 rounded-full bg-purple-500/15 border border-purple-500/30">
+                        <span className="text-[10px] font-semibold text-purple-300">ACTIVE</span>
                       </div>
                     )}
                   </div>
 
                   {/* Details */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4 text-sm">
                     {prescription.dosage && (
-                      <div className="flex items-center gap-2 text-sm">
-                        <div className="w-2 h-2 rounded-full bg-emerald-400"></div>
-                        <span className="text-emerald-200/70">Dosage:</span>
-                        <span className="text-white font-semibold">{prescription.dosage}</span>
+                      <div className="flex items-center gap-2">
+                        <div className="w-1.5 h-1.5 rounded-full bg-purple-400"></div>
+                        <span className="text-gray-400">Dosage:</span>
+                        <span className="text-white font-medium">{prescription.dosage}</span>
                       </div>
                     )}
 
-                    <div className="flex items-center gap-2 text-sm">
-                      <Clock className="w-4 h-4 text-emerald-400" />
-                      <span className="text-emerald-200/70">Frequency:</span>
-                      <span className="text-white font-semibold">{prescription.frequency}</span>
+                    <div className="flex items-center gap-2">
+                      <Clock className="w-4 h-4 text-purple-400" />
+                      <span className="text-gray-400">Frequency:</span>
+                      <span className="text-white font-medium">{prescription.frequency}</span>
                     </div>
 
-                    <div className="flex items-center gap-2 text-sm">
-                      <Calendar className="w-4 h-4 text-emerald-400" />
-                      <span className="text-emerald-200/70">Duration:</span>
-                      <span className="text-white font-semibold">{prescription.duration_days} days</span>
+                    <div className="flex items-center gap-2">
+                      <Calendar className="w-4 h-4 text-purple-400" />
+                      <span className="text-gray-400">Duration:</span>
+                      <span className="text-white font-medium">{prescription.duration_days} days</span>
                     </div>
 
-                    <div className="flex items-center gap-2 text-sm">
-                      <Calendar className="w-4 h-4 text-emerald-400" />
-                      <span className="text-emerald-200/70">End Date:</span>
-                      <span className="text-white font-semibold">
+                    <div className="flex items-center gap-2">
+                      <Calendar className="w-4 h-4 text-purple-400" />
+                      <span className="text-gray-400">End Date:</span>
+                      <span className="text-white font-medium">
                         {format(parseISO(prescription.end_date), 'MMM dd, yyyy')}
                       </span>
                     </div>
@@ -374,19 +368,19 @@ export const PatientPrescriptions = () => {
 
                   {/* Instructions */}
                   {prescription.instructions && (
-                    <div className="mb-4 p-3 rounded-lg bg-white/5 border border-white/10">
-                      <p className="text-xs text-emerald-200/70 mb-1">Instructions:</p>
-                      <p className="text-sm text-emerald-200/90">{prescription.instructions}</p>
+                    <div className="mb-4 p-3 rounded-xl bg-[#121B32] border border-slate-700/40">
+                      <p className="text-[11px] text-gray-400 mb-1">Instructions:</p>
+                      <p className="text-sm text-gray-200">{prescription.instructions}</p>
                     </div>
                   )}
 
                   {/* Reminders */}
                   {!expired && prescriptionReminders.length > 0 && (
-                    <div className="pt-4 border-t border-emerald-500/20">
+                    <div className="pt-4 border-t border-slate-700/40">
                       <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center gap-2">
-                          <Bell className="w-4 h-4 text-emerald-400" />
-                          <span className="text-sm font-semibold text-emerald-200">
+                          <Bell className="w-4 h-4 text-purple-400" />
+                          <span className="text-sm font-semibold text-purple-300">
                             Medication Reminders
                           </span>
                         </div>
@@ -394,16 +388,16 @@ export const PatientPrescriptions = () => {
                         {/* Toggle Reminders */}
                         <button
                           onClick={() => toggleReminders(prescription.id, hasActiveReminders)}
-                          className={`p-2 rounded-lg transition-all duration-300 ${
+                          className={`p-2 rounded-xl transition-all duration-300 ${
                             hasActiveReminders
-                              ? 'bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30'
+                              ? 'bg-purple-500/20 text-purple-300 hover:bg-purple-500/30'
                               : 'bg-red-500/20 text-red-300 hover:bg-red-500/30'
                           }`}
                         >
                           {hasActiveReminders ? (
-                            <Bell className="w-5 h-5" />
+                            <Bell className="w-4 h-4" />
                           ) : (
-                            <BellOff className="w-5 h-5" />
+                            <BellOff className="w-4 h-4" />
                           )}
                         </button>
                       </div>
@@ -412,7 +406,7 @@ export const PatientPrescriptions = () => {
                         {prescriptionReminders.map((reminder) => (
                           <div
                             key={reminder.id}
-                            className="flex items-center justify-between p-2 rounded-md bg-emerald-500/10 border border-emerald-500/20"
+                            className="flex items-center justify-between p-2.5 rounded-xl bg-[#121B32] border border-slate-700/40"
                           >
                             {editingReminder === reminder.id ? (
                               // Edit mode
@@ -421,17 +415,17 @@ export const PatientPrescriptions = () => {
                                   type="time"
                                   value={newReminderTime}
                                   onChange={(e) => setNewReminderTime(e.target.value)}
-                                  className="px-2 py-1 rounded bg-emerald-950/40 border border-emerald-500/30 text-emerald-100 text-sm"
+                                  className="px-2 py-1 rounded-lg bg-[#1A243D] border border-slate-700/40 text-white text-sm"
                                 />
                                 <button
                                   onClick={() => updateReminderTime(reminder.id)}
-                                  className="p-1 rounded bg-emerald-600/20 text-emerald-300 hover:bg-emerald-600/30"
+                                  className="p-1 rounded-lg bg-purple-600/20 text-purple-300 hover:bg-purple-600/30"
                                 >
                                   <Save className="w-4 h-4" />
                                 </button>
                                 <button
                                   onClick={cancelEditingReminder}
-                                  className="p-1 rounded bg-red-500/20 text-red-300 hover:bg-red-500/30"
+                                  className="p-1 rounded-lg bg-red-500/20 text-red-300 hover:bg-red-500/30"
                                 >
                                   <X className="w-4 h-4" />
                                 </button>
@@ -439,14 +433,14 @@ export const PatientPrescriptions = () => {
                             ) : (
                               // View mode
                               <>
-                                <span className="text-sm text-emerald-200">
+                                <span className="text-sm text-gray-200">
                                   {format(new Date(`2000-01-01T${reminder.reminder_time}`), 'h:mm a')}
                                 </span>
                                 <button
                                   onClick={() => startEditingReminder(reminder.id, reminder.reminder_time)}
-                                  className="p-1 rounded bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30"
+                                  className="p-1.5 rounded-lg bg-purple-500/20 text-purple-300 hover:bg-purple-500/30 transition-colors"
                                 >
-                                  <Edit2 className="w-4 h-4" />
+                                  <Edit2 className="w-3.5 h-3.5" />
                                 </button>
                               </>
                             )}
@@ -454,7 +448,7 @@ export const PatientPrescriptions = () => {
                         ))}
                       </div>
 
-                      <p className="text-xs text-emerald-200/60 mt-2">
+                      <p className="text-xs text-gray-500 mt-2">
                         You'll receive notifications 30 minutes before each time. Click edit to change reminder times.
                       </p>
                     </div>
@@ -464,7 +458,6 @@ export const PatientPrescriptions = () => {
             })}
           </div>
         )}
-        </div>
       </div>
     </div>
   );

@@ -16,6 +16,7 @@ import {
   DialogTitle,
 } from '../components/ui/dialog';
 import { toast } from 'sonner';
+import { MobileAppContainer } from '../components/MobileAppContainer';
 
 interface PatientProfile {
   id: string;
@@ -124,7 +125,7 @@ const Profile = () => {
       }
 
       setProfile(data);
-      
+
       // Load risk criteria
       const { data: riskData } = await getPatientRiskCriteria(data.id);
       if (riskData) {
@@ -272,568 +273,550 @@ const Profile = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-emerald-900 to-slate-900 flex items-center justify-center">
-        <div className="w-8 h-8 border-4 border-emerald-400/30 border-t-emerald-400 rounded-full animate-spin"></div>
+      <div className="min-h-screen bg-[#080D1A] flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-blue-500/30 border-t-blue-500 rounded-full animate-spin"></div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-emerald-900 to-slate-900">
-      {/* Header with Back Button */}
-      <div className="bg-slate-800/50 backdrop-blur-sm border-b border-slate-700">
-        <div className="relative flex items-center justify-between p-4 pt-safe-top">
-          <button
-            onClick={() => navigate(-1)}
-            className="flex items-center gap-2 px-3 py-2 text-white bg-blue-600 hover:bg-blue-700 transition-colors touch-manipulation rounded-lg"
-            style={{ minHeight: '40px', minWidth: '70px' }}
-          >
-            <ArrowLeft className="h-4 w-4" />
-            <span className="text-sm">Back</span>
-          </button>
-          <h1 className="absolute left-1/2 transform -translate-x-1/2 text-xl font-semibold text-white">Profile</h1>
-          <div className="w-16" />
+    <MobileAppContainer>
+      <div className="min-h-screen bg-[#080D1A] text-white font-inter select-none">
+
+        {/* Header */}
+        <div className="p-4 pt-safe-top">
+          <header className="flex items-center gap-3 mb-6">
+            <button
+              onClick={() => navigate(-1)}
+              className="p-2 rounded-full bg-white/5 hover:bg-white/10 transition-colors active:scale-95 text-white"
+            >
+              <ArrowLeft className="w-4 h-4" />
+            </button>
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-2xl bg-blue-900/70 flex items-center justify-center border border-blue-400/50">
+                <User className="h-6 w-6 text-blue-300" />
+              </div>
+              <div>
+                <h1 className="text-xl font-bold">Profile</h1>
+                <p className="text-xs text-gray-400">Manage your account and vitals thresholds</p>
+              </div>
+            </div>
+          </header>
         </div>
-      </div>
 
-      <div className="p-4 pb-20">
-        <div className="max-w-2xl mx-auto space-y-6">
-          {/* Profile Header Card */}
-          <Card className="glass-card border-emerald-500/30 bg-emerald-500/10">
-            <CardContent className="p-6">
-              <div className="flex items-center gap-4 mb-4">
-                <div className="w-20 h-20 rounded-full bg-gradient-to-br from-emerald-500 to-green-500 flex items-center justify-center border-4 border-emerald-400/30">
-                  {profile?.profile_picture_url ? (
-                    <img
-                      src={profile.profile_picture_url}
-                      alt={profile.full_name}
-                      className="w-full h-full rounded-full object-cover"
-                    />
-                  ) : (
-                    <UserCircle className="w-10 h-10 text-white" />
-                  )}
-                </div>
-                <div className="flex-1">
-                  <h2 className="text-2xl font-bold text-white mb-1">{profile?.full_name || 'User'}</h2>
-                  {profile?.patient_code && (
-                    <p className="text-sm text-emerald-200/70">Patient ID: {profile.patient_code}</p>
-                  )}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Personal Information */}
-          <Card className="glass-card border-emerald-500/30 bg-emerald-500/10">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-                  <User className="w-5 h-5 text-emerald-400" />
-                  Personal Information
-                </h3>
-                <button
-                  onClick={handleOpenPersonalModal}
-                  className="p-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 transition-colors"
-                >
-                  <Edit2 className="w-4 h-4 text-emerald-400" />
-                </button>
-              </div>
-              <div className="space-y-3">
-                <div className="flex items-start gap-3">
-                  <Mail className="w-5 h-5 text-emerald-400 mt-0.5 flex-shrink-0" />
-                  <div className="flex-1">
-                    <p className="text-xs text-emerald-200/60 mb-1">Email</p>
-                    <p className="text-white">{profile?.email || user?.email || 'Not provided'}</p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3">
-                  <Phone className="w-5 h-5 text-emerald-400 mt-0.5 flex-shrink-0" />
-                  <div className="flex-1">
-                    <p className="text-xs text-emerald-200/60 mb-1">Phone Number</p>
-                    <p className="text-white">{profile?.phone_number || 'Not provided'}</p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3">
-                  <Calendar className="w-5 h-5 text-emerald-400 mt-0.5 flex-shrink-0" />
-                  <div className="flex-1">
-                    <p className="text-xs text-emerald-200/60 mb-1">Date of Birth</p>
-                    <p className="text-white">{profile?.date_of_birth ? formatDate(profile.date_of_birth) : 'Not provided'}</p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3">
-                  <User className="w-5 h-5 text-emerald-400 mt-0.5 flex-shrink-0" />
-                  <div className="flex-1">
-                    <p className="text-xs text-emerald-200/60 mb-1">Gender</p>
-                    <p className="text-white capitalize">{profile?.gender || 'Not provided'}</p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3">
-                  <MapPin className="w-5 h-5 text-emerald-400 mt-0.5 flex-shrink-0" />
-                  <div className="flex-1">
-                    <p className="text-xs text-emerald-200/60 mb-1">Address</p>
-                    <p className="text-white">{profile?.address || 'Not provided'}</p>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Physical Information */}
-          <Card className="glass-card border-emerald-500/30 bg-emerald-500/10">
-            <CardContent className="p-6">
-              <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                <Ruler className="w-5 h-5 text-emerald-400" />
-                Physical Information
-              </h3>
-              <div className="space-y-3">
-                <div className="flex items-start gap-3">
-                  <Ruler className="w-5 h-5 text-emerald-400 mt-0.5 flex-shrink-0" />
-                  <div className="flex-1">
-                    <p className="text-xs text-emerald-200/60 mb-1">Height</p>
-                    <div className="flex items-center gap-2">
-                      <p className="text-white">
-                        {profile?.height_cm ? `${profile.height_cm} cm` : 'Not set'}
-                      </p>
-                      <button
-                        onClick={handleOpenHeightModal}
-                        className="p-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 transition-colors"
-                      >
-                        <Edit2 className="w-3.5 h-3.5 text-emerald-400" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3">
-                  <Scale className="w-5 h-5 text-emerald-400 mt-0.5 flex-shrink-0" />
-                  <div className="flex-1">
-                    <p className="text-xs text-emerald-200/60 mb-1">Weight</p>
-                    <div className="flex items-center gap-2">
-                      <p className="text-white">
-                        {profile?.weight_kg ? `${profile.weight_kg} kg` : 'Not set'}
-                      </p>
-                      <button
-                        onClick={handleOpenWeightModal}
-                        className="p-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 transition-colors"
-                      >
-                        <Edit2 className="w-3.5 h-3.5 text-emerald-400" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Medical Information */}
-          <Card className="glass-card border-emerald-500/30 bg-emerald-500/10">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-                  <Heart className="w-5 h-5 text-emerald-400" />
-                  Medical Information
-                </h3>
-                <button
-                  onClick={handleOpenMedicalModal}
-                  className="p-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 transition-colors"
-                >
-                  <Edit2 className="w-4 h-4 text-emerald-400" />
-                </button>
-              </div>
-              <div className="space-y-3">
-                <div className="flex items-start gap-3">
-                  <Droplet className="w-5 h-5 text-emerald-400 mt-0.5 flex-shrink-0" />
-                  <div className="flex-1">
-                    <p className="text-xs text-emerald-200/60 mb-1">Blood Type</p>
-                    <p className="text-white">{profile?.blood_type || 'Not provided'}</p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3">
-                  <AlertCircle className="w-5 h-5 text-red-400 mt-0.5 flex-shrink-0" />
-                  <div className="flex-1">
-                    <p className="text-xs text-emerald-200/60 mb-1">Allergies</p>
-                    <div className="flex flex-wrap gap-2 mt-1">
-                      {profile?.allergies && profile.allergies.length > 0 ? (
-                        profile.allergies.map((allergy, idx) => (
-                          <span
-                            key={idx}
-                            className="px-2 py-1 rounded-md bg-red-500/20 border border-red-500/30 text-sm text-red-200"
-                          >
-                            {allergy}
-                          </span>
-                        ))
-                      ) : (
-                        <p className="text-gray-400 text-sm">None reported</p>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3">
-                  <Heart className="w-5 h-5 text-emerald-400 mt-0.5 flex-shrink-0" />
-                  <div className="flex-1">
-                    <p className="text-xs text-emerald-200/60 mb-1">Medical Conditions</p>
-                    <div className="flex flex-wrap gap-2 mt-1">
-                      {profile?.medical_conditions && profile.medical_conditions.length > 0 ? (
-                        profile.medical_conditions.map((condition, idx) => (
-                          <span
-                            key={idx}
-                            className="px-2 py-1 rounded-md bg-emerald-500/20 border border-emerald-500/30 text-sm text-emerald-200"
-                          >
-                            {condition}
-                          </span>
-                        ))
-                      ) : (
-                        <p className="text-gray-400 text-sm">None reported</p>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3">
-                  <Pill className="w-5 h-5 text-emerald-400 mt-0.5 flex-shrink-0" />
-                  <div className="flex-1">
-                    <p className="text-xs text-emerald-200/60 mb-1">Current Medications</p>
-                    <div className="flex flex-wrap gap-2 mt-1">
-                      {profile?.current_medications && profile.current_medications.length > 0 ? (
-                        profile.current_medications.map((medication, idx) => (
-                          <span
-                            key={idx}
-                            className="px-2 py-1 rounded-md bg-blue-500/20 border border-blue-500/30 text-sm text-blue-200"
-                          >
-                            {medication}
-                          </span>
-                        ))
-                      ) : (
-                        <p className="text-gray-400 text-sm">None reported</p>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Vital High Risk Section */}
-          <Card className="glass-card border-red-500/30 bg-red-500/10">
-            <CardContent className="p-6">
-              <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                <AlertCircle className="w-5 h-5 text-red-400" />
-                Vital High Risk Thresholds
-              </h3>
-              <div className="space-y-4">
-                {riskCriteria ? (
-                  <>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="bg-slate-900/50 p-3 rounded-lg border border-red-500/20">
-                        <p className="text-xs text-red-200/60 mb-1">Blood Pressure</p>
-                        <p className="text-white font-medium">
-                          &gt;{riskCriteria.systolic_high || 140}/{riskCriteria.diastolic_high || 90} mmHg
-                        </p>
-                      </div>
-                      <div className="bg-slate-900/50 p-3 rounded-lg border border-red-500/20">
-                        <p className="text-xs text-red-200/60 mb-1">Heart Rate</p>
-                        <p className="text-white font-medium">
-                          &gt;{riskCriteria.heart_rate_high || 100} BPM
-                        </p>
-                      </div>
-                      <div className="bg-slate-900/50 p-3 rounded-lg border border-red-500/20">
-                        <p className="text-xs text-red-200/60 mb-1">SpO2</p>
-                        <p className="text-white font-medium">
-                          &lt;{riskCriteria.spo2_low || 95}%
-                        </p>
-                      </div>
-                      <div className="bg-slate-900/50 p-3 rounded-lg border border-red-500/20">
-                        <p className="text-xs text-red-200/60 mb-1">Risk Status</p>
-                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                          riskCriteria.is_high_risk ? 'bg-red-500 text-white' : 'bg-green-500 text-white'
-                        }`}>
-                          {riskCriteria.is_high_risk ? 'HIGH RISK' : 'STABLE'}
-                        </span>
-                      </div>
-                    </div>
-                    {riskCriteria.doctor_notes && (
-                      <div className="bg-red-500/5 border border-red-500/20 p-3 rounded-lg">
-                        <p className="text-xs text-red-200/60 mb-1">Doctor's Risk Notes</p>
-                        <p className="text-sm text-white italic">"{riskCriteria.doctor_notes}"</p>
-                      </div>
+        <div className="p-4 pb-20">
+          <div className="max-w-2xl mx-auto space-y-6">
+            {/* Profile Header Card */}
+            <Card className="bg-[#1A243D] border border-slate-700/40 shadow-sm rounded-3xl">
+              <CardContent className="p-6">
+                <div className="flex items-center gap-4 mb-4">
+                  <div className="w-20 h-20 rounded-full bg-gradient-to-br from-blue-500 to-indigo-500 flex items-center justify-center border-4 border-blue-400/30">
+                    {profile?.profile_picture_url ? (
+                      <img
+                        src={profile.profile_picture_url}
+                        alt={profile.full_name}
+                        className="w-full h-full rounded-full object-cover"
+                      />
+                    ) : (
+                      <UserCircle className="w-10 h-10 text-white" />
                     )}
-                  </>
-                ) : (
-                  <div className="text-center py-4 bg-slate-900/30 rounded-lg">
-                    <p className="text-sm text-gray-400 italic">No custom risk criteria set by doctor.</p>
                   </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
+                  <div className="flex-1">
+                    <h2 className="text-2xl font-bold text-white mb-1">{profile?.full_name || 'User'}</h2>
+                    {profile?.patient_code && (
+                      <p className="text-sm text-blue-200/70">Patient ID: {profile.patient_code}</p>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
 
-          {/* Emergency Contact */}
-          <Card className="glass-card border-emerald-500/30 bg-emerald-500/10">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-                  <AlertCircle className="w-5 h-5 text-emerald-400" />
-                  Emergency Contact
+            {/* Personal Information */}
+            <Card className="bg-[#1A243D] border border-slate-700/40 shadow-sm rounded-3xl">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                    <User className="w-5 h-5 text-blue-400" />
+                    Personal Information
+                  </h3>
+                  <button
+                    onClick={handleOpenPersonalModal}
+                    className="p-1.5 rounded-lg bg-blue-500/20 hover:bg-blue-500/30 transition-colors"
+                  >
+                    <Edit2 className="w-4 h-4 text-blue-400" />
+                  </button>
+                </div>
+                <div className="space-y-3">
+                  <div className="flex items-start gap-3">
+                    <Mail className="w-5 h-5 text-blue-400 mt-0.5 flex-shrink-0" />
+                    <div className="flex-1">
+                      <p className="text-xs text-slate-400 mb-1">Email</p>
+                      <p className="text-white">{profile?.email || user?.email || 'Not provided'}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-3">
+                    <Phone className="w-5 h-5 text-blue-400 mt-0.5 flex-shrink-0" />
+                    <div className="flex-1">
+                      <p className="text-xs text-slate-400 mb-1">Phone Number</p>
+                      <p className="text-white">{profile?.phone_number || 'Not provided'}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-3">
+                    <Calendar className="w-5 h-5 text-blue-400 mt-0.5 flex-shrink-0" />
+                    <div className="flex-1">
+                      <p className="text-xs text-slate-400 mb-1">Date of Birth</p>
+                      <p className="text-white">{profile?.date_of_birth ? formatDate(profile.date_of_birth) : 'Not provided'}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-3">
+                    <User className="w-5 h-5 text-blue-400 mt-0.5 flex-shrink-0" />
+                    <div className="flex-1">
+                      <p className="text-xs text-slate-400 mb-1">Gender</p>
+                      <p className="text-white capitalize">{profile?.gender || 'Not provided'}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-3">
+                    <MapPin className="w-5 h-5 text-blue-400 mt-0.5 flex-shrink-0" />
+                    <div className="flex-1">
+                      <p className="text-xs text-slate-400 mb-1">Address</p>
+                      <p className="text-white">{profile?.address || 'Not provided'}</p>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Physical Information */}
+            <Card className="bg-[#1A243D] border border-slate-700/40 shadow-sm rounded-3xl">
+              <CardContent className="p-6">
+                <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                  <Ruler className="w-5 h-5 text-blue-400" />
+                  Physical Information
                 </h3>
-                <button
-                  onClick={handleOpenEmergencyModal}
-                  className="p-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 transition-colors"
+                <div className="space-y-3">
+                  <div className="flex items-start gap-3">
+                    <Ruler className="w-5 h-5 text-blue-400 mt-0.5 flex-shrink-0" />
+                    <div className="flex-1">
+                      <p className="text-xs text-slate-400 mb-1">Height</p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-white">
+                          {profile?.height_cm ? `${profile.height_cm} cm` : 'Not set'}
+                        </p>
+                        <button
+                          onClick={handleOpenHeightModal}
+                          className="p-1.5 rounded-lg bg-blue-500/20 hover:bg-blue-500/30 transition-colors"
+                        >
+                          <Edit2 className="w-3.5 h-3.5 text-blue-400" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-3">
+                    <Scale className="w-5 h-5 text-blue-400 mt-0.5 flex-shrink-0" />
+                    <div className="flex-1">
+                      <p className="text-xs text-slate-400 mb-1">Weight</p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-white">
+                          {profile?.weight_kg ? `${profile.weight_kg} kg` : 'Not set'}
+                        </p>
+                        <button
+                          onClick={handleOpenWeightModal}
+                          className="p-1.5 rounded-lg bg-blue-500/20 hover:bg-blue-500/30 transition-colors"
+                        >
+                          <Edit2 className="w-3.5 h-3.5 text-blue-400" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Medical Information */}
+            <Card className="bg-[#1A243D] border border-slate-700/40 shadow-sm rounded-3xl">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                    <Heart className="w-5 h-5 text-blue-400" />
+                    Medical Information
+                  </h3>
+                  <button
+                    onClick={handleOpenMedicalModal}
+                    className="p-1.5 rounded-lg bg-blue-500/20 hover:bg-blue-500/30 transition-colors"
+                  >
+                    <Edit2 className="w-4 h-4 text-blue-400" />
+                  </button>
+                </div>
+                <div className="space-y-3">
+                  <div className="flex items-start gap-3">
+                    <Droplet className="w-5 h-5 text-blue-400 mt-0.5 flex-shrink-0" />
+                    <div className="flex-1">
+                      <p className="text-xs text-slate-400 mb-1">Blood Type</p>
+                      <p className="text-white">{profile?.blood_type || 'Not provided'}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-3">
+                    <AlertCircle className="w-5 h-5 text-red-400 mt-0.5 flex-shrink-0" />
+                    <div className="flex-1">
+                      <p className="text-xs text-slate-400 mb-1">Allergies</p>
+                      <div className="flex flex-wrap gap-2 mt-1">
+                        {profile?.allergies && profile.allergies.length > 0 ? (
+                          profile.allergies.map((allergy, idx) => (
+                            <span
+                              key={idx}
+                              className="px-2 py-1 rounded-md bg-red-500/20 border border-red-500/30 text-sm text-red-200"
+                            >
+                              {allergy}
+                            </span>
+                          ))
+                        ) : (
+                          <p className="text-gray-400 text-sm">None reported</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-3">
+                    <Heart className="w-5 h-5 text-blue-400 mt-0.5 flex-shrink-0" />
+                    <div className="flex-1">
+                      <p className="text-xs text-slate-400 mb-1">Medical Conditions</p>
+                      <div className="flex flex-wrap gap-2 mt-1">
+                        {profile?.medical_conditions && profile.medical_conditions.length > 0 ? (
+                          profile.medical_conditions.map((condition, idx) => (
+                            <span
+                              key={idx}
+                              className="px-2 py-1 rounded-md bg-blue-500/20 border border-blue-500/30 text-sm text-blue-200"
+                            >
+                              {condition}
+                            </span>
+                          ))
+                        ) : (
+                          <p className="text-gray-400 text-sm">None reported</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-3">
+                    <Pill className="w-5 h-5 text-blue-400 mt-0.5 flex-shrink-0" />
+                    <div className="flex-1">
+                      <p className="text-xs text-slate-400 mb-1">Current Medications</p>
+                      <div className="flex flex-wrap gap-2 mt-1">
+                        {profile?.current_medications && profile.current_medications.length > 0 ? (
+                          profile.current_medications.map((medication, idx) => (
+                            <span
+                              key={idx}
+                              className="px-2 py-1 rounded-md bg-blue-500/20 border border-blue-500/30 text-sm text-blue-200"
+                            >
+                              {medication}
+                            </span>
+                          ))
+                        ) : (
+                          <p className="text-gray-400 text-sm">None reported</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Vital High Risk Section */}
+            <Card className="bg-[#1A243D] border border-red-500/30 shadow-sm rounded-3xl">
+              <CardContent className="p-6">
+                <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                  <AlertCircle className="w-5 h-5 text-red-400" />
+                  Vital High Risk Thresholds
+                </h3>
+                <div className="space-y-4">
+                  {riskCriteria ? (
+                    <>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="bg-[#121B32] p-3 rounded-lg border border-red-500/20">
+                          <p className="text-xs text-red-200/60 mb-1">Blood Pressure</p>
+                          <p className="text-white font-medium">
+                            &gt;{riskCriteria.systolic_high || 140}/{riskCriteria.diastolic_high || 90} mmHg
+                          </p>
+                        </div>
+                        <div className="bg-[#121B32] p-3 rounded-lg border border-red-500/20">
+                          <p className="text-xs text-red-200/60 mb-1">Heart Rate</p>
+                          <p className="text-white font-medium">
+                            &gt;{riskCriteria.heart_rate_high || 100} BPM
+                          </p>
+                        </div>
+                        <div className="bg-[#121B32] p-3 rounded-lg border border-red-500/20">
+                          <p className="text-xs text-red-200/60 mb-1">SpO2</p>
+                          <p className="text-white font-medium">
+                            &lt;{riskCriteria.spo2_low || 95}%
+                          </p>
+                        </div>
+                        <div className="bg-[#121B32] p-3 rounded-lg border border-red-500/20">
+                          <p className="text-xs text-red-200/60 mb-1">Risk Status</p>
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${riskCriteria.is_high_risk ? 'bg-red-500 text-white' : 'bg-green-500 text-white'
+                            }`}>
+                            {riskCriteria.is_high_risk ? 'HIGH RISK' : 'STABLE'}
+                          </span>
+                        </div>
+                      </div>
+                      {riskCriteria.doctor_notes && (
+                        <div className="bg-red-500/5 border border-red-500/20 p-3 rounded-lg">
+                          <p className="text-xs text-red-200/60 mb-1">Doctor's Risk Notes</p>
+                          <p className="text-sm text-white italic">"{riskCriteria.doctor_notes}"</p>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <div className="text-center py-4 bg-[#121B32] rounded-lg">
+                      <p className="text-sm text-gray-400 italic">No custom risk criteria set by doctor.</p>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Emergency Contact */}
+            <Card className="bg-[#1A243D] border border-slate-700/40 shadow-sm rounded-3xl">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                    <AlertCircle className="w-5 h-5 text-blue-400" />
+                    Emergency Contact
+                  </h3>
+                  <button
+                    onClick={handleOpenEmergencyModal}
+                    className="p-1.5 rounded-lg bg-blue-500/20 hover:bg-blue-500/30 transition-colors"
+                  >
+                    <Edit2 className="w-4 h-4 text-blue-400" />
+                  </button>
+                </div>
+                <div className="space-y-3">
+                  <div className="flex items-start gap-3">
+                    <User className="w-5 h-5 text-blue-400 mt-0.5 flex-shrink-0" />
+                    <div className="flex-1">
+                      <p className="text-xs text-slate-400 mb-1">Contact Name</p>
+                      <p className="text-white">{profile?.emergency_contact_name || 'Not provided'}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-3">
+                    <Phone className="w-5 h-5 text-blue-400 mt-0.5 flex-shrink-0" />
+                    <div className="flex-1">
+                      <p className="text-xs text-slate-400 mb-1">Contact Phone</p>
+                      <p className="text-white">{profile?.emergency_contact_phone || 'Not provided'}</p>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Logout Button */}
+            <Card className="bg-[#1A243D] border border-slate-700/40 shadow-sm rounded-3xl">
+              <CardContent className="p-6">
+                <Button
+                  onClick={handleLogout}
+                  className="w-full bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white font-semibold py-6 flex items-center justify-center gap-2"
                 >
-                  <Edit2 className="w-4 h-4 text-emerald-400" />
-                </button>
-              </div>
-              <div className="space-y-3">
-                <div className="flex items-start gap-3">
-                  <User className="w-5 h-5 text-emerald-400 mt-0.5 flex-shrink-0" />
-                  <div className="flex-1">
-                    <p className="text-xs text-emerald-200/60 mb-1">Contact Name</p>
-                    <p className="text-white">{profile?.emergency_contact_name || 'Not provided'}</p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3">
-                  <Phone className="w-5 h-5 text-emerald-400 mt-0.5 flex-shrink-0" />
-                  <div className="flex-1">
-                    <p className="text-xs text-emerald-200/60 mb-1">Contact Phone</p>
-                    <p className="text-white">{profile?.emergency_contact_phone || 'Not provided'}</p>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* ABHA Health ID */}
-          {profile && (
-            <ABHALinking
-              patientId={profile.id}
-              currentAbha={profile.abha_id}
-              onLinked={(abhaNumber, abhaAddress) => {
-                setProfile(prev => prev ? { ...prev, abha_id: abhaNumber, abha_address: abhaAddress } : prev);
-              }}
-            />
-          )}
-
-          {/* My Vital Thresholds */}
-          <Card className="glass-card border-blue-500/30 bg-blue-500/5 cursor-pointer hover:bg-blue-500/10 transition-colors" onClick={() => navigate('/my-thresholds')}>
-            <CardContent className="p-4 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <Heart className="w-5 h-5 text-blue-400" />
-                <div>
-                  <p className="text-white font-medium">My Vital Thresholds</p>
-                  <p className="text-xs text-gray-400">View doctor-configured alert ranges</p>
-                </div>
-              </div>
-              <span className="text-gray-400 text-lg">›</span>
-            </CardContent>
-          </Card>
-
-          {/* Logout Button */}
-          <Card className="glass-card border-red-500/30 bg-red-500/10">
-            <CardContent className="p-6">
-              <Button
-                onClick={handleLogout}
-                className="w-full bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white font-semibold py-6 flex items-center justify-center gap-2"
-              >
-                <LogOut className="w-5 h-5" />
-                Sign Out
-              </Button>
-            </CardContent>
-          </Card>
+                  <LogOut className="w-5 h-5" />
+                  Sign Out
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
         </div>
+
+        {/* Personal Info Modal */}
+        <Dialog open={personalModalOpen} onOpenChange={setPersonalModalOpen}>
+          <DialogContent className="bg-[#1A243D] border border-slate-700/40 text-white max-w-sm rounded-3xl">
+            <DialogHeader>
+              <DialogTitle>Personal Information</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <label className="text-xs text-slate-400">Full Name</label>
+                <Input
+                  value={personalForm.full_name}
+                  onChange={e => setPersonalForm({ ...personalForm, full_name: e.target.value })}
+                  className="bg-[#121B32] border border-slate-700/40 text-white placeholder-gray-500 rounded-xl"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs text-slate-400">Phone Number</label>
+                <Input
+                  value={personalForm.phone_number}
+                  onChange={e => setPersonalForm({ ...personalForm, phone_number: e.target.value })}
+                  className="bg-[#121B32] border border-slate-700/40 text-white placeholder-gray-500 rounded-xl"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs text-slate-400">Date of Birth</label>
+                <Input
+                  type="date"
+                  value={personalForm.date_of_birth}
+                  onChange={e => setPersonalForm({ ...personalForm, date_of_birth: e.target.value })}
+                  className="bg-[#121B32] border border-slate-700/40 text-white placeholder-gray-500 rounded-xl"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs text-slate-400">Gender</label>
+                <select
+                  value={personalForm.gender}
+                  onChange={e => setPersonalForm({ ...personalForm, gender: e.target.value })}
+                  className="w-full bg-[#121B32] border border-slate-700/40 text-white rounded-xl p-2.5 text-sm"
+                >
+                  <option value="">Select Gender</option>
+                  <option value="male">Male</option>
+                  <option value="female">Female</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs text-slate-400">Address</label>
+                <textarea
+                  value={personalForm.address}
+                  onChange={e => setPersonalForm({ ...personalForm, address: e.target.value })}
+                  className="w-full bg-[#121B32] border border-slate-700/40 text-white rounded-xl p-2.5 text-sm h-20 resize-none"
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="ghost" onClick={() => setPersonalModalOpen(false)}>Cancel</Button>
+              <Button onClick={handleSavePersonal} disabled={saving}>{saving ? 'Saving...' : 'Save'}</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Medical Info Modal */}
+        <Dialog open={medicalModalOpen} onOpenChange={setMedicalModalOpen}>
+          <DialogContent className="bg-[#1A243D] border border-slate-700/40 text-white max-w-sm rounded-3xl">
+            <DialogHeader>
+              <DialogTitle>Medical Information</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <label className="text-xs text-slate-400">Blood Type</label>
+                <select
+                  value={medicalForm.blood_type}
+                  onChange={e => setMedicalForm({ ...medicalForm, blood_type: e.target.value })}
+                  className="w-full bg-[#121B32] border border-slate-700/40 text-white rounded-xl p-2.5 text-sm"
+                >
+                  <option value="">Select Blood Type</option>
+                  {['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'].map(t => (
+                    <option key={t} value={t}>{t}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs text-slate-400">Allergies (comma separated)</label>
+                <textarea
+                  value={medicalForm.allergies}
+                  onChange={e => setMedicalForm({ ...medicalForm, allergies: e.target.value })}
+                  className="w-full bg-[#121B32] border border-slate-700/40 text-white rounded-xl p-2.5 text-sm h-20 resize-none"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs text-slate-400">Conditions (comma separated)</label>
+                <textarea
+                  value={medicalForm.medical_conditions}
+                  onChange={e => setMedicalForm({ ...medicalForm, medical_conditions: e.target.value })}
+                  className="w-full bg-[#121B32] border border-slate-700/40 text-white rounded-xl p-2.5 text-sm h-20 resize-none"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs text-slate-400">Medications (comma separated)</label>
+                <textarea
+                  value={medicalForm.current_medications}
+                  onChange={e => setMedicalForm({ ...medicalForm, current_medications: e.target.value })}
+                  className="w-full bg-[#121B32] border border-slate-700/40 text-white rounded-xl p-2.5 text-sm h-20 resize-none"
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="ghost" onClick={() => setMedicalModalOpen(false)}>Cancel</Button>
+              <Button onClick={handleSaveMedical} disabled={saving}>{saving ? 'Saving...' : 'Save'}</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Emergency Contact Modal */}
+        <Dialog open={emergencyModalOpen} onOpenChange={setEmergencyModalOpen}>
+          <DialogContent className="bg-[#1A243D] border border-slate-700/40 text-white max-w-sm rounded-3xl">
+            <DialogHeader>
+              <DialogTitle>Emergency Contact</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <label className="text-xs text-slate-400">Contact Name</label>
+                <Input
+                  value={emergencyForm.emergency_contact_name}
+                  onChange={e => setEmergencyForm({ ...emergencyForm, emergency_contact_name: e.target.value })}
+                  className="bg-[#121B32] border border-slate-700/40 text-white placeholder-gray-500 rounded-xl"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs text-slate-400">Contact Phone</label>
+                <Input
+                  value={emergencyForm.emergency_contact_phone}
+                  onChange={e => setEmergencyForm({ ...emergencyForm, emergency_contact_phone: e.target.value })}
+                  className="bg-[#121B32] border border-slate-700/40 text-white placeholder-gray-500 rounded-xl"
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="ghost" onClick={() => setEmergencyModalOpen(false)}>Cancel</Button>
+              <Button onClick={handleSaveEmergency} disabled={saving}>{saving ? 'Saving...' : 'Save'}</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Height Modal */}
+        <Dialog open={heightModalOpen} onOpenChange={setHeightModalOpen}>
+          <DialogContent className="bg-[#1A243D] border border-slate-700/40 text-white max-w-sm rounded-3xl">
+            <DialogHeader>
+              <DialogTitle>Update Height</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <Input
+                type="number"
+                value={heightInput}
+                onChange={e => setHeightInput(e.target.value)}
+                className="bg-[#121B32] border border-slate-700/40 text-white placeholder-gray-500 rounded-xl"
+              />
+            </div>
+            <DialogFooter>
+              <Button variant="ghost" onClick={() => setHeightModalOpen(false)}>Cancel</Button>
+              <Button onClick={handleSaveHeight} disabled={saving}>{saving ? 'Saving...' : 'Save'}</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Weight Modal */}
+        <Dialog open={weightModalOpen} onOpenChange={setWeightModalOpen}>
+          <DialogContent className="bg-[#1A243D] border border-slate-700/40 text-white max-w-sm rounded-3xl">
+            <DialogHeader>
+              <DialogTitle>Update Weight</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <Input
+                type="number"
+                value={weightInput}
+                onChange={e => setWeightInput(e.target.value)}
+                className="bg-[#121B32] border border-slate-700/40 text-white placeholder-gray-500 rounded-xl"
+              />
+            </div>
+            <DialogFooter>
+              <Button variant="ghost" onClick={() => setWeightModalOpen(false)}>Cancel</Button>
+              <Button onClick={handleSaveWeight} disabled={saving}>{saving ? 'Saving...' : 'Save'}</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
-
-      {/* Personal Info Modal */}
-      <Dialog open={personalModalOpen} onOpenChange={setPersonalModalOpen}>
-        <DialogContent className="bg-slate-900 border-emerald-500/30 text-white max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Personal Information</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <label className="text-xs text-emerald-200/60">Full Name</label>
-              <Input
-                value={personalForm.full_name}
-                onChange={e => setPersonalForm({...personalForm, full_name: e.target.value})}
-                className="bg-slate-800 border-emerald-500/20"
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-xs text-emerald-200/60">Phone Number</label>
-              <Input
-                value={personalForm.phone_number}
-                onChange={e => setPersonalForm({...personalForm, phone_number: e.target.value})}
-                className="bg-slate-800 border-emerald-500/20"
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-xs text-emerald-200/60">Date of Birth</label>
-              <Input
-                type="date"
-                value={personalForm.date_of_birth}
-                onChange={e => setPersonalForm({...personalForm, date_of_birth: e.target.value})}
-                className="bg-slate-800 border-emerald-500/20"
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-xs text-emerald-200/60">Gender</label>
-              <select
-                value={personalForm.gender}
-                onChange={e => setPersonalForm({...personalForm, gender: e.target.value})}
-                className="w-full bg-slate-800 border border-emerald-500/20 rounded-md p-2 text-sm"
-              >
-                <option value="">Select Gender</option>
-                <option value="male">Male</option>
-                <option value="female">Female</option>
-                <option value="other">Other</option>
-              </select>
-            </div>
-            <div className="space-y-2">
-              <label className="text-xs text-emerald-200/60">Address</label>
-              <textarea
-                value={personalForm.address}
-                onChange={e => setPersonalForm({...personalForm, address: e.target.value})}
-                className="w-full bg-slate-800 border border-emerald-500/20 rounded-md p-2 text-sm h-20 resize-none"
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setPersonalModalOpen(false)}>Cancel</Button>
-            <Button onClick={handleSavePersonal} disabled={saving}>{saving ? 'Saving...' : 'Save'}</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Medical Info Modal */}
-      <Dialog open={medicalModalOpen} onOpenChange={setMedicalModalOpen}>
-        <DialogContent className="bg-slate-900 border-emerald-500/30 text-white max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Medical Information</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <label className="text-xs text-emerald-200/60">Blood Type</label>
-              <select
-                value={medicalForm.blood_type}
-                onChange={e => setMedicalForm({...medicalForm, blood_type: e.target.value})}
-                className="w-full bg-slate-800 border border-emerald-500/20 rounded-md p-2 text-sm"
-              >
-                <option value="">Select Blood Type</option>
-                {['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'].map(t => (
-                  <option key={t} value={t}>{t}</option>
-                ))}
-              </select>
-            </div>
-            <div className="space-y-2">
-              <label className="text-xs text-emerald-200/60">Allergies (comma separated)</label>
-              <textarea
-                value={medicalForm.allergies}
-                onChange={e => setMedicalForm({...medicalForm, allergies: e.target.value})}
-                className="w-full bg-slate-800 border border-emerald-500/20 rounded-md p-2 text-sm h-20 resize-none"
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-xs text-emerald-200/60">Conditions (comma separated)</label>
-              <textarea
-                value={medicalForm.medical_conditions}
-                onChange={e => setMedicalForm({...medicalForm, medical_conditions: e.target.value})}
-                className="w-full bg-slate-800 border border-emerald-500/20 rounded-md p-2 text-sm h-20 resize-none"
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-xs text-emerald-200/60">Medications (comma separated)</label>
-              <textarea
-                value={medicalForm.current_medications}
-                onChange={e => setMedicalForm({...medicalForm, current_medications: e.target.value})}
-                className="w-full bg-slate-800 border border-emerald-500/20 rounded-md p-2 text-sm h-20 resize-none"
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setMedicalModalOpen(false)}>Cancel</Button>
-            <Button onClick={handleSaveMedical} disabled={saving}>{saving ? 'Saving...' : 'Save'}</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Emergency Contact Modal */}
-      <Dialog open={emergencyModalOpen} onOpenChange={setEmergencyModalOpen}>
-        <DialogContent className="bg-slate-900 border-emerald-500/30 text-white max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Emergency Contact</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <label className="text-xs text-emerald-200/60">Contact Name</label>
-              <Input
-                value={emergencyForm.emergency_contact_name}
-                onChange={e => setEmergencyForm({...emergencyForm, emergency_contact_name: e.target.value})}
-                className="bg-slate-800 border-emerald-500/20"
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-xs text-emerald-200/60">Contact Phone</label>
-              <Input
-                value={emergencyForm.emergency_contact_phone}
-                onChange={e => setEmergencyForm({...emergencyForm, emergency_contact_phone: e.target.value})}
-                className="bg-slate-800 border-emerald-500/20"
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setEmergencyModalOpen(false)}>Cancel</Button>
-            <Button onClick={handleSaveEmergency} disabled={saving}>{saving ? 'Saving...' : 'Save'}</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Height Modal */}
-      <Dialog open={heightModalOpen} onOpenChange={setHeightModalOpen}>
-        <DialogContent className="bg-slate-900 border-emerald-500/30 text-white max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Update Height</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <Input
-              type="number"
-              value={heightInput}
-              onChange={e => setHeightInput(e.target.value)}
-              className="bg-slate-800 border-emerald-500/20"
-            />
-          </div>
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setHeightModalOpen(false)}>Cancel</Button>
-            <Button onClick={handleSaveHeight} disabled={saving}>{saving ? 'Saving...' : 'Save'}</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Weight Modal */}
-      <Dialog open={weightModalOpen} onOpenChange={setWeightModalOpen}>
-        <DialogContent className="bg-slate-900 border-emerald-500/30 text-white max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Update Weight</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <Input
-              type="number"
-              value={weightInput}
-              onChange={e => setWeightInput(e.target.value)}
-              className="bg-slate-800 border-emerald-500/20"
-            />
-          </div>
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setWeightModalOpen(false)}>Cancel</Button>
-            <Button onClick={handleSaveWeight} disabled={saving}>{saving ? 'Saving...' : 'Save'}</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
+    </MobileAppContainer>
   );
 };
 
