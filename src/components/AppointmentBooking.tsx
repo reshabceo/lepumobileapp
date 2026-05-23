@@ -471,13 +471,32 @@ export const AppointmentBooking = () => {
 
   if (!doctorId) {
     return (
-      <div className="p-4">
-        <Card className="glass border-white/10 bg-gradient-to-br from-emerald-950/50 via-green-900/30 to-emerald-950/50">
+      <div className="space-y-4 p-4 w-full bg-[#080D1A] min-h-screen text-white">
+        {/* Standard Header */}
+        <header className="flex items-center gap-3 mb-6">
+          <button
+            onClick={() => navigate(-1)}
+            className="p-2 rounded-full bg-white/5 hover:bg-white/10 transition-colors active:scale-95 text-white"
+          >
+            <ArrowLeft className="w-4 h-4" />
+          </button>
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-2xl bg-orange-900/70 flex items-center justify-center border border-orange-400/50">
+              <Calendar className="h-6 w-6 text-orange-300" />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold">Book Appointment</h1>
+              <p className="text-xs text-gray-400">Schedule an appointment with your doctor</p>
+            </div>
+          </div>
+        </header>
+
+        <Card className="bg-[#1A243D] border-slate-700/40 text-white shadow-xl rounded-3xl">
           <CardContent className="p-8">
-            <div className="text-center text-emerald-200/60">
-              <AlertCircle className="w-12 h-12 mx-auto mb-4 opacity-50 text-emerald-400/50" />
-              <p className="text-emerald-100">No doctor assigned</p>
-              <p className="text-sm mt-2 text-emerald-300/70">Please contact support to get assigned to a doctor</p>
+            <div className="text-center text-slate-350">
+              <AlertCircle className="w-12 h-12 mx-auto mb-4 opacity-50 text-orange-400" />
+              <p className="text-white font-bold">No doctor assigned</p>
+              <p className="text-sm mt-2 text-slate-400">Please contact support to get assigned to a doctor</p>
             </div>
           </CardContent>
         </Card>
@@ -486,42 +505,41 @@ export const AppointmentBooking = () => {
   }
 
   return (
-    <div className="space-y-4 p-4 w-full">
-      <Card className="glass border-white/10 bg-gradient-to-br from-emerald-950/50 via-green-900/30 to-emerald-950/50 w-full overflow-visible">
-        <CardHeader className="space-y-4 px-4 sm:px-6">
-          {/* Back Button - Mobile First */}
+    <div className="space-y-4 p-4 w-full bg-[#080D1A] min-h-screen text-white">
+      {/* Standard Header */}
+      <header className="space-y-3 mb-6">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => navigate(-1)}
+            className="p-2 rounded-full bg-white/5 hover:bg-white/10 transition-colors active:scale-95 text-white flex-shrink-0"
+          >
+            <ArrowLeft className="w-4 h-4" />
+          </button>
           <div className="flex items-center gap-3">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => navigate('/dashboard')}
-              className="text-emerald-300 hover:bg-emerald-600/20 hover:text-emerald-100 p-2 -ml-2"
-            >
-              <ArrowLeft className="w-5 h-5" />
-            </Button>
-            <div className="flex-1 min-w-0">
-              <CardTitle className="flex items-center gap-2 text-emerald-100 text-lg sm:text-xl">
-                <Calendar className="w-5 h-5 text-emerald-400 flex-shrink-0" />
-                <span className="truncate">Book Appointment</span>
-              </CardTitle>
-              <CardDescription className="text-emerald-200/70 text-sm">
-                Schedule an appointment with your doctor
-              </CardDescription>
+            <div className="h-10 w-10 rounded-2xl bg-orange-900/70 flex items-center justify-center border border-orange-400/50 flex-shrink-0">
+              <Calendar className="h-6 w-6 text-orange-300" />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold">Book Appointment</h1>
+              <p className="text-xs text-gray-400">Schedule an appointment with your doctor</p>
             </div>
           </div>
-          
-          {/* My Appointments Button - Responsive */}
-          <div className="flex justify-end">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowMyAppointments(!showMyAppointments)}
-              className="border-emerald-500/30 text-emerald-300 hover:bg-emerald-600/20 text-xs sm:text-sm whitespace-nowrap"
-            >
-              {showMyAppointments ? 'Hide' : 'Show'} My Appointments
-            </Button>
-          </div>
-        </CardHeader>
+        </div>
+        
+        {/* My Appointments Button */}
+        <div className="pl-12">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowMyAppointments(!showMyAppointments)}
+            className="border-orange-500/30 text-orange-300 hover:bg-orange-600/20 text-xs rounded-xl"
+          >
+            {showMyAppointments ? 'Hide' : 'Show'} Appointments
+          </Button>
+        </div>
+      </header>
+
+      <Card className="bg-[#1A243D] border-slate-700/40 text-white shadow-xl rounded-3xl w-full overflow-visible">
         <CardContent className="space-y-6 p-3 sm:p-6 overflow-x-hidden">
           {showMyAppointments && myAppointments.length > 0 && (
             <div className="border border-emerald-500/20 rounded-xl p-4 bg-gradient-to-br from-emerald-900/20 to-green-900/10">

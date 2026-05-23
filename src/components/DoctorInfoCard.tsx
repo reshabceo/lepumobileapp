@@ -1,16 +1,13 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import {
   Phone,
-  MapPin,
-  Stethoscope,
-  User,
-  Mail,
-  Building2,
   Clock,
   AlertCircle,
-  Video,
   MessageSquare,
   Loader2,
+  Stethoscope,
+  User,
+  Video,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
@@ -33,7 +30,7 @@ export const DoctorInfoCard: React.FC = React.memo(() => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { currentCall, initiateCall } = usePatientVideoCall(user?.id);
-  
+
   const cacheKey = useMemo(() => user ? `doctor_info_${user.id}` : null, [user?.id]);
 
   const [doctor, setDoctor] = useState<Doctor | null>(() => {
@@ -55,7 +52,7 @@ export const DoctorInfoCard: React.FC = React.memo(() => {
   });
   const [loading, setLoading] = useState(!doctor);
   const [error, setError] = useState<string | null>(null);
-  
+
   // Prevent multiple simultaneous fetches
   const fetchingRef = useRef(false);
   const lastUserIdRef = useRef<string | null>(null);
@@ -122,7 +119,6 @@ export const DoctorInfoCard: React.FC = React.memo(() => {
 
         if (patientError) {
           clearTimeout(timeoutId);
-          // Show a network/DB error rather than "No doctor assigned" — it's a fetch failure, not a real unassigned state
           setError("Could not load doctor info. Check your connection and try again.");
           setLoading(false);
           fetchingRef.current = false;
@@ -185,7 +181,7 @@ export const DoctorInfoCard: React.FC = React.memo(() => {
 
     fetchDoctorInfo();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id]); // Only depend on user.id, not the whole user object
+  }, [user?.id]);
 
   const handleChatClick = () => {
     navigate("/chat");
@@ -193,14 +189,12 @@ export const DoctorInfoCard: React.FC = React.memo(() => {
 
   const handleVideoCall = async () => {
     console.log('[CALL] VideoCall button pressed. currentCall=', currentCall)
-    // If we already have an active/pending call from the subscription, go straight in
     if (currentCall?.channel_name) {
       console.log('[CALL] Navigating to existing channel', currentCall.channel_name)
       navigate(`/call/${currentCall.channel_name}`)
       return
     }
 
-    // Fallback: query Supabase for latest pending/accepted call for this patient
     if (!user) { return }
     console.log('[CALL] Querying for existing pending/accepted call')
     const { data: patient, error: pErr } = await supabase
@@ -214,13 +208,16 @@ export const DoctorInfoCard: React.FC = React.memo(() => {
       .from('video_calls')
       .select('id, channel_name, status, call_type')
       .eq('patient_id', patient.id)
-      .in('status', ['pending','accepted'])
+      .in('status', ['pending', 'accepted'])
       .order('initiated_at', { ascending: false })
       .limit(1)
     const call = calls?.[0]
-    if (call?.channel_name) { console.log('[CALL] Found pending/accepted call, navigating to', call.channel_name); navigate(`/call/${call.channel_name}`); return }
+    if (call?.channel_name) {
+      console.log('[CALL] Found pending/accepted call, navigating to', call.channel_name)
+      navigate(`/call/${call.channel_name}`)
+      return
+    }
 
-    // No active call yet: start one and go to waiting screen
     console.log('[CALL] No active call. Initiating new one…')
     await initiateCall('video')
     navigate('/call/wait')
@@ -228,19 +225,18 @@ export const DoctorInfoCard: React.FC = React.memo(() => {
 
   if (loading) {
     return (
-      <div className="bg-[#1E1E1E] rounded-2xl mb-6 overflow-hidden transition-all duration-200 hover:bg-[#252525] animate-pulse">
+      <div className="bg-[#1A243D] border border-slate-700/40 shadow-sm rounded-3xl mb-6 overflow-hidden animate-pulse">
         <div className="relative">
-          <div className="w-full h-44 bg-gray-700"></div>
-          <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
+          <div className="w-full h-44 bg-slate-800 animate-pulse"></div>
         </div>
         <div className="p-4">
           <div className="flex justify-between items-start">
             <div className="flex items-center gap-3">
-              <div className="bg-gray-600 p-3 rounded-full w-12 h-12"></div>
+              <div className="bg-slate-800 p-3 rounded-full w-12 h-12"></div>
               <div className="space-y-2">
-                <div className="h-4 bg-gray-600 rounded w-32"></div>
-                <div className="h-3 bg-gray-600 rounded w-24"></div>
-                <div className="h-3 bg-gray-600 rounded w-40"></div>
+                <div className="h-4 bg-slate-800 rounded w-32"></div>
+                <div className="h-3 bg-slate-800 rounded w-24"></div>
+                <div className="h-3 bg-slate-800 rounded w-40"></div>
               </div>
             </div>
           </div>
@@ -251,7 +247,7 @@ export const DoctorInfoCard: React.FC = React.memo(() => {
 
   if (error) {
     return (
-      <div className="bg-[#1E1E1E] rounded-2xl mb-6 overflow-hidden transition-all duration-200 hover:bg-[#252525]">
+      <div className="bg-[#1A243D] border border-slate-700/40 shadow-sm rounded-3xl mb-6 overflow-hidden">
         <div className="p-6">
           <div className="flex items-center gap-3">
             <AlertCircle className="w-5 h-5 text-red-400" />
@@ -264,11 +260,11 @@ export const DoctorInfoCard: React.FC = React.memo(() => {
 
   if (!doctor) {
     return (
-      <div className="bg-[#1E1E1E] rounded-2xl mb-6 overflow-hidden transition-all duration-200 hover:bg-[#252525]">
+      <div className="bg-[#1A243D] border border-slate-700/40 shadow-sm rounded-3xl mb-6 overflow-hidden">
         <div className="p-6">
           <div className="flex items-center gap-3">
-            <User className="w-5 h-5 text-gray-400" />
-            <p className="text-gray-300 text-sm">No doctor assigned</p>
+            <User className="w-5 h-5 text-slate-550" />
+            <p className="text-slate-400 text-sm">No doctor assigned</p>
           </div>
         </div>
       </div>
@@ -276,45 +272,18 @@ export const DoctorInfoCard: React.FC = React.memo(() => {
   }
 
   return (
-    <div className="bg-[#1E1E1E] rounded-2xl mb-6 overflow-hidden transition-all duration-200 hover:bg-[#252525]">
-      <div className="relative">
-        {/* Doctor Cover Image */}
-        <img
-          src={
-            doctor.profile_picture_url ||
-            "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?q=80&w=2938&auto=format&fit=crop"
-          }
-          alt={doctor.full_name}
-          className="w-full h-44 object-cover object-center"
-          onError={(e) => {
-            e.currentTarget.onerror = null;
-            e.currentTarget.src =
-              "https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?q=80&w=2940&auto=format&fit=crop";
-          }}
-        />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
-
-        {/* Video Call Button (disabled per requirements)
-        <button
-          onClick={handleVideoCall}
-          className="absolute top-4 right-4 bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-3 rounded-lg flex items-center gap-2 text-sm transition-all duration-200 hover:scale-105 active:scale-95"
-        >
-          <Video size={16} />
-          <span>Video Call</span>
-        </button>
-        */}
-      </div>
+    <div className="bg-[#1A243D] border border-slate-700/40 shadow-md rounded-3xl mb-6 overflow-hidden transition-all duration-200 hover:shadow-lg">
 
       <div className="p-4">
         <div className="flex flex-wrap gap-2 justify-between items-start">
           <div className="flex items-center gap-3">
             {/* Doctor Avatar */}
-            <div className="bg-blue-500 p-3 rounded-full">
+            <div className="bg-blue-600 p-0.5 rounded-full flex items-center justify-center">
               {doctor.profile_picture_url ? (
                 <img
                   src={doctor.profile_picture_url}
                   alt={doctor.full_name}
-                  className="h-6 w-6 rounded-full object-cover"
+                  className="h-10 w-10 rounded-full object-cover"
                   onError={(e) => {
                     const target = e.target as HTMLImageElement;
                     target.style.display = "none";
@@ -323,35 +292,34 @@ export const DoctorInfoCard: React.FC = React.memo(() => {
                 />
               ) : null}
               <Stethoscope
-                className={`h-6 w-6 text-white ${
-                  doctor.profile_picture_url ? "hidden" : ""
-                }`}
+                className={`h-5 w-5 text-white ${doctor.profile_picture_url ? "hidden" : ""
+                  }`}
               />
             </div>
 
             {/* Doctor Information */}
             <div>
-              <div className="flex items-center gap-2 mb-1">
-                <h2 className="font-bold text-lg text-white">
+              <div className="flex items-center gap-2 mb-0.5">
+                <h2 className="font-bold text-base text-white">
                   Dr. {doctor.full_name}
                 </h2>
-                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-500/20 text-blue-300 border border-blue-500/30">
+                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-500/10 text-blue-400 border border-blue-500/20">
                   {doctor.doctor_code}
                 </span>
               </div>
 
-              <p className="text-gray-400 text-xs">
+              <p className="text-slate-400 text-xs">
                 {doctor.specialty} • {doctor.hospital}
               </p>
 
-              <div className="flex items-center gap-4 mt-2 text-sm">
-                <div className="flex items-center gap-1 text-gray-300">
-                  <Stethoscope className="w-3 h-3 text-blue-400" />
+              <div className="flex items-center gap-4 mt-2 text-xs">
+                <div className="flex items-center gap-1 text-slate-300">
+                  <Stethoscope className="w-3.5 h-3.5 text-blue-400" />
                   <span>{doctor.specialty}</span>
                 </div>
                 {doctor.years_experience && (
-                  <div className="flex items-center gap-1 text-gray-300">
-                    <Clock className="w-3 h-3 text-orange-400" />
+                  <div className="flex items-center gap-1 text-slate-300">
+                    <Clock className="w-3.5 h-3.5 text-amber-400" />
                     <span>{doctor.years_experience} years</span>
                   </div>
                 )}
@@ -360,36 +328,29 @@ export const DoctorInfoCard: React.FC = React.memo(() => {
           </div>
 
           {/* Action Buttons */}
-          <div className="flex items-center gap-2 mt-1">
-            {/* <a
-              href={`tel:${doctor.phone_number}`}
-              className="bg-gray-700/80 hover:bg-gray-600 p-3 rounded-lg transition-all duration-200 hover:scale-105 active:scale-95"
-              title="Call Doctor"
-            >
-              <Phone size={20} className="text-white" />
-            </a> */}
+          <div className="flex items-center gap-2">
             <button
               onClick={handleChatClick}
-              className="bg-gray-700/80 hover:bg-gray-600 p-3 rounded-lg transition-all duration-200 hover:scale-105 active:scale-95"
+              className="bg-slate-800 hover:bg-slate-700 text-slate-200 p-2.5 rounded-xl transition-all duration-200 hover:scale-105 active:scale-95"
               title="Chat with Doctor"
             >
-              <MessageSquare size={20} className="text-white" />
+              <MessageSquare size={18} />
             </button>
           </div>
         </div>
 
         {/* Emergency Contact Section */}
-        <div className="mt-4 pt-4 border-t border-gray-700">
+        <div className="mt-4 pt-4 border-t border-slate-800/80">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <AlertCircle className="w-4 h-4 text-red-400" />
-              <span className="text-sm text-gray-300">Emergency Contact</span>
+              <span className="text-xs font-semibold text-slate-300">Emergency Contact</span>
             </div>
             <a
               href={`tel:${doctor.phone_number}`}
-              className="inline-flex items-center px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-lg transition-all duration-200 hover:scale-105 active:scale-95"
+              className="inline-flex items-center px-3.5 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-xl transition-all duration-200 hover:scale-105 active:scale-95 shadow-md shadow-red-900/30"
             >
-              <Phone className="w-4 h-4 mr-2" />
+              <Phone className="w-3.5 h-3.5 mr-1.5" />
               Call Now
             </a>
           </div>
@@ -398,3 +359,4 @@ export const DoctorInfoCard: React.FC = React.memo(() => {
     </div>
   );
 });
+DoctorInfoCard.displayName = "DoctorInfoCard";
