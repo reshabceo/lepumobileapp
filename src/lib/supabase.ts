@@ -50,6 +50,12 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     persistSession: true,
     autoRefreshToken: true,
     detectSessionInUrl: true,
+    // Disable the cross-tab GoTrue lock. Its navigator.locks implementation can
+    // deadlock after the tab/webview goes idle: a background token refresh acquires
+    // the lock and hangs, so EVERY subsequent DB query blocks forever with no error
+    // until a full page reload. In a single mobile webview the cross-tab lock buys
+    // nothing, and running the function directly can never deadlock.
+    lock: async <R>(_name: string, _acquireTimeout: number, fn: () => Promise<R>): Promise<R> => fn(),
   },
 });
 

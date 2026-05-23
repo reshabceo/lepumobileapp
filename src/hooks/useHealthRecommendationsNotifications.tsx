@@ -84,7 +84,7 @@ export const useHealthRecommendationsNotifications = () => {
 
       // Subscribe to real-time updates for new recommendations
       subscription = supabase
-        .channel('health_recommendations_channel')
+        .channel(`health_recommendations_channel_${patient.id}`)
         .on(
           'postgres_changes',
           {

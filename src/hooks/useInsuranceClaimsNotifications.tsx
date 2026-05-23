@@ -45,7 +45,7 @@ export const useInsuranceClaimsNotifications = () => {
 
       // Subscribe to real-time updates for new claims
       subscription = supabase
-        .channel('insurance_claims_channel')
+        .channel(`insurance_claims_channel_${user.id}`)
         .on(
           'postgres_changes',
           {

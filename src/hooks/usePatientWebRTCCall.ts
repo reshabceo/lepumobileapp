@@ -48,6 +48,8 @@ export const usePatientWebRTCCall = (patientId: string | null): UsePatientWebRTC
   const socketRef = useRef<WebSocket | null>(null);
   const pendingIceCandidatesRef = useRef<RTCIceCandidateInit[]>([]);
   const reconnectAttemptRef = useRef<number>(0);
+  // Bumping this re-runs the WebSocket effect to reconnect after an unexpected drop.
+  const [reconnectTick, setReconnectTick] = useState(0);
 
   const {
     localStream,
@@ -78,11 +80,14 @@ export const usePatientWebRTCCall = (patientId: string | null): UsePatientWebRTC
     if (!patientId) return;
 
     console.log('[Patient WebRTC] 🔌 Connecting to signaling server...');
+    let intentionalClose = false;
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
     const ws = new WebSocket(WS_URL);
     socketRef.current = ws;
 
     ws.onopen = () => {
       console.log('[Patient WebRTC] WebSocket connected');
+      reconnectAttemptRef.current = 0; // reset backoff after a successful connect
       ws.send(JSON.stringify({
         type: 'LOGIN',
         userId: `patient_${patientId}`,
@@ -282,18 +287,29 @@ export const usePatientWebRTCCall = (patientId: string | null): UsePatientWebRTC
 
     ws.onclose = () => {
       console.log('[Patient WebRTC] 📴 WebSocket disconnected');
-      if (activeCall) {
-        toast.error('Connection lost');
+      // Don't reconnect if we closed on purpose (unmount / patient change).
+      if (intentionalClose || !patientId) return;
+
+      if (activeCallRef.current) {
+        toast.error('Connection lost — reconnecting…');
       }
+      // Exponential backoff, capped at 15s, so a flaky network or a brief server
+      // restart self-heals instead of requiring an app restart.
+      const attempt = reconnectAttemptRef.current++;
+      const delay = Math.min(1000 * 2 ** attempt, 15000);
+      console.log(`[Patient WebRTC] 🔄 reconnecting in ${delay}ms (attempt ${attempt + 1})`);
+      reconnectTimer = setTimeout(() => setReconnectTick((t) => t + 1), delay);
     };
 
     return () => {
+      intentionalClose = true;
+      if (reconnectTimer) clearTimeout(reconnectTimer);
       // Close regardless of state — CONNECTING sockets left open become zombie sockets
       if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
         ws.close();
       }
     };
-  }, [patientId]);
+  }, [patientId, reconnectTick]);
 
   // Setup ICE candidate handler (use ref to avoid stale closure)
   useEffect(() => {

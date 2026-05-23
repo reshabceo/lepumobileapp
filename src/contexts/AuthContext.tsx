@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
 import { auth, db, supabase, isDoctorByAuthId } from '@/lib/supabase';
 import { User, Session } from '@supabase/supabase-js';
 
@@ -49,6 +49,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  // Tracks which user id we've already run the doctor-role check for, so token
+  // refreshes don't re-fire the DB query (and the state churn) on every event.
+  const doctorCheckedIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     // Get initial session
@@ -85,8 +88,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             const stored = JSON.parse(localStorage.getItem(key) || 'null');
             if (stored?.access_token && stored?.user && stored?.expires_at) {
               if (Date.now() < stored.expires_at * 1000) {
-                setSession(stored);
-                setUser(stored.user);
+                // Only swap state when the token ACTUALLY changed. Setting a fresh
+                // user object on every focus forces every user-dependent hook to
+                // re-run and fire a burst of queries — which is what wedges the
+                // Supabase client after the tab has been idle.
+                setSession(prev => (prev && prev.access_token === stored.access_token ? prev : stored));
+                setUser(prev => (prev && prev.id === stored.user.id ? prev : stored.user));
               }
             }
           }
@@ -109,22 +116,29 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         }
 
         if (event === 'SIGNED_IN' && session?.user) {
-          // Optimistically set session if email is confirmed
+          // Optimistically set session if email is confirmed.
           if (session.user.email_confirmed_at) {
-            setSession(session);
-            setUser(session.user);
-            
-            // Verify role in background
-            isDoctorByAuthId(session.user.id).then(async (isDoctor) => {
-              if (isDoctor) {
-                console.log('🚫 Doctor detected - signing out of patient app');
-                await supabase.auth.signOut();
-                setSession(null);
-                setUser(null);
-              }
-            });
+            // Keep the same object reference when the user/token is unchanged so a
+            // background token refresh (which also fires SIGNED_IN) doesn't churn
+            // every user-dependent hook.
+            setSession(prev => (prev && prev.access_token === session.access_token ? prev : session));
+            setUser(prev => (prev && prev.id === session.user.id ? prev : session.user));
+
+            // Verify role only once per user id (not on every refresh event).
+            if (doctorCheckedIdRef.current !== session.user.id) {
+              doctorCheckedIdRef.current = session.user.id;
+              isDoctorByAuthId(session.user.id).then(async (isDoctor) => {
+                if (isDoctor) {
+                  console.log('🚫 Doctor detected - signing out of patient app');
+                  await supabase.auth.signOut();
+                  setSession(null);
+                  setUser(null);
+                }
+              });
+            }
           }
         } else if (event === 'SIGNED_OUT') {
+          doctorCheckedIdRef.current = null;
           setSession(null);
           setUser(null);
         }
