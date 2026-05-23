@@ -12,7 +12,8 @@ import {
   Save,
   Loader2,
   CheckCircle2,
-  ArrowLeft
+  ArrowLeft,
+  Edit3
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
@@ -256,38 +257,37 @@ export const ManualVitalInput = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-950 via-green-900 to-emerald-950">
-      {/* Header with Back Button */}
-      <div className="bg-slate-800/50 backdrop-blur-sm border-b border-slate-700 sticky top-0 z-10">
-        <div className="relative flex items-center justify-between p-4" style={{ paddingTop: 'max(1rem, env(safe-area-inset-top))' }}>
+    <div className="min-h-screen bg-[#080D1A] text-white font-inter select-none p-4 pt-safe-top">
+      <div className="max-w-2xl mx-auto pb-20">
+        {/* Standardized Header */}
+        <header className="flex items-center gap-3 mb-6">
           <button
             onClick={() => navigate(-1)}
-            className="flex items-center gap-2 px-3 py-2 text-white bg-blue-600 hover:bg-blue-700 transition-colors touch-manipulation rounded-lg"
-            style={{ minHeight: '40px', minWidth: '70px' }}
+            className="p-2 rounded-full bg-white/5 hover:bg-white/10 transition-colors active:scale-95 text-white"
           >
-            <ArrowLeft className="h-4 w-4" />
-            <span className="text-sm">Back</span>
+            <ArrowLeft className="w-4 h-4" />
           </button>
-          <h1 className="absolute left-1/2 transform -translate-x-1/2 text-xl font-semibold text-white">Manual Vital Input</h1>
-          <div className="w-16" />
-        </div>
-      </div>
-
-      <div className="p-6">
-        <div className="max-w-2xl mx-auto">
-          {/* Subtitle */}
-          <div className="mb-6 mt-4">
-            <p className="text-emerald-200/80 text-center">Enter your health readings manually - Basic Plan</p>
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-2xl bg-emerald-900/70 flex items-center justify-center border border-emerald-400/50">
+              <Edit3 className="h-6 w-6 text-emerald-300" />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold">Manual Vital Input</h1>
+              <p className="text-xs text-gray-400">Enter your health readings manually - Basic Plan</p>
+            </div>
           </div>
+        </header>
 
         {/* Info Card */}
-        <Card className="bg-blue-500/10 border-blue-500/30 mb-6">
-          <CardContent className="pt-4">
+        <Card className="bg-[#1A243D] border border-blue-500/30 mb-6 rounded-3xl">
+          <CardContent className="pt-5 pb-5 px-5">
             <div className="flex items-start gap-3">
-              <CheckCircle2 className="h-5 w-5 text-blue-400 mt-0.5" />
-              <div className="text-sm text-blue-200">
-                <p className="font-medium mb-1">Real-Time Monitoring</p>
-                <p className="text-blue-200/80">
+              <div className="p-2 rounded-xl bg-blue-900/50 border border-blue-500/30 text-blue-400 flex-shrink-0">
+                <CheckCircle2 className="h-5 w-5" />
+              </div>
+              <div className="text-sm text-gray-200">
+                <p className="font-semibold text-white mb-0.5">Real-Time Monitoring</p>
+                <p className="text-xs text-gray-400 leading-relaxed">
                   Your doctor will see these readings instantly. Fill in the vitals you measured at home.
                 </p>
               </div>
@@ -297,11 +297,11 @@ export const ManualVitalInput = () => {
 
         {/* Input Form */}
         <form onSubmit={handleSubmit}>
-          <Card className="bg-white/10 backdrop-blur-md border-white/20">
-            <CardHeader>
-              <CardTitle className="text-white">Enter Your Vitals</CardTitle>
+          <Card className="bg-[#1A243D] border border-slate-700/40 shadow-sm rounded-3xl overflow-hidden">
+            <CardHeader className="border-b border-slate-800/60 pb-4">
+              <CardTitle className="text-lg font-semibold text-white">Enter Your Vitals</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-6">
+            <CardContent className="space-y-6 pt-6">
               {/* Blood Pressure */}
               <div className="space-y-2">
                 <Label className="text-white flex items-center gap-2">
@@ -316,9 +316,9 @@ export const ManualVitalInput = () => {
                       placeholder="Systolic (120)"
                       value={vitals.bloodPressureSystolic}
                       onChange={(e) => handleInputChange('bloodPressureSystolic', e.target.value)}
-                      className="bg-white/5 border-white/20 text-white placeholder:text-white/40"
+                      className="bg-[#121B32] border border-slate-700/40 text-white placeholder-gray-500 rounded-xl py-5 px-4 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20 transition-all text-sm"
                     />
-                    <p className="text-xs text-emerald-200/60 mt-1">Upper</p>
+                    <p className="text-xs text-gray-400 mt-1">Upper</p>
                   </div>
                   <div>
                     <Input
@@ -327,9 +327,9 @@ export const ManualVitalInput = () => {
                       placeholder="Diastolic (80)"
                       value={vitals.bloodPressureDiastolic}
                       onChange={(e) => handleInputChange('bloodPressureDiastolic', e.target.value)}
-                      className="bg-white/5 border-white/20 text-white placeholder:text-white/40"
+                      className="bg-[#121B32] border border-slate-700/40 text-white placeholder-gray-500 rounded-xl py-5 px-4 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20 transition-all text-sm"
                     />
-                    <p className="text-xs text-emerald-200/60 mt-1">Lower</p>
+                    <p className="text-xs text-gray-400 mt-1">Lower</p>
                   </div>
                 </div>
               </div>
@@ -346,9 +346,9 @@ export const ManualVitalInput = () => {
                   placeholder="e.g., 72"
                   value={vitals.heartRate}
                   onChange={(e) => handleInputChange('heartRate', e.target.value)}
-                  className="bg-white/5 border-white/20 text-white placeholder:text-white/40"
+                  className="bg-[#121B32] border border-slate-700/40 text-white placeholder-gray-500 rounded-xl py-5 px-4 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20 transition-all text-sm"
                 />
-                <p className="text-xs text-emerald-200/60">Heart rate in beats per minute</p>
+                <p className="text-xs text-gray-400">Heart rate in beats per minute</p>
               </div>
 
               {/* SpO2 */}
@@ -363,9 +363,9 @@ export const ManualVitalInput = () => {
                   placeholder="e.g., 98"
                   value={vitals.spo2}
                   onChange={(e) => handleInputChange('spo2', e.target.value)}
-                  className="bg-white/5 border-white/20 text-white placeholder:text-white/40"
+                  className="bg-[#121B32] border border-slate-700/40 text-white placeholder-gray-500 rounded-xl py-5 px-4 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20 transition-all text-sm"
                 />
-                <p className="text-xs text-emerald-200/60">Oxygen saturation percentage</p>
+                <p className="text-xs text-gray-400">Oxygen saturation percentage</p>
               </div>
 
               {/* Temperature */}
@@ -380,9 +380,9 @@ export const ManualVitalInput = () => {
                   placeholder="e.g., 37.0"
                   value={vitals.temperature}
                   onChange={(e) => handleInputChange('temperature', e.target.value)}
-                  className="bg-white/5 border-white/20 text-white placeholder:text-white/40"
+                  className="bg-[#121B32] border border-slate-700/40 text-white placeholder-gray-500 rounded-xl py-5 px-4 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20 transition-all text-sm"
                 />
-                <p className="text-xs text-emerald-200/60">Body temperature in Celsius</p>
+                <p className="text-xs text-gray-400">Body temperature in Celsius</p>
               </div>
 
               {/* Blood Sugar */}
@@ -397,16 +397,16 @@ export const ManualVitalInput = () => {
                   placeholder="e.g., 100"
                   value={vitals.bloodSugar}
                   onChange={(e) => handleInputChange('bloodSugar', e.target.value)}
-                  className="bg-white/5 border-white/20 text-white placeholder:text-white/40"
+                  className="bg-[#121B32] border border-slate-700/40 text-white placeholder-gray-500 rounded-xl py-5 px-4 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/20 transition-all text-sm"
                 />
-                <p className="text-xs text-emerald-200/60">Blood glucose level</p>
+                <p className="text-xs text-gray-400">Blood glucose level</p>
               </div>
 
               {/* Submit Button */}
               <Button
                 type="submit"
                 disabled={submitting}
-                className="w-full bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white font-semibold py-6 text-lg"
+                className="w-full bg-emerald-600 hover:bg-emerald-700 active:scale-95 transition-all text-white font-semibold py-6 text-lg rounded-2xl"
               >
                 {submitting ? (
                   <>
@@ -422,9 +422,9 @@ export const ManualVitalInput = () => {
               </Button>
 
               {/* Info Text */}
-              <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-4">
-                <p className="text-xs text-emerald-200/90 leading-relaxed">
-                  📱 <strong>Basic Plan:</strong> Manually enter your vitals measured at home. 
+              <div className="bg-[#121B32] border border-slate-700/40 rounded-xl p-4">
+                <p className="text-xs text-gray-400 leading-relaxed">
+                  📱 <strong className="text-white">Basic Plan:</strong> Manually enter your vitals measured at home. 
                   Your doctor will see these readings instantly in real-time, just like device readings. 
                   All fields are optional - enter what you have measured.
                 </p>
@@ -432,7 +432,6 @@ export const ManualVitalInput = () => {
             </CardContent>
           </Card>
         </form>
-        </div>
       </div>
     </div>
   );

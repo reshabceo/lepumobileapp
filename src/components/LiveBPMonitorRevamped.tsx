@@ -5,7 +5,7 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useDevice } from '@/contexts/DeviceContext';
 import { WellueSDKBridge } from '@/lib/wellue-sdk-bridge';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Heart } from 'lucide-react';
 
 type MeasurementState = 'idle' | 'ready' | 'waiting' | 'inflating' | 'deflating' | 'analyzing' | 'completed' | 'canceled' | 'error';
 
@@ -1048,33 +1048,38 @@ export const LiveBPMonitorRevamped: React.FC = () => {
 
   if (!connectedDevice) {
     return (
-      <div className="min-h-screen bg-slate-900 text-white w-full">
+      <div className="min-h-screen bg-[#080D1A] text-white font-inter select-none w-full">
         {/* Header */}
-        <div className="bg-slate-800/50 backdrop-blur-sm border-b border-slate-700" style={{ paddingTop: 'max(1rem, env(safe-area-inset-top))' }}>
-          <div className="relative flex items-center justify-between p-4">
+        <div className="p-4 pt-safe-top">
+          <header className="flex items-center gap-3 mb-6">
             <button
               onClick={() => navigate(-1)}
-              className="flex items-center gap-2 px-3 py-2 text-white bg-blue-600 hover:bg-blue-700 transition-colors touch-manipulation rounded-lg"
-              style={{ minHeight: '40px', minWidth: '70px' }}
+              className="p-2 rounded-full bg-white/5 hover:bg-white/10 transition-colors active:scale-95 text-white"
             >
-              <ArrowLeft className="h-4 w-4" />
-              <span className="text-sm">Back</span>
+              <ArrowLeft className="w-4 h-4" />
             </button>
-            <h1 className="absolute left-1/2 transform -translate-x-1/2 text-xl font-semibold">BP Monitor</h1>
-            <div className="w-16" />
-          </div>
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-2xl bg-blue-900/70 flex items-center justify-center border border-blue-400/50">
+                <Heart className="h-6 w-6 text-blue-300" />
+              </div>
+              <div>
+                <h1 className="text-xl font-bold">BP Monitor</h1>
+                <p className="text-xs text-gray-400">Live Blood Pressure Monitoring</p>
+              </div>
+            </div>
+          </header>
         </div>
         
         {/* Content */}
         <div className="p-4">
           <div className="w-full max-w-md mx-auto">
-            <div className="text-center">
-              <h1 className="text-2xl font-bold mb-4">No Device Connected</h1>
+            <Card className="bg-[#1A243D] border border-slate-700/40 shadow-sm rounded-3xl p-6 text-center">
+              <h2 className="text-2xl font-bold mb-4 text-white">No Device Connected</h2>
               <p className="text-gray-400 mb-6">Please connect a BP monitor device first.</p>
-              <Button onClick={() => navigate('/wellue-scanner')} className="w-full">
+              <Button onClick={() => navigate('/wellue-scanner')} className="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-xl">
                 Connect Device
               </Button>
-            </div>
+            </Card>
           </div>
         </div>
       </div>
@@ -1083,23 +1088,28 @@ export const LiveBPMonitorRevamped: React.FC = () => {
 
 
   return (
-    <div className="min-h-screen bg-slate-900 text-white w-full">
+    <div className="min-h-screen bg-[#080D1A] text-white font-inter select-none w-full">
       <style dangerouslySetInnerHTML={{ __html: heartbeatStyles }} />
       
       {/* Header */}
-      <div className="bg-slate-800/50 backdrop-blur-sm border-b border-slate-700" style={{ paddingTop: 'max(1rem, env(safe-area-inset-top))' }}>
-        <div className="relative flex items-center justify-between p-4">
+      <div className="p-4 pt-safe-top">
+        <header className="flex items-center gap-3 mb-6">
           <button
             onClick={() => navigate(-1)}
-            className="flex items-center gap-2 px-3 py-2 text-white bg-blue-600 hover:bg-blue-700 transition-colors touch-manipulation rounded-lg"
-            style={{ minHeight: '40px', minWidth: '70px' }}
+            className="p-2 rounded-full bg-white/5 hover:bg-white/10 transition-colors active:scale-95 text-white"
           >
-            <ArrowLeft className="h-4 w-4" />
-            <span className="text-sm">Back</span>
+            <ArrowLeft className="w-4 h-4" />
           </button>
-          <h1 className="absolute left-1/2 transform -translate-x-1/2 text-xl font-semibold">BP Monitor</h1>
-          <div className="w-16" />
-        </div>
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-2xl bg-blue-900/70 flex items-center justify-center border border-blue-400/50">
+              <Heart className="h-6 w-6 text-blue-300" />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold">BP Monitor</h1>
+              <p className="text-xs text-gray-400">Live Blood Pressure Monitoring</p>
+            </div>
+          </div>
+        </header>
       </div>
       
       {/* Content */}
@@ -1107,7 +1117,7 @@ export const LiveBPMonitorRevamped: React.FC = () => {
         <div className="w-full max-w-md mx-auto">
 
         {/* Device Info */}
-        <Card className="bg-slate-800 border-slate-700 p-4 mb-6">
+        <Card className="bg-[#1A243D] border border-slate-700/40 shadow-sm rounded-3xl p-4 mb-6">
           <div className="flex items-center justify-between">
             <div>
               <h3 className="font-semibold text-white">{connectedDevice.name}</h3>
@@ -1121,7 +1131,7 @@ export const LiveBPMonitorRevamped: React.FC = () => {
         </Card>
 
         {/* Main Measurement Panel - 2-column grid */}
-        <Card className="bg-slate-800 border-slate-700 p-6 mb-4">
+        <Card className="bg-[#1A243D] border border-slate-700/40 shadow-sm rounded-3xl p-6 mb-4">
           <div className="grid grid-cols-[1fr_36px] gap-4">
             {/* Column 1: Status badge, live pressure, and phase indicators */}
             <div className="flex flex-col">
@@ -1213,7 +1223,7 @@ export const LiveBPMonitorRevamped: React.FC = () => {
         {/* Action Buttons Section Removed */}
 
         {/* Results Display Panel - Direct Results */}
-        <Card className="bg-slate-800 border-slate-700 p-4 mb-6">
+        <Card className="bg-[#1A243D] border border-slate-700/40 shadow-sm rounded-3xl p-4 mb-6">
           <div className="flex items-center justify-between mb-3">
             <div className="text-gray-200 font-medium">Measurement Results</div>
             {/* Status section removed as requested */}
@@ -1223,19 +1233,19 @@ export const LiveBPMonitorRevamped: React.FC = () => {
             {bpResult ? (
               <div className="flex flex-col justify-center">
                 <div className="grid grid-cols-2 gap-4 text-center">
-                  <div className="bg-slate-700/50 rounded-lg p-3">
+                  <div className="bg-[#121B32] border border-slate-700/40 rounded-2xl p-3">
                     <div className="text-2xl font-bold text-white">{bpResult.systolic}</div>
                     <div className="text-xs text-gray-400">Systolic (mmHg)</div>
                   </div>
-                  <div className="bg-slate-700/50 rounded-lg p-3">
+                  <div className="bg-[#121B32] border border-slate-700/40 rounded-2xl p-3">
                     <div className="text-2xl font-bold text-white">{bpResult.diastolic}</div>
                     <div className="text-xs text-gray-400">Diastolic (mmHg)</div>
                   </div>
-                  <div className="bg-slate-700/50 rounded-lg p-3">
+                  <div className="bg-[#121B32] border border-slate-700/40 rounded-2xl p-3">
                     <div className="text-2xl font-bold text-white">{bpResult.pulseRate}</div>
                     <div className="text-xs text-gray-400">Pulse Rate (bpm)</div>
                   </div>
-                  <div className="bg-slate-700/50 rounded-lg p-3">
+                  <div className="bg-[#121B32] border border-slate-700/40 rounded-2xl p-3">
                     <div className="text-2xl font-bold text-white">{bpResult.map}</div>
                     <div className="text-xs text-gray-400">MAP (mmHg)</div>
                   </div>
@@ -1277,12 +1287,12 @@ export const LiveBPMonitorRevamped: React.FC = () => {
 
         {/* BP History Section */}
         {previousReadings.length > 0 && (
-          <Card className="bg-slate-800 border-slate-700 p-4 mb-4">
+          <Card className="bg-[#1A243D] border border-slate-700/40 shadow-sm rounded-3xl p-4 mb-4">
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-gray-200 font-medium">Previous Reading</h3>
               <div className="text-sm text-gray-400">Latest</div>
             </div>
-            <div className="bg-slate-700/30 rounded-lg p-3">
+            <div className="bg-[#121B32] border border-slate-700/40 rounded-2xl p-3">
               <div className="grid grid-cols-2 gap-3 text-center">
                 <div>
                   <div className="text-lg font-bold text-white">{previousReadings[0].systolic}/{previousReadings[0].diastolic}</div>
@@ -1305,7 +1315,7 @@ export const LiveBPMonitorRevamped: React.FC = () => {
 
         {/* Error Display */}
         {errorMessage && (
-          <Card className="bg-red-900/20 border-red-700 p-4 mb-6">
+          <Card className="bg-red-900/20 border-red-700/40 shadow-sm rounded-3xl p-4 mb-6">
             <div className="text-red-400 text-center">
               <p className="font-semibold">Error</p>
               <p className="text-sm">{errorMessage}</p>
