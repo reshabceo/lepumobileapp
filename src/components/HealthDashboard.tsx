@@ -1528,6 +1528,14 @@ export const HealthDashboard = () => {
             <Video size={20} className="text-indigo-400" />
             <span className="text-xs">Camera</span>
           </button>
+
+          <button
+            onClick={() => navigate("/live-monitoring")}
+            className="bg-teal-900/60 backdrop-blur-sm hover:bg-teal-800/70 text-white font-bold py-4 rounded-xl flex flex-col items-center justify-center gap-1 transition-all duration-200 hover:scale-105 active:scale-95 border border-teal-400/40 hover:border-teal-400/60"
+          >
+            <Video size={20} className="text-teal-300" />
+            <span className="text-xs">Live RPM</span>
+          </button>
         </div>
 
         {/* Manual Vital Input Button - Basic Plan */}

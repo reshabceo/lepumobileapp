@@ -124,9 +124,9 @@ export default function ConnectCamera() {
     const displayUser = cleanUser || "YOUR_USERNAME";
     const displayIp = cleanIp || "YOUR_CAMERA_IP";
 
-    // Format: rtsp://username:password@CAMERA_IP:554/stream1
-    const mainStream = `rtsp://${displayUser}:${encodedPassword}@${displayIp}:554/stream1`;
-    const subStream = `rtsp://${displayUser}:${encodedPassword}@${displayIp}:554/stream2`;
+    // Reolink RTSP (E1 / E1 Outdoor / Go). Sub stream = low bandwidth.
+    const mainStream = `rtsp://${displayUser}:${encodedPassword}@${displayIp}:554/h264Preview_01_main`;
+    const subStream = `rtsp://${displayUser}:${encodedPassword}@${displayIp}:554/h264Preview_01_sub`;
 
     setGeneratedRtsp(mainStream);
     setGeneratedRtspSub(subStream);
@@ -202,6 +202,7 @@ export default function ConnectCamera() {
           ip_address: ipAddress.trim(),
           rtsp_url: generatedRtsp,
           rtsp_url_sub: generatedRtspSub,
+          camera_model: "reolink_e1_pro",
           updated_at: new Date().toISOString()
         }, {
           onConflict: "patient_id"
@@ -249,7 +250,7 @@ export default function ConnectCamera() {
                 <span className="text-sm">Back</span>
               </button>
               <h1 className="text-md font-bold tracking-tight bg-gradient-to-r from-purple-400 to-indigo-300 bg-clip-text text-transparent">
-                Tapo Camera Link
+                Reolink Camera
               </h1>
               <button
                 onClick={() => setIsInstructionOpen(true)}
@@ -272,11 +273,11 @@ export default function ConnectCamera() {
                   <Video className="w-6 h-6 text-indigo-400 animate-pulse" />
                 </div>
                 <div className="space-y-1">
-                  <h3 className="text-lg font-bold text-white">Tapo RTSP Connection</h3>
+                  <h3 className="text-lg font-bold text-white">Reolink RTSP Connection</h3>
                   <p className="text-gray-400 text-xs leading-relaxed">
-                    Enter your camera account details below to generate a secure
-                    <span className="text-indigo-300 font-semibold"> RTSP stream URL</span>.
-                    This link can be integrated into go2rtc or MediaMTX to view the stream live inside your web dashboard.
+                    Enter Reolink credentials to build the
+                    <span className="text-indigo-300 font-semibold"> RTSP preview URL</span>.
+                    The Pi monitoring kit or Phase-2 native bridge ingests this LAN URL and forwards it to doctors.
                   </p>
                 </div>
               </div>
@@ -389,7 +390,7 @@ export default function ConnectCamera() {
                 {/* Main HD Stream */}
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs text-gray-400 font-semibold">HD High Quality Stream (stream1)</span>
+                    <span className="text-xs text-gray-400 font-semibold">Main stream — h264Preview_01_main</span>
                     {isCopiedMain ? (
                       <span className="text-[10px] text-green-400 flex items-center gap-1">
                         <Check className="w-3 h-3" /> Copied!
@@ -413,7 +414,7 @@ export default function ConnectCamera() {
                 {/* Sub stream (low quality) */}
                 <div className="space-y-2 pt-2 border-t border-white/5">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs text-gray-400 font-semibold">SD Low Quality Stream (stream2)</span>
+                    <span className="text-xs text-gray-400 font-semibold">Sub stream — h264Preview_01_sub</span>
                     {isCopiedSub ? (
                       <span className="text-[10px] text-green-400 flex items-center gap-1">
                         <Check className="w-3 h-3" /> Copied!
@@ -455,10 +456,10 @@ export default function ConnectCamera() {
                   <div className="space-y-1">
                     <h3 className="text-md font-bold flex items-center gap-2 text-indigo-400">
                       <Shield className="w-4 h-4" />
-                      Tapo Camera Setup Guide
+                      Reolink Camera Setup Guide
                     </h3>
                     <p className="text-gray-400 text-[10px]">
-                      Follow these steps inside your Tapo mobile application.
+                      Follow these steps inside the official Reolink mobile app.
                     </p>
                   </div>
                   <button
@@ -477,14 +478,14 @@ export default function ConnectCamera() {
                   <div className="space-y-1.5">
                     <h4 className="font-bold text-white text-[11px] uppercase tracking-wide text-purple-300 flex items-center gap-1.5">
                       <span className="w-5 h-5 rounded-full bg-purple-500/20 border border-purple-500/40 text-[9px] flex items-center justify-center text-purple-200 font-extrabold font-mono flex-shrink-0">1</span>
-                      Create Camera Account
+                      Add Camera to Wi-Fi
                     </h4>
                     <div className="pl-6 text-gray-300 text-[11px] space-y-1">
-                      <p>In your Tapo mobile app:</p>
+                      <p>In the Reolink app, add your camera and connect it to your home Wi-Fi:</p>
                       <p className="bg-black/40 p-2 rounded-lg border border-white/5 text-[10px] font-mono break-all select-all">
-                        Camera Settings → Advanced Settings → Camera Account
+                        Reolink app → Add Device → follow pairing
                       </p>
-                      <p className="text-gray-400 text-[10px]">Create a secure username and password. This is what you will type into our form.</p>
+                      <p className="text-gray-400 text-[10px]">Use the <span className="text-white font-semibold">same Wi-Fi network</span> that this phone is on.</p>
                     </div>
                   </div>
 
@@ -492,14 +493,14 @@ export default function ConnectCamera() {
                   <div className="space-y-1.5">
                     <h4 className="font-bold text-white text-[11px] uppercase tracking-wide text-purple-300 flex items-center gap-1.5">
                       <span className="w-5 h-5 rounded-full bg-purple-500/20 border border-purple-500/40 text-[9px] flex items-center justify-center text-purple-200 font-extrabold font-mono flex-shrink-0">2</span>
-                      Enable RTSP Compatibility
+                      Note Username &amp; Password
                     </h4>
                     <div className="pl-6 text-gray-300 text-[11px] space-y-1">
-                      <p>Inside Advanced Settings:</p>
+                      <p>Use the camera login you set when adding the device:</p>
                       <p className="bg-black/40 p-2 rounded-lg border border-white/5 text-[10px] font-mono break-all select-all">
-                        Advanced Settings → Camera Account / Third Party Compatibility → Enable
+                        Device Settings → Login / User → admin + your password
                       </p>
-                      <p className="text-gray-400 text-[10px]">This allows third-party players (like our app or VLC) to stream the camera feed.</p>
+                      <p className="text-gray-400 text-[10px]">The username is usually <code className="font-mono text-white bg-white/10 px-1 rounded text-[10px]">admin</code>. Enter it and the password into our form.</p>
                     </div>
                   </div>
 
@@ -507,37 +508,45 @@ export default function ConnectCamera() {
                   <div className="space-y-1.5">
                     <h4 className="font-bold text-white text-[11px] uppercase tracking-wide text-purple-300 flex items-center gap-1.5">
                       <span className="w-5 h-5 rounded-full bg-purple-500/20 border border-purple-500/40 text-[9px] flex items-center justify-center text-purple-200 font-extrabold font-mono flex-shrink-0">3</span>
-                      Find Camera IP Address
+                      Enable RTSP / ONVIF
                     </h4>
                     <div className="pl-6 text-gray-300 text-[11px] space-y-1">
-                      <p>Locate your Camera IP address in the Tapo App under:</p>
+                      <p>Turn on standard streaming so we can read the feed:</p>
                       <p className="bg-black/40 p-2 rounded-lg border border-white/5 text-[10px] font-mono break-all select-all">
-                        Camera Settings → Device Info → IP Address
+                        Device Settings → Network → Advanced → Server / Port Settings → enable RTSP &amp; ONVIF
                       </p>
-                      <p className="text-gray-400 text-[10px]">Usually looks like <code className="font-mono text-white bg-white/10 px-1 rounded text-[10px]">192.168.0.100</code>.</p>
+                      <p className="text-gray-400 text-[10px]">This lets our app securely pull the camera video on your local network.</p>
                     </div>
                   </div>
 
                   {/* Step 4 */}
+                  <div className="space-y-1.5">
+                    <h4 className="font-bold text-white text-[11px] uppercase tracking-wide text-purple-300 flex items-center gap-1.5">
+                      <span className="w-5 h-5 rounded-full bg-purple-500/20 border border-purple-500/40 text-[9px] flex items-center justify-center text-purple-200 font-extrabold font-mono flex-shrink-0">4</span>
+                      Find Camera IP Address
+                    </h4>
+                    <div className="pl-6 text-gray-300 text-[11px] space-y-1">
+                      <p>Locate the camera's IP in the Reolink app under:</p>
+                      <p className="bg-black/40 p-2 rounded-lg border border-white/5 text-[10px] font-mono break-all select-all">
+                        Device Settings → Network Information → IP Address
+                      </p>
+                      <p className="text-gray-400 text-[10px]">Usually looks like <code className="font-mono text-white bg-white/10 px-1 rounded text-[10px]">192.168.0.100</code>. Tip: set a DHCP reservation in your router so it never changes.</p>
+                    </div>
+                  </div>
+
+                  {/* How it works (privacy note) */}
                   <div className="space-y-1.5 border-t border-white/5 pt-3">
                     <h4 className="font-bold text-white text-[11px] uppercase tracking-wide text-indigo-300 flex items-center gap-1.5">
                       <Info className="w-4.5 h-4.5 flex-shrink-0" />
-                      Browser Integration Architecture
+                      How It Works
                     </h4>
                     <div className="pl-6 text-gray-300 text-[11px] space-y-2">
                       <p className="text-gray-400 text-[10px] leading-normal">
-                        React Web Browsers cannot directly play standard RTSP streams. To render the video inside the web app, you must proxy it through a stream transcoder.
+                        Your phone reads the camera on your local Wi-Fi and securely forwards the live video to your doctor only while monitoring is turned on. No router changes, port-forwarding, or static IP are needed, and nothing is exposed to the public internet.
                       </p>
-
-                      <div className="bg-indigo-950/40 border border-indigo-500/20 rounded-xl p-2.5 space-y-1.5">
-                        <p className="font-bold text-indigo-300 text-[10px]">Quick Setup with go2rtc (Docker):</p>
-                        <code className="block bg-black/60 p-2 rounded text-[9px] break-all select-all font-mono text-emerald-300 border border-white/5 leading-normal">
-                          docker run --rm -p 1984:1984 -p 8554:8554 -p 8555:8555 alexxit/go2rtc
-                        </code>
-                        <p className="text-[9px] text-gray-400">
-                          Configure your streams and map the generated RTSP link to a WebRTC source to render inside HTML5 video players.
-                        </p>
-                      </div>
+                      <p className="text-[10px] text-gray-400 leading-normal">
+                        Keep your phone on the <span className="text-white font-semibold">same Wi-Fi as the camera</span> while monitoring is active.
+                      </p>
                     </div>
                   </div>
                 </div>

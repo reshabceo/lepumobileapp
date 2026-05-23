@@ -18,6 +18,8 @@
 		861F6F3E2FA0AC1C00A8819C /* StoreKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 861F6F3D2FA0AC1C00A8819C /* StoreKit.framework */; };
 		861F6F412FA0B1E500A8819C /* IAP.swift in Sources */ = {isa = PBXBuildFile; fileRef = 861F6F3F2FA0B1E400A8819C /* IAP.swift */; };
 		861F6F422FA0B1E500A8819C /* IAPPlugin.m in Sources */ = {isa = PBXBuildFile; fileRef = 861F6F402FA0B1E400A8819C /* IAPPlugin.m */; };
+		A91C5E0012AB4E009BFFC003 /* CameraBridgePlugin.m in Sources */ = {isa = PBXBuildFile; fileRef = A91C5E0012AB4E009BFFC004 /* CameraBridgePlugin.m */; };
+		A91C5E0012AB4E009BFFC001 /* CameraBridgePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = A91C5E0012AB4E009BFFC002 /* CameraBridgePlugin.swift */; };
 		A084ECDBA7D38E1E42DFC39D /* Pods_App.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AF277DCFFFF123FFC6DF26C7 /* Pods_App.framework */; };
 		F59C12E7AE354E0BB94EA219 /* WellueSDKPlugin.m in Sources */ = {isa = PBXBuildFile; fileRef = 916B2B78E03146E3BA5C4969 /* WellueSDKPlugin.m */; };
 /* End PBXBuildFile section */
@@ -35,6 +37,8 @@
 		861F6F3D2FA0AC1C00A8819C /* StoreKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = StoreKit.framework; path = System/Library/Frameworks/StoreKit.framework; sourceTree = SDKROOT; };
 		861F6F3F2FA0B1E400A8819C /* IAP.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IAP.swift; sourceTree = "<group>"; };
 		861F6F402FA0B1E400A8819C /* IAPPlugin.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = IAPPlugin.m; sourceTree = "<group>"; };
+		A91C5E0012AB4E009BFFC004 /* CameraBridgePlugin.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = CameraBridgePlugin.m; sourceTree = "<group>"; };
+		A91C5E0012AB4E009BFFC002 /* CameraBridgePlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraBridgePlugin.swift; sourceTree = "<group>"; };
 		916B2B78E03146E3BA5C4969 /* WellueSDKPlugin.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = WellueSDKPlugin.m; sourceTree = "<group>"; };
 		AF277DCFFFF123FFC6DF26C7 /* Pods_App.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_App.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		AF51FD2D460BCFE21FA515B2 /* Pods-App.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-App.release.xcconfig"; path = "Pods/Target Support Files/Pods-App/Pods-App.release.xcconfig"; sourceTree = "<group>"; };
@@ -92,6 +96,8 @@
 				504EC3071FED79650016851F /* AppDelegate.swift */,
 				D11B268E9348466CBC996A08 /* WellueSDKPlugin.swift */,
 				916B2B78E03146E3BA5C4969 /* WellueSDKPlugin.m */,
+				A91C5E0012AB4E009BFFC002 /* CameraBridgePlugin.swift */,
+				A91C5E0012AB4E009BFFC004 /* CameraBridgePlugin.m */,
 				B8E7F3A92C4A5E1D00123456 /* App-Bridging-Header.h */,
 				504EC30B1FED79650016851F /* Main.storyboard */,
 				504EC30E1FED79650016851F /* Assets.xcassets */,
@@ -246,6 +252,8 @@
 				861F6F422FA0B1E500A8819C /* IAPPlugin.m in Sources */,
 				6FDD8C083F604E979B843C27 /* WellueSDKPlugin.swift in Sources */,
 				F59C12E7AE354E0BB94EA219 /* WellueSDKPlugin.m in Sources */,
+				A91C5E0012AB4E009BFFC001 /* CameraBridgePlugin.swift in Sources */,
+				A91C5E0012AB4E009BFFC003 /* CameraBridgePlugin.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

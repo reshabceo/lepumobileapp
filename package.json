@@ -12,7 +12,8 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "android": "npx cap run android",
-    "sync": "npx cap sync"
+    "sync": "npx cap sync",
+    "build:camera-bridge": "./scripts/build-camera-bridge.sh"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1038.0",

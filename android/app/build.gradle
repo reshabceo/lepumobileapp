@@ -159,6 +159,13 @@ dependencies {
     implementation "androidx.navigation:navigation-fragment:2.8.3"
     implementation "androidx.navigation:navigation-ui:2.8.3"
     implementation project(':capacitor-cordova-android-plugins')
+
+    def camBridgeAar = file('libs/camerabridge.aar')
+    if (camBridgeAar.exists()) {
+        implementation files(camBridgeAar)
+    } else {
+        logger.lifecycle("camera bridge: libs/camerabridge.aar not found — native RTSP bridge disabled until built (see camera-bridge-core/Makefile)")
+    }
 }
 
 apply from: 'capacitor.build.gradle'
