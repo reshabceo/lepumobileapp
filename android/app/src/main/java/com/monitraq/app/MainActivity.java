@@ -16,6 +16,7 @@ import com.getcapacitor.BridgeActivity;
 import com.monitraq.wellue.WelluePlugin;
 import com.monitraq.app.plugins.Bp2Plugin;
 import com.monitraq.app.plugins.AliveCorPlugin;
+import com.monitraq.app.plugins.CameraBridgePlugin;
 
 public class MainActivity extends BridgeActivity {
 
@@ -55,6 +56,13 @@ public class MainActivity extends BridgeActivity {
             Log.d(TAG, "✅ AliveCorPlugin added to initialPlugins");
         } catch (Exception e) {
             Log.e(TAG, "❌ Failed to add AliveCorPlugin: " + e.getMessage(), e);
+        }
+
+        try {
+            initialPlugins.add(CameraBridgePlugin.class);
+            Log.d(TAG, "CameraBridgePlugin registered (gomobile)");
+        } catch (Exception e) {
+            Log.e(TAG, "Failed CameraBridgePlugin", e);
         }
 
         // NOW call super.onCreate() - bridge will be created with our plugins included
