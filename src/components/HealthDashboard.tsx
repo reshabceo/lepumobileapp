@@ -23,7 +23,7 @@ import {
   AlertCircle,
   RefreshCw,
   LogOut,
-  Monitor
+  Monitor,
   Shield,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";

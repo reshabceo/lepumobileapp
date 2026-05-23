@@ -29,3 +29,8 @@ dist-ssr
 *.sln
 *.sw?
 backend/src/firebase-service-account.json
+
+# Native camera-bridge binaries (built from native/camera-bridge-core via
+# `npm run build:camera-bridge`; large platform artifacts, do not commit)
+android/app/libs/camerabridge.aar
+ios/App/Frameworks/Mobile.xcframework/

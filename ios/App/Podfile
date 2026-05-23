@@ -28,6 +28,12 @@ target 'App' do
   capacitor_pods
   pod 'VTMProductLib', :path => '../../VTProductLib_Pods'
   pod 'AliveCorKitLite', :path => 'Frameworks'
+  # Native RTSP→WHIP camera bridge. Only embedded once the gomobile framework is
+  # built: `cd camera-bridge-core && make xcframework` → Frameworks/Mobile.xcframework.
+  # Until then iOS uses the usePhoneBridge WebRTC fallback (and pod install still works).
+  if File.exist?(File.join(__dir__, 'Frameworks', 'Mobile.xcframework'))
+    pod 'CameraBridge', :path => 'Frameworks'
+  end
 end
 
 post_install do |installer|
