@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { toast } from 'sonner';
-import { Heart, Activity, Droplets, Thermometer, Wind, ArrowLeft, Calendar, Clock, List, LineChart as LineChartIcon } from 'lucide-react';
+import { Heart, Activity, Droplets, Thermometer, Wind, ArrowLeft, Calendar, Clock, List, LineChart as LineChartIcon, BarChart3 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import {
   LineChart,
@@ -177,171 +177,169 @@ export const PatientVitalsHistory = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-emerald-900 to-slate-900 flex items-center justify-center">
-        <div className="w-8 h-8 border-4 border-emerald-400/30 border-t-emerald-400 rounded-full animate-spin"></div>
+      <div className="min-h-screen bg-[#080D1A] flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-blue-500/30 border-t-blue-500 rounded-full animate-spin"></div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-emerald-900 to-slate-900">
-      {/* Header */}
-      <div className="bg-slate-800/50 backdrop-blur-sm border-b border-slate-700">
-        <div className="relative flex items-center justify-between p-4" style={{ paddingTop: 'max(1rem, env(safe-area-inset-top))' }}>
+    <div className="min-h-screen bg-[#080D1A] text-white font-inter select-none p-4 pt-safe-top">
+      <div className="max-w-2xl mx-auto pb-20">
+        {/* Standardized Header */}
+        <header className="flex items-center gap-3 mb-6">
           <button
             onClick={() => navigate(-1)}
-            className="flex items-center gap-2 px-3 py-2 text-white bg-blue-600 hover:bg-blue-700 transition-colors touch-manipulation rounded-lg"
-            style={{ minHeight: '40px', minWidth: '70px' }}
+            className="p-2 rounded-full bg-white/5 hover:bg-white/10 transition-colors active:scale-95 text-white"
           >
-            <ArrowLeft className="h-4 w-4" />
-            <span className="text-sm">Back</span>
+            <ArrowLeft className="w-4 h-4" />
           </button>
-          <h1 className="absolute left-1/2 transform -translate-x-1/2 text-xl font-semibold text-white">Vitals History</h1>
-          <div className="w-16" />
-        </div>
-      </div>
-
-      <div className="p-4 pb-20">
-        <div className="max-w-4xl mx-auto">
-          {/* Info */}
-          <div className="mb-6">
-            <p className="text-emerald-200/80">Your recorded vital signs and measurements</p>
-          </div>
-
-          {/* Filter Buttons */}
-          <div className="flex flex-col gap-3 mb-6">
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => setViewMode('list')}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold ${
-                  viewMode === 'list'
-                    ? 'bg-emerald-600 text-white'
-                    : 'bg-white/10 text-emerald-200'
-                }`}
-              >
-                <List className="w-4 h-4" />
-                List
-              </button>
-              <button
-                type="button"
-                onClick={() => setViewMode('trend')}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold ${
-                  viewMode === 'trend'
-                    ? 'bg-emerald-600 text-white'
-                    : 'bg-white/10 text-emerald-200'
-                }`}
-              >
-                <LineChartIcon className="w-4 h-4" />
-                Trend
-              </button>
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-2xl bg-blue-900/70 flex items-center justify-center border border-blue-400/50">
+              <BarChart3 className="h-6 w-6 text-blue-300" />
             </div>
-            <div className="flex gap-2 overflow-x-auto pb-2">
+            <div>
+              <h1 className="text-xl font-bold">Vitals History</h1>
+              <p className="text-xs text-gray-400">Your recorded vital signs and measurements</p>
+            </div>
+          </div>
+        </header>
+
+        {/* View Selection & Filters */}
+        <div className="flex flex-col gap-3 mb-6">
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setViewMode('list')}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all duration-300 active:scale-95 ${
+                viewMode === 'list'
+                  ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/10'
+                  : 'bg-[#1A243D] text-gray-300 border border-slate-700/40 hover:bg-[#1A243D]/80'
+              }`}
+            >
+              <List className="w-4 h-4" />
+              List
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode('trend')}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all duration-300 active:scale-95 ${
+                viewMode === 'trend'
+                  ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/10'
+                  : 'bg-[#1A243D] text-gray-300 border border-slate-700/40 hover:bg-[#1A243D]/80'
+              }`}
+            >
+              <LineChartIcon className="w-4 h-4" />
+              Trend
+            </button>
+          </div>
+          
+          <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-none">
             {measurementTypes.map((type) => (
               <button
                 key={type}
                 onClick={() => setFilter(type)}
-                className={`px-4 py-2 rounded-lg font-semibold transition-all duration-300 whitespace-nowrap ${
+                className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-300 whitespace-nowrap active:scale-95 ${
                   filter === type
-                    ? 'bg-gradient-to-r from-emerald-500 to-green-500 text-white shadow-lg'
-                    : 'bg-white/10 text-emerald-200 hover:bg-white/20'
+                    ? 'bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-lg'
+                    : 'bg-[#1A243D] text-gray-300 border border-slate-700/40 hover:bg-[#1A243D]/80'
                 }`}
               >
                 {type === 'all' ? 'All' : formatMeasurementType(type)}
               </button>
             ))}
-            </div>
           </div>
+        </div>
 
-          {viewMode === 'trend' && filter !== 'all' && (() => {
-            const series = extractNumericSeries(filter);
-            const { lo, hi } = normalRangeFor(filter);
-            if (series.length === 0) {
-              return (
-                <div className="glass-card p-8 rounded-xl border border-emerald-500/30 text-center text-emerald-200/70">
-                  No numeric points for this vital type yet.
-                </div>
-              );
-            }
-            const chartData = series.map((r) => ({
-              ...r,
-              timeLabel: format(parseISO(r.t), 'MMM d HH:mm'),
-            }));
+        {/* Trend View */}
+        {viewMode === 'trend' && filter !== 'all' && (() => {
+          const series = extractNumericSeries(filter);
+          const { lo, hi } = normalRangeFor(filter);
+          if (series.length === 0) {
             return (
-              <div className="glass-card p-4 rounded-xl border border-emerald-500/30 mb-6" style={{ height: 320 }}>
-                <h2 className="text-white font-semibold mb-2">{formatMeasurementType(filter)}</h2>
-                <ResponsiveContainer width="100%" height="90%">
-                  <LineChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-                    <XAxis dataKey="timeLabel" tick={{ fill: '#94a3b8', fontSize: 10 }} />
-                    <YAxis tick={{ fill: '#94a3b8', fontSize: 10 }} domain={['auto', 'auto']} />
-                    <Tooltip
-                      contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #334155' }}
-                      labelStyle={{ color: '#e2e8f0' }}
-                    />
-                    <Legend />
-                    {lo != null && <ReferenceLine y={lo} stroke="#38bdf8" strokeDasharray="4 4" label={{ value: 'Low ref', fill: '#7dd3fc' }} />}
-                    {hi != null && <ReferenceLine y={hi} stroke="#f472b6" strokeDasharray="4 4" label={{ value: 'High ref', fill: '#f9a8d4' }} />}
-                    <Line type="monotone" dataKey="v" name={filter === 'blood_pressure' ? 'Systolic' : 'Value'} stroke="#34d399" dot={false} strokeWidth={2} />
-                    {filter === 'blood_pressure' && (
-                      <Line type="monotone" dataKey="v2" name="Diastolic" stroke="#a78bfa" dot={false} strokeWidth={2} />
-                    )}
-                  </LineChart>
-                </ResponsiveContainer>
+              <div className="bg-[#1A243D] p-8 rounded-3xl border border-slate-700/40 text-center text-gray-400">
+                No numeric points for this vital type yet.
               </div>
             );
-          })()}
-
-          {viewMode === 'trend' && filter === 'all' && (
-            <div className="glass-card p-6 rounded-xl border border-amber-500/30 text-amber-100 mb-6">
-              Select a vital type above to view its trend chart.
+          }
+          const chartData = series.map((r) => ({
+            ...r,
+            timeLabel: format(parseISO(r.t), 'MMM d HH:mm'),
+          }));
+          return (
+            <div className="bg-[#1A243D] p-5 rounded-3xl border border-slate-700/40 shadow-sm mb-6" style={{ height: 320 }}>
+              <h2 className="text-white font-semibold mb-4 text-base">{formatMeasurementType(filter)}</h2>
+              <ResponsiveContainer width="100%" height="90%">
+                <LineChart data={chartData} margin={{ top: 8, right: 8, left: -20, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#1E293B" />
+                  <XAxis dataKey="timeLabel" tick={{ fill: '#94a3b8', fontSize: 10 }} />
+                  <YAxis tick={{ fill: '#94a3b8', fontSize: 10 }} domain={['auto', 'auto']} />
+                  <Tooltip
+                    contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #334155', borderRadius: '12px' }}
+                    labelStyle={{ color: '#e2e8f0' }}
+                  />
+                  <Legend />
+                  {lo != null && <ReferenceLine y={lo} stroke="#38bdf8" strokeDasharray="4 4" label={{ value: 'Low ref', fill: '#7dd3fc', fontSize: 10 }} />}
+                  {hi != null && <ReferenceLine y={hi} stroke="#f472b6" strokeDasharray="4 4" label={{ value: 'High ref', fill: '#f9a8d4', fontSize: 10 }} />}
+                  <Line type="monotone" dataKey="v" name={filter === 'blood_pressure' ? 'Systolic' : 'Value'} stroke="#3b82f6" dot={false} strokeWidth={2.5} />
+                  {filter === 'blood_pressure' && (
+                    <Line type="monotone" dataKey="v2" name="Diastolic" stroke="#8b5cf6" dot={false} strokeWidth={2.5} />
+                  )}
+                </LineChart>
+              </ResponsiveContainer>
             </div>
-          )}
+          );
+        })()}
 
-          {/* Vitals List */}
-          {viewMode === 'list' && filteredVitals.length === 0 ? (
-            <div className="glass-card p-8 rounded-xl border border-emerald-500/30 bg-emerald-500/10 text-center">
-              <Activity className="w-16 h-16 text-emerald-400/50 mx-auto mb-4" />
-              <p className="text-emerald-200/60 text-lg">No vital signs recorded yet</p>
-              <p className="text-emerald-200/40 text-sm mt-2">Start submitting your vitals to track your health</p>
-            </div>
-          ) : viewMode === 'list' ? (
-            <div className="space-y-3">
-              {filteredVitals.map((vital) => (
-                <div
-                  key={vital.id}
-                  className="glass-card p-4 rounded-xl border border-emerald-500/30 bg-emerald-500/10 hover:border-emerald-400/50 transition-all"
-                >
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-start gap-3 flex-1">
-                      <div className="p-2 rounded-lg bg-emerald-500/20 border border-emerald-500/30">
-                        {getVitalIcon(vital.measurement_type)}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <h3 className="text-white font-semibold text-lg mb-1">
-                          {formatMeasurementType(vital.measurement_type)}
-                        </h3>
-                        <p className="text-emerald-100 text-lg font-medium mb-2">
-                          {formatVitalValue(vital)}
-                        </p>
-                        <div className="flex flex-wrap items-center gap-3 text-sm text-emerald-200/70">
-                          <div className="flex items-center gap-1">
-                            <Calendar className="w-4 h-4" />
-                            <span>{format(parseISO(vital.reading_timestamp), 'MMM dd, yyyy')}</span>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <Clock className="w-4 h-4" />
-                            <span>{format(parseISO(vital.reading_timestamp), 'h:mm a')}</span>
-                          </div>
+        {viewMode === 'trend' && filter === 'all' && (
+          <div className="bg-[#1A243D] p-6 rounded-3xl border border-blue-500/30 text-blue-200 mb-6 text-sm">
+            Select a vital type above to view its trend chart.
+          </div>
+        )}
+
+        {/* Vitals List */}
+        {viewMode === 'list' && filteredVitals.length === 0 ? (
+          <div className="bg-[#1A243D] p-8 rounded-3xl border border-slate-700/40 shadow-sm text-center">
+            <Activity className="w-16 h-16 text-blue-500/50 mx-auto mb-4 animate-pulse" />
+            <p className="text-white font-semibold text-lg">No vital signs recorded yet</p>
+            <p className="text-gray-400 text-sm mt-2">Start submitting your vitals to track your health</p>
+          </div>
+        ) : viewMode === 'list' ? (
+          <div className="space-y-3">
+            {filteredVitals.map((vital) => (
+              <div
+                key={vital.id}
+                className="bg-[#1A243D] p-4 rounded-3xl border border-slate-700/40 hover:border-blue-500/30 transition-all duration-300 shadow-sm"
+              >
+                <div className="flex items-start justify-between">
+                  <div className="flex items-start gap-4 flex-1">
+                    <div className="p-3 rounded-2xl bg-blue-950/70 border border-blue-500/30 text-blue-400 flex-shrink-0">
+                      {getVitalIcon(vital.measurement_type)}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-white font-bold text-base mb-0.5">
+                        {formatMeasurementType(vital.measurement_type)}
+                      </h3>
+                      <p className="text-blue-400 text-lg font-bold mb-2">
+                        {formatVitalValue(vital)}
+                      </p>
+                      <div className="flex flex-wrap items-center gap-3 text-xs text-gray-400">
+                        <div className="flex items-center gap-1">
+                          <Calendar className="w-3.5 h-3.5" />
+                          <span>{format(parseISO(vital.reading_timestamp), 'MMM dd, yyyy')}</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Clock className="w-3.5 h-3.5" />
+                          <span>{format(parseISO(vital.reading_timestamp), 'h:mm a')}</span>
                         </div>
                       </div>
                     </div>
                   </div>
                 </div>
-              ))}
-            </div>
-          ) : null}
-        </div>
+              </div>
+            ))}
+          </div>
+        ) : null}
       </div>
     </div>
   );

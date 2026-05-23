@@ -45,6 +45,23 @@ import { supabase, storeEcgRecording } from "@/lib/supabase";
 import EcgChartWithControls from "@/components/EcgChartWithControls";
 import EcgFullScreenChart from "@/components/EcgFullScreenChart";
 
+function shortsToBase64(shorts: number[]): string {
+  const bytes = new Uint8Array(shorts.length * 2);
+  const view = new DataView(bytes.buffer);
+  for (let i = 0; i < shorts.length; i++) {
+    const val = Math.max(-32768, Math.min(32767, Math.round(shorts[i])));
+    view.setInt16(i * 2, val, true);
+  }
+  if (typeof Buffer !== "undefined") {
+    return Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength).toString("base64");
+  }
+  let binary = "";
+  const len = bytes.byteLength;
+  for (let i = 0; i < len; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return typeof btoa !== "undefined" ? btoa(binary) : "";
+}
 
 import { Capacitor } from "@capacitor/core";
 
@@ -977,6 +994,7 @@ const ECGMonitor: React.FC = () => {
 
           // Convert raw Int16 values to mV if needed
           let mvData: number[];
+          let rawShorts: number[];
           if (ecgDataArray.length > 0) {
             // Check if data is already in mV (values typically < 10 for ECG)
             // or raw Int16 (values typically -32768 to 32767)
@@ -986,15 +1004,19 @@ const ECGMonitor: React.FC = () => {
             if (isLikelyMv) {
               // Already in mV, use directly
               mvData = ecgDataArray;
+              const mvPerLsb = scaleUvPerLsb / 1000;
+              rawShorts = ecgDataArray.map((val) => val / mvPerLsb);
               console.log("🫀 [ECG SAVE] ECG data appears to be in mV format");
             } else {
               // Convert from Int16 to mV
               const mvPerLsb = scaleUvPerLsb / 1000; // Convert μV to mV
               mvData = ecgDataArray.map((val) => val * mvPerLsb);
+              rawShorts = ecgDataArray;
               console.log("🫀 [ECG SAVE] Converted ECG data from Int16 to mV");
             }
           } else {
             mvData = [];
+            rawShorts = [];
           }
 
           // Prepare ECG data for Supabase
@@ -1009,7 +1031,7 @@ const ECGMonitor: React.FC = () => {
             scale_uv_per_lsb: scaleUvPerLsb,
             duration_seconds: mvData.length / sampleRate,
             mv_data_json: mvData, // ✅ Array of numbers in mV
-            raw_data_base64: null, // ✅ MUST be null when using mv_data_json
+            raw_data_base64: shortsToBase64(rawShorts), // ✅ Populated raw base64 instead of null
             heart_rate: dataToSave.heartRate || 0,
             quality_score: 0.95,
             notes: "ECG recording from BP2 device",
@@ -1023,7 +1045,7 @@ const ECGMonitor: React.FC = () => {
             heart_rate: ecgRecord.heart_rate,
             has_mv_data:
               !!ecgRecord.mv_data_json && Array.isArray(ecgRecord.mv_data_json),
-            raw_data_is_null: ecgRecord.raw_data_base64 === null,
+            raw_data_length: ecgRecord.raw_data_base64?.length || 0,
           });
 
           // Store in Supabase with better error handling
@@ -2704,11 +2726,15 @@ const ECGMonitor: React.FC = () => {
                     const isLikelyMv = maxAbsValue < 100;
 
                     let mvData: number[];
+                    let rawShorts: number[];
                     if (isLikelyMv) {
                       mvData = reportData.ecgData;
+                      const mvPerLsb = scaleUvPerLsb / 1000;
+                      rawShorts = reportData.ecgData.map((val) => val / mvPerLsb);
                     } else {
                       const mvPerLsb = scaleUvPerLsb / 1000;
                       mvData = reportData.ecgData.map((val) => val * mvPerLsb);
+                      rawShorts = reportData.ecgData;
                     }
 
                     const ecgRecord = {
@@ -2723,7 +2749,7 @@ const ECGMonitor: React.FC = () => {
                       scale_uv_per_lsb: scaleUvPerLsb,
                       duration_seconds: mvData.length / sampleRate,
                       mv_data_json: mvData, // ✅ Array of numbers
-                      raw_data_base64: null, // ✅ MUST be null when using mv_data_json
+                      raw_data_base64: shortsToBase64(rawShorts), // ✅ Populated raw base64 instead of null
                       heart_rate: reportData.heartRate || 0,
                       quality_score: 0.95,
                       notes: "ECG recording from BP2 device",
@@ -5603,9 +5629,9 @@ const ECGMonitor: React.FC = () => {
   if (isLoading) {
     return (
       <MobileAppContainer>
-        <div className="min-h-screen bg-[#0F0F0F] text-white flex items-center justify-center">
+        <div className="min-h-screen bg-[#080D1A] text-white flex items-center justify-center">
           <div className="flex flex-col items-center gap-4">
-            <Activity className="h-8 w-8 animate-spin text-blue-500" />
+            <Activity className="h-8 w-8 animate-spin text-purple-500" />
 
             <p className="text-gray-400">Loading ECG monitor...</p>
           </div>
@@ -5620,27 +5646,26 @@ const ECGMonitor: React.FC = () => {
 
       <style dangerouslySetInnerHTML={{ __html: ecgLoadingStyles }} />
 
-      <div className="min-h-screen bg-[#0F0F0F] text-white">
+      <div className="min-h-screen bg-[#080D1A] text-white font-inter select-none">
         {/* Header */}
-
-        <div
-          className="bg-[#1E1E1E] p-4 border-b border-gray-800"
-          style={{ paddingTop: "max(1rem, env(safe-area-inset-top))" }}
-        >
-          <div className="flex items-center justify-between">
+        <div className="p-4 pt-safe-top">
+          <header className="flex items-center gap-3 mb-6">
             <button
               onClick={handleBack}
-              className="flex items-center gap-2 px-3 py-2 text-white bg-blue-600 hover:bg-blue-700 transition-colors touch-manipulation rounded-lg"
-              style={{ minHeight: "40px", minWidth: "70px" }}
+              className="p-2 rounded-full bg-white/5 hover:bg-white/10 transition-colors active:scale-95 text-white"
             >
-              <ArrowLeft className="h-4 w-4" />
-              <span className="text-sm">Back</span>
+              <ArrowLeft className="w-4 h-4" />
             </button>
-
-            <h1 className="text-xl font-semibold">ECG Monitoring</h1>
-
-            <div className="w-10"></div>
-          </div>
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-2xl bg-purple-900/70 flex items-center justify-center border border-purple-400/50">
+                <Activity className="h-6 w-6 text-purple-300" />
+              </div>
+              <div>
+                <h1 className="text-xl font-bold">ECG Monitor</h1>
+                <p className="text-xs text-gray-400">Live ECG Waveform Analysis</p>
+              </div>
+            </div>
+          </header>
         </div>
 
         {/* Content */}
@@ -5652,21 +5677,12 @@ const ECGMonitor: React.FC = () => {
 
           {devices.length > 0 && selectedDevice && (
             <div className="mb-4">
-              <div
-                className="rounded-2xl p-4 mb-4"
-                style={{
-                  background: "rgba(17,24,39,0.6)",
-
-                  backdropFilter: "blur(10px)",
-
-                  border: "1px solid rgba(55,65,81,0.3)",
-                }}
-              >
+              <div className="bg-[#1A243D] border border-slate-700/40 shadow-sm rounded-3xl p-4 mb-4">
                 <div className="flex items-center justify-between mb-3">
                   {/* Left: ECG icon */}
 
                   <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-full bg-green-500 flex items-center justify-center">
+                    <div className="w-12 h-12 rounded-full bg-purple-500 flex items-center justify-center">
                       <ActivityIcon className="h-6 w-6 text-white" />
                     </div>
 
@@ -5741,18 +5757,7 @@ const ECGMonitor: React.FC = () => {
 
           {/* Live ECG Waveform Panel - New BP UI Style */}
 
-          <div
-            className="rounded-2xl p-4 mb-4"
-            style={{
-              background: "rgba(17,24,39,0.6)",
-
-              backdropFilter: "blur(10px)",
-
-              border: "1px solid rgba(55,65,81,0.3)",
-
-              boxShadow: "0 0 20px rgba(0,0,0,0.3)",
-            }}
-          >
+          <div className="bg-[#1A243D] border border-slate-700/40 shadow-sm rounded-3xl p-4 mb-4">
             <div className="flex items-center justify-between mb-4">
               <h2
                 className="text-base font-medium text-white"
@@ -5851,15 +5856,7 @@ const ECGMonitor: React.FC = () => {
           {/* Loading State for ECG Chart - Only show if not already loaded */}
           {/* Final ECG Result Display Section - Shows Completed Measurement Results */}
           {ecgResult && isMeasurementCompleted && (
-            <div
-              className="rounded-2xl p-4 mb-4"
-              style={{
-                background: "rgba(17,24,39,0.6)",
-                backdropFilter: "blur(10px)",
-                border: "1px solid rgba(55,65,81,0.3)",
-                boxShadow: "0 0 20px rgba(0,0,0,0.3)",
-              }}
-            >
+            <div className="bg-[#1A243D] border border-slate-700/40 shadow-sm rounded-3xl p-4 mb-4">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-base font-medium text-white flex items-center gap-2">
                   <ActivityIcon className="h-5 w-5" />
@@ -5875,13 +5872,13 @@ const ECGMonitor: React.FC = () => {
 
               {/* Result Values */}
               <div className="grid grid-cols-2 gap-4 mb-4">
-                <div className="bg-slate-700/30 rounded-lg p-4">
+                <div className="bg-[#121B32] border border-slate-700/40 rounded-2xl p-4">
                   <div className="text-2xl font-bold text-blue-400">
                     {ecgResult.heartRate > 0 ? ecgResult.heartRate : "—"}
                   </div>
                   <div className="text-xs text-gray-400">Heart Rate (BPM)</div>
                 </div>
-                <div className="bg-slate-700/30 rounded-lg p-4">
+                <div className="bg-[#121B32] border border-slate-700/40 rounded-2xl p-4">
                   <div className="text-lg font-bold text-white capitalize">
                     {ecgResult.rhythm}
                   </div>
@@ -5890,7 +5887,7 @@ const ECGMonitor: React.FC = () => {
               </div>
 
               <div className="grid grid-cols-2 gap-4 mb-4">
-                <div className="bg-slate-700/30 rounded-lg p-4">
+                <div className="bg-[#121B32] border border-slate-700/40 rounded-2xl p-4">
                   <div className="text-lg font-semibold text-white">
                     {ecgResult.qrsDuration > 0
                       ? `${ecgResult.qrsDuration} ms`
@@ -5898,7 +5895,7 @@ const ECGMonitor: React.FC = () => {
                   </div>
                   <div className="text-xs text-gray-400">QRS Duration</div>
                 </div>
-                <div className="bg-slate-700/30 rounded-lg p-4">
+                <div className="bg-[#121B32] border border-slate-700/40 rounded-2xl p-4">
                   <div className="text-sm font-semibold text-gray-300">
                     {measurementCompletionTime
                       ? new Date(measurementCompletionTime).toLocaleString()
@@ -5921,15 +5918,7 @@ const ECGMonitor: React.FC = () => {
 
           {/* Previous ECG Readings Section */}
           {previousECGReadings.length > 0 && (
-            <div
-              className="rounded-2xl p-4 mb-4"
-              style={{
-                background: "rgba(17,24,39,0.6)",
-                backdropFilter: "blur(10px)",
-                border: "1px solid rgba(55,65,81,0.3)",
-                boxShadow: "0 0 20px rgba(0,0,0,0.3)",
-              }}
-            >
+            <div className="bg-[#1A243D] border border-slate-700/40 shadow-sm rounded-3xl p-4 mb-4">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-base font-medium text-white flex items-center gap-2">
                   <ActivityIcon className="h-5 w-5" />
@@ -5974,7 +5963,7 @@ const ECGMonitor: React.FC = () => {
                   return (
                     <div
                       key={reading.id || index}
-                      className="bg-slate-700/30 rounded-lg p-4 border border-slate-600/30"
+                      className="bg-[#121B32] border border-slate-700/40 rounded-2xl p-4"
                     >
                       <div className="grid grid-cols-2 gap-4">
                         <div>
@@ -6022,7 +6011,7 @@ const ECGMonitor: React.FC = () => {
                           }
                           className={`w-full px-4 py-2 text-white rounded-lg transition-all duration-300 border shadow-lg flex items-center justify-center gap-2 ${
                             reading.ecgData && reading.ecgData.length > 0
-                              ? "bg-green-500/80 hover:bg-green-400/90 border-green-400/30"
+                              ? "bg-purple-600 hover:bg-purple-700 border-purple-400/30 text-white"
                               : "bg-gray-500/50 border-gray-400/30 cursor-not-allowed opacity-50"
                           }`}
                         >

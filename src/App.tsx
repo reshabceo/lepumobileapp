@@ -52,6 +52,7 @@ import RecommendationsDashboard from "./pages/RecommendationsDashboard";
 import PatientMessages from "./pages/PatientMessages";
 import AliveCorHistory from "./pages/AliveCorHistory";
 import ConnectCamera from "./pages/ConnectCamera";
+import { ServicesRecords } from "./pages/ServicesRecords";
 
 const queryClient = new QueryClient();
 
@@ -91,6 +92,11 @@ const App = () => (
               <Route path="/dashboard" element={
                 <ProtectedRoute>
                   <Dashboard />
+                </ProtectedRoute>
+              } />
+              <Route path="/services" element={
+                <ProtectedRoute>
+                  <ServicesRecords />
                 </ProtectedRoute>
               } />
               <Route path="/devices" element={
