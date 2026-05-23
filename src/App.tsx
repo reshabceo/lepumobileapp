@@ -55,6 +55,7 @@ import AliveCorHistory from "./pages/AliveCorHistory";
 import ConnectCamera from "./pages/ConnectCamera";
 import LiveMonitoringPage from "./pages/LiveMonitoring";
 import PiPairingPage from "./pages/PiPairing";
+import { ServicesRecords } from "./pages/ServicesRecords";
 import MyThresholds from "./components/MyThresholds";
 
 const queryClient = new QueryClient();
@@ -95,6 +96,11 @@ const App = () => (
               <Route path="/dashboard" element={
                 <ProtectedRoute>
                   <Dashboard />
+                </ProtectedRoute>
+              } />
+              <Route path="/services" element={
+                <ProtectedRoute>
+                  <ServicesRecords />
                 </ProtectedRoute>
               } />
               <Route path="/devices" element={

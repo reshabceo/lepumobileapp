@@ -96,22 +96,22 @@ export const DoctorAssignment: React.FC<DoctorAssignmentProps> = ({ onAssignment
     // Show doctor code if user is a doctor
     if (userProfile?.role === 'doctor') {
         return (
-            <Card className="w-full max-w-md mx-auto">
+            <Card className="w-full max-w-md mx-auto bg-[#1A243D] border-slate-700/40 text-white shadow-xl rounded-3xl">
                 <CardHeader className="text-center">
-                    <div className="w-16 h-16 mx-auto mb-4 bg-blue-100 rounded-full flex items-center justify-center">
-                        <Stethoscope className="w-8 h-8 text-blue-600" />
+                    <div className="w-16 h-16 mx-auto mb-4 bg-indigo-500/10 border border-indigo-500/30 rounded-full flex items-center justify-center">
+                        <Stethoscope className="w-8 h-8 text-indigo-400" />
                     </div>
-                    <CardTitle className="text-xl">Doctor Dashboard</CardTitle>
-                    <CardDescription>
+                    <CardTitle className="text-xl text-white">Doctor Dashboard</CardTitle>
+                    <CardDescription className="text-slate-400">
                         Your unique doctor code for patient assignments
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <div className="text-center">
-                        <Badge variant="outline" className="text-lg px-4 py-2">
+                        <Badge variant="outline" className="text-lg px-4 py-2 border-indigo-500/30 text-indigo-300">
                             {userProfile.doctor_code || 'Loading...'}
                         </Badge>
-                        <p className="text-sm text-gray-600 mt-2">
+                        <p className="text-sm text-slate-300 mt-2">
                             Share this code with your patients so they can assign you as their monitoring doctor.
                         </p>
                     </div>
@@ -121,31 +121,32 @@ export const DoctorAssignment: React.FC<DoctorAssignmentProps> = ({ onAssignment
     }
 
     return (
-        <Card className="w-full max-w-md mx-auto">
+        <Card className="w-full max-w-md mx-auto bg-[#1A243D] border-slate-700/40 text-white shadow-xl rounded-3xl">
             <CardHeader className="text-center">
-                <div className="w-16 h-16 mx-auto mb-4 bg-green-100 rounded-full flex items-center justify-center">
-                    <UserPlus className="w-8 h-8 text-green-600" />
+                <div className="w-16 h-16 mx-auto mb-4 bg-emerald-500/10 border border-emerald-500/30 rounded-full flex items-center justify-center">
+                    <UserPlus className="w-8 h-8 text-emerald-400" />
                 </div>
-                <CardTitle className="text-xl">Doctor Assignment</CardTitle>
-                <CardDescription>
+                <CardTitle className="text-xl text-white">Doctor Assignment</CardTitle>
+                <CardDescription className="text-slate-400">
                     Enter your doctor's code to enable vital signs monitoring
                 </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
                 {/* Current doctor status */}
-                {currentDoctor ? (
-                    <Alert className="border-green-200 bg-green-50">
-                        <CheckCircle className="h-4 w-4 text-green-600" />
-                        <AlertDescription className="text-green-800">
+                {currentDoctor && (
+                    <Alert className="border-emerald-500/20 bg-emerald-500/10 text-emerald-400">
+                        <CheckCircle className="h-4 w-4 text-emerald-400" />
+                        <AlertDescription className="text-emerald-300">
                             <strong>Assigned Doctor:</strong> {currentDoctor.full_name || currentDoctor.name}
                             <br />
                             <span className="text-sm">Code: {currentDoctor.doctor_code}</span>
                         </AlertDescription>
                     </Alert>
-                ) : (
-                    <Alert className="border-yellow-200 bg-yellow-50">
-                        <AlertCircle className="h-4 w-4 text-yellow-600" />
-                        <AlertDescription className="text-yellow-800">
+                )}
+                {!currentDoctor && (
+                    <Alert className="border-amber-500/20 bg-amber-500/10 text-amber-400">
+                        <AlertCircle className="h-4 w-4 text-amber-400" />
+                        <AlertDescription className="text-amber-300">
                             No doctor assigned. Enter a doctor code below to enable monitoring.
                         </AlertDescription>
                     </Alert>
@@ -155,7 +156,7 @@ export const DoctorAssignment: React.FC<DoctorAssignmentProps> = ({ onAssignment
                 {(!currentDoctor || editing) && (
                     <>
                         <div className="space-y-2">
-                            <label htmlFor="doctor-code" className="text-sm font-medium text-gray-700">
+                            <label htmlFor="doctor-code" className="text-sm font-medium text-slate-300">
                                 Doctor Code
                             </label>
                             <Input
@@ -164,7 +165,7 @@ export const DoctorAssignment: React.FC<DoctorAssignmentProps> = ({ onAssignment
                                 placeholder="Enter doctor code (e.g., DR1234)"
                                 value={doctorCode}
                                 onChange={(e) => setDoctorCode(e.target.value.toUpperCase())}
-                                className="text-center font-mono"
+                                className="text-center font-mono bg-[#121B32] border-slate-700/40 text-white placeholder-slate-500 focus-visible:ring-indigo-500"
                                 disabled={isAssigning}
                             />
                         </div>
@@ -173,7 +174,7 @@ export const DoctorAssignment: React.FC<DoctorAssignmentProps> = ({ onAssignment
                         <Button
                             onClick={handleAssignDoctor}
                             disabled={!doctorCode.trim() || isAssigning}
-                            className="w-full"
+                            className="w-full bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white font-bold"
                         >
                             {isAssigning ? 'Assigning...' : 'Assign Doctor'}
                         </Button>
@@ -182,32 +183,32 @@ export const DoctorAssignment: React.FC<DoctorAssignmentProps> = ({ onAssignment
 
                 {/* Change doctor CTA when already assigned */}
                 {currentDoctor && !editing && (
-                    <Button variant="outline" className="w-full" onClick={() => setEditing(true)}>
+                    <Button variant="outline" className="w-full border-slate-700/80 text-slate-300 hover:bg-slate-800" onClick={() => setEditing(true)}>
                         Change doctor
                     </Button>
                 )}
 
                 {/* Status messages */}
                 {assignmentStatus === 'success' && (
-                    <Alert className="border-green-200 bg-green-50">
-                        <CheckCircle className="h-4 w-4 text-green-600" />
-                        <AlertDescription className="text-green-800">
+                    <Alert className="border-emerald-500/20 bg-emerald-500/10 text-emerald-400">
+                        <CheckCircle className="h-4 w-4 text-emerald-400" />
+                        <AlertDescription className="text-emerald-300">
                             {statusMessage}
                         </AlertDescription>
                     </Alert>
                 )}
 
                 {assignmentStatus === 'error' && (
-                    <Alert className="border-red-200 bg-red-50">
-                        <AlertCircle className="h-4 w-4 text-red-600" />
-                        <AlertDescription className="text-red-800">
+                    <Alert className="border-red-500/20 bg-red-500/10 text-red-400">
+                        <AlertCircle className="h-4 w-4 text-red-400" />
+                        <AlertDescription className="text-red-300">
                             {statusMessage}
                         </AlertDescription>
                     </Alert>
                 )}
 
                 {/* Help text */}
-                <div className="text-xs text-gray-500 text-center">
+                <div className="text-xs text-slate-500 text-center">
                     <p>Ask your doctor for their unique doctor code.</p>
                     <p>This will allow them to monitor your vital signs in real-time.</p>
                 </div>

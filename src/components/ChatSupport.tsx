@@ -121,7 +121,7 @@ export const ChatSupport = () => {
 
   if (!isOpen) {
     return (
-      <div className="fixed bottom-6 right-6 z-50">
+      <div className="fixed bottom-[96px] right-6 z-50">
         <Button
           onClick={() => setIsOpen(true)}
           className="w-14 h-14 rounded-full bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white shadow-lg shadow-emerald-500/50"
@@ -133,7 +133,7 @@ export const ChatSupport = () => {
   }
 
   return (
-    <div className="fixed bottom-6 right-6 z-50 w-[90vw] max-w-md">
+    <div className="fixed bottom-[96px] right-6 z-50 w-[90vw] max-w-md">
       <Card className="glass border-emerald-500/20 bg-gradient-to-br from-emerald-950/95 via-green-900/90 to-emerald-950/95 shadow-2xl">
         <div className="flex items-center justify-between p-4 border-b border-emerald-500/20">
           <div className="flex items-center gap-2">

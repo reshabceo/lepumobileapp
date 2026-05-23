@@ -4,7 +4,7 @@ import { AppointmentBooking } from '../components/AppointmentBooking';
 
 export const AppointmentBookingPage = () => {
   return (
-    <div className="min-h-screen bg-[#161B22]">
+    <div className="min-h-screen bg-[#080D1A]">
       <MobileAppContainer>
         <AppointmentBooking />
       </MobileAppContainer>
