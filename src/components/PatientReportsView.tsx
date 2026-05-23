@@ -1146,7 +1146,7 @@ const PatientReportsView: React.FC = () => {
                                     <div className="flex items-center justify-between border-t border-gray-800 pt-3">
                                         <div className="flex items-center text-xs text-gray-500">
                                             <User className="h-3 w-3 mr-1" />
-                                            <span>Dr. {report.doctors?.full_name || 'Radiologist'}</span>
+                                            <span>Dr. {report.radiologists?.full_name || 'Radiologist'}</span>
                                         </div>
                                         <button 
                                             onClick={() => {
