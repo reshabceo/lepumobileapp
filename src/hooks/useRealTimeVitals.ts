@@ -227,21 +227,25 @@ export const useRealTimeVitals = () => {
         };
     }, [user?.id]); // Only depend on user.id to prevent unnecessary re-fetches
 
-    // Set up real-time subscription for vital signs
+    // Set up real-time subscription for vital signs.
+    // Depend on the patient ID (a string) — NOT the patientProfile object — so the
+    // subscription is created once per patient and not torn down/recreated on every
+    // profile re-fetch. A unique channel name avoids duplicate-channel collisions.
+    const patientId = patientProfile?.id;
     useEffect(() => {
-        if (!patientProfile) return;
+        if (!patientId) return;
 
-        console.log('🔄 Setting up real-time vital signs subscription for patient:', patientProfile.id);
+        console.log('🔄 Setting up real-time vital signs subscription for patient:', patientId);
 
         const channel = supabase
-            .channel('patient_vital_signs')
+            .channel(`patient_vital_signs_${patientId}`)
             .on(
                 'postgres_changes',
                 {
                     event: '*',
                     schema: 'public',
                     table: 'vital_signs',
-                    filter: `patient_id=eq.${patientProfile.id}`
+                    filter: `patient_id=eq.${patientId}`
                 },
                 (payload) => {
                     console.log('📊 Real-time vital signs update:', payload);
@@ -277,9 +281,12 @@ export const useRealTimeVitals = () => {
 
         return () => {
             console.log('🔄 Unsubscribing from vital signs updates');
-            channel.unsubscribe();
+            // removeChannel fully tears down AND unregisters the channel from the
+            // client. Plain unsubscribe() leaves it registered → channels leak and
+            // eventually break the realtime socket.
+            void supabase.removeChannel(channel);
         };
-    }, [patientProfile]);
+    }, [patientId]);
 
     // Add new vital sign
     const addVitalSign = async (type: VitalSign['type'], data: any, deviceId?: string) => {

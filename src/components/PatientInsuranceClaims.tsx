@@ -16,7 +16,7 @@ import {
   ChevronUp,
   ArrowLeft,
   Loader2,
-  FileCheck
+  FileCheck,
   AlertTriangle,
   RefreshCw
 } from 'lucide-react';
@@ -491,8 +491,7 @@ const PatientInsuranceClaims = () => {
                   )}
                 </CardContent>
               </Card>
-            );
-            })}
+            ))}
           </div>
         )}
       </div>
