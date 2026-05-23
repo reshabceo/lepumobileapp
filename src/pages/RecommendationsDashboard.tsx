@@ -59,6 +59,21 @@ const statusColors: Record<string, { bg: string; text: string; label: string }> 
   expired: { bg: 'bg-red-950/70', text: 'text-red-400', label: 'Expired' },
 };
 
+// Strip markdown formatting from AI-generated text
+const stripMarkdown = (text: string): string => {
+  if (!text) return text;
+  return text
+    .replace(/\*\*([^*]+)\*\*/g, '$1')   // **bold**
+    .replace(/\*([^*]+)\*/g, '$1')         // *italic*
+    .replace(/^#{1,6}\s+/gm, '')           // ## headings
+    .replace(/`([^`]+)`/g, '$1')           // `code`
+    .replace(/^\s*[-*+]\s+/gm, '')         // bullet points
+    .replace(/^\s*\d+\.\s+/gm, '')         // numbered lists
+    .replace(/__([^_]+)__/g, '$1')          // __bold__
+    .replace(/_([^_]+)_/g, '$1')            // _italic_
+    .trim();
+};
+
 export const RecommendationsDashboard: React.FC = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -195,13 +210,13 @@ export const RecommendationsDashboard: React.FC = () => {
         <div className="flex flex-col items-center gap-4 p-6 text-center">
           <Loader2 className="h-8 w-8 animate-spin text-emerald-400" />
           <p className="text-gray-400">Loading your recommendations...</p>
-          
+
           {forceStopLoading && (
             <div className="mt-4 flex flex-col items-center gap-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
               <p className="text-amber-400 text-sm max-w-xs">
-                This is taking longer than expected. 
+                This is taking longer than expected.
               </p>
-              <button 
+              <button
                 onClick={handleRefresh}
                 className="bg-white/5 hover:bg-white/10 border border-white/10 px-4 py-2 rounded-lg flex items-center gap-2 transition-all"
               >
@@ -275,7 +290,7 @@ export const RecommendationsDashboard: React.FC = () => {
                 <Icon className={`w-6 h-6 ${priorityStyle.text}`} />
               </div>
               <div className="flex-1">
-                <h2 className="text-xl font-bold mb-2">{selectedRec.title}</h2>
+                <h2 className="text-xl font-bold mb-2">{stripMarkdown(selectedRec.title)}</h2>
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full ${priorityStyle.bg} ${priorityStyle.text} border ${priorityStyle.border}`}>
                     {selectedRec.priority.toUpperCase()}
@@ -459,21 +474,19 @@ export const RecommendationsDashboard: React.FC = () => {
         <div className="flex gap-2 mb-6 overflow-x-auto pb-1 scrollbar-hide">
           <button
             onClick={() => setShowCompleted(!showCompleted)}
-            className={`px-4 py-2 rounded-full text-xs font-semibold transition-all whitespace-nowrap border ${
-              showCompleted
+            className={`px-4 py-2 rounded-full text-xs font-semibold transition-all whitespace-nowrap border ${showCompleted
                 ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
                 : 'bg-[#1A243D] text-gray-400 border-slate-700/40 hover:text-gray-200'
-            }`}
+              }`}
           >
             {showCompleted ? 'Show Active Only' : 'Show All Recommendations'}
           </button>
           <button
             onClick={() => setFilterPriority(filterPriority === 'urgent' ? 'all' : 'urgent')}
-            className={`px-4 py-2 rounded-full text-xs font-semibold transition-all whitespace-nowrap border ${
-              filterPriority === 'urgent'
+            className={`px-4 py-2 rounded-full text-xs font-semibold transition-all whitespace-nowrap border ${filterPriority === 'urgent'
                 ? 'bg-red-500/20 text-red-300 border-red-500/40'
                 : 'bg-[#1A243D] text-gray-400 border-slate-700/40 hover:text-gray-200'
-            }`}
+              }`}
           >
             Urgent Only
           </button>
