@@ -36,6 +36,7 @@ import { ChatSupport } from "./components/ChatSupport";
 import AIDoctorPage from "./pages/AIDoctorPage";
 import InvoicesPage from "./pages/InvoicesPage";
 import PatientInsuranceClaims from "./components/PatientInsuranceClaims";
+import { PatientInsuranceProfile } from "./components/PatientInsuranceProfile";
 import { ManualVitalInput } from "./components/ManualVitalInput";
 import { PatientPrescriptions } from "./components/PatientPrescriptions";
 import { PatientVitalsHistory } from "./components/PatientVitalsHistory";
@@ -53,6 +54,7 @@ import PatientMessages from "./pages/PatientMessages";
 import AliveCorHistory from "./pages/AliveCorHistory";
 import ConnectCamera from "./pages/ConnectCamera";
 import { ServicesRecords } from "./pages/ServicesRecords";
+import MyThresholds from "./components/MyThresholds";
 
 const queryClient = new QueryClient();
 
@@ -214,6 +216,13 @@ const App = () => (
                   <PatientInsuranceClaims />
                 </ProtectedRoute>
               } />
+              <Route path="/insurance-profile" element={
+                <ProtectedRoute>
+                  <div className="min-h-screen bg-background p-4">
+                    <PatientInsuranceProfile />
+                  </div>
+                </ProtectedRoute>
+              } />
               <Route path="/manual-vitals" element={
                 <ProtectedRoute>
                   <ManualVitalInput />
@@ -247,6 +256,11 @@ const App = () => (
               <Route path="/connect-camera" element={
                 <ProtectedRoute>
                   <ConnectCamera />
+                </ProtectedRoute>
+              } />
+              <Route path="/my-thresholds" element={
+                <ProtectedRoute>
+                  <MyThresholds />
                 </ProtectedRoute>
               } />
 

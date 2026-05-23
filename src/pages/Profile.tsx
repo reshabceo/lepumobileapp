@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, User, Mail, Phone, Calendar, MapPin, Droplet, Heart, AlertCircle, Pill, UserCircle, LogOut, Ruler, Scale, Edit2 } from 'lucide-react';
+import { ABHALinking } from '../components/ABHALinking';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase, getPatientRiskCriteria } from '../lib/supabase';
 import { Button } from '../components/ui/button';
@@ -29,6 +30,8 @@ interface PatientProfile {
   allergies?: string[];
   medical_conditions?: string[];
   current_medications?: string[];
+  abha_id?: string | null;
+  abha_address?: string | null;
   emergency_contact_name?: string;
   emergency_contact_phone?: string;
   profile_picture_url?: string;
@@ -122,7 +125,7 @@ const Profile = () => {
       }
 
       setProfile(data);
-      
+
       // Load risk criteria
       const { data: riskData } = await getPatientRiskCriteria(data.id);
       if (riskData) {
@@ -279,7 +282,7 @@ const Profile = () => {
   return (
     <MobileAppContainer>
       <div className="min-h-screen bg-[#080D1A] text-white font-inter select-none">
-        
+
         {/* Header */}
         <div className="p-4 pt-safe-top">
           <header className="flex items-center gap-3 mb-6">
@@ -555,9 +558,8 @@ const Profile = () => {
                         </div>
                         <div className="bg-[#121B32] p-3 rounded-lg border border-red-500/20">
                           <p className="text-xs text-red-200/60 mb-1">Risk Status</p>
-                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                            riskCriteria.is_high_risk ? 'bg-red-500 text-white' : 'bg-green-500 text-white'
-                          }`}>
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${riskCriteria.is_high_risk ? 'bg-red-500 text-white' : 'bg-green-500 text-white'
+                            }`}>
                             {riskCriteria.is_high_risk ? 'HIGH RISK' : 'STABLE'}
                           </span>
                         </div>
@@ -628,191 +630,191 @@ const Profile = () => {
           </div>
         </div>
 
-      {/* Personal Info Modal */}
-      <Dialog open={personalModalOpen} onOpenChange={setPersonalModalOpen}>
-        <DialogContent className="bg-[#1A243D] border border-slate-700/40 text-white max-w-sm rounded-3xl">
-          <DialogHeader>
-            <DialogTitle>Personal Information</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <label className="text-xs text-slate-400">Full Name</label>
-              <Input
-                value={personalForm.full_name}
-                onChange={e => setPersonalForm({...personalForm, full_name: e.target.value})}
-                className="bg-[#121B32] border border-slate-700/40 text-white placeholder-gray-500 rounded-xl"
-              />
+        {/* Personal Info Modal */}
+        <Dialog open={personalModalOpen} onOpenChange={setPersonalModalOpen}>
+          <DialogContent className="bg-[#1A243D] border border-slate-700/40 text-white max-w-sm rounded-3xl">
+            <DialogHeader>
+              <DialogTitle>Personal Information</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <label className="text-xs text-slate-400">Full Name</label>
+                <Input
+                  value={personalForm.full_name}
+                  onChange={e => setPersonalForm({ ...personalForm, full_name: e.target.value })}
+                  className="bg-[#121B32] border border-slate-700/40 text-white placeholder-gray-500 rounded-xl"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs text-slate-400">Phone Number</label>
+                <Input
+                  value={personalForm.phone_number}
+                  onChange={e => setPersonalForm({ ...personalForm, phone_number: e.target.value })}
+                  className="bg-[#121B32] border border-slate-700/40 text-white placeholder-gray-500 rounded-xl"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs text-slate-400">Date of Birth</label>
+                <Input
+                  type="date"
+                  value={personalForm.date_of_birth}
+                  onChange={e => setPersonalForm({ ...personalForm, date_of_birth: e.target.value })}
+                  className="bg-[#121B32] border border-slate-700/40 text-white placeholder-gray-500 rounded-xl"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs text-slate-400">Gender</label>
+                <select
+                  value={personalForm.gender}
+                  onChange={e => setPersonalForm({ ...personalForm, gender: e.target.value })}
+                  className="w-full bg-[#121B32] border border-slate-700/40 text-white rounded-xl p-2.5 text-sm"
+                >
+                  <option value="">Select Gender</option>
+                  <option value="male">Male</option>
+                  <option value="female">Female</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs text-slate-400">Address</label>
+                <textarea
+                  value={personalForm.address}
+                  onChange={e => setPersonalForm({ ...personalForm, address: e.target.value })}
+                  className="w-full bg-[#121B32] border border-slate-700/40 text-white rounded-xl p-2.5 text-sm h-20 resize-none"
+                />
+              </div>
             </div>
-            <div className="space-y-2">
-              <label className="text-xs text-slate-400">Phone Number</label>
-              <Input
-                value={personalForm.phone_number}
-                onChange={e => setPersonalForm({...personalForm, phone_number: e.target.value})}
-                className="bg-[#121B32] border border-slate-700/40 text-white placeholder-gray-500 rounded-xl"
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-xs text-slate-400">Date of Birth</label>
-              <Input
-                type="date"
-                value={personalForm.date_of_birth}
-                onChange={e => setPersonalForm({...personalForm, date_of_birth: e.target.value})}
-                className="bg-[#121B32] border border-slate-700/40 text-white placeholder-gray-500 rounded-xl"
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-xs text-slate-400">Gender</label>
-              <select
-                value={personalForm.gender}
-                onChange={e => setPersonalForm({...personalForm, gender: e.target.value})}
-                className="w-full bg-[#121B32] border border-slate-700/40 text-white rounded-xl p-2.5 text-sm"
-              >
-                <option value="">Select Gender</option>
-                <option value="male">Male</option>
-                <option value="female">Female</option>
-                <option value="other">Other</option>
-              </select>
-            </div>
-            <div className="space-y-2">
-              <label className="text-xs text-slate-400">Address</label>
-              <textarea
-                value={personalForm.address}
-                onChange={e => setPersonalForm({...personalForm, address: e.target.value})}
-                className="w-full bg-[#121B32] border border-slate-700/40 text-white rounded-xl p-2.5 text-sm h-20 resize-none"
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setPersonalModalOpen(false)}>Cancel</Button>
-            <Button onClick={handleSavePersonal} disabled={saving}>{saving ? 'Saving...' : 'Save'}</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            <DialogFooter>
+              <Button variant="ghost" onClick={() => setPersonalModalOpen(false)}>Cancel</Button>
+              <Button onClick={handleSavePersonal} disabled={saving}>{saving ? 'Saving...' : 'Save'}</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
-      {/* Medical Info Modal */}
-      <Dialog open={medicalModalOpen} onOpenChange={setMedicalModalOpen}>
-        <DialogContent className="bg-[#1A243D] border border-slate-700/40 text-white max-w-sm rounded-3xl">
-          <DialogHeader>
-            <DialogTitle>Medical Information</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <label className="text-xs text-slate-400">Blood Type</label>
-              <select
-                value={medicalForm.blood_type}
-                onChange={e => setMedicalForm({...medicalForm, blood_type: e.target.value})}
-                className="w-full bg-[#121B32] border border-slate-700/40 text-white rounded-xl p-2.5 text-sm"
-              >
-                <option value="">Select Blood Type</option>
-                {['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'].map(t => (
-                  <option key={t} value={t}>{t}</option>
-                ))}
-              </select>
+        {/* Medical Info Modal */}
+        <Dialog open={medicalModalOpen} onOpenChange={setMedicalModalOpen}>
+          <DialogContent className="bg-[#1A243D] border border-slate-700/40 text-white max-w-sm rounded-3xl">
+            <DialogHeader>
+              <DialogTitle>Medical Information</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <label className="text-xs text-slate-400">Blood Type</label>
+                <select
+                  value={medicalForm.blood_type}
+                  onChange={e => setMedicalForm({ ...medicalForm, blood_type: e.target.value })}
+                  className="w-full bg-[#121B32] border border-slate-700/40 text-white rounded-xl p-2.5 text-sm"
+                >
+                  <option value="">Select Blood Type</option>
+                  {['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'].map(t => (
+                    <option key={t} value={t}>{t}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs text-slate-400">Allergies (comma separated)</label>
+                <textarea
+                  value={medicalForm.allergies}
+                  onChange={e => setMedicalForm({ ...medicalForm, allergies: e.target.value })}
+                  className="w-full bg-[#121B32] border border-slate-700/40 text-white rounded-xl p-2.5 text-sm h-20 resize-none"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs text-slate-400">Conditions (comma separated)</label>
+                <textarea
+                  value={medicalForm.medical_conditions}
+                  onChange={e => setMedicalForm({ ...medicalForm, medical_conditions: e.target.value })}
+                  className="w-full bg-[#121B32] border border-slate-700/40 text-white rounded-xl p-2.5 text-sm h-20 resize-none"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs text-slate-400">Medications (comma separated)</label>
+                <textarea
+                  value={medicalForm.current_medications}
+                  onChange={e => setMedicalForm({ ...medicalForm, current_medications: e.target.value })}
+                  className="w-full bg-[#121B32] border border-slate-700/40 text-white rounded-xl p-2.5 text-sm h-20 resize-none"
+                />
+              </div>
             </div>
-            <div className="space-y-2">
-              <label className="text-xs text-slate-400">Allergies (comma separated)</label>
-              <textarea
-                value={medicalForm.allergies}
-                onChange={e => setMedicalForm({...medicalForm, allergies: e.target.value})}
-                className="w-full bg-[#121B32] border border-slate-700/40 text-white rounded-xl p-2.5 text-sm h-20 resize-none"
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-xs text-slate-400">Conditions (comma separated)</label>
-              <textarea
-                value={medicalForm.medical_conditions}
-                onChange={e => setMedicalForm({...medicalForm, medical_conditions: e.target.value})}
-                className="w-full bg-[#121B32] border border-slate-700/40 text-white rounded-xl p-2.5 text-sm h-20 resize-none"
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-xs text-slate-400">Medications (comma separated)</label>
-              <textarea
-                value={medicalForm.current_medications}
-                onChange={e => setMedicalForm({...medicalForm, current_medications: e.target.value})}
-                className="w-full bg-[#121B32] border border-slate-700/40 text-white rounded-xl p-2.5 text-sm h-20 resize-none"
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setMedicalModalOpen(false)}>Cancel</Button>
-            <Button onClick={handleSaveMedical} disabled={saving}>{saving ? 'Saving...' : 'Save'}</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            <DialogFooter>
+              <Button variant="ghost" onClick={() => setMedicalModalOpen(false)}>Cancel</Button>
+              <Button onClick={handleSaveMedical} disabled={saving}>{saving ? 'Saving...' : 'Save'}</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
-      {/* Emergency Contact Modal */}
-      <Dialog open={emergencyModalOpen} onOpenChange={setEmergencyModalOpen}>
-        <DialogContent className="bg-[#1A243D] border border-slate-700/40 text-white max-w-sm rounded-3xl">
-          <DialogHeader>
-            <DialogTitle>Emergency Contact</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <label className="text-xs text-slate-400">Contact Name</label>
+        {/* Emergency Contact Modal */}
+        <Dialog open={emergencyModalOpen} onOpenChange={setEmergencyModalOpen}>
+          <DialogContent className="bg-[#1A243D] border border-slate-700/40 text-white max-w-sm rounded-3xl">
+            <DialogHeader>
+              <DialogTitle>Emergency Contact</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <label className="text-xs text-slate-400">Contact Name</label>
+                <Input
+                  value={emergencyForm.emergency_contact_name}
+                  onChange={e => setEmergencyForm({ ...emergencyForm, emergency_contact_name: e.target.value })}
+                  className="bg-[#121B32] border border-slate-700/40 text-white placeholder-gray-500 rounded-xl"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs text-slate-400">Contact Phone</label>
+                <Input
+                  value={emergencyForm.emergency_contact_phone}
+                  onChange={e => setEmergencyForm({ ...emergencyForm, emergency_contact_phone: e.target.value })}
+                  className="bg-[#121B32] border border-slate-700/40 text-white placeholder-gray-500 rounded-xl"
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="ghost" onClick={() => setEmergencyModalOpen(false)}>Cancel</Button>
+              <Button onClick={handleSaveEmergency} disabled={saving}>{saving ? 'Saving...' : 'Save'}</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Height Modal */}
+        <Dialog open={heightModalOpen} onOpenChange={setHeightModalOpen}>
+          <DialogContent className="bg-[#1A243D] border border-slate-700/40 text-white max-w-sm rounded-3xl">
+            <DialogHeader>
+              <DialogTitle>Update Height</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
               <Input
-                value={emergencyForm.emergency_contact_name}
-                onChange={e => setEmergencyForm({...emergencyForm, emergency_contact_name: e.target.value})}
+                type="number"
+                value={heightInput}
+                onChange={e => setHeightInput(e.target.value)}
                 className="bg-[#121B32] border border-slate-700/40 text-white placeholder-gray-500 rounded-xl"
               />
             </div>
-            <div className="space-y-2">
-              <label className="text-xs text-slate-400">Contact Phone</label>
+            <DialogFooter>
+              <Button variant="ghost" onClick={() => setHeightModalOpen(false)}>Cancel</Button>
+              <Button onClick={handleSaveHeight} disabled={saving}>{saving ? 'Saving...' : 'Save'}</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Weight Modal */}
+        <Dialog open={weightModalOpen} onOpenChange={setWeightModalOpen}>
+          <DialogContent className="bg-[#1A243D] border border-slate-700/40 text-white max-w-sm rounded-3xl">
+            <DialogHeader>
+              <DialogTitle>Update Weight</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
               <Input
-                value={emergencyForm.emergency_contact_phone}
-                onChange={e => setEmergencyForm({...emergencyForm, emergency_contact_phone: e.target.value})}
+                type="number"
+                value={weightInput}
+                onChange={e => setWeightInput(e.target.value)}
                 className="bg-[#121B32] border border-slate-700/40 text-white placeholder-gray-500 rounded-xl"
               />
             </div>
-          </div>
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setEmergencyModalOpen(false)}>Cancel</Button>
-            <Button onClick={handleSaveEmergency} disabled={saving}>{saving ? 'Saving...' : 'Save'}</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Height Modal */}
-      <Dialog open={heightModalOpen} onOpenChange={setHeightModalOpen}>
-        <DialogContent className="bg-[#1A243D] border border-slate-700/40 text-white max-w-sm rounded-3xl">
-          <DialogHeader>
-            <DialogTitle>Update Height</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <Input
-              type="number"
-              value={heightInput}
-              onChange={e => setHeightInput(e.target.value)}
-              className="bg-[#121B32] border border-slate-700/40 text-white placeholder-gray-500 rounded-xl"
-            />
-          </div>
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setHeightModalOpen(false)}>Cancel</Button>
-            <Button onClick={handleSaveHeight} disabled={saving}>{saving ? 'Saving...' : 'Save'}</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Weight Modal */}
-      <Dialog open={weightModalOpen} onOpenChange={setWeightModalOpen}>
-        <DialogContent className="bg-[#1A243D] border border-slate-700/40 text-white max-w-sm rounded-3xl">
-          <DialogHeader>
-            <DialogTitle>Update Weight</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <Input
-              type="number"
-              value={weightInput}
-              onChange={e => setWeightInput(e.target.value)}
-              className="bg-[#121B32] border border-slate-700/40 text-white placeholder-gray-500 rounded-xl"
-            />
-          </div>
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setWeightModalOpen(false)}>Cancel</Button>
-            <Button onClick={handleSaveWeight} disabled={saving}>{saving ? 'Saving...' : 'Save'}</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            <DialogFooter>
+              <Button variant="ghost" onClick={() => setWeightModalOpen(false)}>Cancel</Button>
+              <Button onClick={handleSaveWeight} disabled={saving}>{saving ? 'Saving...' : 'Save'}</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </MobileAppContainer>
   );

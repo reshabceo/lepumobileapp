@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { FileText, Download, Calendar, User, ArrowLeft, Upload, Stethoscope, Plus, Loader2, FileDown, Image, Send, RotateCcw } from 'lucide-react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { FileText, Download, Calendar, User, ArrowLeft, Upload, Stethoscope, Plus, Loader2, FileDown, Image, Send, RotateCcw, Brain, CheckCircle2, XCircle, Clock } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase, db, supabaseUrl, supabaseAnonKey } from '@/lib/supabase';
 import { useRealTimeVitals } from '@/hooks/useRealTimeVitals';
@@ -54,7 +54,7 @@ const generateReportHTML = (analysisData: any, reportTitle: string): string => {
 
     // Helper function to generate lab results table
     const generateLabResultsTable = () => {
-        if (!analysisData.labResults || analysisData.labResults.length === 0) return '';
+        if (!Array.isArray(analysisData.labResults) || analysisData.labResults.length === 0) return '';
 
         return `
       <div class="section">
@@ -97,7 +97,7 @@ const generateReportHTML = (analysisData: any, reportTitle: string): string => {
 
     // Helper function to generate findings list
     const generateFindingsList = () => {
-        if (!analysisData.analysis?.keyFindings || analysisData.analysis.keyFindings.length === 0) return '';
+        if (!Array.isArray(analysisData.analysis?.keyFindings) || analysisData.analysis.keyFindings.length === 0) return '';
 
         return `
       <div class="section">
@@ -120,7 +120,7 @@ const generateReportHTML = (analysisData: any, reportTitle: string): string => {
 
     // Helper function to generate critical risks
     const generateCriticalRisks = () => {
-        if (!analysisData.advancedReport?.criticalRisks || analysisData.advancedReport.criticalRisks.length === 0) return '';
+        if (!Array.isArray(analysisData.advancedReport?.criticalRisks) || analysisData.advancedReport.criticalRisks.length === 0) return '';
 
         return `
       <div class="section">
@@ -143,7 +143,7 @@ const generateReportHTML = (analysisData: any, reportTitle: string): string => {
 
     // Helper function to generate recommendations
     const generateRecommendations = () => {
-        if (!analysisData.analysis?.recommendations || analysisData.analysis.recommendations.length === 0) return '';
+        if (!Array.isArray(analysisData.analysis?.recommendations) || analysisData.analysis.recommendations.length === 0) return '';
 
         return `
       <div class="section">
@@ -444,7 +444,7 @@ const generateReportHTML = (analysisData: any, reportTitle: string): string => {
             </div>
           ` : ''}
 
-          ${analysisData.advancedReport.patientSummary.keyPoints && analysisData.advancedReport.patientSummary.keyPoints.length > 0 ? `
+          ${Array.isArray(analysisData.advancedReport.patientSummary.keyPoints) && analysisData.advancedReport.patientSummary.keyPoints.length > 0 ? `
             <div style="margin-bottom: 20px;">
               <h3 style="color: #22c55e; display: flex; align-items: center;">🔑 Key Points:</h3>
               ${analysisData.advancedReport.patientSummary.keyPoints.map((point: string) => `
@@ -456,7 +456,7 @@ const generateReportHTML = (analysisData: any, reportTitle: string): string => {
             </div>
           ` : ''}
 
-          ${analysisData.advancedReport.patientSummary.nextSteps && analysisData.advancedReport.patientSummary.nextSteps.length > 0 ? `
+          ${Array.isArray(analysisData.advancedReport.patientSummary.nextSteps) && analysisData.advancedReport.patientSummary.nextSteps.length > 0 ? `
             <div>
               <h3 style="color: #3b82f6; display: flex; align-items: center;">👣 Next Steps:</h3>
               ${analysisData.advancedReport.patientSummary.nextSteps.map((step: string) => `
@@ -573,6 +573,44 @@ const PatientReportsView: React.FC = () => {
         };
     }, [patientProfile]);
 
+    // ── Real-time subscription: update report status as analysis completes ────────
+    useEffect(() => {
+        if (!patientProfile?.id) return;
+
+        const channel = supabase
+            .channel(`patient_reports_status_${patientProfile.id}`)
+            .on(
+                'postgres_changes',
+                {
+                    event: 'UPDATE',
+                    schema: 'public',
+                    table: 'patient_reports',
+                    filter: `patient_id=eq.${patientProfile.id}`,
+                },
+                (payload) => {
+                    const updated = payload.new as PatientReport;
+                    setReports(prev =>
+                        prev.map(r => r.id === updated.id
+                            ? { ...r,
+                                analysis_status: updated.analysis_status,
+                                analysis_data: updated.analysis_data ?? r.analysis_data,
+                                sent_to_patient: updated.sent_to_patient ?? r.sent_to_patient,
+                                analyzed_at: (updated as any).analyzed_at ?? (r as any).analyzed_at,
+                              }
+                            : r
+                        )
+                    );
+                    // Toast when analysis finishes
+                    if (updated.analysis_status === 'completed' && updated.uploaded_by_patient) {
+                        toast({ title: 'Analysis complete', description: `"${updated.title}" has been analysed.` });
+                    }
+                }
+            )
+            .subscribe();
+
+        return () => { supabase.removeChannel(channel); };
+    }, [patientProfile?.id]);
+
     // 🚀 Persist active tab to handle Android process death/restarts
     useEffect(() => {
         localStorage.setItem('reports_active_tab', activeTab);
@@ -629,49 +667,23 @@ const PatientReportsView: React.FC = () => {
         const activeProfile = profile || patientProfile;
         if (!activeProfile) return;
 
-        try {
-            setLoading(true);
-            console.log(`📡 [Reports] Fetching reports for patient: ${activeProfile.id}...`);
-            
-            // 🚀 Robust timeout for reports fetch
-            const timeoutPromise = new Promise<any>((_, reject) => 
-                setTimeout(() => reject(new Error('Reports fetch timeout (15s)')), 15000)
-            );
+        setLoading(true);
+        const { data } = await supabase
+            .from('patient_reports')
+            .select(`
+                *,
+                doctors!doctor_id(full_name)
+            `)
+            .eq('patient_id', activeProfile.id)
+            .order('created_at', { ascending: false });
 
-            const fetchPromise = supabase
-                .from('patient_reports')
-                .select(`
-                    *,
-                    doctors!doctor_id(full_name)
-                `)
-                .eq('patient_id', activeProfile.id)
-                .order('created_at', { ascending: false });
-
-            const { data, error } = await Promise.race([fetchPromise, timeoutPromise]);
-
-            if (error) {
-                console.error('❌ [Reports] Error fetching reports:', error);
-                toast.error('Failed to load reports. Please try again.');
-            } else {
-                console.log(`✅ [Reports] Successfully fetched ${data?.length || 0} reports`);
-                const formattedReports = data?.map((report: any) => ({
-                    ...report,
-                    doctor_name: report.doctors?.full_name || 'Unknown Doctor'
-                })) || [];
-                setReports(formattedReports);
-            }
-        } catch (err: any) {
-            console.error('❌ [Reports] Unexpected error:', err);
-            if (err.message?.includes('timeout')) {
-                toast.error('Connection slow. Tap retry to load reports.');
-            }
-            // On error/timeout: leave reportsLoaded=false so the retry button shows,
-            // not the "no reports found" empty state (which would be misleading)
-            setLoading(false);
-            return;
-        }
-        setLoading(false);
+        const formattedReports = (data || []).map((report: any) => ({
+            ...report,
+            doctor_name: report.doctors?.full_name || 'Unknown Doctor'
+        }));
+        setReports(formattedReports);
         setReportsLoaded(true);
+        setLoading(false);
     };
 
     // Filter reports based on active tab
@@ -804,8 +816,19 @@ const PatientReportsView: React.FC = () => {
         try {
             console.log('Generating PDF... Please wait.');
 
+            // Parse analysis_data if Supabase returned it as a JSON string
+            let analysisData = report.analysis_data;
+            if (typeof analysisData === 'string') {
+                try {
+                    analysisData = JSON.parse(analysisData);
+                } catch {
+                    alert('Analysis data is corrupted and cannot be exported.');
+                    return;
+                }
+            }
+
             // Generate HTML content
-            const htmlContent = generateReportHTML(report.analysis_data, report.title);
+            const htmlContent = generateReportHTML(analysisData, report.title);
 
             // Create a temporary element to hold the HTML
             const element = document.createElement('div');
@@ -865,6 +888,7 @@ const PatientReportsView: React.FC = () => {
             discharge_summary: 'Discharge Summary',
             weekly_vitals_report: 'Weekly Vitals Report',
             rpm_compliance_report: 'RPM Compliance Report',
+            combined_weekly_report: 'Combined Weekly Report',
         };
         return types[type] || type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
     };
@@ -878,8 +902,46 @@ const PatientReportsView: React.FC = () => {
             discharge_summary: 'bg-red-100 text-red-800',
             weekly_vitals_report: 'bg-cyan-100 text-cyan-800',
             rpm_compliance_report: 'bg-orange-100 text-orange-800',
+            combined_weekly_report: 'bg-violet-100 text-violet-800',
         };
         return colors[type] || 'bg-gray-100 text-gray-800';
+    };
+
+    // ── Render analysis status badge for patient-uploaded reports ─────────────────
+    const renderAnalysisStatus = (report: PatientReport) => {
+        if (!report.uploaded_by_patient) return null;
+        switch (report.analysis_status) {
+            case 'processing':
+                return (
+                    <span className="flex items-center gap-1 text-xs bg-yellow-500/20 text-yellow-400 px-2 py-1 rounded-full">
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                        Analysing…
+                    </span>
+                );
+            case 'completed':
+                return (
+                    <span className="flex items-center gap-1 text-xs bg-emerald-500/20 text-emerald-400 px-2 py-1 rounded-full">
+                        <CheckCircle2 className="h-3 w-3" />
+                        AI Analysed
+                    </span>
+                );
+            case 'failed':
+                return (
+                    <span className="flex items-center gap-1 text-xs bg-red-500/20 text-red-400 px-2 py-1 rounded-full">
+                        <XCircle className="h-3 w-3" />
+                        Analysis failed
+                    </span>
+                );
+            case 'pending':
+                return (
+                    <span className="flex items-center gap-1 text-xs bg-gray-500/20 text-gray-400 px-2 py-1 rounded-full">
+                        <Clock className="h-3 w-3" />
+                        Pending
+                    </span>
+                );
+            default:
+                return null;
+        }
     };
 
     // Show loading state — only block if we're still fetching the profile AND have nothing cached
@@ -1180,19 +1242,16 @@ const PatientReportsView: React.FC = () => {
                             >
                                 <div className="flex items-start justify-between mb-3">
                                     <div className="flex-1">
-                                        <div className="flex items-center gap-2 mb-2">
+                                        <div className="flex items-center gap-2 mb-2 flex-wrap">
                                             {report.uploaded_by_patient ? (
-                                                <Upload className="h-5 w-5 text-green-500" />
+                                                <Upload className="h-5 w-5 text-green-500 shrink-0" />
                                             ) : (
-                                                <Stethoscope className="h-5 w-5 text-blue-500" />
+                                                <Stethoscope className="h-5 w-5 text-blue-500 shrink-0" />
                                             )}
-                                            <h3 className="font-semibold text-white">{report.title}</h3>
-                                            {report.uploaded_by_patient && !report.sent_to_patient && (
-                                                <span className="text-xs bg-green-500/20 text-green-400 px-2 py-1 rounded-full">
-                                                    My Upload
-                                                </span>
-                                            )}
-                                            {report.sent_to_patient && report.analysis_status === 'completed' && (
+                                            <h3 className="font-semibold text-white flex-1 min-w-0 truncate">{report.title}</h3>
+                                            {/* Live analysis status for patient uploads */}
+                                            {renderAnalysisStatus(report)}
+                                            {report.sent_to_patient && report.analysis_status === 'completed' && !report.uploaded_by_patient && (
                                                 <span className="text-xs bg-emerald-500/20 text-emerald-400 px-2 py-1 rounded-full">
                                                     Analyzed
                                                 </span>
@@ -1224,14 +1283,16 @@ const PatientReportsView: React.FC = () => {
                                         </div>
                                     </div>
 
-                                    <div className="flex gap-2">
-                                        {activeTab === 'my-uploads' && <button
+                                    <div className="flex gap-2 flex-wrap">
+                                        {/* Download original file */}
+                                        <button
                                             onClick={() => downloadReport(report)}
                                             className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors"
                                         >
                                             <Download className="h-4 w-4" />
                                             <span className="text-sm">Download</span>
-                                        </button>}
+                                        </button>
+                                        {/* Analysis PDF — for doctor-shared reports */}
                                         {activeTab === 'from-doctor' && report.sent_to_patient && report.analysis_status === 'completed' && report.analysis_data && (
                                             <button
                                                 onClick={() => downloadAnalysisAsPDF(report)}
@@ -1239,6 +1300,16 @@ const PatientReportsView: React.FC = () => {
                                             >
                                                 <FileDown className="h-4 w-4" />
                                                 <span className="text-sm">Analysis PDF</span>
+                                            </button>
+                                        )}
+                                        {/* Analysis PDF — for patient's own completed uploads */}
+                                        {activeTab === 'my-uploads' && report.analysis_status === 'completed' && report.analysis_data && (
+                                            <button
+                                                onClick={() => downloadAnalysisAsPDF(report)}
+                                                className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg transition-colors"
+                                            >
+                                                <Brain className="h-4 w-4" />
+                                                <span className="text-sm">AI Analysis</span>
                                             </button>
                                         )}
                                     </div>
