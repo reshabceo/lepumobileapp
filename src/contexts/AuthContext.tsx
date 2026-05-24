@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, useMemo, ReactNode } from 'react';
 import { auth, db, supabase, isDoctorByAuthId } from '@/lib/supabase';
 import { User, Session } from '@supabase/supabase-js';
 
@@ -290,7 +290,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-  const value: AuthContextType = {
+  // Memoize so consumers only re-render when auth state ACTUALLY changes — not on
+  // every AuthProvider render. Without this, every render handed children a new
+  // object, re-rendering the whole tree and remounting data hooks (which each fire
+  // getSession + realtime subscribe), flooding the Supabase client.
+  const value: AuthContextType = useMemo(() => ({
     user,
     session,
     isAuthenticated: !!user,
@@ -299,7 +303,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     signup,
     logout,
     updateUser,
-  };
+  }), [user, session, isLoading]);
 
   return (
     <AuthContext.Provider value={value}>
