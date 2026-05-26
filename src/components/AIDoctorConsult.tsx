@@ -43,6 +43,7 @@ import {
   Lock,
   Timer,
   CheckCircle,
+  Bot,
 } from "lucide-react";
 import { Capacitor } from "@capacitor/core";
 import { Button } from "@/components/ui/button";
@@ -188,10 +189,10 @@ export const AIDoctorConsult: React.FC = () => {
             fullName: (patient.full_name as string | null) || undefined,
             age: patient.date_of_birth
               ? Math.floor(
-                  (Date.now() -
-                    new Date(patient.date_of_birth as string).getTime()) /
-                    (1000 * 60 * 60 * 24 * 365.25)
-                )
+                (Date.now() -
+                  new Date(patient.date_of_birth as string).getTime()) /
+                (1000 * 60 * 60 * 24 * 365.25)
+              )
               : undefined,
             sex:
               (patient.gender as string | null) ||
@@ -279,7 +280,7 @@ export const AIDoctorConsult: React.FC = () => {
       if (ms <= 0) {
         setExpiryCountdown("Expired");
         setPaymentStatus("expired");
-        if (sessionId) expireSession(sessionId).catch(() => {});
+        if (sessionId) expireSession(sessionId).catch(() => { });
         return;
       }
       const h = Math.floor(ms / 3600000);
@@ -289,8 +290,8 @@ export const AIDoctorConsult: React.FC = () => {
         h > 0
           ? `${h}h ${m}m remaining`
           : m > 0
-          ? `${m}m ${s}s remaining`
-          : `${s}s remaining`
+            ? `${m}m ${s}s remaining`
+            : `${s}s remaining`
       );
     };
 
@@ -351,7 +352,7 @@ export const AIDoctorConsult: React.FC = () => {
 
     // Close current session
     if (sessionId) {
-      await closeSession(sessionId).catch(() => {});
+      await closeSession(sessionId).catch(() => { });
     }
 
     try {
@@ -418,10 +419,10 @@ export const AIDoctorConsult: React.FC = () => {
     }
 
     if (!patientContext.id || !currentSessionId || !pricing) {
-      console.warn("⚠️ [DEBUG] Cannot proceed with payment: Missing context", { 
-        patientId: patientContext.id, 
-        sessionId: currentSessionId, 
-        pricing: !!pricing 
+      console.warn("⚠️ [DEBUG] Cannot proceed with payment: Missing context", {
+        patientId: patientContext.id,
+        sessionId: currentSessionId,
+        pricing: !!pricing
       });
       toast({
         title: "Session Error",
@@ -659,8 +660,8 @@ export const AIDoctorConsult: React.FC = () => {
         response.triageLevel === "emergency"
           ? "⚠️ EMERGENCY: This sounds potentially serious. If you have severe symptoms, difficulty breathing, chest pain, confusion, or feel very unwell, seek emergency medical care immediately.\n\n"
           : response.triageLevel === "urgent"
-          ? "⚠️ URGENT: Your symptoms may need prompt evaluation by a doctor. Please contact your doctor or local clinic as soon as you can.\n\n"
-          : "";
+            ? "⚠️ URGENT: Your symptoms may need prompt evaluation by a doctor. Please contact your doctor or local clinic as soon as you can.\n\n"
+            : "";
 
       addMessage({
         role: "ai",
@@ -676,8 +677,8 @@ export const AIDoctorConsult: React.FC = () => {
           (err instanceof Error && err.message.includes("timeout")
             ? "The analysis took too long - this can happen with large files. Please try with a smaller or clearer file."
             : err instanceof Error && err.message.includes("file")
-            ? err.message
-            : "Please try again, and if the issue persists, try describing your symptoms without attachments first."),
+              ? err.message
+              : "Please try again, and if the issue persists, try describing your symptoms without attachments first."),
         type: "text",
       });
       toast({
@@ -1042,8 +1043,8 @@ export const AIDoctorConsult: React.FC = () => {
         description: isTimeout
           ? "The AI doctor took too long to respond. Try a shorter message."
           : err instanceof Error
-          ? err.message.substring(0, 150)
-          : "Something went wrong.",
+            ? err.message.substring(0, 150)
+            : "Something went wrong.",
         variant: "destructive",
       });
     } finally {
@@ -1166,7 +1167,8 @@ export const AIDoctorConsult: React.FC = () => {
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <h1 className="text-xl font-bold">Dr. MonitraQ AI</h1>
+                  <h1 className="text-xl font-bold">MonitraQ Health AI
+                  </h1>
                   {paymentStatus === "paid" && expiryCountdown && (
                     <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 font-medium whitespace-nowrap flex-shrink-0 flex items-center gap-1">
                       <Timer className="w-2.5 h-2.5" />
@@ -1183,12 +1185,12 @@ export const AIDoctorConsult: React.FC = () => {
                   {consultMode === "voice"
                     ? "Voice consultation"
                     : consultMode === "text"
-                    ? "Text consultation"
-                    : paymentStatus === "unpaid"
-                    ? "Start a new session"
-                    : paymentStatus === "expired"
-                    ? "Session ended"
-                    : "Understand your symptoms safely"}
+                      ? "Text consultation"
+                      : paymentStatus === "unpaid"
+                        ? "Chat to our AI Health Assistant"
+                        : paymentStatus === "expired"
+                          ? "Session ended"
+                          : "Understand your symptoms safely"}
                 </p>
               </div>
             </div>
@@ -1221,41 +1223,6 @@ export const AIDoctorConsult: React.FC = () => {
           </div>
         </header>
 
-
-        {/* Info cards */}
-        <div className="mt-3 grid gap-3 md:grid-cols-3">
-          <Card className="bg-white/5 border-white/10 p-3">
-            <div className="flex items-center gap-2 text-xs text-emerald-300">
-              <Activity className="w-3 h-3" />
-              <span>What this does</span>
-            </div>
-            <p className="mt-1 text-xs text-white/80">
-              Helps you understand possible causes of your symptoms, how urgent
-              they might be, and which type of doctor to see.
-            </p>
-          </Card>
-          <Card className="bg-white/5 border-white/10 p-3">
-            <div className="flex items-center gap-2 text-xs text-amber-300">
-              <ShieldAlert className="w-3 h-3" />
-              <span>What it does not do</span>
-            </div>
-            <p className="mt-1 text-xs text-white/80">
-              Does not prescribe or recommend any medications, doses, or
-              treatment plans. It is not a diagnosis or medical care.
-            </p>
-          </Card>
-          <Card className="bg-white/5 border-white/10 p-3">
-            <div className="flex items-center gap-2 text-xs text-red-300">
-              <AlertTriangle className="w-3 h-3" />
-              <span>Emergency safety</span>
-            </div>
-            <p className="mt-1 text-xs text-white/80">
-              If you have severe chest pain, trouble breathing, confusion,
-              stroke symptoms, very high fever, or feel in danger, call your
-              local emergency number immediately.
-            </p>
-          </Card>
-        </div>
       </div>
 
       {/* ========== PAYWALL (session unpaid or expired) ========== */}
@@ -1266,7 +1233,7 @@ export const AIDoctorConsult: React.FC = () => {
               {paymentStatus === "expired" ? (
                 <Timer className="w-8 h-8" />
               ) : (
-                <Lock className="w-8 h-8" />
+                <Bot className="w-8 h-8" />
               )}
             </div>
             <h2 className="text-xl font-semibold text-white mb-2">
@@ -1279,6 +1246,41 @@ export const AIDoctorConsult: React.FC = () => {
                 ? "Your 24-hour consultation window has ended. Start a new session to continue chatting with Dr. MonitraQ."
                 : "Choose a consultation mode and pay once to unlock a full 24-hour session with Dr. MonitraQ."}
             </p>
+
+            {/* Info cards */}
+            <div className="mt-3 grid gap-3 md:grid-cols-3">
+              <Card className="bg-white/5 border-white/10 p-3">
+                <div className="flex items-center gap-2 text-xs text-emerald-300">
+                  <Activity className="w-3 h-3" />
+                  <span>What this does</span>
+                </div>
+                <p className="mt-1 text-xs text-white/80">
+                  Helps you understand possible causes of your symptoms, how urgent
+                  they might be, and which type of doctor to see.
+                </p>
+              </Card>
+              <Card className="bg-white/5 border-white/10 p-3">
+                <div className="flex items-center gap-2 text-xs text-amber-300">
+                  <ShieldAlert className="w-3 h-3" />
+                  <span>What it does not do</span>
+                </div>
+                <p className="mt-1 text-xs text-white/80">
+                  Does not prescribe or recommend any medications, doses, or
+                  treatment plans. It is not a diagnosis or medical care.
+                </p>
+              </Card>
+              <Card className="bg-white/5 border-white/10 p-3">
+                <div className="flex items-center gap-2 text-xs text-red-300">
+                  <AlertTriangle className="w-3 h-3" />
+                  <span>Emergency safety</span>
+                </div>
+                <p className="mt-1 text-xs text-white/80">
+                  If you have severe chest pain, trouble breathing, confusion,
+                  stroke symptoms, very high fever, or feel in danger, call your
+                  local emergency number immediately.
+                </p>
+              </Card>
+            </div>
           </div>
 
           {/* Pricing cards */}
@@ -1513,11 +1515,11 @@ export const AIDoctorConsult: React.FC = () => {
                     <p className="text-xs text-gray-400">
                       {viewingSession
                         ? new Date(viewingSession.created_at).toLocaleDateString(undefined, {
-                            weekday: "short",
-                            month: "short",
-                            day: "numeric",
-                            year: "numeric",
-                          })
+                          weekday: "short",
+                          month: "short",
+                          day: "numeric",
+                          year: "numeric",
+                        })
                         : `${allSessions.length} consultation${allSessions.length !== 1 ? "s" : ""}`}
                     </p>
                   </div>
@@ -1554,20 +1556,18 @@ export const AIDoctorConsult: React.FC = () => {
                     <button
                       key={session.id}
                       onClick={() => viewSessionDetail(session)}
-                      className={`w-full text-left px-4 py-3.5 rounded-xl border transition-all active:scale-[0.99] ${
-                        isCurrent
-                          ? "bg-emerald-500/5 border-emerald-500/20 hover:bg-emerald-500/10"
-                          : "bg-white/[0.03] border-white/5 hover:bg-white/[0.06] hover:border-emerald-500/20"
-                      }`}
+                      className={`w-full text-left px-4 py-3.5 rounded-xl border transition-all active:scale-[0.99] ${isCurrent
+                        ? "bg-emerald-500/5 border-emerald-500/20 hover:bg-emerald-500/10"
+                        : "bg-white/[0.03] border-white/5 hover:bg-white/[0.06] hover:border-emerald-500/20"
+                        }`}
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-1">
-                            <div className={`flex h-7 w-7 items-center justify-center rounded-lg flex-shrink-0 ${
-                              isCurrent
-                                ? "bg-emerald-500/20 text-emerald-400"
-                                : "bg-emerald-500/10 text-emerald-400"
-                            }`}>
+                            <div className={`flex h-7 w-7 items-center justify-center rounded-lg flex-shrink-0 ${isCurrent
+                              ? "bg-emerald-500/20 text-emerald-400"
+                              : "bg-emerald-500/10 text-emerald-400"
+                              }`}>
                               <Stethoscope className="w-3.5 h-3.5" />
                             </div>
                             <span className="text-sm font-medium text-white/90 truncate">
@@ -1636,16 +1636,14 @@ export const AIDoctorConsult: React.FC = () => {
                   {historyMessages.map((msg, idx) => (
                     <div
                       key={idx}
-                      className={`flex ${
-                        msg.role === "patient" ? "justify-end" : "justify-start"
-                      }`}
+                      className={`flex ${msg.role === "patient" ? "justify-end" : "justify-start"
+                        }`}
                     >
                       <div
-                        className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm leading-relaxed ${
-                          msg.role === "patient"
-                            ? "bg-emerald-500/80 text-black rounded-br-sm"
-                            : "bg-white/5 text-white border border-white/10 rounded-bl-sm"
-                        }`}
+                        className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm leading-relaxed ${msg.role === "patient"
+                          ? "bg-emerald-500/80 text-black rounded-br-sm"
+                          : "bg-white/5 text-white border border-white/10 rounded-bl-sm"
+                          }`}
                       >
                         {/* Voice indicator */}
                         {msg.type === "voice" && msg.role === "patient" && (
@@ -1720,9 +1718,8 @@ export const AIDoctorConsult: React.FC = () => {
 
                         {/* Timestamp */}
                         {msg.timestamp && (
-                          <p className={`text-[9px] mt-1.5 ${
-                            msg.role === "patient" ? "text-black/40" : "text-white/25"
-                          }`}>
+                          <p className={`text-[9px] mt-1.5 ${msg.role === "patient" ? "text-black/40" : "text-white/25"
+                            }`}>
                             {new Date(msg.timestamp).toLocaleTimeString(undefined, {
                               hour: "2-digit",
                               minute: "2-digit",
@@ -1845,16 +1842,14 @@ export const AIDoctorConsult: React.FC = () => {
             {messages.map((msg, idx) => (
               <div
                 key={idx}
-                className={`flex ${
-                  msg.role === "patient" ? "justify-end" : "justify-start"
-                }`}
+                className={`flex ${msg.role === "patient" ? "justify-end" : "justify-start"
+                  }`}
               >
                 <div
-                  className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm leading-relaxed ${
-                    msg.role === "patient"
-                      ? "bg-emerald-500 text-black rounded-br-sm"
-                      : "bg-white/5 text-white border border-white/10 rounded-bl-sm"
-                  }`}
+                  className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm leading-relaxed ${msg.role === "patient"
+                    ? "bg-emerald-500 text-black rounded-br-sm"
+                    : "bg-white/5 text-white border border-white/10 rounded-bl-sm"
+                    }`}
                 >
                   {/* --- Patient voice bubble --- */}
                   {msg.type === "voice" && msg.role === "patient" && (
@@ -1925,11 +1920,10 @@ export const AIDoctorConsult: React.FC = () => {
                           ].map((h, i) => (
                             <div
                               key={i}
-                              className={`w-[2px] rounded-full transition-colors ${
-                                isSpeaking
-                                  ? "bg-emerald-400"
-                                  : "bg-white/20"
-                              }`}
+                              className={`w-[2px] rounded-full transition-colors ${isSpeaking
+                                ? "bg-emerald-400"
+                                : "bg-white/20"
+                                }`}
                               style={{ height: `${h * 2}px` }}
                             />
                           ))}
@@ -2090,22 +2084,20 @@ export const AIDoctorConsult: React.FC = () => {
               <div className="inline-flex bg-white/5 rounded-lg p-0.5 gap-0.5">
                 <button
                   onClick={() => setConsultMode("text")}
-                  className={`px-3 py-1.5 rounded-md text-xs flex items-center gap-1.5 transition-all ${
-                    consultMode === "text"
-                      ? "bg-emerald-500 text-black font-medium"
-                      : "text-white/50 hover:text-white/80"
-                  }`}
+                  className={`px-3 py-1.5 rounded-md text-xs flex items-center gap-1.5 transition-all ${consultMode === "text"
+                    ? "bg-emerald-500 text-black font-medium"
+                    : "text-white/50 hover:text-white/80"
+                    }`}
                 >
                   <Keyboard className="w-3 h-3" />
                   Text
                 </button>
                 <button
                   onClick={() => setConsultMode("voice")}
-                  className={`px-3 py-1.5 rounded-md text-xs flex items-center gap-1.5 transition-all ${
-                    consultMode === "voice"
-                      ? "bg-emerald-500 text-black font-medium"
-                      : "text-white/50 hover:text-white/80"
-                  }`}
+                  className={`px-3 py-1.5 rounded-md text-xs flex items-center gap-1.5 transition-all ${consultMode === "voice"
+                    ? "bg-emerald-500 text-black font-medium"
+                    : "text-white/50 hover:text-white/80"
+                    }`}
                 >
                   <Mic className="w-3 h-3" />
                   Voice
@@ -2225,11 +2217,10 @@ export const AIDoctorConsult: React.FC = () => {
                     <div className="flex items-center gap-2">
                       <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
                       <span
-                        className={`text-sm font-mono ${
-                          recordingDuration >= 50
-                            ? "text-orange-400"
-                            : "text-red-400"
-                        }`}
+                        className={`text-sm font-mono ${recordingDuration >= 50
+                          ? "text-orange-400"
+                          : "text-red-400"
+                          }`}
                       >
                         {formatDuration(recordingDuration)}
                       </span>

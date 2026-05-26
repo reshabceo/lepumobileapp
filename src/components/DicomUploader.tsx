@@ -128,7 +128,7 @@ export default function DicomUploader({ onUploadComplete, patientProfile: propPr
             try {
               const cacheName = `dicom_upload_${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
               toast.info('Preparing file for upload...', { duration: 2000 });
-              
+
               const copyResult = await Filesystem.copy({
                 from: finalPath,
                 to: cacheName,
@@ -247,7 +247,7 @@ export default function DicomUploader({ onUploadComplete, patientProfile: propPr
   // ── Main upload handler ─────────────────────────────────────────────────────
   const handleUpload = async () => {
     const isNative = Capacitor.isNativePlatform();
-    
+
     if (!selectedFile && !isNative) return toast.error('No file selected');
 
     setState({ ...INITIAL_STATE, uploading: true, status: 'Authenticating…' });
@@ -287,36 +287,36 @@ export default function DicomUploader({ onUploadComplete, patientProfile: propPr
 
       // 1. Auth & Patient Profile
       update({ status: 'Authenticating…', progress: 1 });
-      
+
       const projectRef = supabaseUrl.split('//')[1].split('.')[0];
       const tokenKey = `sb-${projectRef}-auth-token`;
       const cachedSession = localStorage.getItem(tokenKey);
       let authUser = user;
-      
+
       if (!authUser) {
         console.log('📡 [DICOM] No user from hook, trying robust fetch...');
         const { data: { user: fetchedUser } } = await supabase.auth.getUser();
         authUser = fetchedUser;
       }
-      
+
       if (!authUser) throw new Error('Not authenticated. Please log in.');
 
       // 2. Patient profile with timeout
       update({ status: 'Fetching patient profile…', progress: 5 });
-      
+
       let patient = propProfile;
       if (!patient) {
         console.log('📡 [DICOM] No profile from props, fetching with 15s timeout...');
-        const profileTimeout = new Promise<any>((_, reject) => 
+        const profileTimeout = new Promise<any>((_, reject) =>
           setTimeout(() => reject(new Error('Profile fetch timeout')), 15000)
         );
-        
+
         const profilePromise = supabase
           .from('patients')
           .select('id, full_name')
           .eq('auth_user_id', authUser.id)
           .maybeSingle();
-        
+
         const { data: fetchedPatient, error: patientErr } = await Promise.race([profilePromise, profileTimeout]);
         if (patientErr) throw new Error(`Profile error: ${patientErr.message}`);
         patient = fetchedPatient;
@@ -351,21 +351,21 @@ export default function DicomUploader({ onUploadComplete, patientProfile: propPr
         const tokenKey = `sb-${projectRef}-auth-token`;
         const cachedSession = localStorage.getItem(tokenKey);
         let token = supabaseAnonKey;
-        
+
         if (cachedSession) {
           try {
             const parsed = JSON.parse(cachedSession);
             token = parsed.access_token || token;
             console.log('📡 [DICOM Native] Using session token');
-          } catch (e) {}
+          } catch (e) { }
         }
 
         const encodedPath = path.split('/').map(segment => encodeURIComponent(segment)).join('/');
         const fullUrl = `${supabaseUrl}/storage/v1/object/upload/sign/${bucket}/${encodedPath}`;
-        
+
         console.log(`📡 [DICOM Native] POST ${fullUrl}`);
-        
-        const timeoutPromise = new Promise<any>((_, reject) => 
+
+        const timeoutPromise = new Promise<any>((_, reject) =>
           setTimeout(() => reject(new Error('Native DICOM URL Timeout (20s)')), 20000)
         );
 
@@ -381,7 +381,7 @@ export default function DicomUploader({ onUploadComplete, patientProfile: propPr
           }),
           timeoutPromise
         ]);
-        
+
         console.log(`📡 [DICOM Native] Status: ${response.status}`);
         if (response.status >= 200 && response.status < 300) {
           const resultUrl = response.data.signedURL || response.data.signedUrl || response.data.url;
@@ -403,8 +403,8 @@ export default function DicomUploader({ onUploadComplete, patientProfile: propPr
         if (useS3) {
           const s3Key = `dicom/${patient.id}/${relPath}`;
           console.log(`🔗 [DICOM] Generating S3 Presigned URL for: ${s3Key}...`);
-          
-          const timeoutPromise = new Promise((_, reject) => 
+
+          const timeoutPromise = new Promise((_, reject) =>
             setTimeout(() => reject(new Error('S3 URL Generation Timeout')), 20000)
           );
           uploadUrl = await Promise.race([getS3PresignedUrl(s3Key, fileType), timeoutPromise]) as string;
@@ -413,11 +413,11 @@ export default function DicomUploader({ onUploadComplete, patientProfile: propPr
         } else {
           const bucket = 'dicom-files';
           console.log(`🔗 [DICOM] Generating Supabase Signed URL for: ${relPath}...`);
-          
+
           try {
             if (isNative) {
               console.log('🚀 [DICOM] Using robust native URL generation...');
-              const timeoutPromise = new Promise((_, reject) => 
+              const timeoutPromise = new Promise((_, reject) =>
                 setTimeout(() => reject(new Error('Native DICOM URL Timeout (30s)')), 30000)
               );
               uploadUrl = await Promise.race([getSignedUrlNatively(bucket, relPath), timeoutPromise]) as string;
@@ -436,13 +436,13 @@ export default function DicomUploader({ onUploadComplete, patientProfile: propPr
 
         console.log(`🚀 [DICOM] Initializing Native Uploader to ${storageType.toUpperCase()}...`);
         update({ status: `Uploading to ${storageType.toUpperCase()}…`, progress: 30 });
-        
+
         let progressListener: any;
         let uploadId: string | null = null;
-        
+
         try {
           console.log(`📡 [DICOM] Executing PUT request to: ${uploadUrl.substring(0, 50)}...`);
-          
+
           await new Promise<void>(async (resolve, reject) => {
             progressListener = await Uploader.addListener('events', (event: any) => {
               if (uploadId && event.id !== uploadId) return;
@@ -450,9 +450,9 @@ export default function DicomUploader({ onUploadComplete, patientProfile: propPr
               if (event.name === 'uploading') {
                 if (event.payload.percent) {
                   const percent = Math.round(event.payload.percent);
-                  update({ 
-                    progress: 30 + (percent * 0.5), 
-                    status: `Uploading to ${storageType.toUpperCase()}… ${percent}%` 
+                  update({
+                    progress: 30 + (percent * 0.5),
+                    status: `Uploading to ${storageType.toUpperCase()}… ${percent}%`
                   });
                   console.log(`⏳ [DICOM] Native Progress: ${percent}%`);
                 }
@@ -469,7 +469,7 @@ export default function DicomUploader({ onUploadComplete, patientProfile: propPr
             try {
               console.log(`📡 [DICOM] Calling Uploader.startUpload for ${fileNameRaw}...`);
               const startTimeout = setTimeout(() => {
-                 if (!uploadId) reject(new Error('Uploader failed to start within 15s'));
+                if (!uploadId) reject(new Error('Uploader failed to start within 15s'));
               }, 15000);
 
               let uploadFilePath = nativeFile.path;
@@ -481,13 +481,13 @@ export default function DicomUploader({ onUploadComplete, patientProfile: propPr
                 filePath: uploadFilePath,
                 serverUrl: uploadUrl,
                 method: 'PUT',
-                headers: { 
+                headers: {
                   'Content-Type': fileType
                 },
                 mimeType: fileType,
                 notificationTitle: 'Uploading DICOM Study'
               });
-              
+
               clearTimeout(startTimeout);
               uploadId = result.id;
               console.log(`📡 [DICOM] Upload started successfully, ID: ${uploadId}`);
@@ -504,7 +504,7 @@ export default function DicomUploader({ onUploadComplete, patientProfile: propPr
             await progressListener.remove();
           }
         }
-        
+
         update({ progress: 85 });
       } else {
         // ── Web Upload ──
@@ -538,8 +538,8 @@ export default function DicomUploader({ onUploadComplete, patientProfile: propPr
 
       if (isNative && (window as any).Capacitor) {
         console.log('📝 [DICOM] Native direct insert dicom_studies. Getting session...');
-        
-        const timeoutPromise = new Promise<any>((_, reject) => 
+
+        const timeoutPromise = new Promise<any>((_, reject) =>
           setTimeout(() => reject(new Error('Native DICOM DB Insert Timeout (25s)')), 25000)
         );
 
@@ -552,9 +552,9 @@ export default function DicomUploader({ onUploadComplete, patientProfile: propPr
         if (cachedSession) {
           try {
             token = JSON.parse(cachedSession).access_token;
-          } catch (e) {}
+          } catch (e) { }
         }
-        
+
         if (!token) {
           const session = await Promise.race([
             supabase.auth.getSession(),
@@ -577,7 +577,7 @@ export default function DicomUploader({ onUploadComplete, patientProfile: propPr
           }),
           timeoutPromise
         ]);
-        
+
         console.log(`📝 [DICOM] Insert result status: ${resp.status}`);
         if (resp.status >= 400) throw new Error(`Database error ${resp.status}: ${JSON.stringify(resp.data)}`);
         console.log('📝 [DICOM] Insert result data:', resp.data);
@@ -618,9 +618,8 @@ export default function DicomUploader({ onUploadComplete, patientProfile: propPr
           <FileArchive className="h-4 w-4" />
           Upload DICOM Files
         </CardTitle>
-        <CardDescription className="text-xs">
-          ZIP or DICOM files · ≤ 40 MB → Supabase · &gt; 40 MB → AWS S3 multipart
-        </CardDescription>
+        {/* <CardDescription className="text-xs">
+        </CardDescription> */}
       </CardHeader>
 
       <CardContent className="space-y-4">
@@ -739,15 +738,6 @@ export default function DicomUploader({ onUploadComplete, patientProfile: propPr
               : <><Upload className="mr-2 h-4 w-4" />Upload</>
             }
           </Button>
-        </div>
-
-        {/* ── Info note ── */}
-        <div className="bg-blue-50 dark:bg-blue-950/50 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
-          <p className="text-xs text-blue-900 dark:text-blue-100 leading-relaxed">
-            <strong>Large files (300–400 MB+)</strong> are automatically split into 20 MB parts and uploaded
-            in parallel to AWS S3 (ap-south-2). Keep the app in the foreground during upload.
-            After upload, request a radiologist review below.
-          </p>
         </div>
 
       </CardContent>
