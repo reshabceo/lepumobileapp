@@ -29,6 +29,9 @@ export function usePatientChat(patientId: string | null, conversationId?: string
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const channelRef = useRef<RealtimeChannel | null>(null);
+  // Cache sender display names (key `${type}:${id}`) so we never re-query the same
+  // person — the realtime handler reuses it instead of a round-trip per message.
+  const nameCacheRef = useRef<Map<string, string>>(new Map());
 
   const fetchConversations = useCallback(async () => {
     if (!patientId) return;
@@ -43,16 +46,19 @@ export function usePatientChat(patientId: string | null, conversationId?: string
 
       if (error) throw error;
 
-      const enriched = await Promise.all(
-        (data || []).map(async (c: any) => {
-          const { data: doc } = await supabase
-            .from('doctors')
-            .select('full_name')
-            .eq('id', c.doctor_id)
-            .maybeSingle();
-          return { ...c, doctor_name: doc?.full_name };
-        })
-      );
+      const rows = data || [];
+      // Batch: one query for ALL doctors instead of one per conversation (no N+1).
+      const doctorIds = [...new Set(rows.map((c: any) => c.doctor_id).filter(Boolean))];
+      const { data: docs } = doctorIds.length
+        ? await supabase.from('doctors').select('id, full_name').in('id', doctorIds)
+        : { data: [] as any[] };
+      const doctorMap = new Map((docs || []).map((d: any) => [d.id, d.full_name]));
+      docs?.forEach((d: any) => nameCacheRef.current.set(`doctor:${d.id}`, d.full_name));
+
+      const enriched = rows.map((c: any) => ({
+        ...c,
+        doctor_name: doctorMap.get(c.doctor_id),
+      }));
       setConversations(enriched as PatientChatConversation[]);
     } catch (e) {
       console.error('usePatientChat conversations', e);
@@ -72,27 +78,30 @@ export function usePatientChat(patientId: string | null, conversationId?: string
           .order('created_at', { ascending: true });
         if (error) throw error;
 
-        const formatted = await Promise.all(
-          (data || []).map(async (m: any) => {
-            let sender_name = 'Unknown';
-            if (m.sender_type === 'doctor') {
-              const { data: d } = await supabase
-                .from('doctors')
-                .select('full_name')
-                .eq('id', m.sender_id)
-                .maybeSingle();
-              sender_name = d?.full_name || 'Doctor';
-            } else {
-              const { data: p } = await supabase
-                .from('patients')
-                .select('full_name')
-                .eq('id', m.sender_id)
-                .maybeSingle();
-              sender_name = p?.full_name || 'You';
-            }
-            return { ...m, sender_name };
-          })
-        );
+        const rows = data || [];
+        // A 1:1 chat has only two senders. Batch ALL doctor names and ALL patient
+        // names in 2 queries total (was one query PER message → the slow load).
+        const doctorIds = [...new Set(rows.filter((m: any) => m.sender_type === 'doctor').map((m: any) => m.sender_id))];
+        const patientIds = [...new Set(rows.filter((m: any) => m.sender_type === 'patient').map((m: any) => m.sender_id))];
+
+        const [docsRes, patsRes] = await Promise.all([
+          doctorIds.length
+            ? supabase.from('doctors').select('id, full_name').in('id', doctorIds)
+            : Promise.resolve({ data: [] as any[] }),
+          patientIds.length
+            ? supabase.from('patients').select('id, full_name').in('id', patientIds)
+            : Promise.resolve({ data: [] as any[] }),
+        ]);
+        const cache = nameCacheRef.current;
+        (docsRes.data || []).forEach((d: any) => cache.set(`doctor:${d.id}`, d.full_name));
+        (patsRes.data || []).forEach((p: any) => cache.set(`patient:${p.id}`, p.full_name));
+
+        const formatted = rows.map((m: any) => ({
+          ...m,
+          sender_name:
+            cache.get(`${m.sender_type}:${m.sender_id}`) ||
+            (m.sender_type === 'doctor' ? 'Doctor' : 'You'),
+        }));
         setMessages(formatted as PatientChatMessage[]);
 
         await supabase.rpc('mark_messages_as_read', {
@@ -130,21 +139,18 @@ export function usePatientChat(patientId: string | null, conversationId?: string
         },
         async (payload) => {
           const row = payload.new as any;
-          let sender_name = 'Unknown';
-          if (row.sender_type === 'doctor') {
-            const { data: d } = await supabase
-              .from('doctors')
+          const cacheKey = `${row.sender_type}:${row.sender_id}`;
+          let sender_name = nameCacheRef.current.get(cacheKey);
+          // Only hit the DB for a name we've never seen (almost never, after initial load).
+          if (!sender_name) {
+            const table = row.sender_type === 'doctor' ? 'doctors' : 'patients';
+            const { data } = await supabase
+              .from(table)
               .select('full_name')
               .eq('id', row.sender_id)
               .maybeSingle();
-            sender_name = d?.full_name || 'Doctor';
-          } else {
-            const { data: p } = await supabase
-              .from('patients')
-              .select('full_name')
-              .eq('id', row.sender_id)
-              .maybeSingle();
-            sender_name = p?.full_name || 'You';
+            sender_name = data?.full_name || (row.sender_type === 'doctor' ? 'Doctor' : 'You');
+            nameCacheRef.current.set(cacheKey, sender_name);
           }
           const msg = { ...row, sender_name } as PatientChatMessage;
           setMessages((prev) => (prev.some((m) => m.id === msg.id) ? prev : [...prev, msg]));

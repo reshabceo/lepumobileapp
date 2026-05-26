@@ -13,6 +13,7 @@ import {
   Pill,
   Target,
   Receipt,
+  Users,
   LogOut,
   Heart,
   ShieldAlert,
@@ -81,6 +82,7 @@ export const ServicesRecords = () => {
 
   const services = [
     { label: "Doctor", icon: Stethoscope, color: "text-blue-400", path: "/doctor-assignment" },
+    { label: "Care Team", icon: Users, color: "text-indigo-400", path: "/care-team" },
     { label: "Prescriptions", icon: Pill, color: "text-purple-400", path: "/prescriptions" },
     { label: "Health Plan", icon: Target, color: "text-emerald-400", path: "/recommendations", badge: recommendationsUnreadCount },
     { label: "Invoices", icon: Receipt, color: "text-amber-400", path: "/invoices" },
