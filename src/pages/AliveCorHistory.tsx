@@ -43,7 +43,7 @@ const AliveCorHistory = () => {
       let recordings: any[] = [];
       
       try {
-        const apiResponse = await getAliveCorRecordings(profile.id);
+        const apiResponse = await getAliveCorRecordings(patientMrn || profile.id);
         console.log("[AliveCorHistory] Backend API response:", JSON.stringify(apiResponse).substring(0, 500));
         
         // The backend may return different shapes depending on version.
@@ -121,8 +121,43 @@ const AliveCorHistory = () => {
         }
       }
 
-      console.log(`[AliveCorHistory] Total recordings to display: ${recordings.length}`);
-      setRecordings(recordings);
+      // Normalize recordings to ensure consistent keys (supporting both DB and API fields)
+      const normalizedRecordings = recordings.map((rec: any) => {
+        const determination = rec.determination || rec.algorithmDetermination || "UNCLASSIFIED";
+        const created_at = rec.created_at || rec.recordedAt || new Date().toISOString();
+        const heartRate = rec.heart_rate || rec.average_heart_rate || rec.bpm || 0;
+        const inverted = rec.is_inverted !== undefined ? rec.is_inverted : (rec.inverted !== undefined ? rec.inverted : false);
+        const deviceType = rec.device_type || "KardiaMobile 6L";
+        const config = rec.lead_config || (rec.leads || rec.waveformLeads || rec.waveform_leads ? "six" : "six");
+        
+        // Ensure nested ecg_recordings is populated so details view works
+        const ecgRec = rec.ecg_recordings || {
+          id: rec.ecg_recording_id || rec.id,
+          sample_rate: rec.sampleRate || rec.sample_rate || 300,
+          duration_seconds: rec.durationSeconds || rec.duration_seconds || 30,
+          mv_data_json: rec.mvData || rec.waveform_mv || null
+        };
+
+        return {
+          ...rec,
+          id: rec.id,
+          patient_id: rec.patient_id || profile.id,
+          created_at,
+          determination,
+          average_heart_rate: heartRate,
+          heart_rate: heartRate,
+          bpm: heartRate,
+          lead_config: config,
+          is_inverted: inverted,
+          device_type: deviceType,
+          notes: rec.notes || "KardiaMobile Recording",
+          ecg_recording_id: rec.ecg_recording_id || rec.id,
+          ecg_recordings: ecgRec
+        };
+      });
+
+      console.log(`[AliveCorHistory] Total recordings to display: ${normalizedRecordings.length}`);
+      setRecordings(normalizedRecordings);
     } catch (err: any) {
       console.error("[AliveCorHistory] Error:", err);
       setError(err.message || "Failed to load recordings");
@@ -466,6 +501,14 @@ const AliveCorHistory = () => {
                 </div>
                 <span className="font-medium text-slate-700">Md Sahil</span>
               </div>
+              
+              {(selectedRecording?.average_heart_rate || selectedRecording?.heart_rate || selectedRecording?.bpm) && (
+                <div className="flex items-center gap-1 text-rose-500 font-bold bg-rose-50 px-2 py-0.5 rounded-full text-xs">
+                  <Heart className="w-3.5 h-3.5 fill-current text-rose-500 animate-pulse" />
+                  <span>{selectedRecording.average_heart_rate || selectedRecording.heart_rate || selectedRecording.bpm} BPM</span>
+                </div>
+              )}
+
               <div className="flex items-center gap-1.5 ml-auto">
                 <Calendar size={14} />
                 <span>{selectedRecording && formatDate(selectedRecording.created_at)}</span>
@@ -482,14 +525,14 @@ const AliveCorHistory = () => {
               </div>
             </div>
 
-            <div className="ecg-paper-grid min-h-full py-4">
+            <div className="ecg-paper-grid min-h-full py-4 overflow-x-auto scrollbar-thin">
               {isDetailLoading ? (
                 <div className="absolute inset-0 flex flex-col items-center justify-center space-y-3 bg-white/60 backdrop-blur-sm z-30">
                   <RefreshCw className="w-10 h-10 text-rose-500 animate-spin" />
                   <p className="text-sm font-bold text-slate-400 animate-pulse uppercase tracking-widest">Processing Waveform...</p>
                 </div>
               ) : recordingDetail ? (
-                <div className="space-y-0 px-2">
+                <div className="space-y-0 px-2" style={{ minWidth: "2000px" }}>
                   {getAvailableLeads(recordingDetail).map((lead) => (
                     <div key={lead} className="h-[120px] relative border-b border-slate-100/50 last:border-none">
                       <div className="absolute top-1/2 -translate-y-1/2 left-2 z-10">
@@ -524,17 +567,18 @@ const AliveCorHistory = () => {
                 </div>
               )}
 
-              {/* Heart Rate Badge Overlay */}
-              {(selectedRecording?.average_heart_rate || selectedRecording?.heart_rate || selectedRecording?.bpm) && !isDetailLoading && (
-                <div className="sticky bottom-4 right-4 ml-auto w-fit z-20">
-                  <div className="bg-white shadow-xl border border-slate-100 rounded-full px-4 py-2 flex items-center gap-2">
-                    <Heart size={16} className="text-rose-500 fill-rose-500" />
-                    <span className="font-bold text-slate-800">{selectedRecording.average_heart_rate || selectedRecording.heart_rate || selectedRecording.bpm}</span>
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">bpm</span>
-                  </div>
-                </div>
-              )}
             </div>
+
+            {/* Heart Rate Badge Overlay - absolute position at top right of waves card container */}
+            {(selectedRecording?.average_heart_rate || selectedRecording?.heart_rate || selectedRecording?.bpm) && !isDetailLoading && (
+              <div className="absolute top-4 right-4 z-20">
+                <div className="bg-white/95 backdrop-blur shadow-xl border border-slate-100/80 rounded-full px-4 py-2 flex items-center gap-2">
+                  <Heart size={16} className="text-rose-500 fill-rose-500 animate-pulse" />
+                  <span className="font-bold text-slate-800">{selectedRecording.average_heart_rate || selectedRecording.heart_rate || selectedRecording.bpm}</span>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">bpm</span>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Footer Controls */}

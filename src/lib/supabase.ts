@@ -17,44 +17,71 @@ if (!supabaseUrl || !supabaseAnonKey) {
 console.log('🔍 Supabase Debug - URL:', supabaseUrl)
 console.log('🔍 Supabase Debug - Anon Key:', supabaseAnonKey.substring(0, 20) + '...')
 
-/**
- * Hardened fetch for the Supabase client.
- *
- * Second half of the "app freezes after a few minutes, fixed only by a hard reload"
- * fix (the first half is `lock: processLock` below). A hung HTTP request — most
- * importantly the token auto-refresh POST to /auth/v1/token — used to never return,
- * so GoTrue kept its lock and every later getSession (i.e. EVERY query) waited
- * forever, with NO error in the Network tab. Giving every Supabase request a hard
- * timeout guarantees it either succeeds or rejects, so GoTrue can recover and the UI
- * never hangs.
- *
- * Storage requests (large DICOM / report uploads) are exempt — they can legitimately
- * run longer than the timeout.
- */
+// Hardened fetch: no Supabase request can hang forever. The DB/API are fast
+// (verified ~0.1ms / ~90ms), but the JS client occasionally stalls a request in
+// its pipeline → the UI gets stuck loading with no error until a full reload.
+// This aborts any request that stalls past the timeout and retries idempotent
+// (GET/HEAD) requests once, so the app self-recovers instead of freezing.
+// Storage requests (large DICOM / report uploads) are exempt.
 const SUPABASE_FETCH_TIMEOUT_MS = 20000
-const fetchWithTimeout: typeof fetch = (input, init = {}) => {
+const fetchWithTimeout: typeof fetch = async (input, init) => {
   const url =
     typeof input === 'string'
       ? input
       : input instanceof URL
         ? input.href
         : (input as Request).url
+
   // Don't time out storage uploads/downloads — medical files can be large/slow.
   if (url && url.includes('/storage/v1/')) {
     return fetch(input as any, init)
   }
 
-  const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), SUPABASE_FETCH_TIMEOUT_MS)
-  // Respect any caller-provided AbortSignal in addition to our timeout.
-  const external = (init as RequestInit).signal
-  if (external) {
-    if (external.aborted) controller.abort()
-    else external.addEventListener('abort', () => controller.abort(), { once: true })
+  const method = (init?.method || 'GET').toUpperCase()
+  const isIdempotent = method === 'GET' || method === 'HEAD'
+
+  const run = async (): Promise<Response> => {
+    const controller = new AbortController()
+    let timeoutId: NodeJS.Timeout
+
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timeoutId = setTimeout(() => {
+        controller.abort() // Attempt standard abort signal abort
+        const abortError = typeof DOMException !== 'undefined'
+          ? new DOMException('The user aborted a request.', 'AbortError')
+          : new Error('The user aborted a request.');
+        (abortError as any).name = 'AbortError';
+        reject(abortError);
+      }, SUPABASE_FETCH_TIMEOUT_MS)
+    })
+
+    // Respect caller-provided signal
+    if (init?.signal) {
+      if (init.signal.aborted) controller.abort()
+      else init.signal.addEventListener('abort', () => controller.abort(), { once: true })
+    }
+
+    const fetchPromise = (async () => {
+      try {
+        return await fetch(input as RequestInfo, { ...init, signal: controller.signal })
+      } finally {
+        clearTimeout(timeoutId)
+      }
+    })()
+
+    return Promise.race([fetchPromise, timeoutPromise])
   }
-  return fetch(input as any, { ...init, signal: controller.signal }).finally(() =>
-    clearTimeout(timer)
-  )
+
+  try {
+    return await run()
+  } catch (err) {
+    // Retry GET/HEAD once on abort/network error; never auto-retry writes.
+    if (isIdempotent) {
+      console.warn('⚠️ [Supabase] request stalled/aborted — retrying once')
+      return await run()
+    }
+    throw err
+  }
 }
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
@@ -354,14 +381,16 @@ export async function storeAliveCorRecording(
  * Fetch past ECG recordings for a patient from the AliveCor backend.
  */
 export async function getAliveCorRecordings(patientId: string, limit: number = 20): Promise<any> {
-  return aliveCorGet(`/api/alivecor/recordings/${patientId}?limit=${limit}`);
+  const mrn = patientId.replace(/-/g, '');
+  return aliveCorGet(`/api/alivecor/recordings/${mrn}?limit=${limit}`);
 }
 
 /**
  * Fetch detailed ECG recording (including waveform) for a specific record ID.
  */
 export async function getAliveCorRecordingDetail(patientId: string, recordingId: string): Promise<any> {
-  return aliveCorGet(`/api/alivecor/recordings/${patientId}/${recordingId}`);
+  const mrn = patientId.replace(/-/g, '');
+  return aliveCorGet(`/api/alivecor/recordings/${mrn}/${recordingId}`);
 }
 
 /**
