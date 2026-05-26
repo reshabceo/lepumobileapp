@@ -17,8 +17,8 @@ export const MobileAppContainer: React.FC<MobileAppContainerProps> = ({ children
 
   if (isMobile) {
     return (
-      <div className={`min-h-screen bg-[#080D1A] relative flex flex-col ${showNav ? 'pb-[76px]' : ''}`}>
-        <div className="flex-1 w-full overflow-y-auto">
+      <div className={`min-h-screen bg-[#080D1A] relative flex flex-col ${showNav ? 'pb-[76px]' : ''} overflow-x-hidden w-full max-w-full`}>
+        <div className="flex-1 w-full overflow-y-auto overflow-x-hidden">
           {children}
         </div>
         {showNav && <AppNavigation className="fixed bottom-0 left-0 right-0 w-full" />}

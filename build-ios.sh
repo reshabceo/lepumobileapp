@@ -58,6 +58,6 @@ xcrun devicectl device install app \
 echo "🚀 Launching app..."
 xcrun devicectl device process launch \
       --device 00008140-001C65993AE3001C \
-      com.monitraq.app
+      com.monitraq.mobile
 
 echo "✅ Build and deployment complete!"

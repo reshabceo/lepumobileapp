@@ -139,123 +139,147 @@ export default function LiveMonitoringPage() {
 
   return (
     <MobileAppContainer>
-      <div className="min-h-screen bg-slate-950 text-white pt-safe-top px-4 pb-8">
-        <div className="flex items-center gap-3 py-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate("/dashboard")}>
-            <ArrowLeft className="w-5 h-5" />
-          </Button>
-          <div>
-            <h1 className="text-lg font-bold flex items-center gap-2">
-              <Video className="w-5 h-5 text-indigo-400" />
-              Live RPM monitoring
-            </h1>
-            <p className="text-xs text-slate-400">
-              {lockedPiMode
-                ? "This account is routed through the Raspberry Pi hardware bridge."
-                : useNativeRtsp
-                  ? "Your phone pulls the Reolink camera over your Wi-Fi and forwards it to your doctor (RTSP→WHIP)."
-                  : "Browser preview streams this device camera via WHIP. Pi Kit uses WAN RTSP from the LAN."}
-            </p>
-          </div>
-        </div>
+      <div className="min-h-screen bg-[#080D1A] text-white p-4 pb-8">
+        <div className="max-w-sm mx-auto">
+          {/* Status Bar Spacing */}
+          <div className="h-6"></div>
 
-        <div className="rounded-2xl border border-white/10 bg-slate-900/70 p-4 space-y-4">
-          {!sfuConfigured && (
-            <p className="text-amber-200 text-xs">
-              Deploy camera-stream-service and set <code>VITE_CAMERA_SFU_URL</code>.
-            </p>
-          )}
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="font-semibold">Allow doctor live view</div>
-              <div className="text-xs text-slate-400">
-                Doctors can watch only while this stays on & your bridge is pushing video.
-              </div>
-            </div>
-            <button type="button" onClick={() => void handleToggleMonitoring(!monitoringEnabled)} className="text-emerald-400">
-              {monitoringEnabled ? <ToggleRight className="w-10 h-10" /> : <ToggleLeft className="w-10 h-10" />}
+          {/* Header */}
+          <header className="flex items-center gap-3 mb-6">
+            <button
+              onClick={() => navigate(-1)}
+              className="p-2 rounded-full bg-white/5 hover:bg-white/10 transition-colors active:scale-95"
+            >
+              <ArrowLeft className="w-4 h-4" />
             </button>
+            <div className="flex items-center gap-3 flex-1">
+              <div className="h-10 w-10 rounded-2xl bg-indigo-900/70 flex items-center justify-center border border-indigo-400/50">
+                <Video className="h-6 w-6 text-indigo-300" />
+              </div>
+              <div>
+                <h1 className="text-xl font-bold">Live RPM</h1>
+                <p className="text-xs text-gray-400">Live monitoring status</p>
+              </div>
+            </div>
+          </header>
+
+          {/* Explanation Card */}
+          <div className="bg-[#1A243D]/50 border border-slate-700/40 rounded-2xl p-3.5 mb-5 text-xs text-slate-300 leading-relaxed shadow-sm">
+            {lockedPiMode
+              ? "This account is routed through the Raspberry Pi hardware bridge."
+              : useNativeRtsp
+                ? "Your phone pulls the Reolink camera over your Wi-Fi and forwards it to your doctor (RTSP→WHIP)."
+                : "Browser preview streams this device camera via WHIP. Pi Kit uses WAN RTSP from the LAN."}
           </div>
 
-          {!lockedPiMode ? (
-            <div className="flex gap-2">
-              <Button
-                variant={bridgeType === "phone" ? "default" : "outline"}
-                className="flex-1"
-                onClick={() => void setBridgeChoice("phone")}
-                type="button"
-              >
-                Phone bridge
-              </Button>
-              <Button
-                variant={bridgeType === "pi_box" ? "default" : "outline"}
-                className="flex-1"
-                onClick={() => void setBridgeChoice("pi_box")}
-                type="button"
-              >
-                Pi Kit
-              </Button>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              <div className="flex items-center gap-2 text-xs rounded-lg bg-amber-950/40 border border-amber-500/40 px-3 py-2 text-amber-100">
-                <Router className="w-4 h-4 shrink-0" />
-                Raspberry Pi pairing active — onboarding happens on the provisioning hotspot.
+          <div className="bg-[#1A243D] border border-slate-700/40 shadow-lg rounded-3xl p-5 space-y-4">
+            {!sfuConfigured && (
+              <p className="text-amber-200 text-xs">
+                Deploy camera-stream-service and set <code>VITE_CAMERA_SFU_URL</code>.
+              </p>
+            )}
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="font-semibold text-sm">Allow doctor live view</div>
+                <div className="text-[11px] text-slate-400 leading-normal mt-0.5">
+                  Doctors can watch only while this stays on & your bridge is pushing video.
+                </div>
               </div>
-              <button
-                type="button"
-                className="text-[11px] text-blue-300 hover:underline"
-                onClick={() => void setBridgeChoice("phone")}
-              >
-                Use phone ingest instead (clears Pi mode)
+              <button type="button" onClick={() => void handleToggleMonitoring(!monitoringEnabled)} className="text-emerald-400 flex-shrink-0">
+                {monitoringEnabled ? <ToggleRight className="w-10 h-10" /> : <ToggleLeft className="w-10 h-10" />}
               </button>
             </div>
-          )}
 
-          {bridgeType === "phone" && (
-            <div className="space-y-2">
-              <p className="text-xs text-slate-400">
-                Stream status: <span className="text-white capitalize">{streamStatus}</span>
-                {useNativeRtsp && streamStatus === "live" ? (
-                  <span className="text-slate-500"> · {(native.bytesTransferred / (1024 * 1024)).toFixed(1)} MB egress</span>
-                ) : null}
-              </p>
-              {streamError && <p className="text-xs text-red-400">{streamError}</p>}
-              <Button
-                className="w-full"
-                disabled={!monitoringEnabled || !sfuConfigured || bridgeType !== "phone"}
-                onClick={() => void handleStartStream()}
-              >
-                Push live ingest
-              </Button>
-              <Button variant="destructive" className="w-full" onClick={() => void handleStopStream()} type="button">
-                Stop ingest
-              </Button>
-              {plat !== "android" ? (
-                <p className="text-[11px] text-slate-500">
-                  Keep the screen unlocked while pushing. Plug in charger for extended sessions.
+            {!lockedPiMode ? (
+              <div className="flex gap-2">
+                <button
+                  onClick={() => void setBridgeChoice("phone")}
+                  type="button"
+                  className={`flex-1 h-10 rounded-xl text-xs font-bold transition-all duration-200 ${
+                    bridgeType === "phone"
+                      ? "bg-blue-600 text-white shadow-md shadow-blue-900/30"
+                      : "bg-[#1E293B] border border-slate-700/40 text-slate-300 hover:bg-slate-800"
+                  }`}
+                >
+                  Phone bridge
+                </button>
+                <button
+                  onClick={() => void setBridgeChoice("pi_box")}
+                  type="button"
+                  className={`flex-1 h-10 rounded-xl text-xs font-bold transition-all duration-200 ${
+                    bridgeType === "pi_box"
+                      ? "bg-blue-600 text-white shadow-md shadow-blue-900/30"
+                      : "bg-[#1E293B] border border-slate-700/40 text-slate-300 hover:bg-slate-800"
+                  }`}
+                >
+                  Pi Kit
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-xs rounded-lg bg-amber-950/40 border border-amber-500/40 px-3 py-2.5 text-amber-100">
+                  <Router className="w-4 h-4 shrink-0" />
+                  Raspberry Pi pairing active — onboarding happens on the provisioning hotspot.
+                </div>
+                <button
+                  type="button"
+                  className="text-[11px] text-blue-400 hover:text-blue-300 hover:underline"
+                  onClick={() => void setBridgeChoice("phone")}
+                >
+                  Use phone ingest instead (clears Pi mode)
+                </button>
+              </div>
+            )}
+
+            {bridgeType === "phone" && (
+              <div className="space-y-2.5">
+                <p className="text-xs text-slate-400">
+                  Stream status: <span className="text-white capitalize">{streamStatus}</span>
+                  {useNativeRtsp && streamStatus === "live" ? (
+                    <span className="text-slate-500"> · {(native.bytesTransferred / (1024 * 1024)).toFixed(1)} MB egress</span>
+                  ) : null}
                 </p>
-              ) : (
-                <p className="text-[11px] text-slate-500">
-                  Native ingest runs in a foreground service so you can briefly background the phone.
-                </p>
-              )}
-            </div>
-          )}
-          {bridgeType === "pi_box" && (
-            <div className="text-xs text-slate-400 space-y-3">
-              <p>The Pi pushes WHIP using credentials from the provisioning flow.</p>
-              <Button
-                variant="outline"
-                className="w-full border-amber-500/60 text-amber-100 hover:bg-amber-950/50"
-                onClick={() => navigate("/pair-pi")}
-                type="button"
-              >
-                Open pairing assistant
-              </Button>
-              <p className="text-[11px] text-slate-500">Power the kit, join its hotspot, then walk through pairing while online.</p>
-            </div>
-          )}
+                {streamError && <p className="text-xs text-red-400">{streamError}</p>}
+                <button
+                  className="w-full h-11 bg-gradient-to-r from-blue-600 to-blue-700 text-white font-bold rounded-xl hover:from-blue-700 hover:to-blue-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-md shadow-blue-500/20 text-xs active:scale-95 flex items-center justify-center gap-1.5"
+                  disabled={!monitoringEnabled || !sfuConfigured || bridgeType !== "phone"}
+                  onClick={() => void handleStartStream()}
+                  type="button"
+                >
+                  Push live ingest
+                </button>
+                <button
+                  className="w-full h-11 bg-[#E11D48] hover:bg-[#BE123C] text-white font-bold rounded-xl transition-all shadow-md shadow-red-950/20 text-xs active:scale-95 flex items-center justify-center gap-1.5"
+                  onClick={() => void handleStopStream()}
+                  type="button"
+                >
+                  Stop ingest
+                </button>
+                {plat !== "android" ? (
+                  <p className="text-[11px] text-slate-500">
+                    Keep the screen unlocked while pushing. Plug in charger for extended sessions.
+                  </p>
+                ) : (
+                  <p className="text-[11px] text-slate-500">
+                    Native ingest runs in a foreground service so you can briefly background the phone.
+                  </p>
+                )}
+              </div>
+            )}
+            {bridgeType === "pi_box" && (
+              <div className="text-xs text-slate-400 space-y-3">
+                <p className="text-[11px] text-slate-400 leading-normal">The Pi pushes WHIP using credentials from the provisioning flow.</p>
+                <button
+                  className="w-full h-11 bg-gradient-to-r from-amber-600 to-amber-700 text-white font-bold rounded-xl hover:from-amber-700 hover:to-amber-800 transition-all shadow-md shadow-amber-900/30 text-xs active:scale-95 flex items-center justify-center gap-1.5"
+                  onClick={() => navigate("/pair-pi")}
+                  type="button"
+                >
+                  Open pairing assistant
+                </button>
+                <p className="text-[11px] text-slate-500">Power the kit, join its hotspot, then walk through pairing while online.</p>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </MobileAppContainer>

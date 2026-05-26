@@ -638,7 +638,7 @@ export const HealthDashboard = () => {
           {/* Logo */}
           <img src="/monitraq-logo.png" alt="Logo" className="w-10 h-10 object-contain rounded-xl" />
           <div>
-            <p className="text-[11px] text-slate-400 font-semibold uppercase tracking-wider">Good Morning 👋</p>
+            <p className="text-[11px] text-slate-400 font-semibold uppercase tracking-wider">Have a Healthy Day</p>
             <h1 className="text-lg font-black tracking-tight text-white mt-0.5">
               {patientProfile?.full_name || "John Doe"}
             </h1>
@@ -931,6 +931,18 @@ export const HealthDashboard = () => {
               <div>
                 <h4 className="font-extrabold text-xs text-white">CGM Monitor</h4>
                 <p className="text-[9px] text-slate-400 font-semibold mt-0.5">Glucose Levels</p>
+              </div>
+            </button>
+
+            {/* Camera Setup */}
+            <button
+              onClick={() => navigate("/connect-camera")}
+              className="flex-shrink-0 w-36 snap-start bg-[#1A243D] hover:bg-[#1A243D]/80 border border-slate-700/40 p-4 rounded-3xl flex flex-col items-center justify-center gap-2.5 transition-all text-center group shadow-md"
+            >
+              <Video className="h-7 w-7 text-indigo-400 group-hover:scale-105 transition-transform" />
+              <div>
+                <h4 className="font-extrabold text-xs text-white">Camera Setup</h4>
+                <p className="text-[9px] text-slate-400 font-semibold mt-0.5">Monitor Camera</p>
               </div>
             </button>
           </div>
