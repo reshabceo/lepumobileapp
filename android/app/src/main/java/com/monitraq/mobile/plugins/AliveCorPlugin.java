@@ -1,4 +1,4 @@
-package com.monitraq.app.plugins;
+package com.monitraq.mobile.plugins;
 
 import android.content.Intent;
 import android.util.Log;
@@ -88,7 +88,7 @@ public class AliveCorPlugin extends Plugin {
 
     // ── Nuclear self-healing: wipe ALL non-safe SharedPreferences + Keystore key ─
     //
-    // Root cause: after a package-name migration (com.monitraq.mobile → com.monitraq.app)
+    // Root cause: after a package-name migration (com.monitraq.mobile → com.monitraq.mobile)
     // the EncryptedSharedPreferences written by the AliveCor SDK (via Tink) are encrypted
     // with a Keystore AES-GCM master key tied to the old package UID.  The key can no
     // longer decrypt the stored keyset → AEADBadTagException on every SDK boot.
@@ -520,7 +520,7 @@ public class AliveCorPlugin extends Plugin {
                 }
 
                 // Unified parameter resolution
-                double hr = 75.0; // default
+                double hr = -1.0; // default indicator for missing HR
                 if (ecg != null) {
                     EcgEvaluation eval = ecg.getEcgEvaluation();
                     if (eval != null && eval.getAverageHeartRate() > 0) {
@@ -535,8 +535,8 @@ public class AliveCorPlugin extends Plugin {
                     Log.d(TAG, "[self-heal] ecg missing, extracted HR from dbMetadata: " + hr);
                 }
 
-                // If heart rate is still <= 0 or default 75, try to use values from ATC file local classification/beats
-                if (hr <= 0 || hr == 75.0) {
+                // If heart rate is still <= 0, try to use values from ATC file local classification/beats
+                if (hr <= 0) {
                     if (ret.has("atc_heartRate")) {
                         hr = ret.getDouble("atc_heartRate");
                         Log.d(TAG, "[self-heal] Overriding default HR with local classifier HR from ATC: " + hr);
@@ -887,9 +887,9 @@ public class AliveCorPlugin extends Plugin {
                         if (leadISignal != null) {
                             double[] leadISamples = leadISignal.getMVSamples();
                             if (leadISamples != null && leadISamples.length > 0) {
-                                int mainsFreqVal = 50;
+                                int mainsFreqVal = 0; // 0 = 50Hz, 1 = 60Hz
                                 try {
-                                    mainsFreqVal = (reader.mainsFrequency() == com.alivecor.ecgcore.MainsFrequency.MAINS_60_HZ) ? 60 : 50;
+                                    mainsFreqVal = (reader.mainsFrequency() == com.alivecor.ecgcore.MainsFrequency.MAINS_60_HZ) ? 1 : 0;
                                 } catch (Exception ex) {}
 
                                 com.alivecor.api.EkgAnalyzer.Result analysisResult = classifier.classifySamples(
@@ -974,27 +974,38 @@ public class AliveCorPlugin extends Plugin {
     private int countPeaks(double[] samples, int sampleRate) {
         if (samples == null || samples.length < sampleRate) return 0;
         try {
-            // Step 1: Compute absolute derivative
-            double[] diff = new double[samples.length - 1];
-            for (int i = 0; i < diff.length; i++) {
-                diff[i] = Math.abs(samples[i + 1] - samples[i]);
+            // Find min/max of raw signal to detect amplitude
+            double max = -999.0;
+            double min = 999.0;
+            for (double s : samples) {
+                if (s > max) max = s;
+                if (s < min) min = s;
+            }
+            double range = max - min;
+            if (range < 0.1) return 0; // flatline/too weak
+
+            // Calculate signal mean
+            double sum = 0;
+            for (double s : samples) sum += s;
+            double mean = sum / samples.length;
+
+            // Find maximum absolute deviation from mean
+            double maxDev = 0;
+            for (double s : samples) {
+                double dev = Math.abs(s - mean);
+                if (dev > maxDev) maxDev = dev;
             }
 
-            // Step 2: Calculate adaptive threshold (75th percentile of diff)
-            double[] sorted = diff.clone();
-            java.util.Arrays.sort(sorted);
-            double threshold = sorted[(int) (sorted.length * 0.75)];
-            // Ensure threshold is meaningful
-            if (threshold < 0.001) threshold = 0.01;
-
-            // Step 3: Count threshold crossings with refractory period
-            int refractorySamples = (int) (sampleRate * 0.3); // 300ms refractory
+            // Set R-peak threshold at 65% of max deviation
+            double threshold = maxDev * 0.65;
+            int refractorySamples = (int) (sampleRate * 0.35); // 350ms refractory period (max ~170 BPM)
             int peaks = 0;
             int lastPeak = -refractorySamples;
 
-            for (int i = 1; i < diff.length - 1; i++) {
-                // Local maximum above threshold, outside refractory period
-                if (diff[i] > threshold && diff[i] >= diff[i - 1] && diff[i] >= diff[i + 1]) {
+            for (int i = 1; i < samples.length - 1; i++) {
+                double dev = Math.abs(samples[i] - mean);
+                // Detect local maximum in absolute deviation above threshold
+                if (dev > threshold && dev >= Math.abs(samples[i - 1] - mean) && dev >= Math.abs(samples[i + 1] - mean)) {
                     if ((i - lastPeak) > refractorySamples) {
                         peaks++;
                         lastPeak = i;
