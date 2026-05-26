@@ -102,8 +102,21 @@ const Profile = () => {
       return;
     }
 
+    const cacheKey = `patient_profile_${user.id}`;
+    // Instant: show last-known cached profile so the page never sits on an empty
+    // "Not provided" state while the (sometimes main-thread-blocked) fetch runs.
+    let hadCache = false;
     try {
-      setLoading(true);
+      const cached = localStorage.getItem(cacheKey);
+      if (cached) {
+        setProfile(JSON.parse(cached));
+        setLoading(false);
+        hadCache = true;
+      }
+    } catch { /* ignore */ }
+
+    try {
+      if (!hadCache) setLoading(true);
       const { data, error } = await supabase
         .from('patients')
         .select('*')
@@ -113,18 +126,18 @@ const Profile = () => {
       if (error) {
         if (error.code === 'PGRST116') {
           console.log('No patient profile found, showing user info only');
-          setProfile(null);
+          if (!hadCache) setProfile(null);
           setLoading(false);
           return;
         }
         console.error('Error loading profile:', error);
-        toast.error('Failed to load profile');
-        setProfile(null);
+        if (!hadCache) { toast.error('Failed to load profile'); setProfile(null); }
         setLoading(false);
         return;
       }
 
       setProfile(data);
+      try { localStorage.setItem(cacheKey, JSON.stringify({ ...data, _cached_at: Date.now() })); } catch { /* ignore */ }
 
       // Load risk criteria
       const { data: riskData } = await getPatientRiskCriteria(data.id);
@@ -133,8 +146,7 @@ const Profile = () => {
       }
     } catch (error) {
       console.error('Error:', error);
-      toast.error('Failed to load profile');
-      setProfile(null);
+      if (!hadCache) { toast.error('Failed to load profile'); setProfile(null); }
     } finally {
       setLoading(false);
     }

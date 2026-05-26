@@ -146,32 +146,33 @@ export const useRealTimeChat = (conversationId?: string) => {
 
             if (error) throw error;
 
-            // Get patient and doctor info separately
-            const formattedConversations = await Promise.all(
-                (data || []).map(async (conv) => {
-                    // Get patient info
-                    const { data: patientData } = await supabase
-                        .from('patients')
-                        .select('id, full_name, profile_picture_url')
-                        .eq('id', conv.patient_id)
-                        .single();
+            // Batch patient + doctor lookups into 2 queries total (was 2 per
+            // conversation → N+1, the slow load). Build maps and join locally.
+            const rows = data || [];
+            const patientIds = [...new Set(rows.map((c: any) => c.patient_id).filter(Boolean))];
+            const doctorIds = [...new Set(rows.map((c: any) => c.doctor_id).filter(Boolean))];
+            const [patsRes, docsRes] = await Promise.all([
+                patientIds.length
+                    ? supabase.from('patients').select('id, full_name, profile_picture_url').in('id', patientIds)
+                    : Promise.resolve({ data: [] as any[] }),
+                doctorIds.length
+                    ? supabase.from('doctors').select('id, full_name, profile_picture_url').in('id', doctorIds)
+                    : Promise.resolve({ data: [] as any[] }),
+            ]);
+            const patMap = new Map((patsRes.data || []).map((p: any) => [p.id, p]));
+            const docMap = new Map((docsRes.data || []).map((d: any) => [d.id, d]));
 
-                    // Get doctor info
-                    const { data: doctorData } = await supabase
-                        .from('doctors')
-                        .select('id, full_name, profile_picture_url')
-                        .eq('id', conv.doctor_id)
-                        .single();
-
-                    return {
-                        ...conv,
-                        patient_name: patientData?.full_name,
-                        patient_avatar: patientData?.profile_picture_url,
-                        doctor_name: doctorData?.full_name,
-                        doctor_avatar: doctorData?.profile_picture_url
-                    };
-                })
-            );
+            const formattedConversations = rows.map((conv: any) => {
+                const p = patMap.get(conv.patient_id);
+                const d = docMap.get(conv.doctor_id);
+                return {
+                    ...conv,
+                    patient_name: p?.full_name,
+                    patient_avatar: p?.profile_picture_url,
+                    doctor_name: d?.full_name,
+                    doctor_avatar: d?.profile_picture_url,
+                };
+            });
 
             setConversations(formattedConversations);
         } catch (err) {
@@ -189,7 +190,6 @@ export const useRealTimeChat = (conversationId?: string) => {
         try {
             setLoading(true);
 
-            // First, get the messages
             const { data: messagesData, error: messagesError } = await supabase
                 .from('chat_messages')
                 .select('*')
@@ -198,43 +198,30 @@ export const useRealTimeChat = (conversationId?: string) => {
 
             if (messagesError) throw messagesError;
 
-            // Then, get sender information separately
-            const formattedMessages = await Promise.all(
-                (messagesData || []).map(async (msg) => {
-                    let senderName = 'Unknown';
-                    let senderAvatar = '';
+            // A 1:1 chat has only two senders. Batch ALL patient + doctor names in
+            // 2 queries total (was one query PER message → the slow load).
+            const rows = messagesData || [];
+            const patientIds = [...new Set(rows.filter((m: any) => m.sender_type === 'patient').map((m: any) => m.sender_id))];
+            const doctorIds = [...new Set(rows.filter((m: any) => m.sender_type === 'doctor').map((m: any) => m.sender_id))];
+            const [patsRes, docsRes] = await Promise.all([
+                patientIds.length
+                    ? supabase.from('patients').select('id, full_name, profile_picture_url').in('id', patientIds)
+                    : Promise.resolve({ data: [] as any[] }),
+                doctorIds.length
+                    ? supabase.from('doctors').select('id, full_name, profile_picture_url').in('id', doctorIds)
+                    : Promise.resolve({ data: [] as any[] }),
+            ]);
+            const patMap = new Map((patsRes.data || []).map((p: any) => [p.id, p]));
+            const docMap = new Map((docsRes.data || []).map((d: any) => [d.id, d]));
 
-                    if (msg.sender_type === 'patient') {
-                        const { data: patientData } = await supabase
-                            .from('patients')
-                            .select('full_name, profile_picture_url')
-                            .eq('id', msg.sender_id)
-                            .single();
-
-                        if (patientData) {
-                            senderName = patientData.full_name;
-                            senderAvatar = patientData.profile_picture_url;
-                        }
-                    } else if (msg.sender_type === 'doctor') {
-                        const { data: doctorData } = await supabase
-                            .from('doctors')
-                            .select('full_name, profile_picture_url')
-                            .eq('id', msg.sender_id)
-                            .single();
-
-                        if (doctorData) {
-                            senderName = doctorData.full_name;
-                            senderAvatar = doctorData.profile_picture_url;
-                        }
-                    }
-
-                    return {
-                        ...msg,
-                        sender_name: senderName,
-                        sender_avatar: senderAvatar
-                    };
-                })
-            );
+            const formattedMessages = rows.map((msg: any) => {
+                const info = msg.sender_type === 'patient' ? patMap.get(msg.sender_id) : docMap.get(msg.sender_id);
+                return {
+                    ...msg,
+                    sender_name: info?.full_name || 'Unknown',
+                    sender_avatar: info?.profile_picture_url || '',
+                };
+            });
 
             setMessages(formattedMessages);
 
@@ -387,10 +374,8 @@ export const useRealTimeChat = (conversationId?: string) => {
     const handleTyping = useCallback((convId: string) => {
         if (!userProfile) return;
 
-        // Set typing to true immediately
         updateTypingStatus(convId, true);
 
-        // Clear existing timeout
         if (typingTimeoutRef.current) {
             clearTimeout(typingTimeoutRef.current);
         }
@@ -405,49 +390,19 @@ export const useRealTimeChat = (conversationId?: string) => {
     useEffect(() => {
         if (!conversationId || !userProfile) return;
 
-        console.log('🔄 Setting up real-time subscriptions for conversation:', conversationId);
-        console.log('🔄 User profile:', userProfile);
-
-        // Test basic realtime connectivity first
-        const testChannel = supabase
-            .channel('test-realtime')
-            .on('broadcast', { event: 'test' }, (payload) => {
-                console.log('✅ Basic realtime is working:', payload);
-            })
-            .subscribe((status) => {
-                console.log('🧪 Test channel status:', status);
-                if (status === 'SUBSCRIBED') {
-                    // Send a test broadcast to verify connectivity
-                    testChannel.send({
-                        type: 'broadcast',
-                        event: 'test',
-                        payload: { message: 'Realtime test successful' }
-                    });
-                }
-            });
-
         // Subscribe to new messages
         const messageChannel = supabase
             .channel(`messages-${conversationId}`)
             .on(
                 'postgres_changes',
                 {
-                    event: '*', // Listen to all events first for debugging
+                    event: '*',
                     schema: 'public',
                     table: 'chat_messages',
                     filter: `conversation_id=eq.${conversationId}`
                 },
                 async (payload) => {
-                    console.log('🚨 REAL-TIME EVENT TRIGGERED! 🚨');
-                    console.log('📨 Event:', payload.eventType);
-                    console.log('📨 New message received:', payload.new);
-                    console.log('🔍 Full payload:', payload);
-                    console.log('🔍 Table:', payload.table);
-
-                    if (payload.eventType !== 'INSERT') {
-                        console.log('⚠️ Ignoring non-INSERT event:', payload.eventType);
-                        return;
-                    }
+                    if (payload.eventType !== 'INSERT') return;
 
                     const newMessage = payload.new as any;
 
@@ -485,48 +440,31 @@ export const useRealTimeChat = (conversationId?: string) => {
                         sender_avatar: senderAvatar
                     };
 
-                    console.log('🔄 Current messages count before update:', messages.length);
-                    console.log('🔄 Attempting to add message:', formattedMessage.id);
-
                     setMessages(prev => {
-                        console.log('🔄 Previous messages count:', prev.length);
+                        // Deduplicate by ID
+                        if (prev.some(msg => msg.id === formattedMessage.id)) return prev;
 
-                        // Check for duplicates by ID (but allow temp IDs to be replaced)
-                        const existingIndex = prev.findIndex(msg => msg.id === formattedMessage.id);
-
-                        if (existingIndex !== -1) {
-                            console.log('🔄 Message already exists, skipping:', formattedMessage.id);
-                            return prev;
-                        }
-
-                        // Also check if this might be replacing a temporary message
+                        // Replace matching optimistic message if present
                         const tempIndex = prev.findIndex(msg =>
                             msg.id.startsWith('temp-') &&
                             msg.content === formattedMessage.content &&
                             msg.sender_id === formattedMessage.sender_id &&
-                            Math.abs(new Date(msg.created_at).getTime() - new Date(formattedMessage.created_at).getTime()) < 5000 // Within 5 seconds
+                            Math.abs(new Date(msg.created_at).getTime() - new Date(formattedMessage.created_at).getTime()) < 5000
                         );
 
                         if (tempIndex !== -1) {
-                            console.log('🔄 Replacing temporary message with real message:', formattedMessage.id);
-                            const newMessages = [...prev];
-                            newMessages[tempIndex] = formattedMessage;
-                            console.log('🔄 New messages count after replacement:', newMessages.length);
-                            return newMessages;
+                            const next = [...prev];
+                            next[tempIndex] = formattedMessage;
+                            return next;
                         }
 
-                        console.log('✅ Adding new message to chat:', formattedMessage.id);
-                        const newMessages = [...prev, formattedMessage];
-                        console.log('🔄 New messages count after addition:', newMessages.length);
-                        return newMessages;
+                        return [...prev, formattedMessage];
                     });
 
                     // Mark as read if not from current user
                     if (newMessage.sender_id !== userProfile.id) {
                         markMessagesAsRead(conversationId);
                     }
-
-                    console.log('🎯 Message processed successfully. Current user:', userProfile.id, 'Sender:', newMessage.sender_id);
                 }
             )
             .on(
@@ -538,7 +476,6 @@ export const useRealTimeChat = (conversationId?: string) => {
                     filter: `conversation_id=eq.${conversationId}`
                 },
                 (payload) => {
-                    console.log('📝 Message updated:', payload.new);
                     const updatedMessage = payload.new as any;
                     setMessages(prev =>
                         prev.map(msg =>
@@ -550,15 +487,10 @@ export const useRealTimeChat = (conversationId?: string) => {
                 }
             )
             .subscribe((status) => {
-                console.log('📡 Message subscription status:', status);
-                if (status === 'SUBSCRIBED') {
-                    console.log('✅ Successfully subscribed to messages for conversation:', conversationId);
-                } else if (status === 'CHANNEL_ERROR') {
-                    console.error('❌ Message subscription error for conversation:', conversationId);
+                if (status === 'CHANNEL_ERROR') {
+                    console.error('Message subscription error for conversation:', conversationId);
                 } else if (status === 'TIMED_OUT') {
-                    console.error('⏰ Message subscription timed out for conversation:', conversationId);
-                } else if (status === 'CLOSED') {
-                    console.log('🔒 Message subscription closed for conversation:', conversationId);
+                    console.error('Message subscription timed out for conversation:', conversationId);
                 }
             });
 
@@ -576,7 +508,6 @@ export const useRealTimeChat = (conversationId?: string) => {
                     filter: `conversation_id=eq.${conversationId}`
                 },
                 async (payload) => {
-                    console.log('⌨️ Typing indicator update:', payload);
                     const indicator = payload.new as any;
 
                     // Don't show typing indicator for current user
@@ -616,23 +547,18 @@ export const useRealTimeChat = (conversationId?: string) => {
                     });
                 }
             )
-            .subscribe((status) => {
-                console.log('⌨️ Typing subscription status:', status);
-            });
+            .subscribe();
 
         typingSubscriptionRef.current = typingChannel;
 
         // Cleanup subscriptions
         return () => {
-            console.log('🧹 Cleaning up chat subscriptions');
             if (messageSubscriptionRef.current) {
                 supabase.removeChannel(messageSubscriptionRef.current);
             }
             if (typingSubscriptionRef.current) {
                 supabase.removeChannel(typingSubscriptionRef.current);
             }
-            // Clean up test channel
-            supabase.removeChannel(testChannel);
             if (typingTimeoutRef.current) {
                 clearTimeout(typingTimeoutRef.current);
             }
@@ -657,23 +583,6 @@ export const useRealTimeChat = (conversationId?: string) => {
         }
     }, [conversationId, fetchMessages, conversations]);
 
-    // Manual refresh for debugging
-    const manualRefresh = useCallback(() => {
-        if (conversationId) {
-            console.log('🔄 Manual refresh triggered');
-            fetchMessages(conversationId);
-        }
-    }, [conversationId, fetchMessages]);
-
-    // Backup polling mechanism - DISABLED since real-time is working perfectly
-    // Polling was causing automatic refreshes, so we rely entirely on real-time subscriptions
-    /*
-    useEffect(() => {
-      // Polling disabled - real-time subscriptions handle everything
-      console.log('📡 Polling disabled - using real-time subscriptions only');
-    }, [conversationId]);
-    */
-
     return {
         // Data
         messages,
@@ -695,7 +604,6 @@ export const useRealTimeChat = (conversationId?: string) => {
         markMessagesAsRead,
         handleTyping,
         updateTypingStatus,
-        manualRefresh, // For debugging
 
         // Utils
         isTyping: typingIndicators.some(t => t.conversation_id === conversationId),

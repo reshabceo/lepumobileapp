@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { supabase } from '@/lib/supabase'
+import { supabase, resolvePatientId } from '@/lib/supabase'
 
 export type PatientVideoCall = {
   id: string
@@ -33,26 +33,13 @@ export function usePatientVideoCall(authUserId?: string | null): UsePatientVideo
   const [error, setError] = useState<string | null>(null)
   const [patientId, setPatientId] = useState<string | null>(null)
 
-  // Resolve patient row once
+  // Resolve patient row once (shared/deduped across all components).
   useEffect(() => {
     if (!authUserId) return
     let cancelled = false
-    ;(async () => {
-      const { data, error } = await supabase
-        .from('patients')
-        .select('id')
-        .eq('auth_user_id', authUserId)
-        .single()
-      if (!cancelled) {
-        if (error) {
-          console.error('[CALL] Resolve patient id failed', authUserId, error)
-          setError(error.message)
-        } else {
-          console.log('[CALL] Resolved patient id', data?.id)
-          setPatientId(data?.id ?? null)
-        }
-      }
-    })()
+    resolvePatientId(authUserId).then((id) => {
+      if (!cancelled) setPatientId(id)
+    })
     return () => { cancelled = true }
   }, [authUserId])
 
@@ -105,6 +92,11 @@ export function usePatientVideoCall(authUserId?: string | null): UsePatientVideo
     } catch { return null }
   }, [patientId])
 
+  // Stable ref to loadLatestCall so the subscription effect never re-runs (and
+  // re-subscribes / re-queries) just because this callback's identity changed.
+  const loadLatestCallRef = useRef(loadLatestCall)
+  useEffect(() => { loadLatestCallRef.current = loadLatestCall }, [loadLatestCall])
+
   // Auto-expire stale pending/accepted calls older than 2 minutes
   useEffect(() => {
     if (!patientId) return
@@ -124,6 +116,11 @@ export function usePatientVideoCall(authUserId?: string | null): UsePatientVideo
   useEffect(() => {
     if (!patientId) return
     const pid = patientId
+    // Fetch the latest call only ONCE per subscription. The realtime socket can
+    // cycle SUBSCRIBED→CLOSED→SUBSCRIBED; firing the query on every reconnect
+    // floods the REST API (hundreds of video_calls requests) and starves every
+    // other query (profile/reports) into timing out.
+    let didInitialLoad = false
     console.log('[CALL] Setting up video_calls subscription for patient:', pid)
 
     const channel = supabase
@@ -185,17 +182,18 @@ export function usePatientVideoCall(authUserId?: string | null): UsePatientVideo
       })
       .subscribe((status) => {
         console.log('[CALL] Realtime subscription status:', status)
-        if (status === 'SUBSCRIBED') {
-          // Fetch immediately when socket is ready
-          loadLatestCall().catch(() => {})
+        if (status === 'SUBSCRIBED' && !didInitialLoad) {
+          // Fetch ONCE when the socket first becomes ready — not on every reconnect.
+          didInitialLoad = true
+          loadLatestCallRef.current().catch(() => {})
         }
       })
 
-    return () => { 
+    return () => {
       console.log('[CALL] Unsubscribing video_calls for patient:', pid)
-      supabase.removeChannel(channel) 
+      supabase.removeChannel(channel)
     }
-  }, [patientId, loadLatestCall])
+  }, [patientId])
 
   const acceptCall = useCallback(async (callId: string) => {
     try {
