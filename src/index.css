@@ -101,6 +101,12 @@ All colors MUST be HSL.
     @apply border-border;
   }
 
+  html, body {
+    max-width: 100%;
+    overflow-x: hidden;
+    position: relative;
+  }
+
   body {
     @apply bg-background text-foreground;
     font-family: 'Inter', sans-serif;
