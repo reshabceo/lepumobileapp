@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js'
+import { createClient, processLock } from '@supabase/supabase-js'
 import { Capacitor, CapacitorHttp } from '@capacitor/core'
 
 // Get environment variables
@@ -17,83 +17,104 @@ if (!supabaseUrl || !supabaseAnonKey) {
 console.log('🔍 Supabase Debug - URL:', supabaseUrl)
 console.log('🔍 Supabase Debug - Anon Key:', supabaseAnonKey.substring(0, 20) + '...')
 
-// Hardened fetch: no Supabase request can hang forever. The DB/API are fast
-// (verified ~0.1ms / ~90ms), but the JS client occasionally stalls a request in
-// its pipeline → the UI gets stuck loading with no error until a full reload.
-// This aborts any request that stalls past the timeout and retries idempotent
-// (GET/HEAD) requests once, so the app self-recovers instead of freezing.
-const REQUEST_TIMEOUT_MS = 15000
-const supabaseFetch: typeof fetch = async (input, init) => {
-  const method = (init?.method || 'GET').toUpperCase()
-  const isIdempotent = method === 'GET' || method === 'HEAD'
-  const run = async (): Promise<Response> => {
-    const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
-    // Respect a caller-provided abort signal too (e.g. .abortSignal()).
-    if (init?.signal) {
-      if (init.signal.aborted) controller.abort()
-      else init.signal.addEventListener('abort', () => controller.abort(), { once: true })
-    }
-    try {
-      return await fetch(input as RequestInfo, { ...init, signal: controller.signal })
-    } finally {
-      clearTimeout(timer)
-    }
+/**
+ * Hardened fetch for the Supabase client.
+ *
+ * Second half of the "app freezes after a few minutes, fixed only by a hard reload"
+ * fix (the first half is `lock: processLock` below). A hung HTTP request — most
+ * importantly the token auto-refresh POST to /auth/v1/token — used to never return,
+ * so GoTrue kept its lock and every later getSession (i.e. EVERY query) waited
+ * forever, with NO error in the Network tab. Giving every Supabase request a hard
+ * timeout guarantees it either succeeds or rejects, so GoTrue can recover and the UI
+ * never hangs.
+ *
+ * Storage requests (large DICOM / report uploads) are exempt — they can legitimately
+ * run longer than the timeout.
+ */
+const SUPABASE_FETCH_TIMEOUT_MS = 20000
+const fetchWithTimeout: typeof fetch = (input, init = {}) => {
+  const url =
+    typeof input === 'string'
+      ? input
+      : input instanceof URL
+        ? input.href
+        : (input as Request).url
+  // Don't time out storage uploads/downloads — medical files can be large/slow.
+  if (url && url.includes('/storage/v1/')) {
+    return fetch(input as any, init)
   }
-  try {
-    return await run()
-  } catch (err) {
-    // Retry GET/HEAD once on abort/network error; never auto-retry writes.
-    if (isIdempotent) {
-      console.warn('⚠️ [Supabase] request stalled/aborted — retrying once')
-      return await run()
-    }
-    throw err
+
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), SUPABASE_FETCH_TIMEOUT_MS)
+  // Respect any caller-provided AbortSignal in addition to our timeout.
+  const external = (init as RequestInit).signal
+  if (external) {
+    if (external.aborted) controller.abort()
+    else external.addEventListener('abort', () => controller.abort(), { once: true })
   }
+  return fetch(input as any, { ...init, signal: controller.signal }).finally(() =>
+    clearTimeout(timer)
+  )
 }
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-  global: { fetch: supabaseFetch },
   auth: {
-    storage: {
-      getItem: (key: string) => {
-        try {
-          const val = localStorage.getItem(key);
-          if (val) console.log(`🔑 [Storage] Get: ${key} (found)`);
-          return val;
-        } catch (error) {
-          console.error('❌ [Storage] Get error:', error);
-          return null;
-        }
-      },
-      setItem: (key: string, value: string) => {
-        try {
-          localStorage.setItem(key, value);
-          console.log(`🔑 [Storage] Set: ${key}`);
-        } catch (error) {
-          console.error('❌ [Storage] Set error:', error);
-        }
-      },
-      removeItem: (key: string) => {
-        try {
-          localStorage.removeItem(key);
-          console.log(`🔑 [Storage] Remove: ${key}`);
-        } catch (error) {
-          console.error('❌ [Storage] Remove error:', error);
-        }
-      },
-    },
     persistSession: true,
     autoRefreshToken: true,
     detectSessionInUrl: true,
-    // Disable the cross-tab GoTrue lock. Its navigator.locks implementation can
-    // deadlock after the tab/webview goes idle: a background token refresh acquires
-    // the lock and hangs, so EVERY subsequent DB query blocks forever with no error
-    // until a full page reload. In a single mobile webview the cross-tab lock buys
-    // nothing, and running the function directly can never deadlock.
-    lock: async <R>(_name: string, _acquireTimeout: number, fn: () => Promise<R>): Promise<R> => fn(),
+    // CRITICAL: use the in-memory processLock, NOT the default navigator.locks.
+    // The Web Locks API deadlocks in long-lived tabs / mobile webviews — a lock held
+    // by a throttled or destroyed context is never released, so every getSession (and
+    // therefore every query) blocks forever and the whole app freezes until a hard
+    // reload. processLock serializes auth ops within THIS tab only and can never wedge
+    // across contexts. This is the root-cause fix for the "stuck after a few minutes"
+    // freeze. See: github.com/supabase/auth-js — Web Locks issues in webviews.
+    lock: processLock,
+  },
+  global: {
+    fetch: fetchWithTimeout,
   },
 });
+
+/**
+ * Deduplicated patient-id resolution.
+ * Many always-mounted components (video-call notification, incoming-call overlay,
+ * WebRTC) each resolve the patient row from the auth user id on every load — that's
+ * ~10 identical `patients?select=id` requests firing at once. This shares ONE
+ * in-flight/cached result per auth user id (the id never changes during a session),
+ * collapsing those duplicates into a single request.
+ */
+const _patientIdCache = new Map<string, Promise<string | null>>();
+export function resolvePatientId(authUserId: string | null | undefined): Promise<string | null> {
+  if (!authUserId) return Promise.resolve(null);
+  const cached = _patientIdCache.get(authUserId);
+  if (cached) return cached;
+  const p = (async (): Promise<string | null> => {
+    try {
+      // Never let a single hung query wedge the whole app forever. Because this
+      // promise is SHARED across every component (video notification, WebRTC,
+      // Reports, ECG history), a hang here used to freeze all of them until reload.
+      // Race against a timeout and always clear the cache on failure so the next
+      // call (re-render / poll) retries with a fresh request.
+      const queryPromise = supabase
+        .from('patients')
+        .select('id')
+        .eq('auth_user_id', authUserId)
+        .single();
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('resolvePatientId timeout')), 8000)
+      );
+      const { data, error } = await Promise.race([queryPromise, timeoutPromise]) as any;
+      if (error) { _patientIdCache.delete(authUserId); return null; }
+      return (data?.id as string) ?? null;
+    } catch {
+      _patientIdCache.delete(authUserId); // allow retry — never cache a dead promise
+      return null;
+    }
+  })();
+  _patientIdCache.set(authUserId, p);
+  return p;
+}
 
 // ECG Data Storage Functions
 export async function storeEcgRecording(ecgData: {
@@ -683,12 +704,18 @@ export const db = {
   // Get patient profile - OPTIMIZED for speed
   getPatientProfile: async (authUserId: string) => {
     try {
-      // 🚀 OPTIMIZED: Use .single() for faster query and direct response
-      const { data, error } = await supabase
+      // 🚀 OPTIMIZED: Use .single() for faster query and direct response.
+      // Guard with a timeout so callers that DON'T wrap this (e.g. AliveCorHistory /
+      // ECG page) can never spin forever if the auth-lock/network stalls.
+      const queryPromise = supabase
         .from('patients')
         .select('*')
         .eq('auth_user_id', authUserId)
         .single() // Faster than limit(1) - returns single object directly
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('getPatientProfile timeout')), 9000)
+      )
+      const { data, error } = await Promise.race([queryPromise, timeoutPromise]) as any
 
       if (error) {
         // If error is "not found", return null data (not an error)

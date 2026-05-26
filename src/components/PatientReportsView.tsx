@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { FileText, Download, Calendar, User, ArrowLeft, Upload, Stethoscope, Plus, Loader2, FileDown, Image, Send, RotateCcw, Brain, CheckCircle2, XCircle, Clock } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { supabase, db, supabaseUrl, supabaseAnonKey } from '@/lib/supabase';
+import { supabase, db, supabaseUrl, supabaseAnonKey, resolvePatientId } from '@/lib/supabase';
 import { useRealTimeVitals } from '@/hooks/useRealTimeVitals';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -510,54 +510,58 @@ const PatientReportsView: React.FC = () => {
 
     // ── Resolve patient profile ──────────────────────────────────────────────────
     useEffect(() => {
-        // 1. Use hook profile the moment it arrives
-        if (hookProfile) {
-            setPatientProfile(hookProfile);
-            setProfileLoading(false);
-            return;
-        }
-
         if (!user) {
             setProfileLoading(false);
             return;
         }
+        let cancelled = false;
 
-        // 2. Check localStorage cache for instant load
+        // FAST PATH: a minimal { id } is all the report queries need. Resolve the
+        // patient id directly (deduped, ~200ms) so the Reports UI loads immediately
+        // and never hangs waiting on the heavy/slow full-profile fetch (which can be
+        // delayed for seconds while big libs like AWS SDK / jspdf parse on this page).
+        resolvePatientId(user.id).then((id) => {
+            if (!cancelled && id) {
+                setPatientProfile((prev: any) => (prev?.id ? prev : { id }));
+                setProfileLoading(false);
+            }
+        });
+
+        // ENRICH with the full profile when available (hook → cache → DB).
+        if (hookProfile) {
+            setPatientProfile(hookProfile);
+            setProfileLoading(false);
+            return () => { cancelled = true; };
+        }
+
         const cacheKey = `patient_profile_${user.id}`;
         const cachedProfile = localStorage.getItem(cacheKey);
         if (cachedProfile) {
             try {
                 const parsed = JSON.parse(cachedProfile);
-                const cacheTime = parsed._cached_at || 0;
-                if (Date.now() - cacheTime < 5 * 60 * 1000) {
-                    console.log('✅ Reports: using cached profile');
+                if (Date.now() - (parsed._cached_at || 0) < 5 * 60 * 1000) {
                     setPatientProfile(parsed);
                     setProfileLoading(false);
-                    return;
                 }
             } catch (e) { /* ignore */ }
         }
 
-        // 3. Direct DB fetch as last resort
-        const fetchProfile = async () => {
+        (async () => {
             try {
-                setProfileLoading(true);
                 const profileData = await db.getPatientProfile(user.id);
-                if (profileData.data) {
-                    setPatientProfile(profileData.data);
-                }
+                if (!cancelled && profileData.data) setPatientProfile(profileData.data);
             } catch (err) {
                 console.error('❌ Failed to fetch profile:', err);
             } finally {
-                setProfileLoading(false);
+                if (!cancelled) setProfileLoading(false);
             }
-        };
-        fetchProfile();
+        })();
 
         // Safety timeout — at most 4 s of profile loading
-        timeoutRef.current = setTimeout(() => setProfileLoading(false), 4000);
+        timeoutRef.current = setTimeout(() => { if (!cancelled) setProfileLoading(false); }, 4000);
 
         return () => {
+            cancelled = true;
             if (timeoutRef.current) clearTimeout(timeoutRef.current);
         };
     }, [hookProfile, user]);
