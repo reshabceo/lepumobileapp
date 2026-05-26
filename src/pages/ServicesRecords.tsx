@@ -80,7 +80,7 @@ export const ServicesRecords = () => {
   };
 
   const services = [
-    { label: "Doctor", icon: Stethoscope, color: "text-blue-400", path: "/doctor-assignment" },
+    // { label: "Doctor", icon: Stethoscope, color: "text-blue-400", path: "/doctor-assignment" },
     { label: "Prescriptions", icon: Pill, color: "text-purple-400", path: "/prescriptions" },
     { label: "Health Plan", icon: Target, color: "text-emerald-400", path: "/recommendations", badge: recommendationsUnreadCount },
     { label: "Invoices", icon: Receipt, color: "text-amber-400", path: "/invoices" },

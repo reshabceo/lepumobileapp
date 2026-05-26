@@ -31,6 +31,10 @@
 	<string>This app needs Bluetooth access to connect and communicate with BP2 medical devices for blood pressure and ECG monitoring.</string>
 	<key>NSBluetoothPeripheralUsageDescription</key>
 	<string>This app needs Bluetooth access to connect and communicate with BP2 medical devices for blood pressure and ECG monitoring.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Location permission is required to discover and connect nearby Bluetooth health monitoring devices such as ECG and blood pressure monitors.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Location permission may be used to maintain Bluetooth connectivity with supported health monitoring devices.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>This app needs camera access to capture photos of medical reports and documents for upload.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>

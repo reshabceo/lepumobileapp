@@ -43,6 +43,11 @@ function readCachedProfile(userId: string): PatientProfile | null {
     return null;
 }
 
+// Module-level cache and coordination to prevent concurrent/duplicate requests globally
+let globalFetchPromise: Promise<PatientProfile | null> | null = null;
+let lastFetchTime = 0;
+const FETCH_COOLDOWN_MS = 15000; // 15 seconds cooldown for duplicate refreshes
+
 export const useRealTimeVitals = () => {
     const { user } = useAuth();
     const [vitals, setVitals] = useState<VitalSign[]>([]);
@@ -64,15 +69,61 @@ export const useRealTimeVitals = () => {
         }
 
         let isMounted = true;
-        let timeoutId: NodeJS.Timeout | null = null;
+
+        // Helper to fetch vitals in background (non-blocking)
+        const fetchVitalsInBackground = async (patientId: string) => {
+            try {
+                const { data: vitalsData, error: vitalsError } = await supabase
+                    .from('vital_signs')
+                    .select('*')
+                    .eq('patient_id', patientId)
+                    .order('reading_timestamp', { ascending: false })
+                    .limit(50);
+
+                if (isMounted && !vitalsError && vitalsData) {
+                    const mappedVitals = vitalsData.map(vital => ({
+                        id: vital.id,
+                        type: vital.device_type as VitalSign['type'],
+                        data: vital.data,
+                        reading_timestamp: vital.reading_timestamp,
+                        device_id: vital.device_id
+                    }));
+                    setVitals(mappedVitals);
+                }
+            } catch (vitalsErr) {
+                console.warn('Failed to fetch vitals (non-critical):', vitalsErr);
+            }
+        };
 
         const fetchPatientData = async () => {
-            // 🚀 OPTIMIZATION: Check localStorage first for instant load
+            const now = Date.now();
+
+            // If we fetched recently, don't request again unless we have no data at all
+            if (now - lastFetchTime < FETCH_COOLDOWN_MS && patientProfile) {
+                console.log('⏳ [useRealTimeVitals] Cooldown active, skipping fetch');
+                return;
+            }
+
+            // If a fetch is already in flight, await it to get the deduplicated results
+            if (globalFetchPromise) {
+                console.log('🔄 [useRealTimeVitals] Awaiting existing fetch promise...');
+                try {
+                    const resultProfile = await globalFetchPromise;
+                    if (isMounted && resultProfile) {
+                        setPatientProfile(resultProfile);
+                        setLoading(false);
+                        // Trigger vitals fetch in background for this instance
+                        fetchVitalsInBackground(resultProfile.id);
+                    }
+                } catch (e) {
+                    // Parent failed, handle gracefully
+                }
+                return;
+            }
+
             const cacheKey = `patient_profile_${user.id}`;
             const cachedProfile = localStorage.getItem(cacheKey);
             let hasCache = false;
-            // Keep ANY parsed cache around (even if stale) so we can fall back to it
-            // if the network fetch hangs/times out — prevents the app getting stuck.
             let cachedParsed: any = null;
 
             if (cachedProfile) {
@@ -80,15 +131,15 @@ export const useRealTimeVitals = () => {
                     const parsed = JSON.parse(cachedProfile);
                     cachedParsed = parsed;
                     const cacheTime = parsed._cached_at || 0;
-                    const now = Date.now();
                     // Use cache if less than 5 minutes old
                     if (now - cacheTime < 5 * 60 * 1000) {
                         console.log('✅ Using cached profile (instant load)');
                         if (isMounted) {
                             setPatientProfile(parsed);
-                            // Set loading to false immediately if we have valid cache
                             setLoading(false);
                             hasCache = true;
+                            // Trigger vitals fetch in background
+                            fetchVitalsInBackground(parsed.id);
                         }
                     }
                 } catch (e) {
@@ -96,22 +147,31 @@ export const useRealTimeVitals = () => {
                 }
             }
 
-            // Safety timeout to prevent infinite loading. 12s is long enough for a
-            // slow mobile network but short enough that the user isn't stuck staring
-            // at a spinner. On fire we fall back to stale cache if we have it.
-            timeoutId = setTimeout(() => {
-                if (isMounted) {
-                    console.warn('⚠️ Loading timeout - forcing loading to false');
-                    setLoading(false);
-                    if (cachedParsed) {
-                        console.warn('⚠️ Falling back to stale cached profile after timeout');
-                        setPatientProfile(cachedParsed);
-                        setError(null);
-                    } else if (!hasCache) {
-                        setError('Loading took too long. Please check your connection.');
-                    }
+            // Define the logic that actually fetches the profile data
+            const doFetchProfile = async () => {
+                const profileResult = await db.getPatientProfile(user.id);
+                if (profileResult.error) {
+                    throw new Error(typeof profileResult.error === 'string' ? profileResult.error : profileResult.error.message);
                 }
-            }, 12000);
+                const profileData = profileResult.data;
+                if (!profileData) {
+                    return null;
+                }
+
+                // Cache the profile
+                const profileToCache = { ...profileData, _cached_at: Date.now() };
+                localStorage.setItem(cacheKey, JSON.stringify(profileToCache));
+                return profileData;
+            };
+
+            // Start the fetch and store it globally
+            globalFetchPromise = (async () => {
+                try {
+                    return await doFetchProfile();
+                } finally {
+                    globalFetchPromise = null;
+                }
+            })();
 
             try {
                 if (isMounted && !hasCache) {
@@ -119,111 +179,51 @@ export const useRealTimeVitals = () => {
                     setError(null);
                 }
 
-                // 🚀 OPTIMIZED: Fetch profile with timeout protection + one retry.
-                // The fetch is wrapped in a 10s timeout; if it hangs (common in
-                // mobile webviews after backgrounding) we retry once before giving up.
-                const fetchProfileWithTimeout = () => {
-                    const profilePromise = db.getPatientProfile(user.id);
-                    const timeoutPromise = new Promise((_, reject) =>
-                        setTimeout(() => reject(new Error('Profile fetch timeout')), 10000)
-                    );
-                    return Promise.race([
-                        Promise.resolve(profilePromise).then(result => ({ status: 'fulfilled' as const, value: result })),
-                        timeoutPromise.then(() => ({ status: 'rejected' as const, reason: new Error('Profile fetch timeout') }))
-                    ]);
-                };
+                const profileData = await globalFetchPromise;
+                lastFetchTime = Date.now();
 
-                let profileResult = await fetchProfileWithTimeout();
-                if (profileResult.status === 'rejected' && isMounted) {
-                    console.warn('⚠️ Profile fetch timed out, retrying once...');
-                    profileResult = await fetchProfileWithTimeout();
+                if (isMounted && profileData) {
+                    setPatientProfile(profileData);
+                    setError(null);
+                    // Trigger background vitals fetch
+                    fetchVitalsInBackground(profileData.id);
                 }
-
-                // Handle profile result
-                if (profileResult.status === 'fulfilled') {
-                    const profileData = profileResult.value;
-                    if (profileData.error) {
-                        throw new Error(typeof profileData.error === 'string' ? profileData.error : profileData.error.message);
-                    }
-
-                    if (!profileData.data) {
-                        console.log('ℹ️ No patient profile found');
-                        if (isMounted) {
-                            setPatientProfile(null);
-                            setLoading(false);
-                        }
-                        if (timeoutId) clearTimeout(timeoutId);
-                        return;
-                    }
-
-                    // Cache the profile for instant future loads
-                    const profileToCache = { ...profileData.data, _cached_at: Date.now() };
-                    localStorage.setItem(cacheKey, JSON.stringify(profileToCache));
-                    
-                    if (isMounted) {
-                        setPatientProfile(profileData.data);
-                        setLoading(false); // Profile loaded - stop showing loading immediately
-                    }
-
-                    if (timeoutId) clearTimeout(timeoutId);
-
-                    // Now fetch vitals in background (non-blocking, with error handling)
-                    try {
-                        const vitalsTimeout = setTimeout(() => {
-                            console.warn('Vitals fetch taking too long, skipping...');
-                        }, 5000);
-
-                        const { data: vitalsData, error: vitalsError } = await supabase
-                            .from('vital_signs')
-                            .select('*')
-                            .eq('patient_id', profileData.data.id)
-                            .order('reading_timestamp', { ascending: false })
-                            .limit(50);
-
-                        clearTimeout(vitalsTimeout);
-
-                        if (isMounted && !vitalsError && vitalsData) {
-                            const mappedVitals = vitalsData.map(vital => ({
-                                id: vital.id,
-                                type: vital.device_type as VitalSign['type'],
-                                data: vital.data,
-                                reading_timestamp: vital.reading_timestamp,
-                                device_id: vital.device_id
-                            }));
-                            setVitals(mappedVitals);
-                        }
-                    } catch (vitalsErr) {
-                        console.warn('Failed to fetch vitals (non-critical):', vitalsErr);
-                        // Don't set error for vitals failure - it's non-critical
-                    }
-                } else {
-                    throw profileResult.reason;
-                }
-
             } catch (err) {
                 console.error('Error fetching patient data:', err);
                 if (isMounted) {
-                    // Never leave the app stuck: if we have ANY cached profile, use it
-                    // so the UI stays usable without a manual reload/app restart.
                     if (cachedParsed) {
                         console.warn('⚠️ Using stale cached profile after fetch failure');
                         setPatientProfile(cachedParsed);
                         setError(null);
+                        fetchVitalsInBackground(cachedParsed.id);
                     } else {
                         setError(err instanceof Error ? err.message : 'Failed to fetch patient data');
                     }
-                    setLoading(false);
                 }
             } finally {
-                if (timeoutId) clearTimeout(timeoutId);
+                if (isMounted) {
+                    setLoading(false);
+                }
             }
         };
 
         fetchPatientData();
 
+        // Auto-refresh when the window/app becomes visible or focused (resuming from idle)
+        const handleRefresh = () => {
+            if (document.visibilityState === 'visible' && user) {
+                console.log('[useRealTimeVitals] App focused/visible, refreshing patient data...');
+                fetchPatientData();
+            }
+        };
+
+        window.addEventListener('focus', handleRefresh);
+        document.addEventListener('visibilitychange', handleRefresh);
+
         return () => {
             isMounted = false;
-            if (timeoutId) clearTimeout(timeoutId);
+            window.removeEventListener('focus', handleRefresh);
+            document.removeEventListener('visibilitychange', handleRefresh);
         };
     }, [user?.id]); // Only depend on user.id to prevent unnecessary re-fetches
 

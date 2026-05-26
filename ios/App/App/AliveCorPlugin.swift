@@ -13,6 +13,7 @@ public class AliveCorSDK: CAPPlugin, CAPBridgedPlugin, ACKEcgMonitorDelegate {
         CAPPluginMethod(name: "startScan", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "stopScan", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "connect", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "requestPermissions", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "dispose", returnType: CAPPluginReturnPromise),
     ]
 
@@ -50,6 +51,13 @@ public class AliveCorSDK: CAPPlugin, CAPBridgedPlugin, ACKEcgMonitorDelegate {
                 call.resolve()
             }
         }
+    }
+
+    @objc override public func requestPermissions(_ call: CAPPluginCall) {
+        call.resolve([
+            "bluetooth": "granted",
+            "audio": "granted"
+        ])
     }
 
     // MARK: - startSixLeadRecording (mirrors Android API name)
@@ -110,7 +118,7 @@ public class AliveCorSDK: CAPPlugin, CAPBridgedPlugin, ACKEcgMonitorDelegate {
 
             var configError: ACKError?
             guard let recordingConfig = ACKEcgRecordingConfig(
-                deviceType: ACKDeviceTypeTriangle,
+                deviceType: .triangle,
                 leadsConfig: leadsConfig,
                 filterType: .enhanced,
                 maxDuration: maxDuration,
@@ -176,10 +184,10 @@ public class AliveCorSDK: CAPPlugin, CAPBridgedPlugin, ACKEcgMonitorDelegate {
         }
 
         let leadsConfigStr = record.config.leadsConfig == .six ? "six" : "single"
-        let deviceName = record.device?.name ?? "KardiaMobile 6L"
+        let deviceName = record.device?.deviceName ?? "KardiaMobile 6L"
         let hr = evaluation?.averageHeartRate ?? 0
-        let determination = evaluation?.determination as String? ?? "NO_ANALYSIS"
-        let modifier = evaluation?.modifier as String? ?? "NONE"
+        let determination = evaluation?.determination.rawValue ?? "NO_ANALYSIS"
+        let modifier = evaluation?.modifier.rawValue ?? "NONE"
         let algPackage = evaluation?.algorithmPackage ?? "KAIv1"
         let isInverted = evaluation?.isInverted ?? false
 
@@ -228,7 +236,7 @@ public class AliveCorSDK: CAPPlugin, CAPBridgedPlugin, ACKEcgMonitorDelegate {
     /// ECGFrame struct has named fields: lead1, lead2, lead3, aVR, aVL, aVF
     public func ecgMonitorViewController(
         _ viewController: ACKEcgMonitorViewController,
-        didReceiveEcgFrame ecgFrame: ECGFrame
+        didReceive ecgFrame: ECGFrame
     ) {
         // ECGFrame is a C struct with 6 named SInt16 fields.
         // Accumulate each lead sample converting from raw SInt16 ADC to mV
@@ -265,11 +273,11 @@ public class AliveCorSDK: CAPPlugin, CAPBridgedPlugin, ACKEcgMonitorDelegate {
         }
     }
 
-    public func showCancelButtonInEcgMonitorViewController(_ viewController: ACKEcgMonitorViewController) -> Bool {
+    public func showCancelButton(in viewController: ACKEcgMonitorViewController) -> Bool {
         return true
     }
 
-    public func showSettingsButtonInEcgMonitorViewController(_ viewController: ACKEcgMonitorViewController) -> Bool {
+    public func showSettingsButton(in viewController: ACKEcgMonitorViewController) -> Bool {
         return false
     }
 
@@ -290,7 +298,7 @@ public class AliveCorSDK: CAPPlugin, CAPBridgedPlugin, ACKEcgMonitorDelegate {
             "connected": isInitialized,
             "ready": isInitialized,
             "deviceName": "KardiaMobile 6L",
-            "deviceType": ACKDeviceTypeTriangle,
+            "deviceType": ACKDeviceType.triangle.rawValue,
             "bluetoothEnabled": true,
             "statusText": isInitialized ? "Ready to Record" : "Not Initialized",
         ]
