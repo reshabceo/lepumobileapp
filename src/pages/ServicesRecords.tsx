@@ -13,6 +13,7 @@ import {
   Pill,
   Target,
   Receipt,
+  Users,
   LogOut,
   Heart,
   ShieldAlert,
@@ -83,6 +84,7 @@ export const ServicesRecords = () => {
   const servicesRow1 = [
     { label: "Reports", icon: FileText, color: "text-purple-400", path: "/reports" },
     { label: "Doctor", icon: Stethoscope, color: "text-blue-400", path: "/doctor-assignment" },
+    { label: "Care Team", icon: Users, color: "text-indigo-400", path: "/care-team" },
     { label: "Book Appointment", icon: Calendar, color: "text-orange-400", path: "/appointments" },
     { label: "AI Assistant", icon: Stethoscope, color: "text-emerald-400", path: "/ai-doctor" },
     { label: "Claims", icon: FileCheck, color: "text-cyan-400", path: "/insurance-claims", badge: claimsUnreadCount },
@@ -93,7 +95,6 @@ export const ServicesRecords = () => {
     { label: "ECG Records", icon: Activity, color: "text-rose-400", path: "/alivecor-history" },
     { label: "Prescriptions", icon: Pill, color: "text-purple-400", path: "/prescriptions" },
     { label: "Health Plan", icon: Target, color: "text-emerald-400", path: "/recommendations", badge: recommendationsUnreadCount },
-    { label: "Camera Setup", icon: Video, color: "text-indigo-400", path: "/connect-camera" },
     { label: "Live RPM", icon: Video, color: "text-teal-300", path: "/live-monitoring" },
   ];
 
