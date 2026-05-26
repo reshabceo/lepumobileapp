@@ -643,19 +643,6 @@ export default function DicomUploader({ onUploadComplete, patientProfile: propPr
                 ${uploading ? 'opacity-50 pointer-events-none' : 'hover:border-primary/60 hover:bg-muted/20'}
               `}>
                 <FileArchive className="h-12 w-12 text-muted-foreground" />
-                <div className="text-center space-y-1">
-                  <p className="text-sm font-semibold">Tap to select file</p>
-                  <p className="text-xs text-muted-foreground">ZIP or DICOM (.dcm) accepted</p>
-                  <div className="flex items-center justify-center gap-3 mt-2">
-                    <span className="flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400">
-                      <Database className="h-3 w-3" /> ≤ {SUPABASE_LIMIT_MB} MB → Supabase
-                    </span>
-                    <span className="text-muted-foreground">·</span>
-                    <span className="flex items-center gap-1 text-xs text-orange-600 dark:text-orange-400">
-                      <Cloud className="h-3 w-3" /> &gt; {SUPABASE_LIMIT_MB} MB → AWS S3
-                    </span>
-                  </div>
-                </div>
               </div>
             </label>
           </div>
