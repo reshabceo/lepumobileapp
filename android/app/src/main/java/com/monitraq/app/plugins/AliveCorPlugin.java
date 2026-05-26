@@ -916,18 +916,22 @@ public class AliveCorPlugin extends Plugin {
                     Log.w(TAG, "[atc] Local classifier execution failed: " + classifierErr.getMessage());
                 }
 
-                // ── ANNOTATIONS BEAT COUNT FALLBACK ──
+                // ── BEAT COUNT FALLBACK (signal-based, avoids broken JNI annotations()) ──
+                // reader.annotations() calls into a JNI method BeatSeries.<init> that
+                // does not exist in this SDK build (NoSuchMethodError). We instead
+                // estimate heart rate from the ECG signal samples directly.
                 try {
-                    com.alivecor.ecgcore.BeatSeries beats = reader.annotations();
-                    if (beats != null && beats.length() > 0) {
-                        int numBeats = beats.length();
-                        com.alivecor.ecgcore.ECGSignal leadISignal = reader.getECGSamples(com.alivecor.ecgcore.ECGLead.LEAD_I);
-                        if (leadISignal != null) {
-                            double[] leadISamples = leadISignal.getMVSamples();
-                            if (leadISamples != null && leadISamples.length > 0) {
-                                double duration = (double) leadISamples.length / 300.0;
-                                double calculatedHr = Math.round((numBeats / duration) * 60.0);
-                                Log.d(TAG, "[atc] Calculated HR from annotations: " + calculatedHr + " (beats: " + numBeats + ")");
+                    com.alivecor.ecgcore.ECGSignal leadIFallback = reader.getECGSamples(com.alivecor.ecgcore.ECGLead.LEAD_I);
+                    if (leadIFallback != null) {
+                        double[] rawSamples = leadIFallback.getMVSamples();
+                        if (rawSamples != null && rawSamples.length > 0) {
+                            double duration = (double) rawSamples.length / 300.0;
+                            // Simple peak detection: count zero-crossings in derivative (≈ beats)
+                            // This is a rough heuristic but avoids the crashing JNI call.
+                            int peaks = countPeaks(rawSamples, 300);
+                            if (peaks > 0) {
+                                double calculatedHr = Math.round((peaks / duration) * 60.0);
+                                Log.d(TAG, "[atc] Calculated HR from signal peaks: " + calculatedHr + " (peaks: " + peaks + ")");
                                 if (calculatedHr > 30 && calculatedHr < 220) {
                                     ret.put("atc_calculatedHr", calculatedHr);
                                 }
@@ -935,7 +939,7 @@ public class AliveCorPlugin extends Plugin {
                         }
                     }
                 } catch (Throwable annotationErr) {
-                    Log.w(TAG, "[atc] Annotations parsing failed: " + annotationErr.getMessage());
+                    Log.w(TAG, "[atc] Signal-based HR estimation failed: " + annotationErr.getMessage());
                 }
 
                 // ── LOG DEVICEDATA ──
@@ -955,6 +959,55 @@ public class AliveCorPlugin extends Plugin {
             Log.e(TAG, "[atc] General exception while parsing ATC file", e);
         }
     }
+
+    /**
+     * Estimates the number of R-peaks (beats) in an ECG signal using a simple
+     * threshold-based peak detector operating on the differentiated signal.
+     *
+     * This avoids calling ATCReader.annotations() which requires BeatSeries JNI
+     * constructor that does not exist in the bundled SDK build.
+     *
+     * @param samples    ECG samples in mV at 300 Hz
+     * @param sampleRate Sample rate in Hz (typically 300)
+     * @return Estimated number of R-peaks
+     */
+    private int countPeaks(double[] samples, int sampleRate) {
+        if (samples == null || samples.length < sampleRate) return 0;
+        try {
+            // Step 1: Compute absolute derivative
+            double[] diff = new double[samples.length - 1];
+            for (int i = 0; i < diff.length; i++) {
+                diff[i] = Math.abs(samples[i + 1] - samples[i]);
+            }
+
+            // Step 2: Calculate adaptive threshold (75th percentile of diff)
+            double[] sorted = diff.clone();
+            java.util.Arrays.sort(sorted);
+            double threshold = sorted[(int) (sorted.length * 0.75)];
+            // Ensure threshold is meaningful
+            if (threshold < 0.001) threshold = 0.01;
+
+            // Step 3: Count threshold crossings with refractory period
+            int refractorySamples = (int) (sampleRate * 0.3); // 300ms refractory
+            int peaks = 0;
+            int lastPeak = -refractorySamples;
+
+            for (int i = 1; i < diff.length - 1; i++) {
+                // Local maximum above threshold, outside refractory period
+                if (diff[i] > threshold && diff[i] >= diff[i - 1] && diff[i] >= diff[i + 1]) {
+                    if ((i - lastPeak) > refractorySamples) {
+                        peaks++;
+                        lastPeak = i;
+                    }
+                }
+            }
+            return peaks;
+        } catch (Exception e) {
+            Log.w(TAG, "[atc] countPeaks error: " + e.getMessage());
+            return 0;
+        }
+    }
+
 
     @PluginMethod
     public void getDeviceStatus(PluginCall call) {

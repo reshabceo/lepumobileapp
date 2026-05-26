@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { toast } from 'sonner';
-import { User, DollarSign, Clock, Send, Star } from 'lucide-react';
+import { User, IndianRupee, Clock, Send, Star } from 'lucide-react';
 
 interface RequestRadiologistModalProps {
   open: boolean;
@@ -273,7 +273,7 @@ export default function RequestRadiologistModal({
                             </div>
                           </div>
                           <div className="flex items-center gap-1 text-sm font-bold whitespace-nowrap">
-                            <DollarSign className="h-3 w-3" />
+                            <IndianRupee className="h-3 w-3" />
                             {rad.report_fee}
                           </div>
                         </div>

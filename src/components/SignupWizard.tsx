@@ -600,7 +600,7 @@ export const SignupWizard: React.FC<SignupWizardProps> = ({ onSwitchToLogin, onS
         <button
           onClick={prevStep}
           disabled={currentStep === 1 || currentStep === 4}
-          className={`flex items-center gap-1 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all duration-300 ${
+          className={`flex-shrink-0 flex items-center gap-1 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all duration-300 ${
             currentStep === 1 || currentStep === 4
               ? 'bg-white/5 text-gray-600 cursor-not-allowed border border-transparent'
               : 'bg-white/10 text-white hover:bg-white/20 border border-white/10 active:scale-95'
@@ -611,7 +611,7 @@ export const SignupWizard: React.FC<SignupWizardProps> = ({ onSwitchToLogin, onS
         </button>
 
         {/* Step Indicator */}
-        <div className="text-xs text-gray-400 font-medium">
+        <div className="text-xs text-gray-400 font-medium text-center flex-1 min-w-0 mx-2 truncate">
           Step {currentStep} of {steps.length}
         </div>
 
@@ -619,7 +619,7 @@ export const SignupWizard: React.FC<SignupWizardProps> = ({ onSwitchToLogin, onS
         {currentStep < 3 ? (
           <button
             onClick={nextStep}
-            className="flex items-center gap-1 px-5 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 text-white text-xs font-semibold rounded-xl hover:from-blue-700 hover:to-blue-800 active:scale-95 transition-all duration-300 shadow-md shadow-blue-500/20"
+            className="flex-shrink-0 flex items-center gap-1 px-5 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 text-white text-xs font-semibold rounded-xl hover:from-blue-700 hover:to-blue-800 active:scale-95 transition-all duration-300 shadow-md shadow-blue-500/20"
           >
             Next
             <ArrowRight className="w-3.5 h-3.5" />
@@ -628,7 +628,7 @@ export const SignupWizard: React.FC<SignupWizardProps> = ({ onSwitchToLogin, onS
           <button
             onClick={handleSubmit}
             disabled={loading}
-            className="flex items-center gap-1.5 px-5 py-2.5 bg-gradient-to-r from-green-600 to-green-700 text-white text-xs font-semibold rounded-xl hover:from-green-700 hover:to-green-800 active:scale-95 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-green-500/20"
+            className="flex-shrink-0 flex items-center gap-1.5 px-5 py-2.5 bg-gradient-to-r from-green-600 to-green-700 text-white text-xs font-semibold rounded-xl hover:from-green-700 hover:to-green-800 active:scale-95 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-green-500/20"
           >
             {loading ? (
               <>
@@ -640,7 +640,7 @@ export const SignupWizard: React.FC<SignupWizardProps> = ({ onSwitchToLogin, onS
             )}
           </button>
         ) : (
-          <div className="w-16"></div> // Spacer for step 4 (OTP auto-verifies)
+          <div className="flex-shrink-0 w-16"></div> // Spacer for step 4 (OTP auto-verifies)
         )}
       </div>
     </div>
