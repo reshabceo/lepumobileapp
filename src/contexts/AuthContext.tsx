@@ -102,15 +102,20 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     };
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
-    // Listen to auth changes
-    const { data: { subscription } } = auth.onAuthStateChange(async (event, session) => {
+    // Listen to auth changes.
+    // IMPORTANT: this callback runs WHILE GoTrue holds its internal auth lock. Calling
+    // supabase.auth.* or any DB query directly here causes reentrant lock contention
+    // (the SIGNED_IN storm + realtime CHANNEL_ERROR seen in the console). So we only do
+    // synchronous state updates inline and DEFER every supabase call with setTimeout(0),
+    // which lets the lock release first. This is the pattern Supabase documents.
+    const { data: { subscription } } = auth.onAuthStateChange((event, session) => {
       console.log('🔍 Auth Debug - Auth state change:', event, session?.user?.email);
 
       try {
         const awaitingOTP = localStorage.getItem('awaiting_otp_verification') === 'true';
-        
+
         if (event === 'SIGNED_UP' || (event === 'SIGNED_IN' && awaitingOTP && !session?.user?.email_confirmed_at)) {
-          if (session) await supabase.auth.signOut();
+          if (session) setTimeout(() => { supabase.auth.signOut().catch(() => {}); }, 0);
           setIsLoading(false);
           return;
         }
@@ -127,14 +132,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             // Verify role only once per user id (not on every refresh event).
             if (doctorCheckedIdRef.current !== session.user.id) {
               doctorCheckedIdRef.current = session.user.id;
-              isDoctorByAuthId(session.user.id).then(async (isDoctor) => {
-                if (isDoctor) {
-                  console.log('🚫 Doctor detected - signing out of patient app');
-                  await supabase.auth.signOut();
-                  setSession(null);
-                  setUser(null);
-                }
-              });
+              // Deferred out of the lock-held callback (see note above).
+              setTimeout(() => {
+                isDoctorByAuthId(session.user.id).then(async (isDoctor) => {
+                  if (isDoctor) {
+                    console.log('🚫 Doctor detected - signing out of patient app');
+                    await supabase.auth.signOut();
+                    setSession(null);
+                    setUser(null);
+                  }
+                }).catch(() => {});
+              }, 0);
             }
           }
         } else if (event === 'SIGNED_OUT') {

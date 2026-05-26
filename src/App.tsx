@@ -1,64 +1,75 @@
+import { lazy, Suspense } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { DeviceProvider } from "./contexts/DeviceContext";
 import { AuthProvider } from "./contexts/AuthContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
+
+// ── Eager: shell + always-mounted globals (needed on first paint) ──────────
 import { LoginPage } from "./components/LoginPage";
-import Dashboard from "./pages/Dashboard";
-import Chat from "./pages/Chat";
-import ViewReports from "./pages/ViewReports";
-import NotFound from "./pages/NotFound";
-import AddReports from "./pages/AddReports";
-import DeviceList from "./pages/DeviceList";
-import PatientList from "./pages/PatientList";
-import PatientDevices from "./pages/PatientDevices";
-import PatientMonitor from "./pages/PatientMonitor";
-import { LiveBPMonitorRevamped } from "./components/LiveBPMonitorRevamped";
-import LiveBPMonitor from "./pages/LiveBPMonitor";
-import WellueDeviceScanner from "./pages/WellueDeviceScanner";
-import BPReadingsHistory from "./pages/BPReadingsHistory";
-import ECGMonitor from "./pages/ECGMonitor";
-import CGMMonitor from "./pages/CGMMonitor";
-import BPResultScreen from "./pages/BPResult";
-import { DoctorAssignmentPage } from "./pages/DoctorAssignmentPage";
-import PatientReportsView from "./components/PatientReportsView";
-import { ResetPasswordPage } from "./components/ResetPasswordPage";
-import EcgDemo from "./pages/EcgDemo";
-import VideoCallPage from "./pages/VideoCall";
-import WaitingForDoctor from "./pages/WaitingForDoctor";
 import { GlobalVideoCallNotification } from "./components/GlobalVideoCallNotification";
 import { PatientIncomingCallOverlay } from "./components/PatientIncomingCallOverlay";
-import { AppointmentBookingPage } from "./pages/AppointmentBookingPage";
 import { ChatSupport } from "./components/ChatSupport";
-import AIDoctorPage from "./pages/AIDoctorPage";
-import InvoicesPage from "./pages/InvoicesPage";
-import PatientInsuranceClaims from "./components/PatientInsuranceClaims";
-import { PatientInsuranceProfile } from "./components/PatientInsuranceProfile";
-import { ManualVitalInput } from "./components/ManualVitalInput";
-import { PatientPrescriptions } from "./components/PatientPrescriptions";
-import { PatientVitalsHistory } from "./components/PatientVitalsHistory";
-import Profile from "./pages/Profile";
 import { BackButtonHandler } from "./components/BackButtonHandler";
-import PrivacyPolicy from "./pages/PrivacyPolicy";
-import ContactUs from "./pages/ContactUs";
-import Support from "./pages/Support";
-import MedicalDisclaimer from "./pages/MedicalDisclaimer";
-import RadiologistAuth from "./pages/RadiologistAuth";
-import RadiologistDashboard from "./pages/RadiologistDashboard";
-import KardiaSixLeadECG from "./pages/KardiaSixLeadECG";
-import RecommendationsDashboard from "./pages/RecommendationsDashboard";
-import PatientMessages from "./pages/PatientMessages";
-import AliveCorHistory from "./pages/AliveCorHistory";
-import ConnectCamera from "./pages/ConnectCamera";
-import LiveMonitoringPage from "./pages/LiveMonitoring";
-import PiPairingPage from "./pages/PiPairing";
-import { ServicesRecords } from "./pages/ServicesRecords";
-import MyThresholds from "./components/MyThresholds";
+
+// ── Lazy: every routed page loads its own small chunk on navigation ─────────
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const Chat = lazy(() => import("./pages/Chat"));
+const ViewReports = lazy(() => import("./pages/ViewReports"));
+const NotFound = lazy(() => import("./pages/NotFound"));
+const AddReports = lazy(() => import("./pages/AddReports"));
+const DeviceList = lazy(() => import("./pages/DeviceList"));
+const PatientList = lazy(() => import("./pages/PatientList"));
+const PatientDevices = lazy(() => import("./pages/PatientDevices"));
+const PatientMonitor = lazy(() => import("./pages/PatientMonitor"));
+const LiveBPMonitorRevamped = lazy(() => import("./components/LiveBPMonitorRevamped").then(m => ({ default: m.LiveBPMonitorRevamped })));
+const LiveBPMonitor = lazy(() => import("./pages/LiveBPMonitor"));
+const WellueDeviceScanner = lazy(() => import("./pages/WellueDeviceScanner"));
+const BPReadingsHistory = lazy(() => import("./pages/BPReadingsHistory"));
+const ECGMonitor = lazy(() => import("./pages/ECGMonitor"));
+const CGMMonitor = lazy(() => import("./pages/CGMMonitor"));
+const BPResultScreen = lazy(() => import("./pages/BPResult"));
+const DoctorAssignmentPage = lazy(() => import("./pages/DoctorAssignmentPage").then(m => ({ default: m.DoctorAssignmentPage })));
+const PatientReportsView = lazy(() => import("./components/PatientReportsView"));
+const ResetPasswordPage = lazy(() => import("./components/ResetPasswordPage").then(m => ({ default: m.ResetPasswordPage })));
+const EcgDemo = lazy(() => import("./pages/EcgDemo"));
+const VideoCallPage = lazy(() => import("./pages/VideoCall"));
+const WaitingForDoctor = lazy(() => import("./pages/WaitingForDoctor"));
+const AppointmentBookingPage = lazy(() => import("./pages/AppointmentBookingPage").then(m => ({ default: m.AppointmentBookingPage })));
+const AIDoctorPage = lazy(() => import("./pages/AIDoctorPage"));
+const InvoicesPage = lazy(() => import("./pages/InvoicesPage"));
+const PatientInsuranceClaims = lazy(() => import("./components/PatientInsuranceClaims"));
+const PatientInsuranceProfile = lazy(() => import("./components/PatientInsuranceProfile").then(m => ({ default: m.PatientInsuranceProfile })));
+const ManualVitalInput = lazy(() => import("./components/ManualVitalInput").then(m => ({ default: m.ManualVitalInput })));
+const PatientPrescriptions = lazy(() => import("./components/PatientPrescriptions").then(m => ({ default: m.PatientPrescriptions })));
+const PatientVitalsHistory = lazy(() => import("./components/PatientVitalsHistory").then(m => ({ default: m.PatientVitalsHistory })));
+const Profile = lazy(() => import("./pages/Profile"));
+const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
+const ContactUs = lazy(() => import("./pages/ContactUs"));
+const Support = lazy(() => import("./pages/Support"));
+const MedicalDisclaimer = lazy(() => import("./pages/MedicalDisclaimer"));
+const RadiologistAuth = lazy(() => import("./pages/RadiologistAuth"));
+const RadiologistDashboard = lazy(() => import("./pages/RadiologistDashboard"));
+const KardiaSixLeadECG = lazy(() => import("./pages/KardiaSixLeadECG"));
+const RecommendationsDashboard = lazy(() => import("./pages/RecommendationsDashboard"));
+const PatientMessages = lazy(() => import("./pages/PatientMessages"));
+const AliveCorHistory = lazy(() => import("./pages/AliveCorHistory"));
+const LiveMonitoringPage = lazy(() => import("./pages/LiveMonitoring"));
+const ServicesRecords = lazy(() => import("./pages/ServicesRecords").then(m => ({ default: m.ServicesRecords })));
+const MyThresholds = lazy(() => import("./components/MyThresholds"));
+const MyCareTeam = lazy(() => import("./pages/MyCareTeam"));
 
 const queryClient = new QueryClient();
+
+// Lightweight loader shown while a route chunk downloads
+const RouteFallback = () => (
+  <div className="min-h-screen flex items-center justify-center bg-background">
+    <div className="w-8 h-8 rounded-full border-2 border-primary/30 border-t-primary animate-spin" />
+  </div>
+);
 
 const ChatSupportOnDashboard = () => {
   const location = useLocation();
@@ -84,6 +95,7 @@ const App = () => (
                 → call ends immediately before media can flow. */}
             <PatientIncomingCallOverlay />
             <ChatSupportOnDashboard />
+            <Suspense fallback={<RouteFallback />}>
             <Routes>
               {/* Public routes */}
               <Route path="/" element={
@@ -255,24 +267,22 @@ const App = () => (
                   <Profile />
                 </ProtectedRoute>
               } />
-              <Route path="/connect-camera" element={
-                <ProtectedRoute>
-                  <ConnectCamera />
-                </ProtectedRoute>
-              } />
+              {/* /connect-camera and /pair-pi are now merged into /live-monitoring */}
+              <Route path="/connect-camera" element={<Navigate to="/live-monitoring" replace />} />
+              <Route path="/pair-pi" element={<Navigate to="/live-monitoring" replace />} />
               <Route path="/live-monitoring" element={
                 <ProtectedRoute>
                   <LiveMonitoringPage />
                 </ProtectedRoute>
               } />
-              <Route path="/pair-pi" element={
-                <ProtectedRoute>
-                  <PiPairingPage />
-                </ProtectedRoute>
-              } />
               <Route path="/my-thresholds" element={
                 <ProtectedRoute>
                   <MyThresholds />
+                </ProtectedRoute>
+              } />
+              <Route path="/care-team" element={
+                <ProtectedRoute>
+                  <MyCareTeam />
                 </ProtectedRoute>
               } />
 
@@ -331,6 +341,7 @@ const App = () => (
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>
+            </Suspense>
           </BrowserRouter>
         </DeviceProvider>
       </AuthProvider>

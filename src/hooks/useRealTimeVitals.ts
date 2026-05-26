@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { supabase, db } from '@/lib/supabase';
+import { supabase, db, resolvePatientId } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 
 export interface VitalSign {
@@ -145,6 +145,20 @@ export const useRealTimeVitals = () => {
                 } catch (e) {
                     console.warn('Failed to parse cached profile', e);
                 }
+            }
+
+            // 🚀 FAST PATH (universal decouple): with no fresh cache, resolve just the
+            // patient id (deduped, ~200ms) and set a minimal { id } profile so EVERY
+            // consumer of this hook unblocks immediately. Data queries only need the
+            // id; without this they hang waiting on the full-profile fetch.
+            if (!hasCache) {
+                resolvePatientId(user.id).then((id) => {
+                    if (id && isMounted) {
+                        setPatientProfile((prev: any) => (prev?.id ? prev : { id }));
+                        setLoading(false);
+                        fetchVitalsInBackground(id);
+                    }
+                }).catch(() => {});
             }
 
             // Define the logic that actually fetches the profile data

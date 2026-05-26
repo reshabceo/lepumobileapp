@@ -3,35 +3,21 @@ import { Button } from '@/components/ui/button';
 import { Video, Phone, X } from 'lucide-react';
 import { usePatientWebRTCCall } from '@/hooks/usePatientWebRTCCall';
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/lib/supabase';
+import { supabase, resolvePatientId } from '@/lib/supabase';
 import { useState, useEffect } from 'react';
 
 export const PatientIncomingCallOverlay: React.FC = () => {
   const { user } = useAuth();
   const [patientId, setPatientId] = useState<string | null>(null);
 
-  // Get patient ID from auth user
+  // Get patient ID from auth user (shared/deduped across all components).
   useEffect(() => {
     if (!user?.id) return;
-    
-    const getPatientId = async () => {
-      const { data, error } = await supabase
-        .from('patients')
-        .select('id')
-        .eq('auth_user_id', user.id)
-        .single();
-      
-      if (error) {
-        console.error('[PatientIncomingCallOverlay] Failed to get patient ID:', error);
-        return;
-      }
-      
-      if (data) {
-        setPatientId(data.id);
-      }
-    };
-    
-    getPatientId();
+    let cancelled = false;
+    resolvePatientId(user.id).then((id) => {
+      if (!cancelled && id) setPatientId(id);
+    });
+    return () => { cancelled = true; };
   }, [user?.id]);
 
   const { incomingCall, acceptCall, declineCall } = usePatientWebRTCCall(patientId);
