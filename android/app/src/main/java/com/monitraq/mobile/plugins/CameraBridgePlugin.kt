@@ -1,4 +1,4 @@
-package com.monitraq.app.plugins
+package com.monitraq.mobile.plugins
 
 import android.content.Intent
 import android.os.Handler

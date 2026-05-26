@@ -2,7 +2,7 @@
 <resources>
     <string name="app_name">Monitraq</string>
     <string name="title_activity_main">Monitraq</string>
-    <string name="package_name">com.monitraq.app</string>
-    <string name="custom_url_scheme">com.monitraq.app</string>
+    <string name="package_name">com.monitraq.mobile</string>
+    <string name="custom_url_scheme">com.monitraq.mobile</string>
     <string name="camera_bridge_notification_text">Streaming camera for remote monitoring…</string>
 </resources>
