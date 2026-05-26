@@ -703,10 +703,30 @@ const PatientReportsView: React.FC = () => {
 
     const downloadReport = async (report: PatientReport) => {
         try {
+            let bucketName = 'patient-reports';
+            let filePath = report.file_url;
+
+            // If file_url is a full URL (e.g. from storage), parse it to get clean bucket name and path
+            if (filePath.startsWith('http://') || filePath.startsWith('https://')) {
+                try {
+                    const urlObj = new URL(filePath);
+                    const pathSegments = urlObj.pathname.split('/');
+                    const objectIndex = pathSegments.indexOf('object');
+                    if (objectIndex !== -1 && pathSegments.length > objectIndex + 2) {
+                        // /storage/v1/object/[public|sign|authenticated]/[bucket-name]/[path...]
+                        bucketName = pathSegments[objectIndex + 2];
+                        filePath = pathSegments.slice(objectIndex + 3).map(decodeURIComponent).join('/');
+                        console.log('Parsed storage URL:', { bucketName, filePath });
+                    }
+                } catch (e) {
+                    console.error('Failed to parse file_url:', e);
+                }
+            }
+
             // Generate signed URL for secure download from private bucket
             const { data, error } = await supabase.storage
-                .from('patient-reports')
-                .createSignedUrl(report.file_url, 300); // 5 minutes expiry for better reliability
+                .from(bucketName)
+                .createSignedUrl(filePath, 300); // 5 minutes expiry for better reliability
 
             if (error) {
                 console.error('Error creating signed URL:', error);
@@ -714,15 +734,15 @@ const PatientReportsView: React.FC = () => {
                 return;
             }
 
-            // Fetch the file as a blob
-            const response = await fetch(data.signedUrl);
-            if (!response.ok) {
-                throw new Error('Failed to fetch file');
-            }
-            const blob = await response.blob();
-
             // Handle download based on platform
             if (Capacitor.isNativePlatform()) {
+                // Fetch the file as a blob (allowed natively, bypasses browser CORS)
+                const response = await fetch(data.signedUrl);
+                if (!response.ok) {
+                    throw new Error('Failed to fetch file');
+                }
+                const blob = await response.blob();
+
                 // Native platform - use Filesystem and Share
                 try {
                     // Convert blob to base64
@@ -748,7 +768,7 @@ const PatientReportsView: React.FC = () => {
                     
                     // Save to Documents directory
                     // For binary files (PDF, images, etc.), we need to use base64 without UTF8 encoding
-                    const filePath = await Filesystem.writeFile({
+                    await Filesystem.writeFile({
                         path: safeFileName,
                         data: base64Data,
                         directory: Directory.Documents,
@@ -776,12 +796,24 @@ const PatientReportsView: React.FC = () => {
                     }
                 } catch (fsError: any) {
                     console.error('Filesystem error:', fsError);
-                    // Fallback to web download method
-                    downloadBlobInApp(blob, report.file_name);
+                    // Fallback to direct URL download
+                    const link = document.createElement('a');
+                    link.href = data.signedUrl;
+                    link.download = report.file_name;
+                    link.target = '_blank';
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
                 }
             } else {
-                // Web platform - use in-app download without opening new tab
-                downloadBlobInApp(blob, report.file_name);
+                // Web platform - directly trigger download with the signed URL to bypass CORS fetch restriction
+                const link = document.createElement('a');
+                link.href = data.signedUrl;
+                link.download = report.file_name;
+                link.target = '_blank';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
             }
         } catch (err: any) {
             console.error('Download error:', err);
