@@ -701,37 +701,25 @@ export const isDoctorByAuthId = async (authUserId: string): Promise<boolean> => 
 
 // Database helper functions
 export const db = {
-  // Get patient profile - OPTIMIZED for speed
+  // Get patient profile — NO TIMEOUT.
+  // The hook that calls this (useRealTimeVitals) uses stale-while-revalidate:
+  // cached profile renders instantly and this fetch runs in the background.
+  // A slow query never blocks the UI, so we let it run to completion.
   getPatientProfile: async (authUserId: string) => {
     try {
-      // 🚀 OPTIMIZED: Use .single() for faster query and direct response.
-      // Guard with a timeout so callers that DON'T wrap this (e.g. AliveCorHistory /
-      // ECG page) can never spin forever if the auth-lock/network stalls.
-      const queryPromise = supabase
+      const { data, error } = await supabase
         .from('patients')
         .select('*')
         .eq('auth_user_id', authUserId)
-        .single() // Faster than limit(1) - returns single object directly
-      const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('getPatientProfile timeout')), 9000)
-      )
-      const { data, error } = await Promise.race([queryPromise, timeoutPromise]) as any
+        .single()
 
       if (error) {
-        // If error is "not found", return null data (not an error)
-        if (error.code === 'PGRST116') {
-          return { data: null, error: null }
-        }
+        if (error.code === 'PGRST116') return { data: null, error: null }
         console.error('❌ Get patient profile error:', error)
         return { data: null, error }
       }
 
-      if (!data) {
-        return { data: null, error: null }
-      }
-
-      return { data, error: null }
-
+      return { data: data ?? null, error: null }
     } catch (err) {
       console.error('❌ Exception getting patient profile:', err)
       return {
