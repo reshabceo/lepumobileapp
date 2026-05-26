@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Phone, PhoneOff, Video, Mic } from 'lucide-react'
-import { supabase } from '@/lib/supabase'
+import { supabase, resolvePatientId } from '@/lib/supabase'
 
 export const GlobalVideoCallNotification: React.FC = () => {
   const navigate = useNavigate()
@@ -16,21 +16,17 @@ export const GlobalVideoCallNotification: React.FC = () => {
   const [isProcessing, setIsProcessing] = useState(false)
   const [patientId, setPatientId] = useState<string | null>(null)
   const pollRef = useRef<number | null>(null)
+  // Stable ref so the poll/subscription effects don't re-run on callback identity.
+  const loadLatestCallRef = useRef(loadLatestCall)
+  useEffect(() => { loadLatestCallRef.current = loadLatestCall }, [loadLatestCall])
 
-  // Resolve patient ID once
+  // Resolve patient ID once (shared/deduped across all components).
   useEffect(() => {
     if (!user?.id) return
     let cancelled = false
-    ;(async () => {
-      const { data } = await supabase
-        .from('patients')
-        .select('id')
-        .eq('auth_user_id', user.id)
-        .single()
-      if (!cancelled && data?.id) {
-        setPatientId(data.id)
-      }
-    })()
+    resolvePatientId(user.id).then((id) => {
+      if (!cancelled && id) setPatientId(id)
+    })
     return () => { cancelled = true }
   }, [user?.id])
 
@@ -57,9 +53,9 @@ export const GlobalVideoCallNotification: React.FC = () => {
     pollRef.current = window.setInterval(async () => {
       if (isVisible) return
       try {
-        await loadLatestCall()
+        await loadLatestCallRef.current()
       } catch {}
-    }, 2000)
+    }, 20000) // 20s fallback poll — realtime subscription is the primary mechanism; 2s hammered the API
 
     return () => {
       if (pollRef.current) {
@@ -67,12 +63,15 @@ export const GlobalVideoCallNotification: React.FC = () => {
         pollRef.current = null
       }
     }
-  }, [user?.id, loadLatestCall]) // deliberately exclude isVisible so interval survives
+  }, [user?.id]) // deliberately exclude isVisible so interval survives
 
   // Realtime subscription as primary mechanism
   useEffect(() => {
     if (!patientId) return
     const pid = patientId
+    // Only fetch once per subscription, not on every reconnect (the realtime socket
+    // cycles SUBSCRIBED→CLOSED→SUBSCRIBED; refetching each time floods the API).
+    let didInitialLoad = false
 
     const channel = supabase
       .channel(`vc_global_${pid}`)
@@ -82,7 +81,7 @@ export const GlobalVideoCallNotification: React.FC = () => {
         table: 'video_calls',
         filter: `patient_id=eq.${pid}`,
       }, () => {
-        loadLatestCall().catch(() => {})
+        loadLatestCallRef.current().catch(() => {})
       })
       .on('postgres_changes', {
         event: 'UPDATE',
@@ -94,27 +93,31 @@ export const GlobalVideoCallNotification: React.FC = () => {
         if (['ended', 'declined', 'missed', 'cancelled'].includes(row?.status)) {
           setIsVisible(false)
         }
-        loadLatestCall().catch(() => {})
+        loadLatestCallRef.current().catch(() => {})
       })
       .subscribe((status) => {
         console.log('[NOTIFICATION] Realtime subscription status:', status)
-        if (status === 'SUBSCRIBED') {
-          loadLatestCall().catch(() => {})
+        if (status === 'SUBSCRIBED' && !didInitialLoad) {
+          didInitialLoad = true
+          loadLatestCallRef.current().catch(() => {})
         }
       })
 
     return () => { try { supabase.removeChannel(channel) } catch {} }
-  }, [patientId, loadLatestCall])
+  }, [patientId])
 
   // On auth sign-in, trigger a load
   useEffect(() => {
-    const { data: sub } = supabase.auth.onAuthStateChange(async (event) => {
+    const { data: sub } = supabase.auth.onAuthStateChange((event) => {
       if (event === 'SIGNED_IN') {
-        try { await loadLatestCall() } catch {}
+        // Defer: never run a query INSIDE the auth-state callback — it executes while
+        // GoTrue holds its lock, causing reentrant contention. setTimeout(0) lets the
+        // lock release first. Use the ref so this effect doesn't re-subscribe.
+        setTimeout(() => { loadLatestCallRef.current().catch(() => {}) }, 0)
       }
     })
     return () => { sub?.subscription?.unsubscribe?.() }
-  }, [loadLatestCall])
+  }, [])
 
   const handleAccept = async () => {
     if (!currentCall || isProcessing) return
