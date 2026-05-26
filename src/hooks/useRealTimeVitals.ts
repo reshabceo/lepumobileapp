@@ -70,7 +70,7 @@ export const useRealTimeVitals = () => {
 
         let isMounted = true;
 
-        // Helper to fetch vitals in background (non-blocking)
+        // Helper to fetch vitals in background (non-blocking, best-effort)
         const fetchVitalsInBackground = async (patientId: string) => {
             try {
                 const { data: vitalsData, error: vitalsError } = await supabase
@@ -81,30 +81,48 @@ export const useRealTimeVitals = () => {
                     .limit(50);
 
                 if (isMounted && !vitalsError && vitalsData) {
-                    const mappedVitals = vitalsData.map(vital => ({
+                    setVitals(vitalsData.map((vital: any) => ({
                         id: vital.id,
                         type: vital.device_type as VitalSign['type'],
                         data: vital.data,
                         reading_timestamp: vital.reading_timestamp,
                         device_id: vital.device_id
-                    }));
-                    setVitals(mappedVitals);
+                    })));
                 }
             } catch (vitalsErr) {
-                console.warn('Failed to fetch vitals (non-critical):', vitalsErr);
+                console.warn('Vitals refresh failed (non-critical):', vitalsErr);
             }
         };
 
         const fetchPatientData = async () => {
             const now = Date.now();
+            const cacheKey = `patient_profile_${user.id}`;
 
-            // If we fetched recently, don't request again unless we have no data at all
-            if (now - lastFetchTime < FETCH_COOLDOWN_MS && patientProfile) {
+            // (1) Hydrate from cache — any age. If we have *anything*, render it instantly.
+            let cachedParsed: any = null;
+            try {
+                const raw = localStorage.getItem(cacheKey);
+                if (raw) cachedParsed = JSON.parse(raw);
+            } catch { /* ignore corrupt cache */ }
+
+            const hasCache = !!cachedParsed;
+            if (hasCache && isMounted) {
+                setPatientProfile(cachedParsed);
+                setLoading(false);
+                setError(null);
+            } else if (isMounted) {
+                setLoading(true);
+                setError(null);
+            }
+
+            // (2) Cooldown: if we just fetched and have data, skip the DB round-trip
+            if (now - lastFetchTime < FETCH_COOLDOWN_MS && hasCache) {
                 console.log('⏳ [useRealTimeVitals] Cooldown active, skipping fetch');
+                if (hasCache) fetchVitalsInBackground(cachedParsed.id);
                 return;
             }
 
-            // If a fetch is already in flight, await it to get the deduplicated results
+            // (3) Deduplicate: if a fetch is already in-flight, await it instead of firing a new one
             if (globalFetchPromise) {
                 console.log('🔄 [useRealTimeVitals] Awaiting existing fetch promise...');
                 try {
@@ -112,45 +130,14 @@ export const useRealTimeVitals = () => {
                     if (isMounted && resultProfile) {
                         setPatientProfile(resultProfile);
                         setLoading(false);
-                        // Trigger vitals fetch in background for this instance
                         fetchVitalsInBackground(resultProfile.id);
                     }
-                } catch (e) {
-                    // Parent failed, handle gracefully
-                }
+                } catch { /* parent failed, handle gracefully */ }
                 return;
             }
 
-            const cacheKey = `patient_profile_${user.id}`;
-            const cachedProfile = localStorage.getItem(cacheKey);
-            let hasCache = false;
-            let cachedParsed: any = null;
-
-            if (cachedProfile) {
-                try {
-                    const parsed = JSON.parse(cachedProfile);
-                    cachedParsed = parsed;
-                    const cacheTime = parsed._cached_at || 0;
-                    // Use cache if less than 5 minutes old
-                    if (now - cacheTime < 5 * 60 * 1000) {
-                        console.log('✅ Using cached profile (instant load)');
-                        if (isMounted) {
-                            setPatientProfile(parsed);
-                            setLoading(false);
-                            hasCache = true;
-                            // Trigger vitals fetch in background
-                            fetchVitalsInBackground(parsed.id);
-                        }
-                    }
-                } catch (e) {
-                    console.warn('Failed to parse cached profile', e);
-                }
-            }
-
-            // 🚀 FAST PATH (universal decouple): with no fresh cache, resolve just the
-            // patient id (deduped, ~200ms) and set a minimal { id } profile so EVERY
-            // consumer of this hook unblocks immediately. Data queries only need the
-            // id; without this they hang waiting on the full-profile fetch.
+            // (4) Fast-path: resolve just the patient id (~200ms) to unblock consumers
+            //     that only need the id (ECG, reports, WebRTC) without waiting for full row.
             if (!hasCache) {
                 resolvePatientId(user.id).then((id) => {
                     if (id && isMounted) {
@@ -161,69 +148,45 @@ export const useRealTimeVitals = () => {
                 }).catch(() => {});
             }
 
-            // Define the logic that actually fetches the profile data
-            const doFetchProfile = async () => {
-                const profileResult = await db.getPatientProfile(user.id);
-                if (profileResult.error) {
-                    throw new Error(typeof profileResult.error === 'string' ? profileResult.error : profileResult.error.message);
-                }
-                const profileData = profileResult.data;
-                if (!profileData) {
-                    return null;
-                }
-
-                // Cache the profile
-                const profileToCache = { ...profileData, _cached_at: Date.now() };
-                localStorage.setItem(cacheKey, JSON.stringify(profileToCache));
-                return profileData;
-            };
-
-            // Start the fetch and store it globally
+            // (5) Full profile fetch — deduplicated via module-level promise
             globalFetchPromise = (async () => {
                 try {
-                    return await doFetchProfile();
+                    const { data, error: profileError } = await db.getPatientProfile(user.id);
+                    return profileError ? null : (data ?? null);
                 } finally {
                     globalFetchPromise = null;
                 }
             })();
 
             try {
-                if (isMounted && !hasCache) {
-                    setLoading(true);
-                    setError(null);
-                }
-
                 const profileData = await globalFetchPromise;
                 lastFetchTime = Date.now();
+                if (!isMounted) return;
 
-                if (isMounted && profileData) {
+                if (profileData) {
+                    const profileToCache = { ...profileData, _cached_at: Date.now() };
+                    localStorage.setItem(cacheKey, JSON.stringify(profileToCache));
                     setPatientProfile(profileData);
+                    setLoading(false);
                     setError(null);
-                    // Trigger background vitals fetch
                     fetchVitalsInBackground(profileData.id);
-                }
-            } catch (err) {
-                console.error('Error fetching patient data:', err);
-                if (isMounted) {
-                    if (cachedParsed) {
-                        console.warn('⚠️ Using stale cached profile after fetch failure');
-                        setPatientProfile(cachedParsed);
-                        setError(null);
-                        fetchVitalsInBackground(cachedParsed.id);
-                    } else {
-                        setError(err instanceof Error ? err.message : 'Failed to fetch patient data');
-                    }
-                }
-            } finally {
-                if (isMounted) {
+                } else if (!hasCache) {
+                    setPatientProfile(null);
                     setLoading(false);
                 }
+            } catch (err) {
+                console.warn('Profile refresh threw:', err);
+                if (!hasCache && isMounted) {
+                    setError(err instanceof Error ? err.message : 'Failed to fetch patient data');
+                    setLoading(false);
+                }
+                // If we have cache, keep showing valid cached data — never blank the UI.
             }
         };
 
         fetchPatientData();
 
-        // Auto-refresh when the window/app becomes visible or focused (resuming from idle)
+        // Auto-refresh when the app comes back to the foreground / tab becomes visible
         const handleRefresh = () => {
             if (document.visibilityState === 'visible' && user) {
                 console.log('[useRealTimeVitals] App focused/visible, refreshing patient data...');
