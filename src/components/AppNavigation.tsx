@@ -14,7 +14,7 @@ interface AppNavigationProps {
 const navigationItems = [
   { path: '/dashboard', label: 'Home', icon: Home },
   { path: '/services', label: 'Services', icon: LayoutGrid },
-  { path: '/ai-doctor', label: 'AI Assistant', icon: Bot },
+  { path: '/ai-doctor', label: 'Health AI', icon: Bot },
   { path: '/profile', label: 'Profile', icon: User },
 ];
 
@@ -27,7 +27,7 @@ export const AppNavigation: React.FC<AppNavigationProps> = ({ className = "" }) 
       {navigationItems.map((item) => {
         const Icon = item.icon;
         // Match path exactly or check if current route starts with path (except for /dashboard)
-        const isActive = item.path === '/dashboard' 
+        const isActive = item.path === '/dashboard'
           ? location.pathname === '/dashboard' || location.pathname === '/dashboard/'
           : location.pathname.startsWith(item.path);
 

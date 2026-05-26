@@ -17,7 +17,7 @@ export const ProgressIndicator: React.FC<ProgressIndicatorProps> = ({
   return (
     <div className="w-full mb-8">
       {/* Progress Bar */}
-      <div className="relative mb-6">
+      <div className="relative h-10 mb-4">
         {/* Background Track */}
         <div className="w-full h-1 bg-white/10 rounded-full overflow-hidden">
           {/* Progress Fill */}
@@ -55,9 +55,21 @@ export const ProgressIndicator: React.FC<ProgressIndicatorProps> = ({
                 </div>
                 
                 {/* Step Label */}
-                <div className="absolute top-4 left-1/2 transform -translate-x-1/2 whitespace-nowrap">
+                <div 
+                  className={`absolute top-4 whitespace-nowrap transition-all duration-300 ${
+                    index === 0 
+                      ? 'left-0 text-left' 
+                      : index === steps.length - 1 
+                      ? 'right-0 text-right' 
+                      : 'left-1/2 transform -translate-x-1/2 text-center'
+                  } ${
+                    isCurrent 
+                      ? 'opacity-100 scale-100' 
+                      : 'opacity-0 sm:opacity-60 scale-95 pointer-events-none sm:pointer-events-auto'
+                  }`}
+                >
                   <span 
-                    className={`text-xs font-medium transition-all duration-300 ${
+                    className={`text-[10px] sm:text-xs font-medium transition-all duration-300 ${
                       isCompleted 
                         ? 'text-blue-400' 
                         : isCurrent 

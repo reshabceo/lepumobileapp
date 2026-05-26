@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		2FAD9763203C412B000D30F8 /* config.xml in Resources */ = {isa = PBXBuildFile; fileRef = 2FAD9762203C412B000D30F8 /* config.xml */; };
 		50379B232058CBB4000EE86E /* capacitor.config.json in Resources */ = {isa = PBXBuildFile; fileRef = 50379B222058CBB4000EE86E /* capacitor.config.json */; };
+		74C6A3B822634BC68DEAF9B0 /* AliveCorPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70865DFDDD0749898C70CB6D /* AliveCorPlugin.swift */; };
 		504EC3081FED79650016851F /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 504EC3071FED79650016851F /* AppDelegate.swift */; };
 		504EC30D1FED79650016851F /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 504EC30B1FED79650016851F /* Main.storyboard */; };
 		504EC30F1FED79650016851F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 504EC30E1FED79650016851F /* Assets.xcassets */; };
@@ -28,6 +29,7 @@
 		2FAD9762203C412B000D30F8 /* config.xml */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = config.xml; sourceTree = "<group>"; };
 		50379B222058CBB4000EE86E /* capacitor.config.json */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.json; path = capacitor.config.json; sourceTree = "<group>"; };
 		504EC3041FED79650016851F /* App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = App.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		70865DFDDD0749898C70CB6D /* AliveCorPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AliveCorPlugin.swift; sourceTree = "<group>"; };
 		504EC3071FED79650016851F /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		504EC30C1FED79650016851F /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/Main.storyboard; sourceTree = "<group>"; };
 		504EC30E1FED79650016851F /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -93,6 +95,7 @@
 				861F6F3F2FA0B1E400A8819C /* IAP.swift */,
 				861F6F402FA0B1E400A8819C /* IAPPlugin.m */,
 				50379B222058CBB4000EE86E /* capacitor.config.json */,
+				70865DFDDD0749898C70CB6D /* AliveCorPlugin.swift */,
 				504EC3071FED79650016851F /* AppDelegate.swift */,
 				D11B268E9348466CBC996A08 /* WellueSDKPlugin.swift */,
 				916B2B78E03146E3BA5C4969 /* WellueSDKPlugin.m */,
@@ -247,7 +250,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				504EC3081FED79650016851F /* AppDelegate.swift in Sources */,
+				74C6A3B822634BC68DEAF9B0 /* AliveCorPlugin.swift in Sources */,
+			504EC3081FED79650016851F /* AppDelegate.swift in Sources */,
 				861F6F412FA0B1E500A8819C /* IAP.swift in Sources */,
 				861F6F422FA0B1E500A8819C /* IAPPlugin.m in Sources */,
 				6FDD8C083F604E979B843C27 /* WellueSDKPlugin.swift in Sources */,
@@ -401,7 +405,7 @@
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
 				MARKETING_VERSION = 1.1;
 				OTHER_SWIFT_FLAGS = "$(inherited) \"-D\" \"COCOAPODS\" \"-DDEBUG\"";
-				PRODUCT_BUNDLE_IDENTIFIER = com.monitraq.app;
+				PRODUCT_BUNDLE_IDENTIFIER = com.monitraq.mobile;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
@@ -428,7 +432,7 @@
 				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
 				MARKETING_VERSION = 1.1;
-				PRODUCT_BUNDLE_IDENTIFIER = com.monitraq.app;
+				PRODUCT_BUNDLE_IDENTIFIER = com.monitraq.mobile;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;

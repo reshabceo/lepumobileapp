@@ -79,21 +79,15 @@ export const ServicesRecords = () => {
     }
   };
 
-  // 10 services split into 2 sets of 5 items
-  const servicesRow1 = [
-    { label: "Reports", icon: FileText, color: "text-purple-400", path: "/reports" },
+  const services = [
     { label: "Doctor", icon: Stethoscope, color: "text-blue-400", path: "/doctor-assignment" },
-    { label: "Book Appointment", icon: Calendar, color: "text-orange-400", path: "/appointments" },
-    { label: "AI Assistant", icon: Stethoscope, color: "text-emerald-400", path: "/ai-doctor" },
-    { label: "Claims", icon: FileCheck, color: "text-cyan-400", path: "/insurance-claims", badge: claimsUnreadCount },
-  ];
-
-  const servicesRow2 = [
-    { label: "Invoices", icon: Receipt, color: "text-amber-400", path: "/invoices" },
-    { label: "ECG Records", icon: Activity, color: "text-rose-400", path: "/alivecor-history" },
     { label: "Prescriptions", icon: Pill, color: "text-purple-400", path: "/prescriptions" },
     { label: "Health Plan", icon: Target, color: "text-emerald-400", path: "/recommendations", badge: recommendationsUnreadCount },
-    { label: "Camera Setup", icon: Video, color: "text-indigo-400", path: "/connect-camera" },
+    { label: "Invoices", icon: Receipt, color: "text-amber-400", path: "/invoices" },
+    { label: "Claims", icon: FileCheck, color: "text-cyan-400", path: "/insurance-claims", badge: claimsUnreadCount },
+    { label: "ECG Records", icon: Activity, color: "text-rose-400", path: "/alivecor-history" },
+    { label: "Reports", icon: FileText, color: "text-purple-400", path: "/reports" },
+    { label: "Book Appointment", icon: Calendar, color: "text-orange-400", path: "/appointments" },
     { label: "Live RPM", icon: Video, color: "text-teal-300", path: "/live-monitoring" },
   ];
 
@@ -109,7 +103,7 @@ export const ServicesRecords = () => {
             {/* Logo */}
             <img src="/monitraq-logo.png" alt="Logo" className="w-10 h-10 object-contain rounded-xl" />
             <div>
-              <p className="text-[11px] text-slate-400 font-semibold uppercase tracking-wider">Good Morning 👋</p>
+              <p className="text-[11px] text-slate-400 font-semibold uppercase tracking-wider">Have a Healthy Day</p>
               <h1 className="text-lg font-black tracking-tight text-white mt-0.5">
                 {patientProfile?.full_name || "John Doe"}
               </h1>
@@ -189,11 +183,10 @@ export const ServicesRecords = () => {
                   <p className="text-[11px] text-slate-400">Configured by your doctor</p>
                 </div>
               </div>
-              <span className={`px-2.5 py-1 rounded-full text-[10px] font-extrabold tracking-wider uppercase ${
-                riskCriteria?.is_high_risk 
-                  ? 'bg-rose-500/20 border border-rose-500/30 text-rose-300 animate-pulse' 
-                  : 'bg-emerald-500/20 border border-emerald-500/30 text-emerald-300'
-              }`}>
+              <span className={`px-2.5 py-1 rounded-full text-[10px] font-extrabold tracking-wider uppercase ${riskCriteria?.is_high_risk
+                ? 'bg-rose-500/20 border border-rose-500/30 text-rose-300 animate-pulse'
+                : 'bg-emerald-500/20 border border-emerald-500/30 text-emerald-300'
+                }`}>
                 {riskCriteria?.is_high_risk ? 'High Risk Alert' : 'System Stable'}
               </span>
             </div>
@@ -264,59 +257,8 @@ export const ServicesRecords = () => {
             )}
           </div>
 
-          {/* Services & Records Grid */}
-          <div className="bg-[#1A243D] border border-slate-700/40 shadow-sm rounded-3xl p-4 space-y-4">
-            <h3 className="text-sm font-bold text-white">Services & Records</h3>
-
-            <div className="space-y-3">
-              {/* Row 1 (first 5 cards) */}
-              <div className="flex gap-3 overflow-x-auto scrollbar-hide py-1">
-                {servicesRow1.map((item) => (
-                  <button
-                    key={item.label}
-                    onClick={() => {
-                      if (item.badge && item.label === "Claims") markClaimsAsRead();
-                      navigate(item.path);
-                    }}
-                    className="w-[100px] h-[84px] flex-shrink-0 bg-[#0F172A]/70 hover:bg-[#121B32]/95 border border-slate-800/40 rounded-2xl flex flex-col items-center justify-center gap-1.5 transition-all text-center relative group"
-                  >
-                    {item.badge && item.badge > 0 && (
-                      <div className="absolute top-1.5 right-1.5 bg-red-500 text-white text-[8px] font-extrabold rounded-full h-4 w-4 flex items-center justify-center animate-pulse">
-                        {item.badge}
-                      </div>
-                    )}
-                    <item.icon className={`h-5 w-5 ${item.color} group-hover:scale-110 transition-transform`} />
-                    <span className="text-[10px] font-bold text-slate-200 truncate px-1 max-w-[90px]">{item.label}</span>
-                  </button>
-                ))}
-              </div>
-
-              {/* Row 2 (next 5 cards) */}
-              <div className="flex gap-3 overflow-x-auto scrollbar-hide py-1">
-                {servicesRow2.map((item) => (
-                  <button
-                    key={item.label}
-                    onClick={() => {
-                      if (item.badge && item.label === "Health Plan") markRecommendationsAsRead();
-                      navigate(item.path);
-                    }}
-                    className="w-[100px] h-[84px] flex-shrink-0 bg-[#0F172A]/70 hover:bg-[#121B32]/95 border border-slate-800/40 rounded-2xl flex flex-col items-center justify-center gap-1.5 transition-all text-center relative group"
-                  >
-                    {item.badge && item.badge > 0 && (
-                      <div className="absolute top-1.5 right-1.5 bg-red-500 text-white text-[8px] font-extrabold rounded-full h-4 w-4 flex items-center justify-center animate-pulse">
-                        {item.badge}
-                      </div>
-                    )}
-                    <item.icon className={`h-5 w-5 ${item.color} group-hover:scale-110 transition-transform`} />
-                    <span className="text-[10px] font-bold text-slate-200 truncate px-1 max-w-[90px]">{item.label}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-
           {/* Manual Vitals Submission & History */}
-          <div className="grid grid-cols-2 gap-3 pb-8">
+          <div className="grid grid-cols-2 gap-3 ">
             <button
               onClick={() => navigate("/manual-vitals")}
               className="h-12 bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white font-extrabold rounded-2xl flex items-center justify-center gap-2 transition-all shadow-md shadow-emerald-950/20 text-xs hover:scale-[1.01] active:scale-95"
@@ -332,6 +274,34 @@ export const ServicesRecords = () => {
               <span>Vitals History</span>
             </button>
           </div>
+
+          {/* Services & Records Grid */}
+          <div className="bg-[#1A243D] border border-slate-700/40 shadow-sm rounded-3xl p-4 space-y-4">
+            <h3 className="text-sm font-bold text-white">Other Services</h3>
+
+            <div className="grid grid-cols-3 gap-3 py-1">
+              {services.map((item) => (
+                <button
+                  key={item.label}
+                  onClick={() => {
+                    if (item.badge && item.label === "Claims") markClaimsAsRead();
+                    if (item.badge && item.label === "Health Plan") markRecommendationsAsRead();
+                    navigate(item.path);
+                  }}
+                  className="w-full h-[84px] bg-[#0F172A]/70 hover:bg-[#121B32]/95 border border-slate-800/40 rounded-2xl flex flex-col items-center justify-center gap-1.5 transition-all text-center relative group"
+                >
+                  {item.badge && item.badge > 0 && (
+                    <div className="absolute top-1.5 right-1.5 bg-red-500 text-white text-[8px] font-extrabold rounded-full h-4 w-4 flex items-center justify-center animate-pulse">
+                      {item.badge}
+                    </div>
+                  )}
+                  <item.icon className={`h-5 w-5 ${item.color} group-hover:scale-110 transition-transform`} />
+                  <span className="text-[10px] font-bold text-slate-200 truncate px-1 w-full">{item.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
         </div>
       </div>
     </MobileAppContainer>
