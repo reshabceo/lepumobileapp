@@ -28,17 +28,34 @@ const supabaseFetch: typeof fetch = async (input, init) => {
   const isIdempotent = method === 'GET' || method === 'HEAD'
   const run = async (): Promise<Response> => {
     const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
-    // Respect a caller-provided abort signal too (e.g. .abortSignal()).
+    let timeoutId: NodeJS.Timeout
+
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timeoutId = setTimeout(() => {
+        controller.abort() // Attempt standard abort signal abort
+        const abortError = typeof DOMException !== 'undefined'
+          ? new DOMException('The user aborted a request.', 'AbortError')
+          : new Error('The user aborted a request.');
+        (abortError as any).name = 'AbortError';
+        reject(abortError);
+      }, REQUEST_TIMEOUT_MS)
+    })
+
+    // Respect caller-provided signal
     if (init?.signal) {
       if (init.signal.aborted) controller.abort()
       else init.signal.addEventListener('abort', () => controller.abort(), { once: true })
     }
-    try {
-      return await fetch(input as RequestInfo, { ...init, signal: controller.signal })
-    } finally {
-      clearTimeout(timer)
-    }
+
+    const fetchPromise = (async () => {
+      try {
+        return await fetch(input as RequestInfo, { ...init, signal: controller.signal })
+      } finally {
+        clearTimeout(timeoutId)
+      }
+    })()
+
+    return Promise.race([fetchPromise, timeoutPromise])
   }
   try {
     return await run()
@@ -333,14 +350,16 @@ export async function storeAliveCorRecording(
  * Fetch past ECG recordings for a patient from the AliveCor backend.
  */
 export async function getAliveCorRecordings(patientId: string, limit: number = 20): Promise<any> {
-  return aliveCorGet(`/api/alivecor/recordings/${patientId}?limit=${limit}`);
+  const mrn = patientId.replace(/-/g, '');
+  return aliveCorGet(`/api/alivecor/recordings/${mrn}?limit=${limit}`);
 }
 
 /**
  * Fetch detailed ECG recording (including waveform) for a specific record ID.
  */
 export async function getAliveCorRecordingDetail(patientId: string, recordingId: string): Promise<any> {
-  return aliveCorGet(`/api/alivecor/recordings/${patientId}/${recordingId}`);
+  const mrn = patientId.replace(/-/g, '');
+  return aliveCorGet(`/api/alivecor/recordings/${mrn}/${recordingId}`);
 }
 
 /**

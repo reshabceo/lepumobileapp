@@ -251,7 +251,7 @@ const KardiaSixLeadECG: React.FC = () => {
       
       let recordings: any[] = [];
       try {
-        const data = await getAliveCorRecordings(patientDbId);
+        const data = await getAliveCorRecordings(patientMrn || patientDbId);
         recordings = data.recordings || data.data || data.items || data.results || (Array.isArray(data) ? data : []);
       } catch (apiErr) {
         console.warn("[ALIVECOR] API recordings fetch failed, trying Supabase direct...", apiErr);
@@ -301,8 +301,43 @@ const KardiaSixLeadECG: React.FC = () => {
         }
       }
 
-      if (recordings.length > 0) {
-        const latest = recordings[0];
+      // Normalize recordings to ensure consistent keys (supporting both DB and API fields)
+      const normalizedRecordings = recordings.map((rec: any) => {
+        const determination = rec.determination || rec.algorithmDetermination || "UNCLASSIFIED";
+        const created_at = rec.created_at || rec.recordedAt || new Date().toISOString();
+        const heartRate = rec.heart_rate || rec.average_heart_rate || rec.bpm || 0;
+        const inverted = rec.is_inverted !== undefined ? rec.is_inverted : (rec.inverted !== undefined ? rec.inverted : false);
+        const deviceType = rec.device_type || "KardiaMobile 6L";
+        const config = rec.lead_config || (rec.leads || rec.waveformLeads || rec.waveform_leads ? "six" : "six");
+        
+        // Ensure nested ecg_recordings is populated so details view works
+        const ecgRec = rec.ecg_recordings || {
+          id: rec.ecg_recording_id || rec.id,
+          sample_rate: rec.sampleRate || rec.sample_rate || 300,
+          duration_seconds: rec.durationSeconds || rec.duration_seconds || 30,
+          mv_data_json: rec.mvData || rec.waveform_mv || null
+        };
+
+        return {
+          ...rec,
+          id: rec.id,
+          patient_id: rec.patient_id || patientDbId,
+          created_at,
+          determination,
+          average_heart_rate: heartRate,
+          heart_rate: heartRate,
+          bpm: heartRate,
+          lead_config: config,
+          is_inverted: inverted,
+          device_type: deviceType,
+          notes: rec.notes || "KardiaMobile Recording",
+          ecg_recording_id: rec.ecg_recording_id || rec.id,
+          ecg_recordings: ecgRec
+        };
+      });
+
+      if (normalizedRecordings.length > 0) {
+        const latest = normalizedRecordings[0];
         
         let leadsObj: Record<string, number[]> | undefined = undefined;
         const ecg = latest.ecg_recordings || latest;
@@ -943,6 +978,14 @@ const KardiaSixLeadECG: React.FC = () => {
                 </div>
                 <span className="font-medium text-gray-300">Recent Recording</span>
               </div>
+              
+              {lastResult?.heartRate && (
+                <div className="flex items-center gap-1 text-rose-400 font-bold bg-rose-950/40 border border-rose-900/50 px-2 py-0.5 rounded-full text-xs">
+                  <Heart className="w-3.5 h-3.5 fill-current text-rose-500 animate-pulse" />
+                  <span>{lastResult.heartRate} BPM</span>
+                </div>
+              )}
+
               <div className="flex items-center gap-1.5 ml-auto">
                 <Calendar size={14} />
                 <span>{new Date().toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
@@ -959,9 +1002,9 @@ const KardiaSixLeadECG: React.FC = () => {
               </div>
             </div>
 
-            <div className="ecg-paper-grid min-h-full py-4">
+            <div className="ecg-paper-grid min-h-full py-4 overflow-x-auto scrollbar-thin">
               {lastResult?.waveformLeads ? (
-                <div className="space-y-0 px-2">
+                <div className="space-y-0 px-2" style={{ minWidth: "2000px" }}>
                   {getAvailableLeads(lastResult.waveformLeads).map((lead) => (
                     <div key={lead} className="h-[120px] relative border-b border-slate-700/20 last:border-none">
                       <div className="absolute top-1/2 -translate-y-1/2 left-2 z-10">
@@ -996,17 +1039,18 @@ const KardiaSixLeadECG: React.FC = () => {
                 </div>
               )}
 
-              {/* Heart Rate Badge Overlay */}
-              {lastResult?.heartRate && (
-                <div className="sticky bottom-4 right-4 ml-auto w-fit z-20">
-                  <div className="bg-[#121B32] shadow-xl border border-slate-700/40 rounded-full px-4 py-2 flex items-center gap-2">
-                    <Heart size={16} className="text-rose-500 fill-rose-500" />
-                    <span className="font-bold text-white">{lastResult.heartRate}</span>
-                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">bpm</span>
-                  </div>
-                </div>
-              )}
             </div>
+
+            {/* Heart Rate Badge Overlay - absolute position at top right of waves container */}
+            {lastResult?.heartRate && (
+              <div className="absolute top-4 right-4 z-20">
+                <div className="bg-[#121B32]/95 backdrop-blur shadow-xl border border-slate-700/40 rounded-full px-4 py-2 flex items-center gap-2">
+                  <Heart size={16} className="text-rose-500 fill-rose-500 animate-pulse" />
+                  <span className="font-bold text-white">{lastResult.heartRate}</span>
+                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">bpm</span>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Footer Controls */}
