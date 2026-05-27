@@ -800,45 +800,80 @@ export const HealthDashboard = () => {
               </div>
 
               {/* Kardia Device */}
-              <div className="bg-[#0F172A]/70 border border-slate-800/45 rounded-2xl p-2.5 flex items-center justify-between">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-xl bg-emerald-950/40 flex items-center justify-center text-emerald-400 border border-emerald-900/50">
-                    <Activity className="w-4.5 h-4.5" />
+              <div className="bg-[#0F172A]/70 border border-slate-800/45 rounded-2xl p-2.5 flex flex-col gap-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-emerald-950/40 flex items-center justify-center text-emerald-400 border border-emerald-900/50">
+                      <Activity className="w-4.5 h-4.5" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-white">KardiaMobile 6L</p>
+                      <p className="text-[10px] text-slate-400 font-medium">
+                        {aliveCorConnected
+                          ? (kardiaStatusText || "Connected")
+                          : isKardiaScanning
+                            ? kardiaDevices.length > 0
+                              ? `${kardiaDevices.length} device${kardiaDevices.length > 1 ? 's' : ''} found`
+                              : "Scanning nearby..."
+                            : "Not connected"}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-xs font-bold text-white">KardiaMobile 6L</p>
-                    <p className="text-[10px] text-slate-400 font-medium">
-                      {aliveCorConnected ? (kardiaStatusText || "Connected") : "Not connected"}
-                    </p>
-                  </div>
+                  {aliveCorConnected ? (
+                    <div className="flex items-center gap-1">
+                      <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
+                      <span className="text-[10px] font-bold text-emerald-400">Connected</span>
+                    </div>
+                  ) : isKardiaScanning ? (
+                    <div className="flex items-center gap-1.5">
+                      <Loader2 className="w-3 h-3 text-emerald-400 animate-spin" />
+                      <button
+                        onClick={() => stopKardiaScan()}
+                        className="text-[10px] text-slate-400 hover:text-white font-semibold"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={async () => {
+                        if (!bluetoothEnabled) {
+                          toast({
+                            title: "Bluetooth Required",
+                            description: "Please enable Bluetooth to connect Kardia",
+                            variant: "destructive",
+                          });
+                          return;
+                        }
+                        await startKardiaScan();
+                      }}
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-extrabold px-3 py-1.5 rounded-xl transition-all shadow-sm"
+                    >
+                      Connect
+                    </button>
+                  )}
                 </div>
-                {aliveCorConnected ? (
-                  <div className="flex items-center gap-1">
-                    <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
-                    <span className="text-[10px] font-bold text-emerald-400">Connected</span>
+
+                {/* Device list — shown when scan finds devices and not yet connected */}
+                {!aliveCorConnected && kardiaDevices.length > 0 && (
+                  <div className="flex flex-col gap-1.5 pt-1 border-t border-slate-800/40">
+                    {kardiaDevices.map((dev) => (
+                      <button
+                        key={dev.deviceId}
+                        onClick={async () => {
+                          await stopKardiaScan();
+                          await connectKardia(dev.deviceId);
+                        }}
+                        className="flex items-center justify-between w-full bg-emerald-950/30 border border-emerald-900/40 rounded-xl px-3 py-2 hover:bg-emerald-900/40 transition-all"
+                      >
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 bg-emerald-500 rounded-full" />
+                          <span className="text-[11px] font-bold text-white">{dev.deviceName}</span>
+                        </div>
+                        <span className="text-[10px] text-emerald-400 font-semibold">Tap to connect</span>
+                      </button>
+                    ))}
                   </div>
-                ) : isKardiaScanning ? (
-                  <div className="flex items-center gap-1.5">
-                    <Loader2 className="w-3 h-3 text-emerald-400 animate-spin" />
-                    <span className="text-[10px] text-emerald-400 font-semibold">Scanning...</span>
-                  </div>
-                ) : (
-                  <button
-                    onClick={async () => {
-                      if (!bluetoothEnabled) {
-                        toast({
-                          title: "Bluetooth Required",
-                          description: "Please enable Bluetooth to connect Kardia",
-                          variant: "destructive",
-                        });
-                        return;
-                      }
-                      await startKardiaScan();
-                    }}
-                    className="bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-extrabold px-3 py-1.5 rounded-xl transition-all shadow-sm"
-                  >
-                    Connect
-                  </button>
                 )}
               </div>
             </div>

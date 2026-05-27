@@ -274,7 +274,16 @@ export const SignupWizard: React.FC<SignupWizardProps> = ({ onSwitchToLogin, onS
   };
 
   const prevStep = () => {
-    setCurrentStep(prev => Math.max(prev - 1, 1));
+    if (currentStep === 1) {
+      // Going back from Step 1 → return to Login, clear any partial signup state
+      localStorage.removeItem('awaiting_otp_verification');
+      localStorage.removeItem('signup_current_step');
+      localStorage.removeItem('signup_email');
+      signupInProgressRef.current = false;
+      onSwitchToLogin();
+    } else {
+      setCurrentStep(prev => Math.max(prev - 1, 1));
+    }
   };
 
   const handleSubmit = async () => {
@@ -599,15 +608,15 @@ export const SignupWizard: React.FC<SignupWizardProps> = ({ onSwitchToLogin, onS
         {/* Previous Button */}
         <button
           onClick={prevStep}
-          disabled={currentStep === 1 || currentStep === 4}
+          disabled={currentStep === 4}
           className={`flex-shrink-0 flex items-center gap-1 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all duration-300 ${
-            currentStep === 1 || currentStep === 4
+            currentStep === 4
               ? 'bg-white/5 text-gray-600 cursor-not-allowed border border-transparent'
               : 'bg-white/10 text-white hover:bg-white/20 border border-white/10 active:scale-95'
           }`}
         >
           <ArrowLeft className="w-3.5 h-3.5" />
-          Previous
+          {currentStep === 1 ? 'Back to Login' : 'Previous'}
         </button>
 
         {/* Step Indicator */}
