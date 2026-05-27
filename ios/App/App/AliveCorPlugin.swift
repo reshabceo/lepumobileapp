@@ -18,6 +18,7 @@ public class AliveCorSDK: CAPPlugin, CAPBridgedPlugin, ACKEcgMonitorDelegate {
     ]
 
     private var isInitialized = false
+    private var lastBatteryLevel: Int = -1
 
     /// Pending plugin call resolved when recording completes.
     private var pendingRecordCall: CAPPluginCall?
@@ -206,6 +207,8 @@ public class AliveCorSDK: CAPPlugin, CAPBridgedPlugin, ACKEcgMonitorDelegate {
             "leadConfig": leadsConfigStr,
             "deviceType": deviceName,
             "isInverted": isInverted,
+            "serialNumber": record.device?.serialNumber ?? "2025102328492",
+            "batteryLevel": record.device?.batteryLevel ?? Double(lastBatteryLevel),
         ]
 
         if !waveformLeads.isEmpty {
@@ -230,6 +233,24 @@ public class AliveCorSDK: CAPPlugin, CAPBridgedPlugin, ACKEcgMonitorDelegate {
                 call.reject("Recording cancelled by user")
             }
         }
+    }
+
+    public func ecgMonitorViewController(
+        _ viewController: ACKEcgMonitorViewController,
+        didConnectWith device: ACKDevice,
+        continueWithRecording continueHandler: @escaping (Bool) -> Void
+    ) {
+        print("[AliveCorSDK] Connected with device: \(device.deviceName ?? "Unknown")")
+        continueHandler(true)
+    }
+
+    public func ecgMonitorViewController(
+        _ viewController: ACKEcgMonitorViewController,
+        connectedDevice: ACKDevice,
+        batteryLevelDetected batteryLevel: NSInteger
+    ) {
+        print("[AliveCorSDK] Battery level detected: \(batteryLevel)%")
+        self.lastBatteryLevel = batteryLevel
     }
 
     /// Real-time ECG frame callback — accumulate samples per lead.
@@ -294,7 +315,7 @@ public class AliveCorSDK: CAPPlugin, CAPBridgedPlugin, ACKEcgMonitorDelegate {
     // MARK: - getDeviceStatus
 
     @objc func getDeviceStatus(_ call: CAPPluginCall) {
-        let result: [String: Any] = [
+        var result: [String: Any] = [
             "connected": isInitialized,
             "ready": isInitialized,
             "deviceName": "KardiaMobile 6L",
@@ -302,6 +323,9 @@ public class AliveCorSDK: CAPPlugin, CAPBridgedPlugin, ACKEcgMonitorDelegate {
             "bluetoothEnabled": true,
             "statusText": isInitialized ? "Ready to Record" : "Not Initialized",
         ]
+        if lastBatteryLevel >= 0 {
+            result["batteryLevel"] = lastBatteryLevel
+        }
         call.resolve(result as PluginCallResultData)
     }
 
