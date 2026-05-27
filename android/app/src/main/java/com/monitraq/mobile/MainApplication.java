@@ -1,4 +1,4 @@
-package com.monitraq.mobile;
+package com.monitraq.com;
 
 import android.app.Application;
 import android.util.Log;
