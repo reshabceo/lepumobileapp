@@ -1,5 +1,6 @@
 import Capacitor
 import AliveCorKitLite
+import CoreBluetooth
 
 @objc(AliveCorSDK)
 public class AliveCorSDK: CAPPlugin, CAPBridgedPlugin, ACKEcgMonitorDelegate {
@@ -19,6 +20,8 @@ public class AliveCorSDK: CAPPlugin, CAPBridgedPlugin, ACKEcgMonitorDelegate {
 
     private var isInitialized = false
     private var lastBatteryLevel: Int = -1
+    private var centralManager: CBCentralManager?
+    private var isScanning = false
 
     /// Pending plugin call resolved when recording completes.
     private var pendingRecordCall: CAPPluginCall?
@@ -148,6 +151,42 @@ public class AliveCorSDK: CAPPlugin, CAPBridgedPlugin, ACKEcgMonitorDelegate {
 
     // MARK: - ACKEcgMonitorDelegate
 
+    private func extractWaveformFromAtc(atcPath: String) -> [String: [Double]] {
+        var leads: [String: [Double]] = [:]
+        guard let file = ECGFile.openedEcgFile(withAtcPath: atcPath) as ECGFile? else {
+            print("[AliveCorSDK] Failed to open ATC file: \(atcPath)")
+            return leads
+        }
+        
+        let totalSamples = Int(file.totalSamples)
+        guard totalSamples > 0 else {
+            file.close()
+            return leads
+        }
+        
+        let leadNames = ["I", "II", "III", "aVR", "aVL", "aVF"]
+        let leadTypes: [ECGFileLead] = [kECGFileLead1, kECGFileLead2, kECGFileLead3, kECGFileLead4, kECGFileLead5, kECGFileLead6]
+        
+        var scale: Double = 0.00284
+        if file.aliveFileFormat != nil {
+            scale = Double(file.aliveFileFormat.pointee.resolution_nV) / 1_000_000.0
+            print("[AliveCorSDK] ATC resolution_nV: \(file.aliveFileFormat.pointee.resolution_nV), scale: \(scale)")
+        } else {
+            print("[AliveCorSDK] Warning: aliveFileFormat is nil, using default scale: \(scale)")
+        }
+        
+        for (i, name) in leadNames.enumerated() {
+            var buffer = [Int16](repeating: 0, count: totalSamples)
+            let readCount = file.readSamples(&buffer, fromSample: 0, length: UInt(totalSamples), for: leadTypes[i])
+            if readCount > 0 {
+                leads[name] = buffer.map { Double($0) * scale }
+            }
+        }
+        
+        file.close()
+        return leads
+    }
+
     public func ecgMonitorViewController(
         _ viewController: ACKEcgMonitorViewController,
         didCompleteRecording record: ACKEcgRecord?
@@ -168,22 +207,6 @@ public class AliveCorSDK: CAPPlugin, CAPBridgedPlugin, ACKEcgMonitorDelegate {
         let durationMs = record.duration?.doubleValue ?? 0
         let durationSec = durationMs / 1000.0
 
-        // Build the per-lead waveform dictionary
-        let leadNames = ["I", "II", "III", "aVR", "aVL", "aVF"]
-        var waveformLeads: [String: [Double]] = [:]
-        var flatMvData: [Double] = []
-
-        let isMultiLead = record.config.leadsConfig == .six
-        if isMultiLead {
-            for (i, samples) in capturedLeadSamples.enumerated() {
-                if i < leadNames.count && !samples.isEmpty {
-                    waveformLeads[leadNames[i]] = samples
-                }
-            }
-        } else {
-            flatMvData = capturedLeadSamples[0]
-        }
-
         let leadsConfigStr = record.config.leadsConfig == .six ? "six" : "single"
         let deviceName = record.device?.deviceName ?? "KardiaMobile 6L"
         let hr = evaluation?.averageHeartRate ?? 0
@@ -191,6 +214,49 @@ public class AliveCorSDK: CAPPlugin, CAPBridgedPlugin, ACKEcgMonitorDelegate {
         let modifier = evaluation?.modifier.rawValue ?? "NONE"
         let algPackage = evaluation?.algorithmPackage ?? "KAIv1"
         let isInverted = evaluation?.isInverted ?? false
+
+        // Extract high-quality waveform data directly from the saved ATC file
+        var waveformLeads: [String: [Double]] = [:]
+        var flatMvData: [Double] = []
+        
+        let path = record.enhancedPath ?? record.originalPath
+        if let path = path, !path.isEmpty {
+            print("[AliveCorSDK] Parsing waveform from ATC file at: \(path)")
+            waveformLeads = extractWaveformFromAtc(atcPath: path)
+        }
+        
+        // Fallback to accumulated real-time samples if ATC parsing fails/is empty
+        if waveformLeads.isEmpty {
+            print("[AliveCorSDK] ATC waveform parsing empty, falling back to accumulated real-time preview samples.")
+            let leadNames = ["I", "II", "III", "aVR", "aVL", "aVF"]
+            let isMultiLead = record.config.leadsConfig == .six
+            if isMultiLead {
+                for (i, samples) in capturedLeadSamples.enumerated() {
+                    if i < leadNames.count && !samples.isEmpty {
+                        waveformLeads[leadNames[i]] = samples
+                    }
+                }
+            } else {
+                flatMvData = capturedLeadSamples[0]
+            }
+        } else {
+            // For single lead, populate flatMvData
+            if record.config.leadsConfig == .single {
+                flatMvData = waveformLeads["I"] ?? []
+            }
+        }
+
+        let serial = record.device?.serialNumber ?? "2025102328492"
+        var batteryLevel: Double = Double(lastBatteryLevel)
+        if let devBattery = record.device?.batteryLevel {
+            batteryLevel = Double(devBattery)
+        }
+
+        // Save last paired device ID and battery when recording successfully completes!
+        UserDefaults.standard.set(serial, forKey: "paired_device_id")
+        if batteryLevel > 0 {
+            UserDefaults.standard.set(batteryLevel, forKey: "last_battery")
+        }
 
         print("[AliveCorSDK] Recording complete. HR=\(hr), determination=\(determination), duration=\(durationSec)s")
 
@@ -207,8 +273,8 @@ public class AliveCorSDK: CAPPlugin, CAPBridgedPlugin, ACKEcgMonitorDelegate {
             "leadConfig": leadsConfigStr,
             "deviceType": deviceName,
             "isInverted": isInverted,
-            "serialNumber": record.device?.serialNumber ?? "2025102328492",
-            "batteryLevel": record.device?.batteryLevel ?? Double(lastBatteryLevel),
+            "serialNumber": serial,
+            "batteryLevel": batteryLevel,
         ]
 
         if !waveformLeads.isEmpty {
@@ -251,6 +317,7 @@ public class AliveCorSDK: CAPPlugin, CAPBridgedPlugin, ACKEcgMonitorDelegate {
     ) {
         print("[AliveCorSDK] Battery level detected: \(batteryLevel)%")
         self.lastBatteryLevel = batteryLevel
+        UserDefaults.standard.set(Double(batteryLevel), forKey: "last_battery")
     }
 
     /// Real-time ECG frame callback — accumulate samples per lead.
@@ -315,34 +382,67 @@ public class AliveCorSDK: CAPPlugin, CAPBridgedPlugin, ACKEcgMonitorDelegate {
     // MARK: - getDeviceStatus
 
     @objc func getDeviceStatus(_ call: CAPPluginCall) {
+        let pairedId = UserDefaults.standard.string(forKey: "paired_device_id")
+        let hasPaired = pairedId != nil
+        let battery = UserDefaults.standard.double(forKey: "last_battery")
+        
         var result: [String: Any] = [
-            "connected": isInitialized,
-            "ready": isInitialized,
-            "deviceName": "KardiaMobile 6L",
-            "deviceType": ACKDeviceType.triangle.rawValue,
+            "connected": hasPaired,
+            "ready": true,
+            "deviceName": hasPaired ? "KardiaMobile 6L" : "",
+            "deviceId": pairedId ?? "",
             "bluetoothEnabled": true,
-            "statusText": isInitialized ? "Ready to Record" : "Not Initialized",
+            "statusText": hasPaired ? "Connected" : "Ready to Pair"
         ]
-        if lastBatteryLevel >= 0 {
+        
+        if battery > 0 {
+            result["batteryLevel"] = battery
+        } else if lastBatteryLevel >= 0 {
             result["batteryLevel"] = lastBatteryLevel
         }
+        
         call.resolve(result as PluginCallResultData)
     }
 
     // MARK: - startScan / stopScan / connect (stubs — iOS uses SDK-internal BLE)
 
     @objc func startScan(_ call: CAPPluginCall) {
-        // AliveCor iOS SDK manages BLE pairing internally via ACKEcgMonitorViewController.
-        // No external scan needed.
+        if centralManager == nil {
+            centralManager = CBCentralManager(delegate: self, queue: nil)
+        }
+        isScanning = true
+        let state = centralManager?.state
+        print("[AliveCorSDK] startScan called. Central manager state: \(state?.rawValue ?? -1)")
+        if state == .poweredOn {
+            centralManager?.scanForPeripherals(withServices: nil, options: [CBCentralManagerScanOptionAllowDuplicatesKey: true])
+            print("[AliveCorSDK] Started BLE scanning immediately")
+        }
         call.resolve()
     }
 
     @objc func stopScan(_ call: CAPPluginCall) {
+        print("[AliveCorSDK] stopScan called")
+        isScanning = false
+        centralManager?.stopScan()
+        centralManager = nil
         call.resolve()
     }
 
     @objc func connect(_ call: CAPPluginCall) {
-        call.resolve(["success": true] as PluginCallResultData)
+        guard let deviceId = call.getString("deviceId") else {
+            call.reject("Device ID is required")
+            return
+        }
+        
+        UserDefaults.standard.set(deviceId, forKey: "paired_device_id")
+        
+        let result: [String: Any] = [
+            "success": true,
+            "deviceId": deviceId,
+            "deviceName": "KardiaMobile 6L"
+        ]
+        notifyListeners("deviceConnected", data: result)
+        call.resolve(result as PluginCallResultData)
     }
 
     // MARK: - dispose
@@ -351,7 +451,34 @@ public class AliveCorSDK: CAPPlugin, CAPBridgedPlugin, ACKEcgMonitorDelegate {
         isInitialized = false
         pendingRecordCall = nil
         capturedLeadSamples = Array(repeating: [], count: 6)
+        isScanning = false
+        centralManager?.stopScan()
+        centralManager = nil
         call.resolve()
+    }
+}
+
+extension AliveCorSDK: CBCentralManagerDelegate {
+    public func centralManagerDidUpdateState(_ central: CBCentralManager) {
+        print("[AliveCorSDK] centralManagerDidUpdateState: \(central.state.rawValue)")
+        if central.state == .poweredOn && isScanning {
+            central.scanForPeripherals(withServices: nil, options: [CBCentralManagerScanOptionAllowDuplicatesKey: true])
+            print("[AliveCorSDK] Started BLE scanning in didUpdateState")
+        }
+    }
+    
+    public func centralManager(_ central: CBCentralManager, didDiscover peripheral: CBPeripheral, advertisementData: [String : Any], rssi: NSNumber) {
+        let name = peripheral.name ?? advertisementData[CBAdvertisementDataLocalNameKey] as? String ?? ""
+        let lowerName = name.lowercased()
+        if lowerName.contains("kardia") || lowerName.contains("k6l") || lowerName.contains("alivecor") || lowerName.contains("ac-") || lowerName.contains("ac_") {
+            let deviceId = peripheral.identifier.uuidString
+            print("[AliveCorSDK] BLE Discovered matching device: \(name) (\(deviceId))")
+            notifyListeners("deviceFound", data: [
+                "deviceName": name.isEmpty ? "KardiaMobile 6L" : name,
+                "deviceId": deviceId,
+                "rssi": rssi.intValue
+            ])
+        }
     }
 
     // MARK: - Helpers

@@ -3,35 +3,35 @@ export const IAP_PRODUCT_ID_PREFIX = 'com.monitraq';
 export const IAP_PRODUCTS = {
   // AI Doctor Services
   ai_doctor_text: {
-    productId: `${IAP_PRODUCT_ID_PREFIX}.ai.text`,
+    productId: `${IAP_PRODUCT_ID_PREFIX}.ai.text_v1`,
     name: 'AI Doctor Text Consultation',
     type: 'ai_doctor_text'
   },
   ai_doctor_voice: {
-    productId: `${IAP_PRODUCT_ID_PREFIX}.ai.voice`,
+    productId: `${IAP_PRODUCT_ID_PREFIX}.ai.voice_v1`,
     name: 'AI Doctor Voice Consultation',
     type: 'ai_doctor_voice'
   },
   // Appointment Services
   appointment_video: {
-    productId: `${IAP_PRODUCT_ID_PREFIX}.appointment.video`,
+    productId: `${IAP_PRODUCT_ID_PREFIX}.appointment.video_v1`,
     name: 'Video Consultation',
     type: 'appointment_video'
   },
   appointment_audio: {
-    productId: `${IAP_PRODUCT_ID_PREFIX}.appointment.audio`,
+    productId: `${IAP_PRODUCT_ID_PREFIX}.appointment.audio_v1`,
     name: 'Audio Consultation',
     type: 'appointment_audio'
   },
   // Radiologist Services
   radiologist_review: {
-    productId: `${IAP_PRODUCT_ID_PREFIX}.radiologist.review`,
+    productId: `${IAP_PRODUCT_ID_PREFIX}.radiologist.review_v1`,
     name: 'Radiologist Report Review',
     type: 'radiologist_review'
   },
   // Emergency Services
   emergency: {
-    productId: `${IAP_PRODUCT_ID_PREFIX}.emergency.consult`,
+    productId: `${IAP_PRODUCT_ID_PREFIX}.emergency.consult_v1`,
     name: 'Emergency Consultation',
     type: 'emergency'
   },
@@ -40,12 +40,12 @@ export const IAP_PRODUCTS = {
 // Radiologist Fee Tiers for dynamic pricing
 // Note: These must match the Product IDs created in App Store Connect
 export const RADIOLOGIST_FEE_TIERS = [
-  { amount: 500, productId: `${IAP_PRODUCT_ID_PREFIX}.radiologist.fee.500` },
-  { amount: 1000, productId: `${IAP_PRODUCT_ID_PREFIX}.radiologist.fee.1000` },
-  { amount: 1500, productId: `${IAP_PRODUCT_ID_PREFIX}.radiologist.fee.1500` },
-  { amount: 2000, productId: `${IAP_PRODUCT_ID_PREFIX}.radiologist.fee.2000` },
-  { amount: 3000, productId: `${IAP_PRODUCT_ID_PREFIX}.radiologist.fee.3000` },
-  { amount: 5000, productId: `${IAP_PRODUCT_ID_PREFIX}.radiologist.fee.5000` },
+  { amount: 500, productId: `${IAP_PRODUCT_ID_PREFIX}.radiologist.fee.500_v1` },
+  { amount: 1000, productId: `${IAP_PRODUCT_ID_PREFIX}.radiologist.fee.1000_v1` },
+  { amount: 1500, productId: `${IAP_PRODUCT_ID_PREFIX}.radiologist.fee.1500_v1` },
+  { amount: 2000, productId: `${IAP_PRODUCT_ID_PREFIX}.radiologist.fee.2000_v1` },
+  { amount: 3000, productId: `${IAP_PRODUCT_ID_PREFIX}.radiologist.fee.3000_v1` },
+  { amount: 5000, productId: `${IAP_PRODUCT_ID_PREFIX}.radiologist.fee.5000_v1` },
 ];
 
 export const getRadiologistTier = (amountPaise: number) => {
