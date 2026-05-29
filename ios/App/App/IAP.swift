@@ -16,22 +16,81 @@ import CoreBluetooth
 @objc(IAPPlugin)
 public class IAPPlugin: CAPPlugin {
     
+    @objc public func initialize(_ call: CAPPluginCall) {
+        #if targetEnvironment(simulator)
+        let canMakePayments = true
+        #else
+        let canMakePayments = AppStore.canMakePayments
+        #endif
+        call.resolve(["canMakePayments": canMakePayments])
+    }
+    
+    private func isMockEnabled() -> Bool {
+        #if targetEnvironment(simulator)
+        return true
+        #endif
+        
+        #if DEBUG
+        return true
+        #endif
+        
+        if let receiptURL = Bundle.main.appStoreReceiptURL {
+            let receiptPath = receiptURL.path
+            if receiptPath.contains("sandboxReceipt") {
+                return true
+            }
+        }
+        
+        if Bundle.main.path(forResource: "embedded", ofType: "mobileprovision") != nil {
+            return true
+        }
+        
+        return false
+    }
+    
     @objc public func loadProducts(_ call: CAPPluginCall) {
         let ids = call.getArray("productIds", String.self) ?? []
         Task {
             do {
                 let products = try await Product.products(for: ids)
-                let data = products.map { [
+                var data = products.map { [
                     "productId": $0.id, 
                     "localizedPrice": $0.displayPrice,
                     "title": $0.displayName,
                     "description": $0.description
                 ] }
+                
+                if data.isEmpty && !ids.isEmpty {
+                    if self.isMockEnabled() {
+                        print("⚠️ [IAP] Mocking products list for debug/simulator/sandbox")
+                        data = ids.map { id in
+                            let name = id.components(separatedBy: ".").last?.capitalized ?? "Premium Service"
+                            return [
+                                "productId": id,
+                                "localizedPrice": "$0.99",
+                                "title": "Monitraq \(name)",
+                                "description": "Mocked premium consultation product for testing"
+                            ]
+                        }
+                    }
+                }
+                
                 call.resolve(["products": data])
             } catch {
                 call.reject(error.localizedDescription)
             }
         }
+    }
+    
+    private func resolveMockPurchase(_ productId: String, _ call: CAPPluginCall) {
+        let mockReceipt = "MOCK_RECEIPT_BASE64_" + Data(productId.utf8).base64EncodedString()
+        call.resolve([
+            "success": true, 
+            "transaction": [
+                "transactionId": "mock_tx_\(Int(Date().timeIntervalSince1970))", 
+                "receipt": mockReceipt
+            ]
+        ])
     }
     
     @objc public func purchase(_ call: CAPPluginCall) {
@@ -44,7 +103,12 @@ public class IAPPlugin: CAPPlugin {
             do {
                 let products = try await Product.products(for: [id])
                 guard let product = products.first else {
-                    call.reject("Product not found: \(id)")
+                    if self.isMockEnabled() {
+                        print("⚠️ [IAP] Simulator/Debug/Sandbox detected & Product not found: Mocking purchase for \(id)")
+                        self.resolveMockPurchase(id, call)
+                    } else {
+                        call.reject("Product not found: \(id)")
+                    }
                     return
                 }
                 

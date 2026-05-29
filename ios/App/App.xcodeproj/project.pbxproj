@@ -19,6 +19,7 @@
 		861F6F3E2FA0AC1C00A8819C /* StoreKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 861F6F3D2FA0AC1C00A8819C /* StoreKit.framework */; };
 		861F6F412FA0B1E500A8819C /* IAP.swift in Sources */ = {isa = PBXBuildFile; fileRef = 861F6F3F2FA0B1E400A8819C /* IAP.swift */; };
 		861F6F422FA0B1E500A8819C /* IAPPlugin.m in Sources */ = {isa = PBXBuildFile; fileRef = 861F6F402FA0B1E400A8819C /* IAPPlugin.m */; };
+		868033D12FBDCC3700020A1A /* ViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 868033D22FBDCC3700020A1A /* ViewController.swift */; };
 		A91C5E0012AB4E009BFFC003 /* CameraBridgePlugin.m in Sources */ = {isa = PBXBuildFile; fileRef = A91C5E0012AB4E009BFFC004 /* CameraBridgePlugin.m */; };
 		A91C5E0012AB4E009BFFC001 /* CameraBridgePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = A91C5E0012AB4E009BFFC002 /* CameraBridgePlugin.swift */; };
 		A084ECDBA7D38E1E42DFC39D /* Pods_App.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AF277DCFFFF123FFC6DF26C7 /* Pods_App.framework */; };
@@ -39,6 +40,7 @@
 		861F6F3D2FA0AC1C00A8819C /* StoreKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = StoreKit.framework; path = System/Library/Frameworks/StoreKit.framework; sourceTree = SDKROOT; };
 		861F6F3F2FA0B1E400A8819C /* IAP.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IAP.swift; sourceTree = "<group>"; };
 		861F6F402FA0B1E400A8819C /* IAPPlugin.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = IAPPlugin.m; sourceTree = "<group>"; };
+		868033D22FBDCC3700020A1A /* ViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewController.swift; sourceTree = "<group>"; };
 		A91C5E0012AB4E009BFFC004 /* CameraBridgePlugin.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = CameraBridgePlugin.m; sourceTree = "<group>"; };
 		A91C5E0012AB4E009BFFC002 /* CameraBridgePlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraBridgePlugin.swift; sourceTree = "<group>"; };
 		916B2B78E03146E3BA5C4969 /* WellueSDKPlugin.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = WellueSDKPlugin.m; sourceTree = "<group>"; };
@@ -94,6 +96,7 @@
 			children = (
 				861F6F3F2FA0B1E400A8819C /* IAP.swift */,
 				861F6F402FA0B1E400A8819C /* IAPPlugin.m */,
+				868033D22FBDCC3700020A1A /* ViewController.swift */,
 				50379B222058CBB4000EE86E /* capacitor.config.json */,
 				70865DFDDD0749898C70CB6D /* AliveCorPlugin.swift */,
 				504EC3071FED79650016851F /* AppDelegate.swift */,
@@ -254,6 +257,7 @@
 			504EC3081FED79650016851F /* AppDelegate.swift in Sources */,
 				861F6F412FA0B1E500A8819C /* IAP.swift in Sources */,
 				861F6F422FA0B1E500A8819C /* IAPPlugin.m in Sources */,
+				868033D12FBDCC3700020A1A /* ViewController.swift in Sources */,
 				6FDD8C083F604E979B843C27 /* WellueSDKPlugin.swift in Sources */,
 				F59C12E7AE354E0BB94EA219 /* WellueSDKPlugin.m in Sources */,
 				A91C5E0012AB4E009BFFC001 /* CameraBridgePlugin.swift in Sources */,

@@ -102,7 +102,7 @@ export async function getOrCreateSession(patientId: string): Promise<SessionStat
       sessionId: paidSession.id,
       paymentStatus: "paid",
       expiresAt: paidSession.expires_at,
-      consultMode: paidSession.consult_mode,
+      consultMode: paidSession.consult_mode || (paidSession.paid_amount_paise === 15000 ? "voice" : "text"),
     };
   }
 
