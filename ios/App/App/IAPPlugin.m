@@ -32,6 +32,7 @@ __attribute__((constructor)) static void _verifyPluginRegistration(void) {
 
 // Register IAPPlugin
 CAP_PLUGIN(IAPPlugin, "IAPPlugin",
+    CAP_PLUGIN_METHOD(initialize, CAPPluginReturnPromise);
     CAP_PLUGIN_METHOD(loadProducts, CAPPluginReturnPromise);
     CAP_PLUGIN_METHOD(purchase, CAPPluginReturnPromise);
     CAP_PLUGIN_METHOD(restorePurchases, CAPPluginReturnPromise);
