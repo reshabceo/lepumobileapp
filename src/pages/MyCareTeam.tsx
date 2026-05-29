@@ -140,7 +140,7 @@ export default function MyCareTeam() {
     <MobileAppContainer>
       <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-white">
         {/* Header */}
-        <div className="sticky top-0 z-20 bg-slate-950/90 backdrop-blur-lg border-b border-white/10 px-4 py-4 flex items-center gap-3">
+        <div className="sticky top-0 z-20 bg-slate-950/90 backdrop-blur-lg border-b border-white/10 px-4 pt-safe-top pb-4 flex items-center gap-3">
           <button
             type="button"
             onClick={() => navigate(-1)}

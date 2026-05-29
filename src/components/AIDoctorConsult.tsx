@@ -386,13 +386,13 @@ export const AIDoctorConsult: React.FC = () => {
       setMessages(msgs);
       setHasStarted(msgs.length > 0);
       setShowHistory(false);
-      if (msgs.length > 0) {
-        const lastVoice = msgs
-          .slice()
-          .reverse()
-          .find((m) => m.type === "voice");
-        setConsultMode(lastVoice ? "voice" : "text");
-      }
+      
+      // Update payment and mode state for the loaded session
+      setPaymentStatus(session.payment_status);
+      setSessionExpiresAt(session.expires_at);
+      
+      const loadedMode = session.consult_mode || (session.paid_amount_paise === 15000 ? "voice" : "text");
+      setConsultMode(loadedMode as "text" | "voice");
     } catch (err) {
       console.error("Failed to load session:", err);
       toast({
@@ -1156,7 +1156,15 @@ export const AIDoctorConsult: React.FC = () => {
         <header className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <button
-              onClick={() => (consultMode ? setConsultMode(null) : navigate(-1))}
+              onClick={() => {
+                if (paymentStatus === "paid") {
+                  navigate(-1);
+                } else if (consultMode) {
+                  setConsultMode(null);
+                } else {
+                  navigate(-1);
+                }
+              }}
               className="p-2 rounded-full bg-white/5 hover:bg-white/10 transition-colors active:scale-95 text-white"
             >
               <ArrowLeft className="w-4 h-4" />
@@ -2080,30 +2088,32 @@ export const AIDoctorConsult: React.FC = () => {
             />
 
             {/* Mode toggle */}
-            <div className="flex justify-center mb-2">
-              <div className="inline-flex bg-white/5 rounded-lg p-0.5 gap-0.5">
-                <button
-                  onClick={() => setConsultMode("text")}
-                  className={`px-3 py-1.5 rounded-md text-xs flex items-center gap-1.5 transition-all ${consultMode === "text"
-                    ? "bg-emerald-500 text-black font-medium"
-                    : "text-white/50 hover:text-white/80"
-                    }`}
-                >
-                  <Keyboard className="w-3 h-3" />
-                  Text
-                </button>
-                <button
-                  onClick={() => setConsultMode("voice")}
-                  className={`px-3 py-1.5 rounded-md text-xs flex items-center gap-1.5 transition-all ${consultMode === "voice"
-                    ? "bg-emerald-500 text-black font-medium"
-                    : "text-white/50 hover:text-white/80"
-                    }`}
-                >
-                  <Mic className="w-3 h-3" />
-                  Voice
-                </button>
+            {paymentStatus !== "paid" && (
+              <div className="flex justify-center mb-2">
+                <div className="inline-flex bg-white/5 rounded-lg p-0.5 gap-0.5">
+                  <button
+                    onClick={() => setConsultMode("text")}
+                    className={`px-3 py-1.5 rounded-md text-xs flex items-center gap-1.5 transition-all ${consultMode === "text"
+                      ? "bg-emerald-500 text-black font-medium"
+                      : "text-white/50 hover:text-white/80"
+                      }`}
+                  >
+                    <Keyboard className="w-3 h-3" />
+                    Text
+                  </button>
+                  <button
+                    onClick={() => setConsultMode("voice")}
+                    className={`px-3 py-1.5 rounded-md text-xs flex items-center gap-1.5 transition-all ${consultMode === "voice"
+                      ? "bg-emerald-500 text-black font-medium"
+                      : "text-white/50 hover:text-white/80"
+                      }`}
+                  >
+                    <Mic className="w-3 h-3" />
+                    Voice
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
 
             {/* ---------- TEXT INPUT ---------- */}
             {consultMode === "text" && (

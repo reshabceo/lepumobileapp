@@ -471,7 +471,7 @@ export const AppointmentBooking = () => {
 
   if (!doctorId) {
     return (
-      <div className="space-y-4 p-4 w-full bg-[#080D1A] min-h-screen text-white">
+      <div className="space-y-4 p-4 pt-safe-top w-full bg-[#080D1A] min-h-screen text-white">
         {/* Standard Header */}
         <header className="flex items-center gap-3 mb-6">
           <button
@@ -505,7 +505,7 @@ export const AppointmentBooking = () => {
   }
 
   return (
-    <div className="space-y-4 p-4 w-full bg-[#080D1A] min-h-screen text-white">
+    <div className="space-y-4 p-4 pt-safe-top w-full bg-[#080D1A] min-h-screen text-white">
       {/* Standard Header */}
       <header className="space-y-3 mb-6">
         <div className="flex items-center gap-3">

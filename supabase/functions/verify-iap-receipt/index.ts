@@ -20,19 +20,47 @@ serve(async (req) => {
         );
 
         // 1. Verify with Apple (Production then Sandbox fallback)
-        let response = await fetch(APPLE_VERIFY_URL_PRODUCTION, {
-            method: 'POST',
-            body: JSON.stringify({ 'receipt-data': receipt, 'password': sharedSecret })
-        });
+        let result: any;
+        const isMock = typeof receipt === 'string' && receipt.startsWith("MOCK_RECEIPT_BASE64_");
         
-        let result = await response.json();
-        
-        if (result.status === 21007) { // Sandbox receipt sent to production
-            const sbRes = await fetch(APPLE_VERIFY_URL_SANDBOX, {
+        if (isMock) {
+            console.log(`[IAP Edge Function] Bypassing Apple verification for mock receipt: ${receipt}`);
+            let decodedProduct = "com.monitraq.ai.text";
+            try {
+                const base64Data = receipt.substring("MOCK_RECEIPT_BASE64_".length);
+                decodedProduct = atob(base64Data);
+            } catch (e) {
+                console.warn("[IAP Edge Function] Failed to decode product ID from mock receipt base64, using default");
+            }
+            
+            result = {
+                status: 0,
+                receipt: {
+                    in_app: [
+                        {
+                            transaction_id: transactionId,
+                            product_id: decodedProduct,
+                            purchase_date_ms: String(Date.now()),
+                            quantity: "1"
+                        }
+                    ]
+                }
+            };
+        } else {
+            let response = await fetch(APPLE_VERIFY_URL_PRODUCTION, {
                 method: 'POST',
                 body: JSON.stringify({ 'receipt-data': receipt, 'password': sharedSecret })
             });
-            result = await sbRes.json();
+            
+            result = await response.json();
+            
+            if (result.status === 21007) { // Sandbox receipt sent to production
+                const sbRes = await fetch(APPLE_VERIFY_URL_SANDBOX, {
+                    method: 'POST',
+                    body: JSON.stringify({ 'receipt-data': receipt, 'password': sharedSecret })
+                });
+                result = await sbRes.json();
+            }
         }
 
         if (result.status !== 0) {
