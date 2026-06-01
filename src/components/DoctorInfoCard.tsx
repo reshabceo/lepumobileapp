@@ -24,6 +24,7 @@ interface Doctor {
   profile_picture_url?: string;
   years_experience?: number;
   email: string;
+  national_medical_council_number?: string | null;
 }
 
 export const DoctorInfoCard: React.FC = React.memo(() => {
@@ -145,7 +146,8 @@ export const DoctorInfoCard: React.FC = React.memo(() => {
             phone_number,
             profile_picture_url,
             years_experience,
-            email
+            email,
+            national_medical_council_number
           `
           )
           .eq("id", patientProfile.assigned_doctor_id)
@@ -311,6 +313,15 @@ export const DoctorInfoCard: React.FC = React.memo(() => {
               <p className="text-slate-400 text-xs">
                 {doctor.specialty} • {doctor.hospital}
               </p>
+
+              {doctor.national_medical_council_number && (
+                <p className="text-slate-500 text-[11px] mt-0.5">
+                  NMC No.{" "}
+                  <span className="text-slate-300 font-mono">
+                    {doctor.national_medical_council_number}
+                  </span>
+                </p>
+              )}
 
               <div className="flex items-center gap-4 mt-2 text-xs">
                 <div className="flex items-center gap-1 text-slate-300">

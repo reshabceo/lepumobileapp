@@ -17,6 +17,7 @@ interface CareTeamMember {
   notes: string | null;
   assigned_by_name: string | null;
   created_at: string;
+  national_medical_council_number?: string | null;
 }
 
 interface AvailabilitySlot {
@@ -93,10 +94,25 @@ export default function MyCareTeam() {
     }
 
     const teamMembers = (data as CareTeamMember[]) || [];
+
+    // Batch-fetch NMC numbers (RPC doesn't return them; merge in client-side).
+    const doctorIds = teamMembers.map((m) => m.doctor_id);
+    if (doctorIds.length > 0) {
+      const { data: nmcRows } = await (supabase as any)
+        .from("doctors")
+        .select("id, national_medical_council_number")
+        .in("id", doctorIds);
+      const nmcById = new Map<string, string | null>(
+        (nmcRows || []).map((d: any) => [d.id, d.national_medical_council_number])
+      );
+      teamMembers.forEach((m) => {
+        m.national_medical_council_number = nmcById.get(m.doctor_id) ?? null;
+      });
+    }
+
     setMembers(teamMembers);
 
     // Batch-fetch availability to compute real on-shift status from schedule
-    const doctorIds = teamMembers.map((m) => m.doctor_id);
     if (doctorIds.length > 0) {
       const { data: slots } = await (supabase as any)
         .from("doctor_availability")
@@ -240,6 +256,11 @@ function DoctorCard({ member, isOnShift }: { member: CareTeamMember; isOnShift: 
       <div className="flex-1 min-w-0">
         <p className="text-white font-semibold text-sm truncate">{member.full_name}</p>
         {member.specialty && <p className="text-slate-400 text-xs truncate">{member.specialty}</p>}
+        {member.national_medical_council_number && (
+          <p className="text-slate-500 text-[11px] truncate mt-0.5">
+            NMC No. <span className="text-slate-300 font-mono">{member.national_medical_council_number}</span>
+          </p>
+        )}
         {member.notes && <p className="text-slate-500 text-xs truncate mt-0.5">{member.notes}</p>}
       </div>
 
