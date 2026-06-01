@@ -61,6 +61,8 @@ const LiveMonitoringPage = lazy(() => import("./pages/LiveMonitoring"));
 const ServicesRecords = lazy(() => import("./pages/ServicesRecords").then(m => ({ default: m.ServicesRecords })));
 const MyThresholds = lazy(() => import("./components/MyThresholds"));
 const MyCareTeam = lazy(() => import("./pages/MyCareTeam"));
+const ConsentManagement = lazy(() => import("./pages/ConsentManagement").then(m => ({ default: m.ConsentManagement })));
+const CareContextHistory = lazy(() => import("./pages/CareContextHistory").then(m => ({ default: m.CareContextHistory })));
 
 const queryClient = new QueryClient();
 
@@ -283,6 +285,17 @@ const App = () => (
               <Route path="/care-team" element={
                 <ProtectedRoute>
                   <MyCareTeam />
+                </ProtectedRoute>
+              } />
+
+              <Route path="/abha/consents" element={
+                <ProtectedRoute>
+                  <ConsentManagement />
+                </ProtectedRoute>
+              } />
+              <Route path="/abha/records" element={
+                <ProtectedRoute>
+                  <CareContextHistory />
                 </ProtectedRoute>
               } />
 
