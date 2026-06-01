@@ -38,6 +38,7 @@ interface PatientProfile {
   patient_code?: string;
   height_cm?: number | null;
   weight_kg?: number | null;
+  category?: 'REMOTE' | 'OPD' | 'IPD' | 'ICU' | null;
 }
 
 const Profile = () => {
@@ -83,6 +84,28 @@ const Profile = () => {
       setLoading(false);
     }
   }, [user]);
+
+  // Realtime: when the doctor edits this patient's row (medical_conditions, category,
+  // allergies, etc.) we want it reflected here without a re-login or manual refresh.
+  // Subscribe to `patients` UPDATE filtered by our own auth_user_id.
+  useEffect(() => {
+    if (!user?.id) return;
+    const channel = supabase
+      .channel(`patient-self-profile:${user.id}`)
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'patients', filter: `auth_user_id=eq.${user.id}` },
+        () => {
+          // Refresh on any change to our own row — and invalidate the localStorage cache so
+          // the next mount doesn't show the pre-edit version.
+          try { localStorage.removeItem(`patient_profile_${user.id}`); } catch { /* ignore */ }
+          loadProfile();
+        }
+      )
+      .subscribe();
+    return () => { void supabase.removeChannel(channel); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
 
   // Safety timeout - prevent infinite loading
   useEffect(() => {
@@ -465,6 +488,34 @@ const Profile = () => {
                   </button>
                 </div>
                 <div className="space-y-3">
+                  {/* Care setting — set at signup; only your doctor can change it. */}
+                  <div className="flex items-start gap-3">
+                    <Heart className="w-5 h-5 text-violet-400 mt-0.5 flex-shrink-0" />
+                    <div className="flex-1">
+                      <p className="text-xs text-slate-400 mb-1">Care Setting</p>
+                      {(() => {
+                        const cat = (profile?.category || 'REMOTE') as 'REMOTE'|'OPD'|'IPD'|'ICU';
+                        const style: Record<string, string> = {
+                          ICU:    'bg-red-500/20 text-red-200 border-red-400/40',
+                          IPD:    'bg-orange-500/20 text-orange-200 border-orange-400/40',
+                          OPD:    'bg-sky-500/15 text-sky-200 border-sky-400/40',
+                          REMOTE: 'bg-violet-500/15 text-violet-200 border-violet-400/40',
+                        };
+                        const label = cat === 'REMOTE' ? 'Remote monitoring' : cat;
+                        return (
+                          <>
+                            <span className={`inline-flex px-2 py-1 rounded-md text-sm font-medium border ${style[cat]}`}>
+                              {label}
+                            </span>
+                            <p className="text-[11px] text-slate-500 mt-1">
+                              Your doctor can change this. You can't.
+                            </p>
+                          </>
+                        );
+                      })()}
+                    </div>
+                  </div>
+
                   <div className="flex items-start gap-3">
                     <Droplet className="w-5 h-5 text-blue-400 mt-0.5 flex-shrink-0" />
                     <div className="flex-1">

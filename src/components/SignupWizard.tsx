@@ -30,6 +30,9 @@ interface SignupData {
   currentMedications: string;
   emergencyContactName: string;
   emergencyContactPhone: string;
+  emergencyContactName2: string;
+  emergencyContactPhone2: string;
+  category: 'REMOTE' | 'OPD' | 'IPD' | 'ICU';
 }
 
 interface SignupWizardProps {
@@ -89,6 +92,9 @@ export const SignupWizard: React.FC<SignupWizardProps> = ({ onSwitchToLogin, onS
         currentMedications: '',
         emergencyContactName: '',
         emergencyContactPhone: '',
+        emergencyContactName2: '',
+        emergencyContactPhone2: '',
+        category: 'REMOTE',
       };
     }
     
@@ -261,6 +267,20 @@ export const SignupWizard: React.FC<SignupWizardProps> = ({ onSwitchToLogin, onS
       } else if (!/^[\+]?[0-9\-\(\)\s]{10,}$/.test(formData.emergencyContactPhone)) {
         newErrors.emergencyContactPhone = 'Please enter a valid emergency contact phone number';
       }
+
+      // Second emergency contact — required as of 2026-05-31
+      if (!formData.emergencyContactName2.trim()) {
+        newErrors.emergencyContactName2 = 'Second emergency contact name is required';
+      } else if (formData.emergencyContactName2.trim().length < 2) {
+        newErrors.emergencyContactName2 = 'Name must be at least 2 characters';
+      }
+      if (!formData.emergencyContactPhone2.trim()) {
+        newErrors.emergencyContactPhone2 = 'Second emergency contact phone is required';
+      } else if (!/^[\+]?[0-9\-\(\)\s]{10,}$/.test(formData.emergencyContactPhone2)) {
+        newErrors.emergencyContactPhone2 = 'Please enter a valid phone number';
+      } else if (formData.emergencyContactPhone2.replace(/\D/g, '') === formData.emergencyContactPhone.replace(/\D/g, '')) {
+        newErrors.emergencyContactPhone2 = 'Must differ from the first emergency contact';
+      }
     }
 
     setErrors(newErrors);
@@ -318,6 +338,9 @@ export const SignupWizard: React.FC<SignupWizardProps> = ({ onSwitchToLogin, onS
         phoneNumber: formData.phoneNumber,
         emergencyContactName: formData.emergencyContactName,
         emergencyContactPhone: formData.emergencyContactPhone,
+        emergencyContactName2: formData.emergencyContactName2,
+        emergencyContactPhone2: formData.emergencyContactPhone2,
+        category: formData.category,
         allergies: formData.allergies,
         medicalConditions: formData.medicalConditions,
         currentMedications: formData.currentMedications,
@@ -452,6 +475,21 @@ export const SignupWizard: React.FC<SignupWizardProps> = ({ onSwitchToLogin, onS
         }
 
         console.log('✅ Patient profile created successfully:', profileData);
+
+        // Persist second emergency contact + chosen category (RPC doesn't accept either; UPDATE directly).
+        const patchPayload: Record<string, unknown> = {};
+        if (pendingPatientData?.emergencyContactName2) patchPayload.emergency_contact_name_2 = pendingPatientData.emergencyContactName2;
+        if (pendingPatientData?.emergencyContactPhone2) patchPayload.emergency_contact_phone_2 = pendingPatientData.emergencyContactPhone2;
+        if (pendingPatientData?.category && pendingPatientData.category !== 'REMOTE') {
+          patchPayload.category = pendingPatientData.category;
+        }
+        if (Object.keys(patchPayload).length > 0) {
+          const { error: patchErr } = await (supabase as any)
+            .from('patients')
+            .update(patchPayload)
+            .eq('auth_user_id', user.id);
+          if (patchErr) console.warn('⚠️ Failed to save extra fields:', patchErr);
+        }
       } else {
         console.warn('⚠️ No pending doctor code or user name found - profile not created');
       }
