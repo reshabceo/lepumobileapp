@@ -119,17 +119,36 @@ export const DeviceProvider: React.FC<DeviceProviderProps> = ({ children }) => {
                         },
                         onDeviceDisconnected: (deviceId: string) => {
                             console.log('🔌 Device disconnected:', deviceId);
-                            if (connectedDevice?.id === deviceId) {
+                            const wasConnected = connectedDevice?.id === deviceId;
+                            const deviceLabel = wasConnected ? connectedDevice?.name : null;
+                            if (wasConnected) {
                                 console.log('🔌 Connected device disconnected, updating status...');
                                 setConnectedDevice(null);
                                 setError('Device disconnected');
-                                
+
                                 // Clear the last connected device from storage since it's no longer connected
                                 localStorage.removeItem('lastConnectedDevice');
+
+                                // Fire-and-forget: report disconnect to backend so patient + care team are notified.
+                                (async () => {
+                                    try {
+                                        const { supabase, resolvePatientId } = await import('@/lib/supabase');
+                                        const { data: { user } } = await supabase.auth.getUser();
+                                        if (!user) return;
+                                        const patientId = await resolvePatientId(user.id);
+                                        if (!patientId) return;
+                                        await (supabase as any).rpc('report_ble_disconnect', {
+                                            p_patient_id: patientId,
+                                            p_device_label: deviceLabel || 'BLE device',
+                                        });
+                                    } catch (err) {
+                                        console.warn('⚠️ Failed to report BLE disconnect:', err);
+                                    }
+                                })();
                             }
-                            
+
                             // Update the device in available devices list
-                            setAvailableDevices(prev => 
+                            setAvailableDevices(prev =>
                                 prev.map(d => d.id === deviceId ? { ...d, isConnected: false } : d)
                             );
                         },
