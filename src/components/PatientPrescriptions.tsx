@@ -2,8 +2,9 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { toast } from 'sonner';
-import { Pill, Clock, Calendar, AlertCircle, CheckCircle, Bell, BellOff, ArrowLeft, Edit2, Save, X } from 'lucide-react';
+import { Pill, Clock, Calendar, AlertCircle, CheckCircle, Bell, BellOff, ArrowLeft, Edit2, Save, X, Download } from 'lucide-react';
 import { format, isPast, parseISO } from 'date-fns';
+import jsPDF from 'jspdf';
 
 interface Prescription {
   id: string;
@@ -18,6 +19,10 @@ interface Prescription {
   created_at: string;
   doctor?: {
     full_name: string;
+    specialty?: string | null;
+    hospital?: string | null;
+    national_medical_council_number?: string | null;
+    signature_data_url?: string | null;
   };
 }
 
@@ -27,6 +32,48 @@ interface Reminder {
   reminder_time: string;
   is_active: boolean;
 }
+
+const loadMonitraqLogoDataUrl = async (): Promise<string | null> => {
+  const candidates = ['/monitraq-logo.png', '/logo.png'];
+  for (const path of candidates) {
+    try {
+      const res = await fetch(path);
+      if (!res.ok) continue;
+      const blob = await res.blob();
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(String(reader.result || ''));
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+      if (dataUrl) return dataUrl;
+    } catch {
+      // Try next candidate.
+    }
+  }
+  return null;
+};
+
+const normalizeImageToPngDataUrl = async (sourceDataUrl: string): Promise<string> => {
+  if (!sourceDataUrl) throw new Error('No image source');
+  if (sourceDataUrl.startsWith('data:image/png')) return sourceDataUrl;
+
+  const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+    const el = new Image();
+    el.onload = () => resolve(el);
+    el.onerror = reject;
+    el.src = sourceDataUrl;
+  });
+
+  const canvas = document.createElement('canvas');
+  canvas.width = img.naturalWidth || img.width || 800;
+  canvas.height = img.naturalHeight || img.height || 300;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return sourceDataUrl;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(img, 0, 0);
+  return canvas.toDataURL('image/png', 0.95);
+};
 
 export const PatientPrescriptions = () => {
   const navigate = useNavigate();
@@ -71,7 +118,7 @@ export const PatientPrescriptions = () => {
         .from('prescriptions')
         .select(`
           *,
-          doctor:doctors!doctor_id(full_name)
+          doctor:doctors!doctor_id(full_name, specialty, hospital, national_medical_council_number, signature_data_url)
         `)
         .eq('patient_id', patientData.id)
         .eq('is_active', true)
@@ -218,6 +265,130 @@ export const PatientPrescriptions = () => {
     return isPast(parseISO(endDate));
   };
 
+  const downloadPrescriptionPdf = async (prescription: Prescription) => {
+    try {
+      const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+      const pageW = doc.internal.pageSize.getWidth();
+      const pageH = doc.internal.pageSize.getHeight();
+      const logoDataUrl = await loadMonitraqLogoDataUrl();
+
+      doc.setFillColor(0, 10, 55);
+      doc.rect(0, 0, pageW, 30, 'F');
+      doc.setFillColor(0, 170, 170);
+      doc.rect(0, 27, pageW, 3, 'F');
+      if (logoDataUrl) {
+        try {
+          doc.addImage(logoDataUrl, 'PNG', 12, 7, 11, 11);
+        } catch {
+          // Keep going with text-only brand fallback.
+        }
+      }
+      doc.setTextColor(255, 255, 255);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(12);
+      doc.text('Monitraq', 26, 13);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9);
+      doc.text('Digital Prescription', 26, 18);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(13);
+      doc.text('PRESCRIPTION', pageW - 10, 14, { align: 'right' });
+
+      let y = 40;
+      doc.setTextColor(20, 20, 20);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(10.5);
+      doc.text('Patient', 12, y);
+      y += 5.5;
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9.5);
+      doc.text(`Name: ${'You'}`, 12, y);
+      y += 5;
+      doc.text(`Written at: ${new Date(prescription.created_at).toLocaleString()}`, 12, y);
+      y += 7;
+
+      doc.setFont('helvetica', 'bold');
+      doc.text('Doctor', 12, y);
+      y += 5.5;
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Dr. ${prescription.doctor?.full_name || 'Not specified'}`, 12, y);
+      y += 5;
+      doc.text(`NMC No.: ${prescription.doctor?.national_medical_council_number || 'Not provided'}`, 12, y);
+      y += 5;
+      doc.text(`Specialty: ${prescription.doctor?.specialty || 'Not specified'}`, 12, y);
+      y += 5;
+      doc.text(`Hospital: ${prescription.doctor?.hospital || 'Not specified'}`, 12, y);
+      y += 7;
+
+      doc.setFillColor(235, 241, 250);
+      doc.rect(12, y - 4.5, pageW - 24, 8, 'F');
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9.5);
+      doc.text('Medicine', 14, y);
+      doc.text('Dosage', 86, y);
+      doc.text('Frequency', 118, y);
+      doc.text('Duration', 152, y);
+      y += 6;
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9);
+      doc.text(doc.splitTextToSize(prescription.medication_name || '-', 68), 14, y);
+      doc.text(doc.splitTextToSize(prescription.dosage || '-', 28), 86, y);
+      doc.text(doc.splitTextToSize(prescription.frequency || '-', 32), 118, y);
+      doc.text(`${prescription.duration_days || '-'} days`, 152, y);
+      y += 8;
+
+      if (prescription.instructions) {
+        doc.setTextColor(80, 80, 80);
+        const instructions = doc.splitTextToSize(`Instructions: ${prescription.instructions}`, pageW - 30);
+        doc.text(instructions, 14, y);
+        y += instructions.length * 4.5 + 1;
+      }
+
+      // Always place signature at bottom-right after medicine section ends.
+      let signatureY = y + 12;
+      if (signatureY > pageH - 28) {
+        doc.addPage();
+        signatureY = 30;
+      }
+      const signatureLineX1 = pageW - 68;
+      const signatureLineX2 = pageW - 14;
+      const signatureImageX = pageW - 66;
+
+      doc.setTextColor(70, 70, 70);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8.5);
+      doc.text('Doctor Signature', signatureLineX2, signatureY, { align: 'right' });
+      doc.setDrawColor(130, 130, 130);
+      doc.line(signatureLineX1, signatureY + 2, signatureLineX2, signatureY + 2);
+
+      const signatureDataUrl = prescription.doctor?.signature_data_url || '';
+      if (signatureDataUrl) {
+        try {
+          const pngSignature = await normalizeImageToPngDataUrl(signatureDataUrl);
+          doc.addImage(pngSignature, 'PNG', signatureImageX, signatureY - 12, 50, 12);
+        } catch {
+          doc.setFontSize(7.5);
+          doc.text('Signature unavailable', signatureLineX2, signatureY - 3, { align: 'right' });
+        }
+      } else {
+        doc.setFontSize(7.5);
+        doc.text('Not uploaded', signatureLineX2, signatureY - 3, { align: 'right' });
+      }
+
+      doc.setFontSize(8);
+      doc.text(`Generated on ${new Date().toLocaleString()}`, pageW - 12, pageH - 8, { align: 'right' });
+      doc.text('Monitraq branded prescription', 12, pageH - 8);
+
+      const safeName = (prescription.medication_name || 'prescription').replace(/\s+/g, '-');
+      doc.save(`monitraq-prescription-${safeName}.pdf`);
+      toast.success('Prescription PDF downloaded');
+    } catch (err: any) {
+      console.error('Prescription PDF error:', err);
+      toast.error('Failed to download prescription PDF');
+    }
+  };
+
   const activePrescriptions = prescriptions.filter(p => !isExpired(p.end_date));
   const expiredPrescriptions = prescriptions.filter(p => isExpired(p.end_date));
 
@@ -324,15 +495,24 @@ export const PatientPrescriptions = () => {
                     </div>
 
                     {/* Status Badges */}
-                    {expired ? (
-                      <div className="px-2.5 py-0.5 rounded-full bg-red-500/15 border border-red-500/30">
-                        <span className="text-[10px] font-semibold text-red-300">EXPIRED</span>
-                      </div>
-                    ) : (
-                      <div className="px-2.5 py-0.5 rounded-full bg-purple-500/15 border border-purple-500/30">
-                        <span className="text-[10px] font-semibold text-purple-300">ACTIVE</span>
-                      </div>
-                    )}
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => downloadPrescriptionPdf(prescription)}
+                        className="p-2 rounded-xl bg-purple-500/15 border border-purple-500/30 text-purple-300 hover:bg-purple-500/25 transition-colors"
+                        title="Download prescription PDF"
+                      >
+                        <Download className="w-4 h-4" />
+                      </button>
+                      {expired ? (
+                        <div className="px-2.5 py-0.5 rounded-full bg-red-500/15 border border-red-500/30">
+                          <span className="text-[10px] font-semibold text-red-300">EXPIRED</span>
+                        </div>
+                      ) : (
+                        <div className="px-2.5 py-0.5 rounded-full bg-purple-500/15 border border-purple-500/30">
+                          <span className="text-[10px] font-semibold text-purple-300">ACTIVE</span>
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   {/* Details */}
