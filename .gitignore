@@ -12,6 +12,11 @@ dist
 dist-ssr
 *.local
 
+# Claude session context (local only — never commit)
+CLAUDE_PROJECT_CONTEXT.md
+CLAUDE.md
+.claude/
+
 # Environment variables
 .env
 .env.local
