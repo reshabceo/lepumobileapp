@@ -7,6 +7,7 @@ import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-route
 import { DeviceProvider } from "./contexts/DeviceContext";
 import { AuthProvider } from "./contexts/AuthContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
+import { RequiresPaid } from "./components/RequiresPaid";
 
 // ── Eager: shell + always-mounted globals (needed on first paint) ──────────
 import { LoginPage } from "./components/LoginPage";
@@ -63,6 +64,7 @@ const MyThresholds = lazy(() => import("./components/MyThresholds"));
 const MyCareTeam = lazy(() => import("./pages/MyCareTeam"));
 const ConsentManagement = lazy(() => import("./pages/ConsentManagement").then(m => ({ default: m.ConsentManagement })));
 const CareContextHistory = lazy(() => import("./pages/CareContextHistory").then(m => ({ default: m.CareContextHistory })));
+const Subscription = lazy(() => import("./pages/Subscription"));
 
 const queryClient = new QueryClient();
 
@@ -112,6 +114,11 @@ const App = () => (
                   <Dashboard />
                 </ProtectedRoute>
               } />
+              <Route path="/subscription" element={
+                <ProtectedRoute>
+                  <Subscription />
+                </ProtectedRoute>
+              } />
               <Route path="/services" element={
                 <ProtectedRoute>
                   <ServicesRecords />
@@ -119,57 +126,57 @@ const App = () => (
               } />
               <Route path="/devices" element={
                 <ProtectedRoute>
-                  <DeviceList />
+                  <RequiresPaid featureLabel="connected devices"><DeviceList /></RequiresPaid>
                 </ProtectedRoute>
               } />
               <Route path="/wellue-scanner" element={
                 <ProtectedRoute>
-                  <WellueDeviceScanner />
+                  <RequiresPaid featureLabel="device scanner"><WellueDeviceScanner /></RequiresPaid>
                 </ProtectedRoute>
               } />
               <Route path="/live-bp-monitor" element={
                 <ProtectedRoute>
-                  <LiveBPMonitorRevamped />
+                  <RequiresPaid featureLabel="live BP monitoring"><LiveBPMonitorRevamped /></RequiresPaid>
                 </ProtectedRoute>
               } />
               <Route path="/live-bp-monitor-old" element={
                 <ProtectedRoute>
-                  <LiveBPMonitor />
+                  <RequiresPaid featureLabel="live BP monitoring"><LiveBPMonitor /></RequiresPaid>
                 </ProtectedRoute>
               } />
               <Route path="/bp-readings" element={
                 <ProtectedRoute>
-                  <BPReadingsHistory />
+                  <RequiresPaid featureLabel="BP history"><BPReadingsHistory /></RequiresPaid>
                 </ProtectedRoute>
               } />
               <Route path="/bp-result" element={
                 <ProtectedRoute>
-                  <BPResultScreen />
+                  <RequiresPaid featureLabel="BP readings"><BPResultScreen /></RequiresPaid>
                 </ProtectedRoute>
               } />
               <Route path="/ecg-monitor" element={
                 <ProtectedRoute>
-                  <ECGMonitor />
+                  <RequiresPaid featureLabel="ECG monitoring"><ECGMonitor /></RequiresPaid>
                 </ProtectedRoute>
               } />
               <Route path="/kardia-6l-ecg" element={
                 <ProtectedRoute>
-                  <KardiaSixLeadECG />
+                  <RequiresPaid featureLabel="6-lead ECG"><KardiaSixLeadECG /></RequiresPaid>
                 </ProtectedRoute>
               } />
               <Route path="/alivecor-history" element={
                 <ProtectedRoute>
-                  <AliveCorHistory />
+                  <RequiresPaid featureLabel="ECG history"><AliveCorHistory /></RequiresPaid>
                 </ProtectedRoute>
               } />
               <Route path="/ecg-results" element={
                 <ProtectedRoute>
-                  <EcgDemo />
+                  <RequiresPaid featureLabel="ECG results"><EcgDemo /></RequiresPaid>
                 </ProtectedRoute>
               } />
               <Route path="/cgm-monitor" element={
                 <ProtectedRoute>
-                  <CGMMonitor />
+                  <RequiresPaid featureLabel="CGM monitoring"><CGMMonitor /></RequiresPaid>
                 </ProtectedRoute>
               } />
               <Route path="/patients" element={
@@ -189,22 +196,22 @@ const App = () => (
               } />
               <Route path="/chat" element={
                 <ProtectedRoute>
-                  <Chat />
+                  <RequiresPaid featureLabel="doctor chat"><Chat /></RequiresPaid>
                 </ProtectedRoute>
               } />
               <Route path="/reports" element={
                 <ProtectedRoute>
-                  <PatientReportsView />
+                  <RequiresPaid featureLabel="reports"><PatientReportsView /></RequiresPaid>
                 </ProtectedRoute>
               } />
               <Route path="/measurement-reports" element={
                 <ProtectedRoute>
-                  <ViewReports />
+                  <RequiresPaid featureLabel="measurement reports"><ViewReports /></RequiresPaid>
                 </ProtectedRoute>
               } />
               <Route path="/add-reports" element={
                 <ProtectedRoute>
-                  <AddReports />
+                  <RequiresPaid featureLabel="report upload"><AddReports /></RequiresPaid>
                 </ProtectedRoute>
               } />
               <Route path="/doctor-assignment" element={
@@ -224,12 +231,12 @@ const App = () => (
               } />
               <Route path="/invoices" element={
                 <ProtectedRoute>
-                  <InvoicesPage />
+                  <RequiresPaid featureLabel="invoices"><InvoicesPage /></RequiresPaid>
                 </ProtectedRoute>
               } />
               <Route path="/insurance-claims" element={
                 <ProtectedRoute>
-                  <PatientInsuranceClaims />
+                  <RequiresPaid featureLabel="insurance claims"><PatientInsuranceClaims /></RequiresPaid>
                 </ProtectedRoute>
               } />
               <Route path="/insurance-profile" element={
@@ -241,7 +248,7 @@ const App = () => (
               } />
               <Route path="/manual-vitals" element={
                 <ProtectedRoute>
-                  <ManualVitalInput />
+                  <RequiresPaid featureLabel="manual vitals"><ManualVitalInput /></RequiresPaid>
                 </ProtectedRoute>
               } />
               <Route path="/prescriptions" element={
@@ -251,17 +258,17 @@ const App = () => (
               } />
               <Route path="/vitals-history" element={
                 <ProtectedRoute>
-                  <PatientVitalsHistory />
+                  <RequiresPaid featureLabel="vitals history"><PatientVitalsHistory /></RequiresPaid>
                 </ProtectedRoute>
               } />
               <Route path="/recommendations" element={
                 <ProtectedRoute>
-                  <RecommendationsDashboard />
+                  <RequiresPaid featureLabel="recommendations"><RecommendationsDashboard /></RequiresPaid>
                 </ProtectedRoute>
               } />
               <Route path="/patient-messages" element={
                 <ProtectedRoute>
-                  <PatientMessages />
+                  <RequiresPaid featureLabel="doctor messages"><PatientMessages /></RequiresPaid>
                 </ProtectedRoute>
               } />
               <Route path="/profile" element={
@@ -274,17 +281,17 @@ const App = () => (
               <Route path="/pair-pi" element={<Navigate to="/live-monitoring" replace />} />
               <Route path="/live-monitoring" element={
                 <ProtectedRoute>
-                  <LiveMonitoringPage />
+                  <RequiresPaid featureLabel="live home monitoring"><LiveMonitoringPage /></RequiresPaid>
                 </ProtectedRoute>
               } />
               <Route path="/my-thresholds" element={
                 <ProtectedRoute>
-                  <MyThresholds />
+                  <RequiresPaid featureLabel="risk thresholds"><MyThresholds /></RequiresPaid>
                 </ProtectedRoute>
               } />
               <Route path="/care-team" element={
                 <ProtectedRoute>
-                  <MyCareTeam />
+                  <RequiresPaid featureLabel="care team"><MyCareTeam /></RequiresPaid>
                 </ProtectedRoute>
               } />
 

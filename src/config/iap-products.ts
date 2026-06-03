@@ -35,6 +35,17 @@ export const IAP_PRODUCTS = {
     name: 'Emergency Consultation',
     type: 'emergency'
   },
+  // Monitraq+ Subscription — auto-renewable. Create matching products in App Store Connect.
+  monitraq_plus_monthly: {
+    productId: `${IAP_PRODUCT_ID_PREFIX}.subscription.monitraq_plus_monthly_v1`,
+    name: 'Monitraq+ Monthly',
+    type: 'monitraq_plus_monthly'
+  },
+  monitraq_plus_quarterly: {
+    productId: `${IAP_PRODUCT_ID_PREFIX}.subscription.monitraq_plus_quarterly_v1`,
+    name: 'Monitraq+ Quarterly',
+    type: 'monitraq_plus_quarterly'
+  },
 };
 
 // Radiologist Fee Tiers for dynamic pricing

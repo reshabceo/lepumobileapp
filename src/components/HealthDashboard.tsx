@@ -25,6 +25,8 @@ import {
   LogOut,
   Monitor,
   Shield,
+  Crown,
+  Lock,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
@@ -46,6 +48,7 @@ import { Button } from "@/components/ui/button";
 import { useInsuranceClaimsNotifications } from "@/hooks/useInsuranceClaimsNotifications";
 import { useHealthRecommendationsNotifications } from "@/hooks/useHealthRecommendationsNotifications";
 import { usePatientUnreadMessages } from "@/hooks/usePatientChat";
+import { useSubscriptionTier } from "@/hooks/useSubscriptionTier";
 import { supabase } from "@/lib/supabase";
 
 // Stored Item type definition
@@ -64,6 +67,8 @@ type StoredItem = {
 // Main Dashboard Component
 export const HealthDashboard = () => {
   const navigate = useNavigate();
+  const { tier: subscriptionTier } = useSubscriptionTier();
+  const isFreeTier = subscriptionTier === "free";
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [forceStopLoading, setForceStopLoading] = useState(false);
   const { user, logout } = useAuth();
@@ -561,6 +566,18 @@ export const HealthDashboard = () => {
     navigate("/reports");
   };
 
+  const goPaidFeature = (path: string, featureName: string) => {
+    if (isFreeTier) {
+      toast({
+        title: `${featureName} is locked on Free`,
+        description: "Upgrade to Monitraq+ to access this feature.",
+      });
+      navigate("/subscription");
+      return;
+    }
+    navigate(path);
+  };
+
   const handleEmergencyCall = () => {
     const phone = patientProfile?.emergency_contact_phone || patientProfile?.phone_number;
     if (!phone) {
@@ -703,6 +720,29 @@ export const HealthDashboard = () => {
           )}
         </div>
       </header>
+
+      {isFreeTier && (
+        <div className="mx-4 mb-3 rounded-2xl border border-amber-400/30 bg-amber-500/10 px-4 py-3">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-xs text-amber-200 font-semibold flex items-center gap-1.5">
+                <Lock className="h-3.5 w-3.5" />
+                Free plan active
+              </p>
+              <p className="text-[11px] text-slate-300 mt-1">
+                Upgrade to unlock monitoring, reports, prescriptions and premium care tools.
+              </p>
+            </div>
+            <button
+              onClick={() => navigate("/subscription")}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-amber-400 px-3 py-2 text-xs font-extrabold text-black hover:bg-amber-300 transition-colors"
+            >
+              <Crown className="h-3.5 w-3.5" />
+              Upgrade
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Main Content Area */}
       <div className="px-4 space-y-5">
@@ -905,9 +945,10 @@ export const HealthDashboard = () => {
           <button
             onClick={handleEmergencyCall}
             className="w-full h-12 bg-gradient-to-r from-emerald-500 via-teal-600 to-emerald-500 hover:from-emerald-600 hover:to-teal-700 text-white font-extrabold rounded-2xl flex items-center justify-center gap-2 border border-emerald-500/20 shadow-md shadow-emerald-900/25 text-xs transition-all hover:scale-[1.01] active:scale-95"
+            title="Call care-team coordinator / emergency contact"
           >
             <Phone size={15} className="text-white" />
-            <span>Call Coordinator</span>
+            <span>Call Care Team</span>
           </button>
         </div>
 
@@ -923,62 +964,97 @@ export const HealthDashboard = () => {
           <div className="flex gap-3 overflow-x-auto pb-3 scrollbar-none snap-x snap-mandatory select-none touch-pan-x">
             {/* BP Monitor */}
             <button
-              onClick={() => navigate("/live-bp-monitor")}
-              className="flex-shrink-0 w-36 snap-start bg-[#1A243D] hover:bg-[#1A243D]/80 border border-slate-700/40 p-4 rounded-3xl flex flex-col items-center justify-center gap-2.5 transition-all text-center group shadow-md"
+              onClick={() => goPaidFeature("/live-bp-monitor", "BP Monitor")}
+              className="relative overflow-hidden flex-shrink-0 w-36 snap-start bg-[#1A243D] hover:bg-[#1A243D]/80 border border-slate-700/40 p-4 rounded-3xl flex flex-col items-center justify-center gap-2.5 transition-all text-center group shadow-md"
             >
-              <Heart className="h-7 w-7 text-blue-400 group-hover:scale-105 transition-transform" />
+              <Heart className={`h-7 w-7 text-blue-400 ${isFreeTier ? "opacity-40" : "group-hover:scale-105 transition-transform"}`} />
               <div>
                 <h4 className="font-extrabold text-xs text-white">BP Monitor</h4>
                 <p className="text-[9px] text-slate-400 font-semibold mt-0.5">Blood Pressure</p>
               </div>
+              {isFreeTier && (
+                <span className="pointer-events-none absolute inset-0 rounded-3xl bg-slate-950/55 backdrop-blur-[1.5px] flex flex-col items-center justify-center border border-amber-400/35">
+                  <span className="inline-flex items-center justify-center h-9 w-9 rounded-full bg-gradient-to-br from-amber-100/25 via-orange-300/15 to-yellow-200/20 border border-amber-300/45 shadow-[0_0_22px_rgba(251,191,36,0.24)] transition-transform duration-200 group-hover:scale-110">
+                    <Lock className="h-5 w-5 text-amber-200" />
+                  </span>
+                </span>
+              )}
             </button>
 
             {/* ECG Monitor */}
             <button
-              onClick={() => navigate("/ecg-monitor")}
-              className="flex-shrink-0 w-36 snap-start bg-[#1A243D] hover:bg-[#1A243D]/80 border border-slate-700/40 p-4 rounded-3xl flex flex-col items-center justify-center gap-2.5 transition-all text-center group shadow-md"
+              onClick={() => goPaidFeature("/ecg-monitor", "ECG Monitor")}
+              className="relative overflow-hidden flex-shrink-0 w-36 snap-start bg-[#1A243D] hover:bg-[#1A243D]/80 border border-slate-700/40 p-4 rounded-3xl flex flex-col items-center justify-center gap-2.5 transition-all text-center group shadow-md"
             >
-              <Activity className="h-7 w-7 text-purple-400 group-hover:scale-105 transition-transform" />
+              <Activity className={`h-7 w-7 text-purple-400 ${isFreeTier ? "opacity-40" : "group-hover:scale-105 transition-transform"}`} />
               <div>
                 <h4 className="font-extrabold text-xs text-white">ECG Monitor</h4>
                 <p className="text-[9px] text-slate-400 font-semibold mt-0.5">BP2 Single-Lead</p>
               </div>
+              {isFreeTier && (
+                <span className="pointer-events-none absolute inset-0 rounded-3xl bg-slate-950/55 backdrop-blur-[1.5px] flex flex-col items-center justify-center border border-amber-400/35">
+                  <span className="inline-flex items-center justify-center h-9 w-9 rounded-full bg-gradient-to-br from-amber-100/25 via-orange-300/15 to-yellow-200/20 border border-amber-300/45 shadow-[0_0_22px_rgba(251,191,36,0.24)] transition-transform duration-200 group-hover:scale-110">
+                    <Lock className="h-5 w-5 text-amber-200" />
+                  </span>
+                </span>
+              )}
             </button>
 
             {/* 6-Channel ECG */}
             <button
-              onClick={() => navigate("/kardia-6l-ecg")}
-              className="flex-shrink-0 w-36 snap-start bg-[#1A243D] hover:bg-[#1A243D]/80 border border-slate-700/40 p-4 rounded-3xl flex flex-col items-center justify-center gap-2.5 transition-all text-center group shadow-md"
+              onClick={() => goPaidFeature("/kardia-6l-ecg", "6-Channel ECG")}
+              className="relative overflow-hidden flex-shrink-0 w-36 snap-start bg-[#1A243D] hover:bg-[#1A243D]/80 border border-slate-700/40 p-4 rounded-3xl flex flex-col items-center justify-center gap-2.5 transition-all text-center group shadow-md"
             >
-              <Monitor className="h-7 w-7 text-indigo-400 group-hover:scale-105 transition-transform" />
+              <Monitor className={`h-7 w-7 text-indigo-400 ${isFreeTier ? "opacity-40" : "group-hover:scale-105 transition-transform"}`} />
               <div>
                 <h4 className="font-extrabold text-xs text-white">6-Channel ECG</h4>
                 <p className="text-[9px] text-slate-400 font-semibold mt-0.5">KardiaMobile 6L</p>
               </div>
+              {isFreeTier && (
+                <span className="pointer-events-none absolute inset-0 rounded-3xl bg-slate-950/55 backdrop-blur-[1.5px] flex flex-col items-center justify-center border border-amber-400/35">
+                  <span className="inline-flex items-center justify-center h-9 w-9 rounded-full bg-gradient-to-br from-amber-100/25 via-orange-300/15 to-yellow-200/20 border border-amber-300/45 shadow-[0_0_22px_rgba(251,191,36,0.24)] transition-transform duration-200 group-hover:scale-110">
+                    <Lock className="h-5 w-5 text-amber-200" />
+                  </span>
+                </span>
+              )}
             </button>
 
             {/* CGM Monitor */}
             <button
-              onClick={() => navigate("/cgm-monitor")}
-              className="flex-shrink-0 w-36 snap-start bg-[#1A243D] hover:bg-[#1A243D]/80 border border-slate-700/40 p-4 rounded-3xl flex flex-col items-center justify-center gap-2.5 transition-all text-center group shadow-md"
+              onClick={() => goPaidFeature("/cgm-monitor", "CGM Monitor")}
+              className="relative overflow-hidden flex-shrink-0 w-36 snap-start bg-[#1A243D] hover:bg-[#1A243D]/80 border border-slate-700/40 p-4 rounded-3xl flex flex-col items-center justify-center gap-2.5 transition-all text-center group shadow-md"
             >
-              <BarChart3 className="h-7 w-7 text-green-400 group-hover:scale-105 transition-transform" />
+              <BarChart3 className={`h-7 w-7 text-green-400 ${isFreeTier ? "opacity-40" : "group-hover:scale-105 transition-transform"}`} />
               <div>
                 <h4 className="font-extrabold text-xs text-white">CGM Monitor</h4>
                 <p className="text-[9px] text-slate-400 font-semibold mt-0.5">Glucose Levels</p>
               </div>
+              {isFreeTier && (
+                <span className="pointer-events-none absolute inset-0 rounded-3xl bg-slate-950/55 backdrop-blur-[1.5px] flex flex-col items-center justify-center border border-amber-400/35">
+                  <span className="inline-flex items-center justify-center h-9 w-9 rounded-full bg-gradient-to-br from-amber-100/25 via-orange-300/15 to-yellow-200/20 border border-amber-300/45 shadow-[0_0_22px_rgba(251,191,36,0.24)] transition-transform duration-200 group-hover:scale-110">
+                    <Lock className="h-5 w-5 text-amber-200" />
+                  </span>
+                </span>
+              )}
             </button>
 
             {/* Camera Setup */}
             <button
-              onClick={() => navigate("/connect-camera")}
-              className="flex-shrink-0 w-36 snap-start bg-[#1A243D] hover:bg-[#1A243D]/80 border border-slate-700/40 p-4 rounded-3xl flex flex-col items-center justify-center gap-2.5 transition-all text-center group shadow-md"
+              onClick={() => goPaidFeature("/connect-camera", "Live Monitoring")}
+              className="relative overflow-hidden flex-shrink-0 w-36 snap-start bg-[#1A243D] hover:bg-[#1A243D]/80 border border-slate-700/40 p-4 rounded-3xl flex flex-col items-center justify-center gap-2.5 transition-all text-center group shadow-md"
             >
-              <Video className="h-7 w-7 text-indigo-400 group-hover:scale-105 transition-transform" />
+              <Video className={`h-7 w-7 text-indigo-400 ${isFreeTier ? "opacity-40" : "group-hover:scale-105 transition-transform"}`} />
               <div>
                 <h4 className="font-extrabold text-xs text-white">Camera Setup</h4>
                 <p className="text-[9px] text-slate-400 font-semibold mt-0.5">Monitor Camera</p>
               </div>
+              {isFreeTier && (
+                <span className="pointer-events-none absolute inset-0 rounded-3xl bg-slate-950/55 backdrop-blur-[1.5px] flex flex-col items-center justify-center border border-amber-400/35">
+                  <span className="inline-flex items-center justify-center h-9 w-9 rounded-full bg-gradient-to-br from-amber-100/25 via-orange-300/15 to-yellow-200/20 border border-amber-300/45 shadow-[0_0_22px_rgba(251,191,36,0.24)] transition-transform duration-200 group-hover:scale-110">
+                    <Lock className="h-5 w-5 text-amber-200" />
+                  </span>
+                </span>
+              )}
             </button>
           </div>
         </div>

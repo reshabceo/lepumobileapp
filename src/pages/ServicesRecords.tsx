@@ -17,7 +17,9 @@ import {
   LogOut,
   Heart,
   ShieldAlert,
-  Info
+  Info,
+  Lock,
+  Crown
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -26,9 +28,14 @@ import { useInsuranceClaimsNotifications } from "@/hooks/useInsuranceClaimsNotif
 import { useHealthRecommendationsNotifications } from "@/hooks/useHealthRecommendationsNotifications";
 import { MobileAppContainer } from "@/components/MobileAppContainer";
 import { supabase, getPatientRiskCriteria } from "@/lib/supabase";
+import { useSubscriptionTier } from "@/hooks/useSubscriptionTier";
+import { useToast } from "@/hooks/use-toast";
 
 export const ServicesRecords = () => {
   const navigate = useNavigate();
+  const { toast } = useToast();
+  const { tier } = useSubscriptionTier();
+  const isFreeTier = tier === "free";
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const { user, logout } = useAuth();
   const { patientProfile } = useRealTimeVitals();
@@ -81,17 +88,29 @@ export const ServicesRecords = () => {
   };
 
   const services = [
-    { label: "Doctor", icon: Stethoscope, color: "text-blue-400", path: "/doctor-assignment" },
-    { label: "Care Team", icon: Users, color: "text-indigo-400", path: "/care-team" },
-    { label: "Prescriptions", icon: Pill, color: "text-purple-400", path: "/prescriptions" },
-    { label: "Health Plan", icon: Target, color: "text-emerald-400", path: "/recommendations", badge: recommendationsUnreadCount },
-    { label: "Invoices", icon: Receipt, color: "text-amber-400", path: "/invoices" },
-    { label: "Claims", icon: FileCheck, color: "text-cyan-400", path: "/insurance-claims", badge: claimsUnreadCount },
-    { label: "ECG Records", icon: Activity, color: "text-rose-400", path: "/alivecor-history" },
-    { label: "Reports", icon: FileText, color: "text-purple-400", path: "/reports" },
-    { label: "Book Appointment", icon: Calendar, color: "text-orange-400", path: "/appointments" },
-    { label: "Live RPM", icon: Video, color: "text-teal-300", path: "/live-monitoring" },
+    { label: "Doctor", icon: Stethoscope, color: "text-blue-400", path: "/doctor-assignment", requiresPaid: false },
+    { label: "Care Team", icon: Users, color: "text-indigo-400", path: "/care-team", requiresPaid: true },
+    { label: "Prescriptions", icon: Pill, color: "text-purple-400", path: "/prescriptions", requiresPaid: false },
+    { label: "Health Plan", icon: Target, color: "text-emerald-400", path: "/recommendations", badge: recommendationsUnreadCount, requiresPaid: true },
+    { label: "Invoices", icon: Receipt, color: "text-amber-400", path: "/invoices", requiresPaid: true },
+    { label: "Claims", icon: FileCheck, color: "text-cyan-400", path: "/insurance-claims", badge: claimsUnreadCount, requiresPaid: true },
+    { label: "ECG Records", icon: Activity, color: "text-rose-400", path: "/alivecor-history", requiresPaid: true },
+    { label: "Reports", icon: FileText, color: "text-purple-400", path: "/reports", requiresPaid: true },
+    { label: "Book Appointment", icon: Calendar, color: "text-orange-400", path: "/appointments", requiresPaid: false },
+    { label: "Live RPM", icon: Video, color: "text-teal-300", path: "/live-monitoring", requiresPaid: true },
   ];
+
+  const openService = (path: string, label: string, requiresPaid?: boolean) => {
+    if (requiresPaid && isFreeTier) {
+      toast({
+        title: `${label} is locked on Free`,
+        description: "Upgrade to Monitraq+ to use this service.",
+      });
+      navigate("/subscription");
+      return;
+    }
+    navigate(path);
+  };
 
   return (
     <MobileAppContainer>
@@ -173,7 +192,31 @@ export const ServicesRecords = () => {
 
         {/* Services & Records Section */}
         <div className="px-4 space-y-5">
-          {/* Vital High Risk Thresholds Card */}
+          {isFreeTier && (
+            <div className="rounded-2xl border border-amber-400/30 bg-amber-500/10 px-4 py-3">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs text-amber-200 font-semibold flex items-center gap-1.5">
+                    <Lock className="h-3.5 w-3.5" />
+                    Free plan active
+                  </p>
+                  <p className="text-[11px] text-slate-300 mt-1">
+                    Locked services require Monitraq+.
+                  </p>
+                </div>
+                <button
+                  onClick={() => navigate("/subscription")}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-amber-400 px-3 py-2 text-xs font-extrabold text-black hover:bg-amber-300 transition-colors"
+                >
+                  <Crown className="h-3.5 w-3.5" />
+                  Upgrade
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Vital High Risk Thresholds Card (paid-only) */}
+          {!isFreeTier && (
           <div className="bg-[#1A243D] border border-slate-700/40 shadow-sm rounded-3xl p-5 space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2.5">
@@ -258,22 +301,45 @@ export const ServicesRecords = () => {
               </div>
             )}
           </div>
+          )}
 
           {/* Manual Vitals Submission & History */}
           <div className="grid grid-cols-2 gap-3 ">
             <button
-              onClick={() => navigate("/manual-vitals")}
-              className="h-12 bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white font-extrabold rounded-2xl flex items-center justify-center gap-2 transition-all shadow-md shadow-emerald-950/20 text-xs hover:scale-[1.01] active:scale-95"
+              onClick={() => openService("/manual-vitals", "Manual Entry", true)}
+              className={`relative overflow-hidden h-12 text-white font-extrabold rounded-2xl flex items-center justify-center gap-2 transition-all shadow-md text-xs ${
+                isFreeTier
+                  ? "bg-[#1A243D] border border-slate-700/40 cursor-pointer"
+                  : "bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 shadow-emerald-950/20 hover:scale-[1.01] active:scale-95"
+              }`}
             >
               <Edit3 size={15} />
               <span>Manual Entry</span>
+              {isFreeTier && (
+                <span className="pointer-events-none absolute inset-0 rounded-2xl bg-slate-950/55 backdrop-blur-[1.5px] flex items-center justify-center border border-amber-400/35">
+                  <span className="inline-flex items-center justify-center h-7 w-7 rounded-full bg-gradient-to-br from-amber-100/25 via-orange-300/15 to-yellow-200/20 border border-amber-300/45 shadow-[0_0_20px_rgba(251,191,36,0.22)] transition-transform duration-200 group-hover:scale-110">
+                    <Lock className="h-4 w-4 text-amber-200" />
+                  </span>
+                </span>
+              )}
             </button>
             <button
-              onClick={() => navigate("/vitals-history")}
-              className="h-12 bg-gradient-to-r from-blue-500 to-indigo-655 hover:from-blue-600 hover:to-indigo-700 text-white font-extrabold rounded-2xl flex items-center justify-center gap-2 transition-all shadow-md shadow-indigo-950/20 text-xs hover:scale-[1.01] active:scale-95"
+              onClick={() => openService("/vitals-history", "Vitals History", true)}
+              className={`relative overflow-hidden h-12 text-white font-extrabold rounded-2xl flex items-center justify-center gap-2 transition-all shadow-md text-xs ${
+                isFreeTier
+                  ? "bg-[#1A243D] border border-slate-700/40 cursor-pointer"
+                  : "bg-gradient-to-r from-blue-500 to-indigo-655 hover:from-blue-600 hover:to-indigo-700 shadow-indigo-950/20 hover:scale-[1.01] active:scale-95"
+              }`}
             >
               <BarChart3 size={15} />
               <span>Vitals History</span>
+              {isFreeTier && (
+                <span className="pointer-events-none absolute inset-0 rounded-2xl bg-slate-950/55 backdrop-blur-[1.5px] flex items-center justify-center border border-amber-400/35">
+                  <span className="inline-flex items-center justify-center h-7 w-7 rounded-full bg-gradient-to-br from-amber-100/25 via-orange-300/15 to-yellow-200/20 border border-amber-300/45 shadow-[0_0_20px_rgba(251,191,36,0.22)] transition-transform duration-200 group-hover:scale-110">
+                    <Lock className="h-4 w-4 text-amber-200" />
+                  </span>
+                </span>
+              )}
             </button>
           </div>
 
@@ -288,16 +354,27 @@ export const ServicesRecords = () => {
                   onClick={() => {
                     if (item.badge && item.label === "Claims") markClaimsAsRead();
                     if (item.badge && item.label === "Health Plan") markRecommendationsAsRead();
-                    navigate(item.path);
+                    openService(item.path, item.label, item.requiresPaid);
                   }}
-                  className="w-full h-[84px] bg-[#0F172A]/70 hover:bg-[#121B32]/95 border border-slate-800/40 rounded-2xl flex flex-col items-center justify-center gap-1.5 transition-all text-center relative group"
+                  className={`w-full h-[84px] rounded-2xl flex flex-col items-center justify-center gap-1.5 transition-all text-center relative group border overflow-hidden ${
+                    isFreeTier && item.requiresPaid
+                      ? "bg-[#0F172A]/80 border-amber-400/35 shadow-[0_0_0_1px_rgba(251,191,36,0.18)]"
+                      : "bg-[#0F172A]/70 border-slate-800/40 hover:bg-[#121B32]/95"
+                  }`}
                 >
+                  {isFreeTier && item.requiresPaid && (
+                    <div className="pointer-events-none absolute inset-0 rounded-2xl bg-slate-950/55 backdrop-blur-[1.5px] flex flex-col items-center justify-center border border-amber-400/35">
+                      <span className="inline-flex items-center justify-center h-8 w-8 rounded-full bg-gradient-to-br from-amber-100/25 via-orange-300/15 to-yellow-200/20 border border-amber-300/45 shadow-[0_0_22px_rgba(251,191,36,0.24)] transition-transform duration-200 group-hover:scale-110">
+                        <Lock className="h-4.5 w-4.5 text-amber-200" />
+                      </span>
+                    </div>
+                  )}
                   {item.badge && item.badge > 0 && (
                     <div className="absolute top-1.5 right-1.5 bg-red-500 text-white text-[8px] font-extrabold rounded-full h-4 w-4 flex items-center justify-center animate-pulse">
                       {item.badge}
                     </div>
                   )}
-                  <item.icon className={`h-5 w-5 ${item.color} group-hover:scale-110 transition-transform`} />
+                  <item.icon className={`h-5 w-5 ${item.color} ${isFreeTier && item.requiresPaid ? "opacity-40" : "group-hover:scale-110 transition-transform"}`} />
                   <span className="text-[10px] font-bold text-slate-200 truncate px-1 w-full">{item.label}</span>
                 </button>
               ))}

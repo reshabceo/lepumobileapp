@@ -124,7 +124,43 @@ export async function verifyPayment(payload: VerifyPayload): Promise<{ success: 
   return data;
 }
 
-export async function fulfilIAP(params: { 
+/**
+ * Apple IAP — auto-renewable subscription purchase (Monitraq+ monthly / quarterly).
+ * Called from Subscription.tsx on iOS only. Web/Android use Razorpay Subscriptions.
+ *
+ * Flow:
+ *   1. iapService.purchase() opens the iOS subscription sheet for the productId.
+ *   2. On success the iOS receipt is base64. Send to `apple-iap-verify-subscription`
+ *      which calls Apple's verifyReceipt + upserts patient_subscriptions.
+ *   3. patients.subscription_tier flips to 'monitraq_plus' via the DB sync trigger.
+ *   4. useSubscriptionTier realtime channel pushes the change to the app within ~500ms.
+ */
+export async function purchaseSubscription(productId: string, planCode: string): Promise<void> {
+  const transaction = await iapService.purchase(productId as any);
+  if (!transaction) throw new Error('Apple IAP returned no transaction.');
+  const isMock = transaction.receipt && transaction.receipt.startsWith('MOCK_RECEIPT_BASE64_');
+  if (isMock) {
+    // Sandbox/test path — let the user proceed; the verify Edge Function should still be wired in prod.
+    console.warn('[IAP-SUB] Mock receipt; skipping server verify (test build only).');
+    return;
+  }
+  const res = await fetch(`${FUNCTIONS_BASE}/apple-iap-verify-subscription`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({
+      plan_code: planCode,
+      product_id: productId,
+      transaction_id: transaction.transactionId,
+      receipt: transaction.receipt,
+    }),
+  });
+  const data = await res.json();
+  if (!res.ok || !data.success) {
+    throw new Error(data.error || 'Apple receipt verification failed');
+  }
+}
+
+export async function fulfilIAP(params: {
   type: PaymentType; 
   metadata: Record<string, any>; 
   transactionId: string;
@@ -152,6 +188,11 @@ export interface CheckoutOptions {
   onError?: (err: Error) => void;
 }
 
+// GST: 18% added on top of the displayed (net) price. Patient pays gross = net × 1.18.
+export const GST_RATE = 0.18;
+export const applyGst = (netPaise: number) => Math.round(netPaise * (1 + GST_RATE));
+export const gstAmount = (netPaise: number) => Math.round(netPaise * GST_RATE);
+
 export interface AIDoctorPricing {
   price_text_paise: number;
   price_voice_paise: number;
@@ -160,10 +201,30 @@ export interface AIDoctorPricing {
 
 /**
  * Fetch AI Doctor pricing from Supabase (admin-configured).
+ * Reads the active row in `ai_doctor_pricing`; falls back to defaults if the
+ * table is empty or RLS blocks the read.
  */
 export async function fetchAIDoctorPricing(): Promise<AIDoctorPricing> {
-  // Enforce pricing as 100 INR (10000 paise) for text and 150 INR (15000 paise) for voice
-  return { price_text_paise: 10000, price_voice_paise: 15000, currency: 'INR' };
+  try {
+    const { supabase } = await import('./supabase');
+    const { data, error } = await (supabase as any)
+      .from('ai_doctor_pricing')
+      .select('price_text_paise, price_voice_paise, currency')
+      .eq('is_active', true)
+      .order('updated_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (error || !data) {
+      return { price_text_paise: 10000, price_voice_paise: 15000, currency: 'INR' };
+    }
+    return {
+      price_text_paise: Number(data.price_text_paise) || 10000,
+      price_voice_paise: Number(data.price_voice_paise) || 15000,
+      currency: data.currency || 'INR',
+    };
+  } catch {
+    return { price_text_paise: 10000, price_voice_paise: 15000, currency: 'INR' };
+  }
 }
 
 /**

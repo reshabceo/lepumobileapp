@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, User, Mail, Phone, Calendar, MapPin, Droplet, Heart, AlertCircle, Pill, UserCircle, LogOut, Ruler, Scale, Edit2 } from 'lucide-react';
+import { ArrowLeft, User, Mail, Phone, Calendar, MapPin, Droplet, Heart, AlertCircle, Pill, UserCircle, LogOut, Ruler, Scale, Edit2, Crown } from 'lucide-react';
 import { ABHALinking } from '../components/ABHALinking';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase, getPatientRiskCriteria } from '../lib/supabase';
+import { useSubscriptionTier } from '@/hooks/useSubscriptionTier';
 import { Button } from '../components/ui/button';
 import { Card, CardContent } from '../components/ui/card';
 import { Input } from '../components/ui/input';
@@ -39,11 +40,14 @@ interface PatientProfile {
   height_cm?: number | null;
   weight_kg?: number | null;
   category?: 'REMOTE' | 'OPD' | 'IPD' | 'ICU' | null;
+  subscription_tier?: 'free' | 'monitraq_plus' | null;
+  subscription_valid_until?: string | null;
 }
 
 const Profile = () => {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
+  const { tier, validUntil, planCode, isInGrace, cancelAtPeriodEnd } = useSubscriptionTier();
   const [profile, setProfile] = useState<PatientProfile | null>(null);
   const [riskCriteria, setRiskCriteria] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
@@ -362,6 +366,47 @@ const Profile = () => {
                       <p className="text-sm text-blue-200/70">Patient ID: {profile.patient_code}</p>
                     )}
                   </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Billing & Subscription */}
+            <Card className="bg-[#1A243D] border border-slate-700/40 shadow-sm rounded-3xl">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                    <Crown className="w-5 h-5 text-amber-300" />
+                    Billing & Subscription
+                  </h3>
+                  <Button
+                    size="sm"
+                    className={`${tier === 'monitraq_plus' ? 'bg-white/10 hover:bg-white/20 text-white' : 'bg-amber-400 hover:bg-amber-300 text-black'} font-semibold`}
+                    onClick={() => navigate('/subscription')}
+                  >
+                    {tier === 'monitraq_plus' ? 'Manage plan' : 'Upgrade plan'}
+                  </Button>
+                </div>
+                <div className="rounded-xl border border-slate-700/50 bg-[#121B32] p-4">
+                  <p className="text-xs text-slate-400 mb-1">Current plan</p>
+                  <div className="flex items-center gap-2">
+                    <span className={`inline-flex px-2 py-1 rounded-md text-sm font-medium border ${
+                      tier === 'monitraq_plus'
+                        ? 'bg-amber-500/20 text-amber-100 border-amber-400/40'
+                        : 'bg-white/5 text-slate-200 border-white/15'
+                    }`}>
+                      {tier === 'monitraq_plus' ? 'Monitraq+' : 'Free'}
+                    </span>
+                    {isInGrace && (
+                      <span className="inline-flex px-2 py-1 rounded-md text-xs font-medium border bg-red-500/20 text-red-200 border-red-400/40">
+                        Renewal pending
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[12px] text-slate-400 mt-2">
+                    {tier === 'monitraq_plus'
+                      ? `${cancelAtPeriodEnd ? 'Cancelled' : 'Active'} ${planCode ? `(${planCode.replace('monitraq_plus_', '').toUpperCase()})` : ''}${validUntil ? ` · ${cancelAtPeriodEnd ? 'Access until' : 'Valid till'} ${new Date(validUntil).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}` : ''}${cancelAtPeriodEnd ? ' · Auto-renew off' : ''}`
+                      : 'You are on Free plan. Upgrade to unlock premium monitoring and reports.'}
+                  </p>
                 </div>
               </CardContent>
             </Card>

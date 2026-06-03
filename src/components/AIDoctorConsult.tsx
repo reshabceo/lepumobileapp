@@ -433,7 +433,10 @@ export const AIDoctorConsult: React.FC = () => {
     }
 
     const paymentType = mode === "text" ? "ai_doctor_text" : "ai_doctor_voice";
-    const amountPaise = mode === "text" ? pricing.price_text_paise : pricing.price_voice_paise;
+    const netPaise = mode === "text" ? pricing.price_text_paise : pricing.price_voice_paise;
+    // GST 18% added on top of the displayed net price. Patient pays gross = net × 1.18.
+    const { applyGst } = await import("@/lib/payment");
+    const amountPaise = applyGst(netPaise);
 
     setPayingMode(mode);
     setIsPaymentLoading(true);
@@ -1307,8 +1310,13 @@ export const AIDoctorConsult: React.FC = () => {
                 </div>
                 <div className="text-right">
                   <p className="text-lg font-bold text-white">
-                    ₹{pricing ? pricing.price_text_paise / 100 : "…"}
+                    ₹{pricing ? Math.round(pricing.price_text_paise * 1.18) / 100 : "…"}
                   </p>
+                  {pricing && (
+                    <p className="text-[10px] text-white/45 leading-tight">
+                      ₹{pricing.price_text_paise / 100} + ₹{Math.round(pricing.price_text_paise * 0.18) / 100} GST
+                    </p>
+                  )}
                   <p className="text-[10px] text-white/40">24h access</p>
                 </div>
               </div>
@@ -1339,8 +1347,13 @@ export const AIDoctorConsult: React.FC = () => {
                 </div>
                 <div className="text-right">
                   <p className="text-lg font-bold text-emerald-400">
-                    ₹{pricing ? pricing.price_voice_paise / 100 : "…"}
+                    ₹{pricing ? Math.round(pricing.price_voice_paise * 1.18) / 100 : "…"}
                   </p>
+                  {pricing && (
+                    <p className="text-[10px] text-white/45 leading-tight">
+                      ₹{pricing.price_voice_paise / 100} + ₹{Math.round(pricing.price_voice_paise * 0.18) / 100} GST
+                    </p>
+                  )}
                   <p className="text-[10px] text-white/40">24h access</p>
                 </div>
               </div>
