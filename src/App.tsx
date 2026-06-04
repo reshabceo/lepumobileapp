@@ -8,6 +8,7 @@ import { DeviceProvider } from "./contexts/DeviceContext";
 import { AuthProvider } from "./contexts/AuthContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { RequiresPaid } from "./components/RequiresPaid";
+import { SubscriptionGraceBanner } from "./components/SubscriptionGraceBanner";
 
 // ── Eager: shell + always-mounted globals (needed on first paint) ──────────
 import { LoginPage } from "./components/LoginPage";
@@ -99,6 +100,7 @@ const App = () => (
                 → call ends immediately before media can flow. */}
             <PatientIncomingCallOverlay />
             <ChatSupportOnDashboard />
+            <SubscriptionGraceBanner />
             <Suspense fallback={<RouteFallback />}>
             <Routes>
               {/* Public routes */}

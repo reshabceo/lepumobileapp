@@ -342,9 +342,16 @@ export default function Subscription() {
         try {
           const isIOS = Capacitor.getPlatform() === 'ios';
           if (isIOS) {
-            // Apple IAP doesn't accept a deferred start date. Patient must wait
-            // until current period ends, then subscribe normally from Apple.
-            toast.error("On iOS, please resubscribe from the App Store after your current plan ends.");
+            // Apple IAP doesn't accept a deferred start date. The native pattern
+            // for "uncancel" on iOS is for the user to toggle auto-renew back on
+            // in Apple's Subscriptions screen — keeps the existing subscription
+            // alive, no new purchase, no double-billing. Open Apple's manage
+            // subscriptions URL and let them do it there.
+            if (confirm(
+              `On iOS, manage Monitraq+ in Apple Subscriptions. Tap "Turn on auto-renew" on your existing plan to keep it going — no new charge, no gap. Open Apple Subscriptions now?`
+            )) {
+              await Browser.open({ url: 'https://apps.apple.com/account/subscriptions' });
+            }
             return;
           }
           const { data, error } = await (supabase as any).functions.invoke('razorpay-subscription-create', {
