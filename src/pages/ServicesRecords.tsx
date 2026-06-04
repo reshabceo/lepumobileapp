@@ -15,6 +15,7 @@ import {
   Receipt,
   Users,
   LogOut,
+  Wind,
   Heart,
   ShieldAlert,
   Info,
@@ -88,16 +89,17 @@ export const ServicesRecords = () => {
   };
 
   const services = [
-    { label: "Doctor", icon: Stethoscope, color: "text-blue-400", path: "/doctor-assignment", requiresPaid: false },
-    { label: "Care Team", icon: Users, color: "text-indigo-400", path: "/care-team", requiresPaid: true },
-    { label: "Prescriptions", icon: Pill, color: "text-purple-400", path: "/prescriptions", requiresPaid: false },
-    { label: "Health Plan", icon: Target, color: "text-emerald-400", path: "/recommendations", badge: recommendationsUnreadCount, requiresPaid: true },
-    { label: "Invoices", icon: Receipt, color: "text-amber-400", path: "/invoices", requiresPaid: true },
-    { label: "Claims", icon: FileCheck, color: "text-cyan-400", path: "/insurance-claims", badge: claimsUnreadCount, requiresPaid: true },
-    { label: "ECG Records", icon: Activity, color: "text-rose-400", path: "/alivecor-history", requiresPaid: true },
-    { label: "Reports", icon: FileText, color: "text-purple-400", path: "/reports", requiresPaid: true },
-    { label: "Book Appointment", icon: Calendar, color: "text-orange-400", path: "/appointments", requiresPaid: false },
-    { label: "Live RPM", icon: Video, color: "text-teal-300", path: "/live-monitoring", requiresPaid: true },
+    { label: "Doctor", icon: Stethoscope, color: "text-blue-400", path: "/doctor-assignment" },
+    { label: "Care Team", icon: Users, color: "text-indigo-400", path: "/care-team" },
+    { label: "Prescriptions", icon: Pill, color: "text-purple-400", path: "/prescriptions" },
+    { label: "Health Plan", icon: Target, color: "text-emerald-400", path: "/recommendations", badge: recommendationsUnreadCount },
+    { label: "Invoices", icon: Receipt, color: "text-amber-400", path: "/invoices" },
+    { label: "Claims", icon: FileCheck, color: "text-cyan-400", path: "/insurance-claims", badge: claimsUnreadCount },
+    { label: "ECG Records", icon: Activity, color: "text-rose-400", path: "/alivecor-history" },
+    { label: "O2 Ring Data", icon: Wind, color: "text-blue-400", path: "/o2ring-records" },
+    { label: "Reports", icon: FileText, color: "text-purple-400", path: "/reports" },
+    { label: "Book Appointment", icon: Calendar, color: "text-orange-400", path: "/appointments" },
+    { label: "Live RPM", icon: Video, color: "text-teal-300", path: "/live-monitoring" },
   ];
 
   const openService = (path: string, label: string, requiresPaid?: boolean) => {
@@ -217,101 +219,100 @@ export const ServicesRecords = () => {
 
           {/* Vital High Risk Thresholds Card (paid-only) */}
           {!isFreeTier && (
-          <div className="bg-[#1A243D] border border-slate-700/40 shadow-sm rounded-3xl p-5 space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <div className="h-9 w-9 rounded-xl bg-rose-500/20 flex items-center justify-center border border-rose-500/30">
-                  <ShieldAlert className="h-5 w-5 text-rose-400" />
+            <div className="bg-[#1A243D] border border-slate-700/40 shadow-sm rounded-3xl p-5 space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="h-9 w-9 rounded-xl bg-rose-500/20 flex items-center justify-center border border-rose-500/30">
+                    <ShieldAlert className="h-5 w-5 text-rose-400" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-extrabold text-white">Vital Alert Thresholds</h3>
+                    <p className="text-[11px] text-slate-400">Configured by your doctor</p>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="text-sm font-extrabold text-white">Vital Alert Thresholds</h3>
-                  <p className="text-[11px] text-slate-400">Configured by your doctor</p>
-                </div>
+                <span className={`px-2.5 py-1 rounded-full text-[10px] font-extrabold tracking-wider uppercase ${riskCriteria?.is_high_risk
+                  ? 'bg-rose-500/20 border border-rose-500/30 text-rose-300 animate-pulse'
+                  : 'bg-emerald-500/20 border border-emerald-500/30 text-emerald-300'
+                  }`}>
+                  {riskCriteria?.is_high_risk ? 'High Risk Alert' : 'System Stable'}
+                </span>
               </div>
-              <span className={`px-2.5 py-1 rounded-full text-[10px] font-extrabold tracking-wider uppercase ${riskCriteria?.is_high_risk
-                ? 'bg-rose-500/20 border border-rose-500/30 text-rose-300 animate-pulse'
-                : 'bg-emerald-500/20 border border-emerald-500/30 text-emerald-300'
-                }`}>
-                {riskCriteria?.is_high_risk ? 'High Risk Alert' : 'System Stable'}
-              </span>
-            </div>
 
-            {loadingRisk ? (
-              <div className="flex items-center justify-center py-6">
-                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-emerald-500"></div>
-              </div>
-            ) : riskCriteria ? (
-              <div className="space-y-4">
-                <div className="grid grid-cols-3 gap-2.5">
-                  {/* BP Column */}
-                  <div className="bg-[#121B32] border border-slate-800/40 p-3 rounded-2xl flex flex-col items-center text-center">
-                    <div className="w-8 h-8 rounded-full bg-rose-500/10 flex items-center justify-center mb-2 border border-rose-500/20">
-                      <Heart className="w-4 h-4 text-rose-400" />
-                    </div>
-                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">BP Limit</span>
-                    <span className="text-xs font-black text-white mt-1">
-                      &gt; {riskCriteria.systolic_high || 140}/{riskCriteria.diastolic_high || 90}
-                    </span>
-                    <span className="text-[9px] text-slate-500 font-medium mt-0.5">mmHg</span>
-                  </div>
-
-                  {/* Heart Rate Column */}
-                  <div className="bg-[#121B32] border border-slate-800/40 p-3 rounded-2xl flex flex-col items-center text-center">
-                    <div className="w-8 h-8 rounded-full bg-orange-500/10 flex items-center justify-center mb-2 border border-orange-500/20">
-                      <Activity className="w-4 h-4 text-orange-400" />
-                    </div>
-                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Heart Rate</span>
-                    <span className="text-xs font-black text-white mt-1">
-                      &gt; {riskCriteria.heart_rate_high || 100}
-                    </span>
-                    <span className="text-[9px] text-slate-500 font-medium mt-0.5">BPM</span>
-                  </div>
-
-                  {/* SpO2 Column */}
-                  <div className="bg-[#121B32] border border-slate-800/40 p-3 rounded-2xl flex flex-col items-center text-center">
-                    <div className="w-8 h-8 rounded-full bg-blue-500/10 flex items-center justify-center mb-2 border border-blue-500/20">
-                      <BarChart3 className="w-4 h-4 text-blue-400" />
-                    </div>
-                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">O2 Sat</span>
-                    <span className="text-xs font-black text-white mt-1">
-                      &lt; {riskCriteria.spo2_low || 95}
-                    </span>
-                    <span className="text-[9px] text-slate-500 font-medium mt-0.5">SpO2 %</span>
-                  </div>
+              {loadingRisk ? (
+                <div className="flex items-center justify-center py-6">
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-emerald-500"></div>
                 </div>
+              ) : riskCriteria ? (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-3 gap-2.5">
+                    {/* BP Column */}
+                    <div className="bg-[#121B32] border border-slate-800/40 p-3 rounded-2xl flex flex-col items-center text-center">
+                      <div className="w-8 h-8 rounded-full bg-rose-500/10 flex items-center justify-center mb-2 border border-rose-500/20">
+                        <Heart className="w-4 h-4 text-rose-400" />
+                      </div>
+                      <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">BP Limit</span>
+                      <span className="text-xs font-black text-white mt-1">
+                        &gt; {riskCriteria.systolic_high || 140}/{riskCriteria.diastolic_high || 90}
+                      </span>
+                      <span className="text-[9px] text-slate-500 font-medium mt-0.5">mmHg</span>
+                    </div>
 
-                {riskCriteria.doctor_notes && (
-                  <div className="bg-amber-500/5 border border-amber-500/25 p-3.5 rounded-2xl relative overflow-hidden">
-                    <div className="absolute top-0 left-0 w-1 h-full bg-amber-500" />
-                    <div className="flex gap-2">
-                      <Info className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
-                      <div>
-                        <p className="text-[10px] text-amber-400 font-extrabold uppercase tracking-wide">Doctor's Guidance</p>
-                        <p className="text-xs text-slate-300 mt-1 leading-relaxed italic">
-                          "{riskCriteria.doctor_notes}"
-                        </p>
+                    {/* Heart Rate Column */}
+                    <div className="bg-[#121B32] border border-slate-800/40 p-3 rounded-2xl flex flex-col items-center text-center">
+                      <div className="w-8 h-8 rounded-full bg-orange-500/10 flex items-center justify-center mb-2 border border-orange-500/20">
+                        <Activity className="w-4 h-4 text-orange-400" />
+                      </div>
+                      <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Heart Rate</span>
+                      <span className="text-xs font-black text-white mt-1">
+                        &gt; {riskCriteria.heart_rate_high || 100}
+                      </span>
+                      <span className="text-[9px] text-slate-500 font-medium mt-0.5">BPM</span>
+                    </div>
+
+                    {/* SpO2 Column */}
+                    <div className="bg-[#121B32] border border-slate-800/40 p-3 rounded-2xl flex flex-col items-center text-center">
+                      <div className="w-8 h-8 rounded-full bg-blue-500/10 flex items-center justify-center mb-2 border border-blue-500/20">
+                        <BarChart3 className="w-4 h-4 text-blue-400" />
+                      </div>
+                      <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">O2 Sat</span>
+                      <span className="text-xs font-black text-white mt-1">
+                        &lt; {riskCriteria.spo2_low || 95}
+                      </span>
+                      <span className="text-[9px] text-slate-500 font-medium mt-0.5">SpO2 %</span>
+                    </div>
+                  </div>
+
+                  {riskCriteria.doctor_notes && (
+                    <div className="bg-amber-500/5 border border-amber-500/25 p-3.5 rounded-2xl relative overflow-hidden">
+                      <div className="absolute top-0 left-0 w-1 h-full bg-amber-500" />
+                      <div className="flex gap-2">
+                        <Info className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
+                        <div>
+                          <p className="text-[10px] text-amber-400 font-extrabold uppercase tracking-wide">Doctor's Guidance</p>
+                          <p className="text-xs text-slate-300 mt-1 leading-relaxed italic">
+                            "{riskCriteria.doctor_notes}"
+                          </p>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="text-center py-6 bg-[#121B32] rounded-2xl border border-slate-800/80">
-                <p className="text-xs text-slate-400 italic">No custom risk thresholds set by physician.</p>
-              </div>
-            )}
-          </div>
+                  )}
+                </div>
+              ) : (
+                <div className="text-center py-6 bg-[#121B32] rounded-2xl border border-slate-800/80">
+                  <p className="text-xs text-slate-400 italic">No custom risk thresholds set by physician.</p>
+                </div>
+              )}
+            </div>
           )}
 
           {/* Manual Vitals Submission & History */}
           <div className="grid grid-cols-2 gap-3 ">
             <button
               onClick={() => openService("/manual-vitals", "Manual Entry", true)}
-              className={`relative overflow-hidden h-12 text-white font-extrabold rounded-2xl flex items-center justify-center gap-2 transition-all shadow-md text-xs ${
-                isFreeTier
-                  ? "bg-[#1A243D] border border-slate-700/40 cursor-pointer"
-                  : "bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 shadow-emerald-950/20 hover:scale-[1.01] active:scale-95"
-              }`}
+              className={`relative overflow-hidden h-12 text-white font-extrabold rounded-2xl flex items-center justify-center gap-2 transition-all shadow-md text-xs ${isFreeTier
+                ? "bg-[#1A243D] border border-slate-700/40 cursor-pointer"
+                : "bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 shadow-emerald-950/20 hover:scale-[1.01] active:scale-95"
+                }`}
             >
               <Edit3 size={15} />
               <span>Manual Entry</span>
@@ -325,11 +326,10 @@ export const ServicesRecords = () => {
             </button>
             <button
               onClick={() => openService("/vitals-history", "Vitals History", true)}
-              className={`relative overflow-hidden h-12 text-white font-extrabold rounded-2xl flex items-center justify-center gap-2 transition-all shadow-md text-xs ${
-                isFreeTier
-                  ? "bg-[#1A243D] border border-slate-700/40 cursor-pointer"
-                  : "bg-gradient-to-r from-blue-500 to-indigo-655 hover:from-blue-600 hover:to-indigo-700 shadow-indigo-950/20 hover:scale-[1.01] active:scale-95"
-              }`}
+              className={`relative overflow-hidden h-12 text-white font-extrabold rounded-2xl flex items-center justify-center gap-2 transition-all shadow-md text-xs ${isFreeTier
+                ? "bg-[#1A243D] border border-slate-700/40 cursor-pointer"
+                : "bg-gradient-to-r from-blue-500 to-indigo-655 hover:from-blue-600 hover:to-indigo-700 shadow-indigo-950/20 hover:scale-[1.01] active:scale-95"
+                }`}
             >
               <BarChart3 size={15} />
               <span>Vitals History</span>
@@ -356,11 +356,10 @@ export const ServicesRecords = () => {
                     if (item.badge && item.label === "Health Plan") markRecommendationsAsRead();
                     openService(item.path, item.label, item.requiresPaid);
                   }}
-                  className={`w-full h-[84px] rounded-2xl flex flex-col items-center justify-center gap-1.5 transition-all text-center relative group border overflow-hidden ${
-                    isFreeTier && item.requiresPaid
-                      ? "bg-[#0F172A]/80 border-amber-400/35 shadow-[0_0_0_1px_rgba(251,191,36,0.18)]"
-                      : "bg-[#0F172A]/70 border-slate-800/40 hover:bg-[#121B32]/95"
-                  }`}
+                  className={`w-full h-[84px] rounded-2xl flex flex-col items-center justify-center gap-1.5 transition-all text-center relative group border overflow-hidden ${isFreeTier && item.requiresPaid
+                    ? "bg-[#0F172A]/80 border-amber-400/35 shadow-[0_0_0_1px_rgba(251,191,36,0.18)]"
+                    : "bg-[#0F172A]/70 border-slate-800/40 hover:bg-[#121B32]/95"
+                    }`}
                 >
                   {isFreeTier && item.requiresPaid && (
                     <div className="pointer-events-none absolute inset-0 rounded-2xl bg-slate-950/55 backdrop-blur-[1.5px] flex flex-col items-center justify-center border border-amber-400/35">

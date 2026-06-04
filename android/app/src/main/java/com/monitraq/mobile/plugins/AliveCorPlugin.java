@@ -1,4 +1,4 @@
-package com.monitraq.com.plugins;
+package com.monitraq.mobile.plugins;
 
 import android.content.Intent;
 import android.util.Log;
@@ -88,7 +88,7 @@ public class AliveCorPlugin extends Plugin {
 
     // ── Nuclear self-healing: wipe ALL non-safe SharedPreferences + Keystore key ─
     //
-    // Root cause: after a package-name migration (com.monitraq.com → com.monitraq.com)
+    // Root cause: after a package-name migration (com.monitraq.app → com.monitraq.mobile)
     // the EncryptedSharedPreferences written by the AliveCor SDK (via Tink) are encrypted
     // with a Keystore AES-GCM master key tied to the old package UID.  The key can no
     // longer decrypt the stored keyset → AEADBadTagException on every SDK boot.

@@ -75,12 +75,12 @@ interface ECGRhythm {
   heartRate: number;
 
   rhythm:
-    | "normal"
-    | "irregular"
-    | "bradycardia"
-    | "tachycardia"
-    | "afib"
-    | "arrhythmia";
+  | "normal"
+  | "irregular"
+  | "bradycardia"
+  | "tachycardia"
+  | "afib"
+  | "arrhythmia";
 
   qrsDuration: number;
 
@@ -1291,7 +1291,7 @@ const ECGMonitor: React.FC = () => {
     while (
       baselineBufferRef.current.length > 0 &&
       baselineBufferRef.current.length >
-        (fsRef.current * BASELINE_WINDOW_MS) / 1000
+      (fsRef.current * BASELINE_WINDOW_MS) / 1000
     ) {
       baselineBufferRef.current.shift();
     }
@@ -1650,9 +1650,9 @@ const ECGMonitor: React.FC = () => {
             r.heartRate === rhythm.heartRate &&
             Math.abs(
               new Date(r.savedAt || r.timestamp).getTime() -
-                new Date(rhythm.savedAt || rhythm.timestamp).getTime()
+              new Date(rhythm.savedAt || rhythm.timestamp).getTime()
             ) <
-              5 * 60 * 1000 // 5 minutes
+            5 * 60 * 1000 // 5 minutes
         );
 
         return index === firstIndex;
@@ -1716,7 +1716,7 @@ const ECGMonitor: React.FC = () => {
 
     try {
       await wellueSDK.stopLive(selectedDevice);
-    } catch {}
+    } catch { }
 
     setIsMonitoring(false);
 
@@ -1734,7 +1734,7 @@ const ECGMonitor: React.FC = () => {
   const startDeviceStatusMonitoring = () => {
     // No-op: native device events are received via the Capacitor plugin listeners
     // already set up in this component (onDeviceDataUpdate, etc.).
-    return () => {};
+    return () => { };
   };
 
   // Simulator removed: UI is driven only by native device stream
@@ -1994,7 +1994,7 @@ const ECGMonitor: React.FC = () => {
             mvPerCount: data?.mvPerCount,
             preview: prev,
           });
-        } catch {}
+        } catch { }
 
         // lock fs from device if provided
 
@@ -2574,12 +2574,12 @@ const ECGMonitor: React.FC = () => {
               // ✅ FIX: Use data.ecgData from lifecycle event instead of empty ecgBufferRef
               ecgData:
                 data?.ecgData &&
-                Array.isArray(data.ecgData) &&
-                data.ecgData.length > 0
+                  Array.isArray(data.ecgData) &&
+                  data.ecgData.length > 0
                   ? data.ecgData
                   : ecgBufferRef.current.length > 0
-                  ? ecgBufferRef.current.map((d) => d.v)
-                  : [],
+                    ? ecgBufferRef.current.map((d) => d.v)
+                    : [],
 
               unit: "mV",
             };
@@ -2848,12 +2848,12 @@ const ECGMonitor: React.FC = () => {
             setCurrentRhythm((prev) =>
               prev
                 ? {
-                    ...prev,
+                  ...prev,
 
-                    heartRate: finalResult.heartRate,
+                  heartRate: finalResult.heartRate,
 
-                    timestamp: new Date().toISOString(),
-                  }
+                  timestamp: new Date().toISOString(),
+                }
                 : prev
             );
           }, 1000); // Increased from 500ms to 1000ms to ensure state updates complete
@@ -2954,7 +2954,7 @@ const ECGMonitor: React.FC = () => {
               mvPerCount: data?.mvPerCount,
               preview: prev,
             });
-          } catch {}
+          } catch { }
 
           // lock fs if provided by native
 
@@ -3230,10 +3230,10 @@ const ECGMonitor: React.FC = () => {
                 deviceBpm > 0
                   ? deviceBpm
                   : currentRhythm?.heartRate > 0
-                  ? currentRhythm.heartRate
-                  : lastBpmRef.current > 0
-                  ? lastBpmRef.current
-                  : 0;
+                    ? currentRhythm.heartRate
+                    : lastBpmRef.current > 0
+                      ? lastBpmRef.current
+                      : 0;
               console.log(
                 "⚠️ [IMMEDIATE] No final HR from native, using fallback:",
                 immediateHeartRate,
@@ -3391,12 +3391,12 @@ const ECGMonitor: React.FC = () => {
                 // ✅ FIX: Use data.ecgData from lifecycle event instead of empty ecgBufferRef
                 ecgData:
                   data?.ecgData &&
-                  Array.isArray(data.ecgData) &&
-                  data.ecgData.length > 0
+                    Array.isArray(data.ecgData) &&
+                    data.ecgData.length > 0
                     ? data.ecgData
                     : ecgBufferRef.current.length > 0
-                    ? ecgBufferRef.current.map((d) => d.v)
-                    : [],
+                      ? ecgBufferRef.current.map((d) => d.v)
+                      : [],
 
                 unit: "mV",
               };
@@ -3467,18 +3467,18 @@ const ECGMonitor: React.FC = () => {
                 // ✅ FIX: Ensure ecgData is included - prioritize from data, then ecgDataForResult, then finalResult
                 ecgData:
                   data?.ecgData &&
-                  Array.isArray(data.ecgData) &&
-                  data.ecgData.length > 0
+                    Array.isArray(data.ecgData) &&
+                    data.ecgData.length > 0
                     ? data.ecgData
                     : ecgDataForResult &&
                       Array.isArray(ecgDataForResult) &&
                       ecgDataForResult.length > 0
-                    ? ecgDataForResult
-                    : finalResult.ecgData &&
-                      Array.isArray(finalResult.ecgData) &&
-                      finalResult.ecgData.length > 0
-                    ? finalResult.ecgData
-                    : [],
+                      ? ecgDataForResult
+                      : finalResult.ecgData &&
+                        Array.isArray(finalResult.ecgData) &&
+                        finalResult.ecgData.length > 0
+                        ? finalResult.ecgData
+                        : [],
                 scaleUvPerLsb: data?.scaleUvPerLsb || 3.098,
                 sampleRate: data?.sampleRate || 125,
                 unit: "raw", // Raw Int16 samples, not mV
@@ -3534,10 +3534,10 @@ const ECGMonitor: React.FC = () => {
               setCurrentRhythm((prev) =>
                 prev
                   ? {
-                      ...prev,
-                      heartRate: finalResult.heartRate,
-                      timestamp: new Date().toISOString(),
-                    }
+                    ...prev,
+                    heartRate: finalResult.heartRate,
+                    timestamp: new Date().toISOString(),
+                  }
                   : prev
               );
             }, 1000); // Increased from 500ms to 1000ms to ensure state updates complete
@@ -3734,7 +3734,7 @@ const ECGMonitor: React.FC = () => {
             r.heartRate === report.heartRate &&
             Math.abs(
               new Date(r.savedAt || r.timestamp).getTime() -
-                new Date(report.savedAt || report.timestamp).getTime()
+              new Date(report.savedAt || report.timestamp).getTime()
             ) < fiveMinutes
         );
         return index === firstIndex;
@@ -3758,8 +3758,8 @@ const ECGMonitor: React.FC = () => {
         // ✅ FIX: Ensure ecgData is properly loaded - check if it exists and is an array
         const ecgData =
           report.ecgData &&
-          Array.isArray(report.ecgData) &&
-          report.ecgData.length > 0
+            Array.isArray(report.ecgData) &&
+            report.ecgData.length > 0
             ? report.ecgData
             : [];
         console.log("📚 [ECG] Loading previous reading:", {
@@ -4232,11 +4232,10 @@ const ECGMonitor: React.FC = () => {
       toast({
         title: "Recording Stopped 🛑",
 
-        description: `Recorded ${
-          recordingBufferRef.current.length
-        } samples over ${Math.round(
-          (Date.now() - recordingStartTimeRef.current) / 1000
-        )}s`,
+        description: `Recorded ${recordingBufferRef.current.length
+          } samples over ${Math.round(
+            (Date.now() - recordingStartTimeRef.current) / 1000
+          )}s`,
 
         duration: 2000,
       });
@@ -4703,8 +4702,7 @@ const ECGMonitor: React.FC = () => {
       ctx.fillText(`Recorded: ${new Date().toLocaleString()}`, 20, 50);
 
       ctx.fillText(
-        `Heart Rate: ${getBestHeartRate()} BPM (Device: ${deviceBpm}, Calc: ${
-          lastBpmRef.current
+        `Heart Rate: ${getBestHeartRate()} BPM (Device: ${deviceBpm}, Calc: ${lastBpmRef.current
         })`,
         20,
         70
@@ -4720,8 +4718,7 @@ const ECGMonitor: React.FC = () => {
         : 0;
 
       ctx.fillText(
-        `Sample Rate: ${fsRef.current}Hz | Samples: ${samplesCount} ${
-          recordingTime > 0 ? `| Recording: ${recordingTime}s` : ""
+        `Sample Rate: ${fsRef.current}Hz | Samples: ${samplesCount} ${recordingTime > 0 ? `| Recording: ${recordingTime}s` : ""
         }`,
         20,
         90
@@ -4913,7 +4910,7 @@ const ECGMonitor: React.FC = () => {
 
       try {
         await (Filesystem as any).requestPermissions?.();
-      } catch {}
+      } catch { }
 
       toast({
         title: "Exporting…",
@@ -4938,7 +4935,7 @@ const ECGMonitor: React.FC = () => {
           const u = (uri as any)?.uri || (uri as any);
 
           if (u) return String(u);
-        } catch {}
+        } catch { }
 
         if (dataText) {
           try {
@@ -4960,7 +4957,7 @@ const ECGMonitor: React.FC = () => {
             const u2 = (uri2 as any)?.uri || (uri2 as any);
 
             if (u2) return String(u2);
-          } catch {}
+          } catch { }
         }
 
         return null;
@@ -5196,7 +5193,7 @@ const ECGMonitor: React.FC = () => {
               });
 
               console.log("[A/B] device JSON internal copy", internalName);
-            } catch {}
+            } catch { }
 
             deviceShareUrl = await ensureSharableUri(
               deviceOutName,
@@ -5263,7 +5260,7 @@ const ECGMonitor: React.FC = () => {
             });
 
             console.log("[A/B] live JSON internal copy", internalName);
-          } catch {}
+          } catch { }
 
           liveShareUrl = await ensureSharableUri(
             liveOutName,
@@ -5327,9 +5324,8 @@ const ECGMonitor: React.FC = () => {
         console.warn("live export failed", e);
       }
 
-      const msg = `Exported${deviceOutName ? " device→" + deviceOutName : ""}${
-        liveOutName ? " live→" + liveOutName : ""
-      }`;
+      const msg = `Exported${deviceOutName ? " device→" + deviceOutName : ""}${liveOutName ? " live→" + liveOutName : ""
+        }`;
 
       toast({
         title:
@@ -5448,12 +5444,12 @@ const ECGMonitor: React.FC = () => {
           setCurrentRhythm((prev) =>
             prev
               ? {
-                  ...prev,
+                ...prev,
 
-                  heartRate: finalResult.heartRate,
+                heartRate: finalResult.heartRate,
 
-                  timestamp: new Date().toISOString(),
-                }
+                timestamp: new Date().toISOString(),
+              }
               : prev
           );
         }
@@ -5737,11 +5733,10 @@ const ECGMonitor: React.FC = () => {
 
                 <div className="flex items-center gap-2">
                   <div
-                    className={`w-2 h-2 rounded-full ${
-                      isMonitoring
+                    className={`w-2 h-2 rounded-full ${isMonitoring
                         ? "bg-green-400 animate-pulse"
                         : "bg-yellow-400"
-                    }`}
+                      }`}
                   ></div>
 
                   <span
@@ -5772,11 +5767,10 @@ const ECGMonitor: React.FC = () => {
                 <span className="text-sm text-gray-400">Status:</span>
 
                 <div
-                  className={`px-2 py-1 rounded-full text-xs font-medium ${
-                    isMonitoring
+                  className={`px-2 py-1 rounded-full text-xs font-medium ${isMonitoring
                       ? "bg-green-500/20 text-green-400 border border-green-500/30"
                       : "bg-blue-500/20 text-blue-400 border border-blue-500/30"
-                  }`}
+                    }`}
                 >
                   {isMonitoring ? "Measuring" : "Ready"}
                 </div>
@@ -5902,8 +5896,8 @@ const ECGMonitor: React.FC = () => {
                     {measurementCompletionTime
                       ? new Date(measurementCompletionTime).toLocaleString()
                       : ecgResult.timestamp
-                      ? new Date(ecgResult.timestamp).toLocaleString()
-                      : "—"}
+                        ? new Date(ecgResult.timestamp).toLocaleString()
+                        : "—"}
                   </div>
                   <div className="text-xs text-gray-400">Timestamp</div>
                 </div>
@@ -6011,11 +6005,10 @@ const ECGMonitor: React.FC = () => {
                           disabled={
                             !reading.ecgData || reading.ecgData.length === 0
                           }
-                          className={`w-full px-4 py-2 text-white rounded-lg transition-all duration-300 border shadow-lg flex items-center justify-center gap-2 ${
-                            reading.ecgData && reading.ecgData.length > 0
+                          className={`w-full px-4 py-2 text-white rounded-lg transition-all duration-300 border shadow-lg flex items-center justify-center gap-2 ${reading.ecgData && reading.ecgData.length > 0
                               ? "bg-purple-600 hover:bg-purple-700 border-purple-400/30 text-white"
                               : "bg-gray-500/50 border-gray-400/30 cursor-not-allowed opacity-50"
-                          }`}
+                            }`}
                         >
                           <ActivityIcon className="h-4 w-4" />
                           Show Chart

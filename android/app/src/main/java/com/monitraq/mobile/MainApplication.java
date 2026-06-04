@@ -1,4 +1,4 @@
-package com.monitraq.com;
+package com.monitraq.mobile;
 
 import android.app.Application;
 import android.util.Log;
@@ -27,7 +27,7 @@ public class MainApplication extends Application {
 
         Log.d(TAG, "MainApplication onCreate - Initializing Lepu SDK BleServiceHelper");
         Log.d(TAG, "SDK Source: https://github.com/viatom-develop/LepuDemo.git");
-        Log.d(TAG, "AAR Version: lepu-blepro-1.0.8.aar (supports BP2 device)");
+        Log.d(TAG, "AAR Version: lepu-blepro-1.3.4.aar (supports BP2/O2Ring devices)");
 
         try {
             // Initialize BleServiceHelper as per official Lepu SDK documentation
@@ -56,7 +56,8 @@ public class MainApplication extends Application {
         } catch (ClassNotFoundException e) {
             Log.e(TAG,
                     "❌ CRITICAL: BleServiceHelper class not found - AAR file may be missing or not properly included");
-            Log.e(TAG, "   Expected AAR: android/app/libs/lepu-blepro-1.0.8.aar");
+            Log.e(TAG,
+                    "   Expected AAR: android/app/libs/lepu-blepro-1.3.4.aar");
             Log.e(TAG, "   Please verify the AAR file exists and build.gradle includes it");
         } catch (Throwable t) {
             Log.e(TAG, "❌ Failed to initialize BleServiceHelper: " + t.getMessage(), t);

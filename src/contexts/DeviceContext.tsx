@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
 import { wellueSDK, WellueDevice, WellueSDKCallbacks } from '../lib/wellue-sdk-bridge';
 import { aliveCorSDK } from '../lib/alivecor-sdk-bridge';
 
@@ -61,6 +61,10 @@ interface DeviceProviderProps {
 export const DeviceProvider: React.FC<DeviceProviderProps> = ({ children }) => {
     const [connectedDevice, setConnectedDevice] = useState<WellueDevice | null>(null);
     const [availableDevices, setAvailableDevices] = useState<WellueDevice[]>([]);
+    const availableDevicesRef = useRef<WellueDevice[]>([]);
+    useEffect(() => {
+        availableDevicesRef.current = availableDevices;
+    }, [availableDevices]);
     const [isScanning, setIsScanning] = useState<boolean>(false);
     const [isConnecting, setIsConnecting] = useState<boolean>(false);
     const [isInitialized, setIsInitialized] = useState<boolean>(false);
@@ -115,7 +119,9 @@ export const DeviceProvider: React.FC<DeviceProviderProps> = ({ children }) => {
                             
                             // Save device ID to localStorage for auto-reconnection
                             localStorage.setItem('lastConnectedDevice', device.id);
-                            console.log('💾 Saved device ID to localStorage for auto-reconnection:', device.id);
+                            localStorage.setItem('lastConnectedDeviceName', device.name || '');
+                            localStorage.setItem('lastConnectedDeviceModel', device.model || '');
+                            console.log('💾 Saved device ID, name, and model to localStorage for auto-reconnection:', device.id, device.name, device.model);
                         },
                         onDeviceDisconnected: (deviceId: string) => {
                             console.log('🔌 Device disconnected:', deviceId);
@@ -128,6 +134,8 @@ export const DeviceProvider: React.FC<DeviceProviderProps> = ({ children }) => {
 
                                 // Clear the last connected device from storage since it's no longer connected
                                 localStorage.removeItem('lastConnectedDevice');
+                                localStorage.removeItem('lastConnectedDeviceName');
+                                localStorage.removeItem('lastConnectedDeviceModel');
 
                                 // Fire-and-forget: report disconnect to backend so patient + care team are notified.
                                 (async () => {
@@ -206,8 +214,10 @@ export const DeviceProvider: React.FC<DeviceProviderProps> = ({ children }) => {
                             // Try to connect to last known device from storage
                             console.log('🔍 No connected devices, checking for last known device...');
                             const lastDeviceId = localStorage.getItem('lastConnectedDevice');
+                            const lastDeviceName = localStorage.getItem('lastConnectedDeviceName') || undefined;
+                            const lastDeviceModel = localStorage.getItem('lastConnectedDeviceModel') || undefined;
                             if (lastDeviceId) {
-                                console.log('🔄 Attempting to reconnect to last known device:', lastDeviceId);
+                                console.log('🔄 Attempting to reconnect to last known device:', lastDeviceId, lastDeviceName, lastDeviceModel);
                                 // Start scan to find the last known device
                                 try {
                                     await wellueSDK.startScan();
@@ -216,7 +226,7 @@ export const DeviceProvider: React.FC<DeviceProviderProps> = ({ children }) => {
                                         try {
                                             await wellueSDK.stopScan();
                                             // Check if we found the last known device
-                                            const lastDevice = availableDevices.find(d => d.id === lastDeviceId);
+                                            const lastDevice = availableDevicesRef.current.find(d => d.id === lastDeviceId);
                                             if (lastDevice) {
                                                 console.log('🎯 Found last known device, attempting connection...');
                                                 await connectToDevice(lastDevice);
@@ -225,7 +235,7 @@ export const DeviceProvider: React.FC<DeviceProviderProps> = ({ children }) => {
                                                 console.log('⚠️ Last known device not found in scan, trying direct connection...');
                                                 // Try to connect directly using the stored ID
                                                 try {
-                                                    await wellueSDK.connect(lastDeviceId);
+                                                    await wellueSDK.connect(lastDeviceId, lastDeviceName, lastDeviceModel);
                                                     console.log('✅ Direct connection to last known device successful');
                                                 } catch (directError) {
                                                     console.log('❌ Direct connection failed:', directError);
@@ -246,7 +256,7 @@ export const DeviceProvider: React.FC<DeviceProviderProps> = ({ children }) => {
                                     setTimeout(async () => {
                                         try {
                                             await wellueSDK.stopScan();
-                                            console.log('🔍 Discovery scan complete, found devices:', availableDevices.length);
+                                            console.log('🔍 Discovery scan complete, found devices:', availableDevicesRef.current.length);
                                         } catch (error) {
                                             console.log('❌ Discovery scan failed:', error);
                                         }
@@ -302,14 +312,14 @@ export const DeviceProvider: React.FC<DeviceProviderProps> = ({ children }) => {
         if (!isInitialized || !connectedDevice) return;
 
         const healthCheckInterval = setInterval(async () => {
-            // SKIP health check if BP measurement is in progress (prevents command interference!)
-            const bpStatus = wellueSDK.getBPMeasurementStatus();
-            if (bpStatus.isMeasuring) {
-                console.log('⏸️ Health check SKIPPED - BP measurement in progress');
-                return; // Don't interfere with measurement!
-            }
-            
             try {
+                // SKIP health check if BP measurement is in progress (prevents command interference!)
+                const bpStatus = wellueSDK.getBPStatus();
+                if (bpStatus.isMeasuring) {
+                    console.log('⏸️ Health check SKIPPED - BP measurement in progress');
+                    return; // Don't interfere with measurement!
+                }
+                
                 // Check if the device is still connected by attempting to get its status
                 const connectedDevices = await wellueSDK.getConnectedDevices();
                 const isStillConnected = connectedDevices.some(device => device.id === connectedDevice.id);
@@ -319,25 +329,39 @@ export const DeviceProvider: React.FC<DeviceProviderProps> = ({ children }) => {
                     setConnectedDevice(null);
                     setError('Device disconnected');
                     localStorage.removeItem('lastConnectedDevice');
+                    localStorage.removeItem('lastConnectedDeviceName');
+                    localStorage.removeItem('lastConnectedDeviceModel');
                     
                     // Update available devices list
                     setAvailableDevices(prev => 
                         prev.map(d => d.id === connectedDevice.id ? { ...d, isConnected: false } : d)
                     );
                 } else {
-                    // Device is still connected, try to get battery level to verify connection
-                    try {
-                        await wellueSDK.getBatteryLevel(connectedDevice.id);
-                    } catch (batteryError) {
-                        // If battery check fails, device might be disconnected
-                        console.log('🔍 Battery check failed, device might be disconnected:', batteryError);
-                        setConnectedDevice(null);
-                        setError('Device connection lost');
-                        localStorage.removeItem('lastConnectedDevice');
-                        
-                        setAvailableDevices(prev => 
-                            prev.map(d => d.id === connectedDevice.id ? { ...d, isConnected: false } : d)
-                        );
+                    // For O2Ring devices, skip the getBatteryLevel call because it sends a BLE command
+                    // (requestBatteryInfo) that competes with the RT data polling timer
+                    // (woxi_requestWOxiRealData) and can starve the live oximetry stream.
+                    const isO2Ring = connectedDevice.model === 'O2Ring' ||
+                        connectedDevice.name?.toLowerCase().includes('o2') ||
+                        connectedDevice.name?.toLowerCase().includes('ring') ||
+                        connectedDevice.name?.toLowerCase().includes('oxy');
+
+                    if (!isO2Ring) {
+                        // Device is still connected, try to get battery level to verify connection
+                        try {
+                            await wellueSDK.getBatteryLevel(connectedDevice.id);
+                        } catch (batteryError) {
+                            // If battery check fails, device might be disconnected
+                            console.log('🔍 Battery check failed, device might be disconnected:', batteryError);
+                            setConnectedDevice(null);
+                            setError('Device connection lost');
+                            localStorage.removeItem('lastConnectedDevice');
+                            localStorage.removeItem('lastConnectedDeviceName');
+                            localStorage.removeItem('lastConnectedDeviceModel');
+                            
+                            setAvailableDevices(prev => 
+                                prev.map(d => d.id === connectedDevice.id ? { ...d, isConnected: false } : d)
+                            );
+                        }
                     }
                 }
             } catch (error) {
@@ -346,6 +370,8 @@ export const DeviceProvider: React.FC<DeviceProviderProps> = ({ children }) => {
                 setConnectedDevice(null);
                 setError('Device connection lost');
                 localStorage.removeItem('lastConnectedDevice');
+                localStorage.removeItem('lastConnectedDeviceName');
+                localStorage.removeItem('lastConnectedDeviceModel');
             }
         }, 10000); // Check every 10 seconds instead of 5 to be less aggressive
 
@@ -387,7 +413,9 @@ export const DeviceProvider: React.FC<DeviceProviderProps> = ({ children }) => {
                             
                             // Save device ID to localStorage for auto-reconnection
                             localStorage.setItem('lastConnectedDevice', device.id);
-                            console.log('💾 Saved device ID to localStorage for auto-reconnection:', device.id);
+                            localStorage.setItem('lastConnectedDeviceName', device.name || '');
+                            localStorage.setItem('lastConnectedDeviceModel', device.model || '');
+                            console.log('💾 Saved device ID, name, and model to localStorage for auto-reconnection:', device.id, device.name, device.model);
                         },
                         onDeviceDisconnected: (deviceId: string) => {
                             console.log('🔌 Device disconnected during scan:', deviceId);
@@ -542,7 +570,7 @@ export const DeviceProvider: React.FC<DeviceProviderProps> = ({ children }) => {
             }
             
             console.log('🔗 Attempting to connect to device:', device.name, device.id);
-            await wellueSDK.connect(device.id);
+            await wellueSDK.connect(device.id, device.name, device.model);
         } catch (error) {
             console.error('Failed to connect:', error);
             setError(`Failed to connect: ${error}`);
@@ -558,6 +586,8 @@ export const DeviceProvider: React.FC<DeviceProviderProps> = ({ children }) => {
             await wellueSDK.disconnect(connectedDevice.id);
             setConnectedDevice(null);
             localStorage.removeItem('lastConnectedDevice');
+            localStorage.removeItem('lastConnectedDeviceName');
+            localStorage.removeItem('lastConnectedDeviceModel');
             
             // Update available devices list
             setAvailableDevices(prev => 
@@ -639,7 +669,9 @@ export const DeviceProvider: React.FC<DeviceProviderProps> = ({ children }) => {
                     
                     // Save device ID to localStorage for auto-reconnection
                     localStorage.setItem('lastConnectedDevice', device.id);
-                    console.log('💾 Saved device ID to localStorage for auto-reconnection:', device.id);
+                    localStorage.setItem('lastConnectedDeviceName', device.name || '');
+                    localStorage.setItem('lastConnectedDeviceModel', device.model || '');
+                    console.log('💾 Saved device ID, name, and model to localStorage for auto-reconnection:', device.id, device.name, device.model);
                 },
                 onDeviceDisconnected: (deviceId: string) => {
                     console.log('🔌 Device disconnected during manual init, attempting auto-reconnection...');
@@ -650,7 +682,7 @@ export const DeviceProvider: React.FC<DeviceProviderProps> = ({ children }) => {
                         setTimeout(async () => {
                             try {
                                 console.log('🔄 Attempting auto-reconnection to device:', deviceId);
-                                const device = availableDevices.find(d => d.id === deviceId);
+                                const device = availableDevicesRef.current.find(d => d.id === deviceId);
                                 if (device) {
                                     await connectToDevice(device);
                                     console.log('✅ Auto-reconnection successful');

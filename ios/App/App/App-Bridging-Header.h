@@ -9,3 +9,11 @@
 // The WellueSDKPlugin is registered via Objective-C macro in WellueSDKPlugin.m
 
 #import <Capacitor/Capacitor.h>
+#import <VTMProductLib/VTMURATUtils.h>
+
+@interface VTMURATUtils (WriteProperties)
+@property (nonatomic, assign, readwrite) VTMDeviceType currentType;
+@property (nonatomic, strong, readwrite) CBCharacteristic *txcharacteristic;
+@property (nonatomic, strong, readwrite) CBCharacteristic *rxcharacteristic;
+@end
+

@@ -45,19 +45,25 @@ cd ios/App
 xcodebuild -workspace App.xcworkspace \
            -scheme App \
            -configuration Debug \
-           -destination 'platform=iOS,id=00008140-001C65993AE3001C' \
+           -destination 'platform=iOS,id=00008150-000242D60A7A401C' \
            build
 
 # Step 5: Install on device
 echo "📱 Installing on device..."
+APP_PATH=$(ls -td ~/Library/Developer/Xcode/DerivedData/App-*/Build/Products/Debug-iphoneos/App.app 2>/dev/null | head -n 1)
+if [ -z "$APP_PATH" ]; then
+    echo "❌ Error: Could not find built App.app in DerivedData!"
+    exit 1
+fi
+echo "🎯 Found built app at: $APP_PATH"
 xcrun devicectl device install app \
-      --device 00008140-001C65993AE3001C \
-      ~/Library/Developer/Xcode/DerivedData/App-cvvdaoljxzghrlezsanitckwqigw/Build/Products/Debug-iphoneos/App.app
+      --device 00008150-000242D60A7A401C \
+      "$APP_PATH"
 
 # Step 6: Launch app
 echo "🚀 Launching app..."
 xcrun devicectl device process launch \
-      --device 00008140-001C65993AE3001C \
+      --device 00008150-000242D60A7A401C \
       com.monitraq.mobile
 
 echo "✅ Build and deployment complete!"

@@ -1,4 +1,4 @@
-package com.monitraq.com.plugins;
+package com.monitraq.mobile.plugins;
 
 import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;

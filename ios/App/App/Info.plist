@@ -43,7 +43,7 @@
 	<string>This app needs access to your photo library to upload medical reports and documents from your device.</string>
 	<key>BGTaskSchedulerPermittedIdentifiers</key>
 	<array>
-		<string>com.monitraq.app.bridge.refresh</string>
+		<string>com.monitraq.mobile.bridge.refresh</string>
 	</array>
 	<key>UIBackgroundModes</key>
 	<array>
