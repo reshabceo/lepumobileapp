@@ -389,11 +389,10 @@ const Profile = () => {
                 <div className="rounded-xl border border-slate-700/50 bg-[#121B32] p-4">
                   <p className="text-xs text-slate-400 mb-1">Current plan</p>
                   <div className="flex items-center gap-2">
-                    <span className={`inline-flex px-2 py-1 rounded-md text-sm font-medium border ${
-                      tier === 'monitraq_plus'
+                    <span className={`inline-flex px-2 py-1 rounded-md text-sm font-medium border ${tier === 'monitraq_plus'
                         ? 'bg-amber-500/20 text-amber-100 border-amber-400/40'
                         : 'bg-white/5 text-slate-200 border-white/15'
-                    }`}>
+                      }`}>
                       {tier === 'monitraq_plus' ? 'Monitraq+' : 'Free'}
                     </span>
                     {isInGrace && (
@@ -539,11 +538,11 @@ const Profile = () => {
                     <div className="flex-1">
                       <p className="text-xs text-slate-400 mb-1">Care Setting</p>
                       {(() => {
-                        const cat = (profile?.category || 'REMOTE') as 'REMOTE'|'OPD'|'IPD'|'ICU';
+                        const cat = (profile?.category || 'REMOTE') as 'REMOTE' | 'OPD' | 'IPD' | 'ICU';
                         const style: Record<string, string> = {
-                          ICU:    'bg-red-500/20 text-red-200 border-red-400/40',
-                          IPD:    'bg-orange-500/20 text-orange-200 border-orange-400/40',
-                          OPD:    'bg-sky-500/15 text-sky-200 border-sky-400/40',
+                          ICU: 'bg-red-500/20 text-red-200 border-red-400/40',
+                          IPD: 'bg-orange-500/20 text-orange-200 border-orange-400/40',
+                          OPD: 'bg-sky-500/15 text-sky-200 border-sky-400/40',
                           REMOTE: 'bg-violet-500/15 text-violet-200 border-violet-400/40',
                         };
                         const label = cat === 'REMOTE' ? 'Remote monitoring' : cat;

@@ -102,267 +102,278 @@ const App = () => (
             <ChatSupportOnDashboard />
             <SubscriptionGraceBanner />
             <Suspense fallback={<RouteFallback />}>
-            <Routes>
-              {/* Public routes */}
-              <Route path="/" element={
-                <ProtectedRoute requireAuth={false}>
-                  <LoginPage />
-                </ProtectedRoute>
-              } />
+              <Routes>
+                {/* Public routes */}
+                <Route path="/" element={
+                  <ProtectedRoute requireAuth={false}>
+                    <LoginPage />
+                  </ProtectedRoute>
+                } />
 
-              {/* Protected routes */}
-              <Route path="/dashboard" element={
-                <ProtectedRoute>
-                  <Dashboard />
-                </ProtectedRoute>
-              } />
-              <Route path="/subscription" element={
-                <ProtectedRoute>
-                  <Subscription />
-                </ProtectedRoute>
-              } />
-              <Route path="/services" element={
-                <ProtectedRoute>
-                  <ServicesRecords />
-                </ProtectedRoute>
-              } />
-              <Route path="/devices" element={
-                <ProtectedRoute>
-                  <RequiresPaid featureLabel="connected devices"><DeviceList /></RequiresPaid>
-                </ProtectedRoute>
-              } />
-              <Route path="/wellue-scanner" element={
-                <ProtectedRoute>
-                  <RequiresPaid featureLabel="device scanner"><WellueDeviceScanner /></RequiresPaid>
-                </ProtectedRoute>
-              } />
-              <Route path="/live-bp-monitor" element={
-                <ProtectedRoute>
-                  <RequiresPaid featureLabel="live BP monitoring"><LiveBPMonitorRevamped /></RequiresPaid>
-                </ProtectedRoute>
-              } />
-              <Route path="/live-bp-monitor-old" element={
-                <ProtectedRoute>
-                  <RequiresPaid featureLabel="live BP monitoring"><LiveBPMonitor /></RequiresPaid>
-                </ProtectedRoute>
-              } />
-              <Route path="/bp-readings" element={
-                <ProtectedRoute>
-                  <RequiresPaid featureLabel="BP history"><BPReadingsHistory /></RequiresPaid>
-                </ProtectedRoute>
-              } />
-              <Route path="/bp-result" element={
-                <ProtectedRoute>
-                  <RequiresPaid featureLabel="BP readings"><BPResultScreen /></RequiresPaid>
-                </ProtectedRoute>
-              } />
-              <Route path="/ecg-monitor" element={
-                <ProtectedRoute>
-                  <RequiresPaid featureLabel="ECG monitoring"><ECGMonitor /></RequiresPaid>
-                </ProtectedRoute>
-              } />
-              <Route path="/kardia-6l-ecg" element={
-                <ProtectedRoute>
-                  <RequiresPaid featureLabel="6-lead ECG"><KardiaSixLeadECG /></RequiresPaid>
-                </ProtectedRoute>
-              } />
-              <Route path="/alivecor-history" element={
-                <ProtectedRoute>
-                  <RequiresPaid featureLabel="ECG history"><AliveCorHistory /></RequiresPaid>
-                </ProtectedRoute>
-              } />
-              <Route path="/ecg-results" element={
-                <ProtectedRoute>
-                  <RequiresPaid featureLabel="ECG results"><EcgDemo /></RequiresPaid>
-                </ProtectedRoute>
-              } />
-              <Route path="/cgm-monitor" element={
-                <ProtectedRoute>
-                  <RequiresPaid featureLabel="CGM monitoring"><CGMMonitor /></RequiresPaid>
-                </ProtectedRoute>
-              } />
-              <Route path="/patients" element={
-                <ProtectedRoute>
-                  <PatientList />
-                </ProtectedRoute>
-              } />
-              <Route path="/patient/:patientId/devices" element={
-                <ProtectedRoute>
-                  <PatientDevices />
-                </ProtectedRoute>
-              } />
-              <Route path="/patient/:patientId/monitor" element={
-                <ProtectedRoute>
-                  <PatientMonitor />
-                </ProtectedRoute>
-              } />
-              <Route path="/chat" element={
-                <ProtectedRoute>
-                  <RequiresPaid featureLabel="doctor chat"><Chat /></RequiresPaid>
-                </ProtectedRoute>
-              } />
-              <Route path="/reports" element={
-                <ProtectedRoute>
-                  <RequiresPaid featureLabel="reports"><PatientReportsView /></RequiresPaid>
-                </ProtectedRoute>
-              } />
-              <Route path="/measurement-reports" element={
-                <ProtectedRoute>
-                  <RequiresPaid featureLabel="measurement reports"><ViewReports /></RequiresPaid>
-                </ProtectedRoute>
-              } />
-              <Route path="/add-reports" element={
-                <ProtectedRoute>
-                  <RequiresPaid featureLabel="report upload"><AddReports /></RequiresPaid>
-                </ProtectedRoute>
-              } />
-              <Route path="/doctor-assignment" element={
-                <ProtectedRoute>
-                  <DoctorAssignmentPage />
-                </ProtectedRoute>
-              } />
-              <Route path="/appointments" element={
-                <ProtectedRoute>
-                  <AppointmentBookingPage />
-                </ProtectedRoute>
-              } />
-              <Route path="/ai-doctor" element={
-                <ProtectedRoute>
-                  <AIDoctorPage />
-                </ProtectedRoute>
-              } />
-              <Route path="/invoices" element={
-                <ProtectedRoute>
-                  <RequiresPaid featureLabel="invoices"><InvoicesPage /></RequiresPaid>
-                </ProtectedRoute>
-              } />
-              <Route path="/insurance-claims" element={
-                <ProtectedRoute>
-                  <RequiresPaid featureLabel="insurance claims"><PatientInsuranceClaims /></RequiresPaid>
-                </ProtectedRoute>
-              } />
-              <Route path="/insurance-profile" element={
-                <ProtectedRoute>
-                  <div className="min-h-screen bg-background p-4">
-                    <PatientInsuranceProfile />
-                  </div>
-                </ProtectedRoute>
-              } />
-              <Route path="/manual-vitals" element={
-                <ProtectedRoute>
-                  <RequiresPaid featureLabel="manual vitals"><ManualVitalInput /></RequiresPaid>
-                </ProtectedRoute>
-              } />
-              <Route path="/prescriptions" element={
-                <ProtectedRoute>
-                  <PatientPrescriptions />
-                </ProtectedRoute>
-              } />
-              <Route path="/vitals-history" element={
-                <ProtectedRoute>
-                  <RequiresPaid featureLabel="vitals history"><PatientVitalsHistory /></RequiresPaid>
-                </ProtectedRoute>
-              } />
-              <Route path="/recommendations" element={
-                <ProtectedRoute>
-                  <RequiresPaid featureLabel="recommendations"><RecommendationsDashboard /></RequiresPaid>
-                </ProtectedRoute>
-              } />
-              <Route path="/patient-messages" element={
-                <ProtectedRoute>
-                  <RequiresPaid featureLabel="doctor messages"><PatientMessages /></RequiresPaid>
-                </ProtectedRoute>
-              } />
-              <Route path="/profile" element={
-                <ProtectedRoute>
-                  <Profile />
-                </ProtectedRoute>
-              } />
-              {/* /connect-camera and /pair-pi are now merged into /live-monitoring */}
-              <Route path="/connect-camera" element={<Navigate to="/live-monitoring" replace />} />
-              <Route path="/pair-pi" element={<Navigate to="/live-monitoring" replace />} />
-              <Route path="/live-monitoring" element={
-                <ProtectedRoute>
-                  <RequiresPaid featureLabel="live home monitoring"><LiveMonitoringPage /></RequiresPaid>
-                </ProtectedRoute>
-              } />
-              <Route path="/my-thresholds" element={
-                <ProtectedRoute>
-                  <RequiresPaid featureLabel="risk thresholds"><MyThresholds /></RequiresPaid>
-                </ProtectedRoute>
-              } />
-              <Route path="/care-team" element={
-                <ProtectedRoute>
-                  <RequiresPaid featureLabel="care team"><MyCareTeam /></RequiresPaid>
-                </ProtectedRoute>
-              } />
+                {/* Protected routes */}
+                <Route path="/dashboard" element={
+                  <ProtectedRoute>
+                    <Dashboard />
+                  </ProtectedRoute>
+                } />
+                <Route path="/subscription" element={
+                  <ProtectedRoute>
+                    <Subscription />
+                  </ProtectedRoute>
+                } />
+                <Route path="/services" element={
+                  <ProtectedRoute>
+                    <ServicesRecords />
+                  </ProtectedRoute>
+                } />
+                <Route path="/devices" element={
+                  <ProtectedRoute>
+                    <RequiresPaid featureLabel="connected devices"><DeviceList /></RequiresPaid>
+                  </ProtectedRoute>
+                } />
+                <Route path="/wellue-scanner" element={
+                  <ProtectedRoute>
+                    <RequiresPaid featureLabel="device scanner"><WellueDeviceScanner /></RequiresPaid>
+                  </ProtectedRoute>
+                } />
+                <Route path="/live-bp-monitor" element={
+                  <ProtectedRoute>
+                    <RequiresPaid featureLabel="live BP monitoring"><LiveBPMonitorRevamped /></RequiresPaid>
+                  </ProtectedRoute>
+                } />
+                <Route path="/live-bp-monitor-old" element={
+                  <ProtectedRoute>
+                    <RequiresPaid featureLabel="live BP monitoring"><LiveBPMonitor /></RequiresPaid>
+                  </ProtectedRoute>
+                } />
+                <Route path="/bp-readings" element={
+                  <ProtectedRoute>
+                    <RequiresPaid featureLabel="BP history"><BPReadingsHistory /></RequiresPaid>
+                  </ProtectedRoute>
+                } />
+                <Route path="/bp-result" element={
+                  <ProtectedRoute>
+                    <RequiresPaid featureLabel="BP readings"><BPResultScreen /></RequiresPaid>
+                  </ProtectedRoute>
+                } />
+                <Route path="/ecg-monitor" element={
+                  <ProtectedRoute>
+                    <RequiresPaid featureLabel="ECG monitoring"><ECGMonitor /></RequiresPaid>
+                  </ProtectedRoute>
+                } />
+                <Route path="/kardia-6l-ecg" element={
+                  <ProtectedRoute>
+                    <RequiresPaid featureLabel="6-lead ECG"><KardiaSixLeadECG /></RequiresPaid>
+                  </ProtectedRoute>
+                } />
+                <Route path="/alivecor-history" element={
+                  <ProtectedRoute>
+                    <RequiresPaid featureLabel="ECG history"><AliveCorHistory /></RequiresPaid>
+                  </ProtectedRoute>
+                } />
+                <Route path="/ecg-results" element={
+                  <ProtectedRoute>
+                    <RequiresPaid featureLabel="ECG results"><EcgDemo /></RequiresPaid>
+                  </ProtectedRoute>
+                } />
+                <Route path="/cgm-monitor" element={
+                  <ProtectedRoute>
+                    <RequiresPaid featureLabel="CGM monitoring"><CGMMonitor /></RequiresPaid>
+                  </ProtectedRoute>
+                } />
+                <Route path="/patients" element={
+                  <ProtectedRoute>
+                    <PatientList />
+                  </ProtectedRoute>
+                } />
+                <Route path="/patient/:patientId/devices" element={
+                  <ProtectedRoute>
+                    <PatientDevices />
+                  </ProtectedRoute>
+                } />
+                <Route path="/patient/:patientId/monitor" element={
+                  <ProtectedRoute>
+                    <PatientMonitor />
+                  </ProtectedRoute>
+                } />
+                <Route path="/chat" element={
+                  <ProtectedRoute>
+                    <RequiresPaid featureLabel="doctor chat"><Chat /></RequiresPaid>
+                  </ProtectedRoute>
+                } />
+                <Route path="/reports" element={
+                  <ProtectedRoute>
+                    <RequiresPaid featureLabel="reports"><PatientReportsView /></RequiresPaid>
+                  </ProtectedRoute>
+                } />
+                <Route path="/measurement-reports" element={
+                  <ProtectedRoute>
+                    <RequiresPaid featureLabel="measurement reports"><ViewReports /></RequiresPaid>
+                  </ProtectedRoute>
+                } />
+                <Route path="/add-reports" element={
+                  <ProtectedRoute>
+                    <RequiresPaid featureLabel="report upload"><AddReports /></RequiresPaid>
+                  </ProtectedRoute>
+                } />
+                <Route path="/doctor-assignment" element={
+                  <ProtectedRoute>
+                    <DoctorAssignmentPage />
+                  </ProtectedRoute>
+                } />
+                <Route path="/appointments" element={
+                  <ProtectedRoute>
+                    <AppointmentBookingPage />
+                  </ProtectedRoute>
+                } />
+                <Route path="/ai-doctor" element={
+                  <ProtectedRoute>
+                    <AIDoctorPage />
+                  </ProtectedRoute>
+                } />
+                <Route path="/invoices" element={
+                  <ProtectedRoute>
+                    <RequiresPaid featureLabel="invoices"><InvoicesPage /></RequiresPaid>
+                  </ProtectedRoute>
+                } />
+                <Route path="/insurance-claims" element={
+                  <ProtectedRoute>
+                    <RequiresPaid featureLabel="insurance claims"><PatientInsuranceClaims /></RequiresPaid>
+                  </ProtectedRoute>
+                } />
+                <Route path="/insurance-profile" element={
+                  <ProtectedRoute>
+                    <div className="min-h-screen bg-background p-4">
+                      <PatientInsuranceProfile />
+                    </div>
+                  </ProtectedRoute>
+                } />
+                <Route path="/manual-vitals" element={
+                  <ProtectedRoute>
+                    <RequiresPaid featureLabel="manual vitals"><ManualVitalInput /></RequiresPaid>
+                  </ProtectedRoute>
+                } />
+                <Route path="/prescriptions" element={
+                  <ProtectedRoute>
+                    <PatientPrescriptions />
+                  </ProtectedRoute>
+                } />
+                <Route path="/vitals-history" element={
+                  <ProtectedRoute>
+                    <RequiresPaid featureLabel="vitals history"><PatientVitalsHistory /></RequiresPaid>
+                  </ProtectedRoute>
+                } />
+                <Route path="/recommendations" element={
+                  <ProtectedRoute>
+                    <RequiresPaid featureLabel="recommendations"><RecommendationsDashboard /></RequiresPaid>
+                  </ProtectedRoute>
+                } />
+                <Route path="/patient-messages" element={
+                  <ProtectedRoute>
+                    <RequiresPaid featureLabel="doctor messages"><PatientMessages /></RequiresPaid>
+                  </ProtectedRoute>
+                } />
+                <Route path="/profile" element={
+                  <ProtectedRoute>
+                    <Profile />
+                  </ProtectedRoute>
+                } />
+                {/* /connect-camera and /pair-pi are now merged into /live-monitoring */}
+                <Route path="/connect-camera" element={<Navigate to="/live-monitoring" replace />} />
+                <Route path="/pair-pi" element={<Navigate to="/live-monitoring" replace />} />
+                <Route path="/live-monitoring" element={
+                  <ProtectedRoute>
+                    <RequiresPaid featureLabel="live home monitoring"><LiveMonitoringPage /></RequiresPaid>
+                  </ProtectedRoute>
+                } />
+                <Route path="/my-thresholds" element={
+                  <ProtectedRoute>
+                    <RequiresPaid featureLabel="risk thresholds"><MyThresholds /></RequiresPaid>
+                  </ProtectedRoute>
+                } />
+                <Route path="/care-team" element={
+                  <ProtectedRoute>
+                    <RequiresPaid featureLabel="care team"><MyCareTeam /></RequiresPaid>
+                  </ProtectedRoute>
+                } />
 
-              <Route path="/abha/consents" element={
-                <ProtectedRoute>
-                  <ConsentManagement />
-                </ProtectedRoute>
-              } />
-              <Route path="/abha/records" element={
-                <ProtectedRoute>
-                  <CareContextHistory />
-                </ProtectedRoute>
-              } />
+                <Route path="/abha/consents" element={
+                  <ProtectedRoute>
+                    <ConsentManagement />
+                  </ProtectedRoute>
+                } />
+                <Route path="/abha/records" element={
+                  <ProtectedRoute>
+                    <CareContextHistory />
+                  </ProtectedRoute>
+                } />
 
-              <Route path="/call/:channel" element={
-                <ProtectedRoute>
-                  <VideoCallPage />
-                </ProtectedRoute>
-              } />
+                <Route path="/abha/consents" element={
+                  <ProtectedRoute>
+                    <ConsentManagement />
+                  </ProtectedRoute>
+                } />
+                <Route path="/abha/records" element={
+                  <ProtectedRoute>
+                    <CareContextHistory />
+                  </ProtectedRoute>
+                } />
 
-              <Route path="/call/wait" element={
-                <ProtectedRoute>
-                  <WaitingForDoctor />
-                </ProtectedRoute>
-              } />
+                <Route path="/call/:channel" element={
+                  <ProtectedRoute>
+                    <VideoCallPage />
+                  </ProtectedRoute>
+                } />
 
-              <Route path="/reset-password" element={
-                <ProtectedRoute requireAuth={false}>
-                  <ResetPasswordPage />
-                </ProtectedRoute>
-              } />
+                <Route path="/call/wait" element={
+                  <ProtectedRoute>
+                    <WaitingForDoctor />
+                  </ProtectedRoute>
+                } />
 
-              {/* Public informational pages */}
-              <Route path="/privacy-policy" element={
-                <ProtectedRoute requireAuth={false}>
-                  <PrivacyPolicy />
-                </ProtectedRoute>
-              } />
-              <Route path="/contact-us" element={
-                <ProtectedRoute requireAuth={false}>
-                  <ContactUs />
-                </ProtectedRoute>
-              } />
-              <Route path="/support" element={
-                <ProtectedRoute requireAuth={false}>
-                  <Support />
-                </ProtectedRoute>
-              } />
-              <Route path="/medical-disclaimer" element={
-                <ProtectedRoute requireAuth={false}>
-                  <MedicalDisclaimer />
-                </ProtectedRoute>
-              } />
+                <Route path="/reset-password" element={
+                  <ProtectedRoute requireAuth={false}>
+                    <ResetPasswordPage />
+                  </ProtectedRoute>
+                } />
 
-              {/* Radiologist Routes */}
-              <Route path="/radiologist-auth" element={
-                <ProtectedRoute requireAuth={false}>
-                  <RadiologistAuth />
-                </ProtectedRoute>
-              } />
-              <Route path="/radiologist-dashboard" element={
-                <ProtectedRoute>
-                  <RadiologistDashboard />
-                </ProtectedRoute>
-              } />
+                {/* Public informational pages */}
+                <Route path="/privacy-policy" element={
+                  <ProtectedRoute requireAuth={false}>
+                    <PrivacyPolicy />
+                  </ProtectedRoute>
+                } />
+                <Route path="/contact-us" element={
+                  <ProtectedRoute requireAuth={false}>
+                    <ContactUs />
+                  </ProtectedRoute>
+                } />
+                <Route path="/support" element={
+                  <ProtectedRoute requireAuth={false}>
+                    <Support />
+                  </ProtectedRoute>
+                } />
+                <Route path="/medical-disclaimer" element={
+                  <ProtectedRoute requireAuth={false}>
+                    <MedicalDisclaimer />
+                  </ProtectedRoute>
+                } />
 
-              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-              <Route path="*" element={<NotFound />} />
-            </Routes>
+                {/* Radiologist Routes */}
+                <Route path="/radiologist-auth" element={
+                  <ProtectedRoute requireAuth={false}>
+                    <RadiologistAuth />
+                  </ProtectedRoute>
+                } />
+                <Route path="/radiologist-dashboard" element={
+                  <ProtectedRoute>
+                    <RadiologistDashboard />
+                  </ProtectedRoute>
+                } />
+
+                {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+                <Route path="*" element={<NotFound />} />
+              </Routes>
             </Suspense>
           </BrowserRouter>
         </DeviceProvider>
