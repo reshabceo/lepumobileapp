@@ -361,7 +361,7 @@ cd ../..
 
 **Error:**
 ```
-error: exportArchive: No profiles for 'com.monitraq.app' were found
+error: exportArchive: No profiles for 'com.monitraq.mobile' were found
 ```
 
 **Fix:**
@@ -641,6 +641,21 @@ You should now have:
 8. **Airplane mode:** Disable to reduce Bluetooth interference when testing
 9. **Fresh build:** If issues, clean everything and rebuild from scratch
 10. **Xcode open:** Keep Xcode closed during script build (can cause conflicts)
+
+---
+
+## App Store Connect — IAP v2 products (iOS payments)
+
+The iOS app uses **Apple In-App Purchase** for all payments. See **[IAP_APP_STORE_CONNECT_V2.md](./IAP_APP_STORE_CONNECT_V2.md)** for the full product list and setup steps.
+
+Before App Store submission:
+
+1. Create all **v2** consumable and subscription products in App Store Connect.
+2. Set status to **Ready to Submit** and attach them to the app version.
+3. Test on a **physical device** with a **Sandbox Apple ID**.
+4. Run migration `supabase/migrations/20260612000000_iap_products_v2.sql` for subscription `apple_product_id` values.
+
+Android/web continue to use **Razorpay**.
 
 ---
 

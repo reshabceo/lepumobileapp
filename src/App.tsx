@@ -32,6 +32,7 @@ const LiveBPMonitor = lazy(() => import("./pages/LiveBPMonitor"));
 const WellueDeviceScanner = lazy(() => import("./pages/WellueDeviceScanner"));
 const BPReadingsHistory = lazy(() => import("./pages/BPReadingsHistory"));
 const ECGMonitor = lazy(() => import("./pages/ECGMonitor"));
+const O2RingMonitor = lazy(() => import("./pages/O2RingMonitor"));
 const CGMMonitor = lazy(() => import("./pages/CGMMonitor"));
 const BPResultScreen = lazy(() => import("./pages/BPResult"));
 const DoctorAssignmentPage = lazy(() => import("./pages/DoctorAssignmentPage").then(m => ({ default: m.DoctorAssignmentPage })));
@@ -59,6 +60,7 @@ const KardiaSixLeadECG = lazy(() => import("./pages/KardiaSixLeadECG"));
 const RecommendationsDashboard = lazy(() => import("./pages/RecommendationsDashboard"));
 const PatientMessages = lazy(() => import("./pages/PatientMessages"));
 const AliveCorHistory = lazy(() => import("./pages/AliveCorHistory"));
+const O2RingRecords = lazy(() => import("./pages/O2RingRecords"));
 const LiveMonitoringPage = lazy(() => import("./pages/LiveMonitoring"));
 const ServicesRecords = lazy(() => import("./pages/ServicesRecords").then(m => ({ default: m.ServicesRecords })));
 const MyThresholds = lazy(() => import("./components/MyThresholds"));
@@ -179,6 +181,16 @@ const App = () => (
                 <Route path="/cgm-monitor" element={
                   <ProtectedRoute>
                     <RequiresPaid featureLabel="CGM monitoring"><CGMMonitor /></RequiresPaid>
+                  </ProtectedRoute>
+                } />
+                <Route path="/o2ring-monitor" element={
+                  <ProtectedRoute>
+                    <RequiresPaid featureLabel="O2 Ring monitoring"><O2RingMonitor /></RequiresPaid>
+                  </ProtectedRoute>
+                } />
+                <Route path="/o2ring-records" element={
+                  <ProtectedRoute>
+                    <RequiresPaid featureLabel="O2 Ring records"><O2RingRecords /></RequiresPaid>
                   </ProtectedRoute>
                 } />
                 <Route path="/patients" element={

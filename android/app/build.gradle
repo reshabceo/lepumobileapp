@@ -5,7 +5,7 @@ apply plugin: 'com.android.application'
 apply plugin: 'kotlin-android'
 
 android {
-    namespace "com.monitraq.com"
+    namespace "com.monitraq.mobile"
     compileSdk rootProject.ext.compileSdkVersion
     
     compileOptions {
@@ -14,10 +14,11 @@ android {
     }
     
     defaultConfig {
+        applicationId "com.monitraq.mobile"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 25
-        versionName "1.25"
+        versionCode 26
+        versionName "1.26"
         multiDexEnabled true
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         ndk {
@@ -37,11 +38,11 @@ android {
     productFlavors {
         production {
             dimension "environment"
-            applicationId "com.monitraq.com"
+            applicationId "com.monitraq.mobile"
         }
         staging {
             dimension "environment"
-            applicationId "com.monitraq.com.staging"
+            applicationId "com.monitraq.mobile"
         }
     }
     signingConfigs {
@@ -102,10 +103,11 @@ dependencies {
     api 'io.getstream:stream-log-android:1.1.4'
     api 'io.getstream:stream-log-android-file:1.1.4'
     // Lepu BLE Pro SDK AAR for BP2 support
-    // Version 1.0.8 supports BP2, BP2A, BP2T devices (as per official SDK docs)
+    // Version 1.3.4 supports BP2, BP2A, BP2T devices (as per official SDK docs)
     // Source: https://github.com/viatom-develop/LepuDemo.git
-    implementation files('libs/lepu-blepro-1.0.8.aar')
+    implementation files('libs/lepu-blepro-1.3.4.aar')
 
+    /*
     // AliveCor SDK integration - REQUIRED dependencies for the AAR
     implementation files('libs/alivecorkit-core-1.6.10-914f71ed.aar')
     implementation 'net.danlew:android.joda:2.12.5'
@@ -140,6 +142,7 @@ dependencies {
     implementation 'org.jetbrains.kotlin:kotlin-stdlib:2.2.0'
     implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2'
     implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2'
+    */
 
     implementation "androidx.appcompat:appcompat:$androidxAppCompatVersion"
     implementation 'com.google.android.material:material:1.12.0'
@@ -147,11 +150,13 @@ dependencies {
     implementation "androidx.security:security-crypto:1.1.0-alpha06"
     implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
     
+    /*
     // AliveCor transitive dependencies found missing in logs
     implementation 'com.github.bosphere.android-filelogger:filelogger:1.0.7'
     implementation 'io.reactivex.rxjava2:rxandroid:2.1.1'
     implementation 'io.reactivex.rxjava2:rxjava:2.2.21'
     implementation 'com.squareup.okhttp3:logging-interceptor:4.12.0'
+    */
     implementation project(':capacitor-android')
     testImplementation "junit:junit:$junitVersion"
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Check, Loader2, Lock } from 'lucide-react';
+import { ArrowLeft, Check, Loader2, Lock } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { Browser } from '@capacitor/browser';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -7,6 +7,8 @@ import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSubscriptionTier } from '@/hooks/useSubscriptionTier';
+import { iapService } from '@/services/iapService';
+import { getAppleSubscriptionProductId } from '@/config/iap-products';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import {
@@ -46,6 +48,44 @@ declare global {
 
 const RAZORPAY_SCRIPT = 'https://checkout.razorpay.com/v1/checkout.js';
 let razorpayScriptPromise: Promise<void> | null = null;
+
+function getAppleProductIdForPlan(plan: PlanRow): string | null {
+  return getAppleSubscriptionProductId(plan.code);
+}
+
+async function purchaseSubscriptionViaIAP(plan: PlanRow): Promise<void> {
+  const productId = getAppleProductIdForPlan(plan);
+  if (!productId) throw new Error('No Apple subscription product configured for this plan.');
+
+  await iapService.preloadProducts();
+  const available = await iapService.isProductAvailable(productId);
+  if (!available) {
+    throw new Error(
+      `Product not found: ${productId}. Create this auto-renewable subscription in App Store Connect and attach it to the app.`,
+    );
+  }
+
+  const transaction = await iapService.purchase(productId);
+  if (!transaction) return;
+
+  const { data, error } = await supabase.functions.invoke('apple-iap-verify-subscription', {
+    body: {
+      receipt: transaction.receipt,
+      transaction_id: transaction.transactionId,
+      product_id: transaction.productId ?? productId,
+      plan_code: plan.code,
+      expiration_date_ms: transaction.expirationDateMs,
+      original_transaction_id: transaction.originalTransactionId,
+    },
+  });
+
+  if (error) {
+    throw new Error(await getFunctionErrorMessage(error, data));
+  }
+  if (!data?.success) {
+    throw new Error(typeof data?.error === 'string' ? data.error : 'Subscription verification failed');
+  }
+}
 
 function loadRazorpayScript(): Promise<void> {
   if (typeof window === 'undefined') return Promise.reject(new Error('No window'));
@@ -165,7 +205,11 @@ export default function Subscription() {
           resolve();
         }, 240000);
       });
-      await Browser.open({ url: checkoutUrl });
+      await Browser.open({
+        url: checkoutUrl,
+        presentationStyle: 'fullscreen',
+        toolbarColor: '#080D1A',
+      });
       await finishPromise;
       await Browser.removeAllListeners();
     } else {
@@ -226,6 +270,12 @@ export default function Subscription() {
   };
 
   useEffect(() => {
+    if (Capacitor.getPlatform() === 'ios') {
+      void iapService.preloadProducts();
+    }
+  }, []);
+
+  useEffect(() => {
     const load = async () => {
       setLoading(true);
       const [{ data: planRows }, { data: patientRow }] = await Promise.all([
@@ -259,7 +309,12 @@ export default function Subscription() {
         }
       }
 
-      setPlans((planRows || []) as PlanRow[]);
+      setPlans(
+        ((planRows || []) as PlanRow[]).map((p) => ({
+          ...p,
+          apple_product_id: getAppleSubscriptionProductId(p.code) ?? p.apple_product_id,
+        })),
+      );
       setActiveSub(subRow);
       setLoading(false);
     };
@@ -340,20 +395,6 @@ export default function Subscription() {
           : undefined;
         setBusyCode(plan.code);
         try {
-          const isIOS = Capacitor.getPlatform() === 'ios';
-          if (isIOS) {
-            // Apple IAP doesn't accept a deferred start date. The native pattern
-            // for "uncancel" on iOS is for the user to toggle auto-renew back on
-            // in Apple's Subscriptions screen — keeps the existing subscription
-            // alive, no new purchase, no double-billing. Open Apple's manage
-            // subscriptions URL and let them do it there.
-            if (confirm(
-              `On iOS, manage Monitraq+ in Apple Subscriptions. Tap "Turn on auto-renew" on your existing plan to keep it going — no new charge, no gap. Open Apple Subscriptions now?`
-            )) {
-              await Browser.open({ url: 'https://apps.apple.com/account/subscriptions' });
-            }
-            return;
-          }
           const { data, error } = await (supabase as any).functions.invoke('razorpay-subscription-create', {
             body: { plan_code: plan.code, start_at_unix: periodEndUnix },
           });
@@ -380,35 +421,41 @@ export default function Subscription() {
       }
     }
 
-    // Fresh subscribe
+    // Fresh subscribe — Apple IAP on iOS, Razorpay elsewhere
     setBusyCode(plan.code);
     try {
-      const isIOS = Capacitor.getPlatform() === 'ios';
-      if (isIOS) {
-        if (!plan.apple_product_id) {
-          toast.error('Apple product not configured. Contact support.');
-          return;
-        }
-        const { purchaseSubscription } = await import('@/lib/payment');
-        await purchaseSubscription(plan.apple_product_id, plan.code);
-        toast.success('Subscription started! Welcome to Monitraq+.');
-      } else {
-        const { data, error } = await (supabase as any).functions.invoke('razorpay-subscription-create', {
-          body: { plan_code: plan.code },
-        });
-        if (error) throw new Error(await getFunctionErrorMessage(error, data));
-        const checkoutUrl = data?.short_url || data?.checkout_url;
-        const keyId = data?.key_id;
-        const subscriptionId = data?.subscription_id;
-        if (!Capacitor.isNativePlatform() && keyId && subscriptionId) {
-          await openWebSubscriptionCheckout(keyId, subscriptionId);
+      if (Capacitor.getPlatform() === 'ios' && getAppleProductIdForPlan(plan)) {
+        await purchaseSubscriptionViaIAP(plan);
+        const activated = await waitForSubscriptionActivation(180000, 4000);
+        if (activated) {
+          toast.success('Payment successful. Monitraq+ activated.');
+          navigate('/profile', { replace: true });
         } else {
-          if (!checkoutUrl) throw new Error('No checkout URL returned.');
-          await openCheckoutWithReturnHandling(checkoutUrl);
+          toast.info('If payment is done, refresh this page in a few moments.');
         }
+        return;
+      }
+
+      const { data, error } = await (supabase as any).functions.invoke('razorpay-subscription-create', {
+        body: { plan_code: plan.code },
+      });
+      if (error) throw new Error(await getFunctionErrorMessage(error, data));
+      const checkoutUrl = data?.short_url || data?.checkout_url;
+      const keyId = data?.key_id;
+      const subscriptionId = data?.subscription_id;
+      if (!Capacitor.isNativePlatform() && keyId && subscriptionId) {
+        await openWebSubscriptionCheckout(keyId, subscriptionId);
+      } else {
+        if (!checkoutUrl) throw new Error('No checkout URL returned.');
+        await openCheckoutWithReturnHandling(checkoutUrl);
       }
     } catch (e: any) {
-      toast.error(`Subscribe failed: ${e?.message || e}`);
+      const msg = e?.message || String(e);
+      if (msg.toLowerCase().includes('cancel')) {
+        toast.info('Purchase cancelled.');
+      } else {
+        toast.error(`Subscribe failed: ${msg}`);
+      }
     } finally {
       setBusyCode(null);
     }
@@ -508,10 +555,20 @@ export default function Subscription() {
   };
 
   return (
-    <div className="min-h-screen bg-[#080D1A] px-4 py-6 pb-24 text-white">
-      <div className="max-w-md mx-auto space-y-5">
-        <button onClick={() => navigate(-1)} className="text-sm text-slate-400 hover:text-white">← Back</button>
+    <div className="min-h-screen bg-[#080D1A] text-white pb-safe-bottom">
+      <header className="sticky top-0 z-30 bg-[#080D1A]/95 backdrop-blur-md border-b border-white/5 px-4 pt-safe-top pb-3">
+        <button
+          type="button"
+          onClick={() => navigate(-1)}
+          className="inline-flex items-center gap-2 rounded-xl px-2 py-2 -ml-1 min-h-[44px] min-w-[44px] text-slate-300 hover:text-white hover:bg-white/10 active:bg-white/15 transition-colors touch-manipulation"
+          aria-label="Go back"
+        >
+          <ArrowLeft className="h-5 w-5 shrink-0" />
+          <span className="text-sm font-medium">Back</span>
+        </button>
+      </header>
 
+      <div className="max-w-md mx-auto px-4 py-5 pb-24 space-y-5">
         <div className="text-center space-y-3 rounded-3xl border border-slate-700/40 bg-[#1A243D] p-5 shadow-sm">
           <div className="inline-flex h-16 w-16 items-center justify-center rounded-full bg-amber-400/15 border border-amber-300/40">
             <img src="/monitraq-logo.png" alt="Monitraq" className="h-8 w-8 object-contain" />
@@ -621,24 +678,28 @@ export default function Subscription() {
                     : 'border-slate-700/40 bg-[#1A243D]'
                 }`}
               >
-                {isQuarterly && (
-                  <span className="absolute -top-2 right-3 text-[10px] uppercase tracking-wide bg-amber-300 text-black px-2 py-0.5 rounded-full font-semibold">
-                    Save ₹5,000
-                  </span>
-                )}
+                {isQuarterly && (() => {
+                  const monthly = plans.find((pl) => pl.period_days === 30);
+                  const saveRupees = monthly
+                    ? Math.max(0, Math.round((monthly.price_paise * 3 - p.price_paise) / 100))
+                    : 0;
+                  return saveRupees > 0 ? (
+                    <span className="absolute -top-2 right-3 text-[10px] uppercase tracking-wide bg-amber-300 text-black px-2 py-0.5 rounded-full font-semibold">
+                      Save ₹{saveRupees.toLocaleString('en-IN')}
+                    </span>
+                  ) : null;
+                })()}
                 <h3 className="text-lg font-semibold text-snow">{p.display_name}</h3>
                 {(() => {
-                  const netRupees = p.price_paise / 100;
-                  const gstRupees = Math.round(p.price_paise * 0.18) / 100;
-                  const totalRupees = netRupees + gstRupees;
+                  const totalRupees = p.price_paise / 100;
                   return (
                     <>
                       <p className="text-3xl font-bold text-snow tabular-nums mt-1">
                         ₹{totalRupees.toLocaleString('en-IN')}
                         <span className="text-sm text-slate-400 font-normal"> / {period}</span>
                       </p>
-                      <p className="text-xs text-cyan-300/80 mt-1 tabular-nums">
-                        ₹{netRupees.toLocaleString('en-IN')} + ₹{gstRupees.toLocaleString('en-IN')} GST (18%)
+                      <p className="text-xs text-cyan-300/80 mt-1">
+                        Inclusive of applicable taxes
                       </p>
                     </>
                   );
@@ -745,7 +806,7 @@ export default function Subscription() {
                 );
               }}
             >
-              {busyCode ? <><Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> Starting…</> : 'Proceed to Razorpay'}
+              {busyCode ? <><Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> Starting…</> : Capacitor.getPlatform() === 'ios' ? 'Subscribe with Apple' : 'Proceed to Razorpay'}
             </Button>
           </DialogFooter>
         </DialogContent>

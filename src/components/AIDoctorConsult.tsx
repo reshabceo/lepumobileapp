@@ -13,7 +13,8 @@ import {
   closeSession,
   expireSession,
 } from "@/services/aiDoctorService";
-import { fetchAIDoctorPricing, payAndFulfil, AIDoctorPricing } from "@/lib/payment";
+import { fetchAIDoctorPricing, getPlatformCheckoutPriceDisplay, isIOSPaymentPlatform, payAndFulfil, AIDoctorPricing } from "@/lib/payment";
+import { iapService } from "@/services/iapService";
 import { useAuth } from "@/contexts/AuthContext";
 import { db } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
@@ -46,6 +47,8 @@ import {
   Bot,
 } from "lucide-react";
 import { Capacitor } from "@capacitor/core";
+import { AIDataSharingConsentDialog } from "@/components/AIDataSharingConsentDialog";
+import { grantAIDataSharingConsent, hasAIDataSharingConsent } from "@/lib/aiDataConsent";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
@@ -172,8 +175,28 @@ export const AIDoctorConsult: React.FC = () => {
   const audioStreamRef = useRef<MediaStream | null>(null);
   const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
   const ttsAudioRef = useRef<HTMLAudioElement | null>(null);
+  const pendingAiConsentActionRef = useRef<(() => void) | null>(null);
+  const paymentInProgressRef = useRef(false);
+
+  const [showAiConsent, setShowAiConsent] = useState(false);
+  const requiresIosAiConsent = Capacitor.getPlatform() === "ios";
+
+  const requestAiConsentIfNeeded = (action: () => void): boolean => {
+    if (!requiresIosAiConsent || hasAIDataSharingConsent()) {
+      return true;
+    }
+    pendingAiConsentActionRef.current = action;
+    setShowAiConsent(true);
+    return false;
+  };
 
   // --- Patient context ---
+  useEffect(() => {
+    if (isIOSPaymentPlatform()) {
+      void iapService.preloadProducts();
+    }
+  }, []);
+
   useEffect(() => {
     const loadContext = async () => {
       try {
@@ -405,6 +428,19 @@ export const AIDoctorConsult: React.FC = () => {
 
   // --- Payment ---
   const handlePayForConsult = async (mode: "text" | "voice") => {
+    if (paymentInProgressRef.current) return;
+    if (!requestAiConsentIfNeeded(() => { void handlePayForConsult(mode); })) return;
+
+    paymentInProgressRef.current = true;
+    setPayingMode(mode);
+    setIsPaymentLoading(true);
+
+    const releasePaymentLock = () => {
+      paymentInProgressRef.current = false;
+      setIsPaymentLoading(false);
+      setPayingMode(null);
+    };
+
     // Ensure we have a session ID before proceeding
     let currentSessionId = sessionId;
     if (!currentSessionId && patientContext.id) {
@@ -424,6 +460,7 @@ export const AIDoctorConsult: React.FC = () => {
         sessionId: currentSessionId,
         pricing: !!pricing
       });
+      releasePaymentLock();
       toast({
         title: "Session Error",
         description: "Your consultation session is not ready. Please try again in a moment.",
@@ -434,45 +471,43 @@ export const AIDoctorConsult: React.FC = () => {
 
     const paymentType = mode === "text" ? "ai_doctor_text" : "ai_doctor_voice";
     const netPaise = mode === "text" ? pricing.price_text_paise : pricing.price_voice_paise;
-    // GST 18% added on top of the displayed net price. Patient pays gross = net × 1.18.
-    const { applyGst } = await import("@/lib/payment");
-    const amountPaise = applyGst(netPaise);
 
-    setPayingMode(mode);
-    setIsPaymentLoading(true);
-    console.log(`💳 [DEBUG] Initiating ${paymentType} payment for session: ${currentSessionId}, amount: ${amountPaise}`);
+    console.log(`💳 [DEBUG] Initiating ${paymentType} payment for session: ${currentSessionId}, net: ${netPaise}`);
 
     try {
       await payAndFulfil({
         type: paymentType,
-        amount_paise: amountPaise,
+        amount_paise: netPaise,
         metadata: {
           session_id: currentSessionId,
           patient_id: patientContext.id,
-          amount_paise: amountPaise,
-          consult_mode: mode
+          net_amount_paise: netPaise,
+          consult_mode: mode,
         },
         onSuccess: async () => {
-          // Refresh session state after payment
           const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
           setPaymentStatus("paid");
           setSessionExpiresAt(expiresAt);
           setConsultMode(mode);
-          setIsPaymentLoading(false);
+          releasePaymentLock();
           toast({
             title: "Payment successful",
             description: `AI Doctor ${mode} consultation unlocked for 24 hours.`,
           });
         },
         onDismiss: () => {
-          setIsPaymentLoading(false);
+          releasePaymentLock();
           toast({
             title: "Payment cancelled",
             description: "You can pay anytime to start your consultation.",
           });
         },
         onError: (err) => {
-          setIsPaymentLoading(false);
+          releasePaymentLock();
+          const msg = err.message?.toLowerCase() ?? "";
+          if (msg.includes("too many requests") || msg.includes("already in progress")) {
+            return;
+          }
           toast({
             title: "Payment failed",
             description: err.message || "Something went wrong. Please try again.",
@@ -481,10 +516,15 @@ export const AIDoctorConsult: React.FC = () => {
         },
       });
     } catch (err) {
-      // Errors already shown via onError callback
-    } finally {
-      setIsPaymentLoading(false);
-      setPayingMode(null);
+      releasePaymentLock();
+      const msg = err instanceof Error ? err.message.toLowerCase() : "";
+      if (!msg.includes("too many requests")) {
+        toast({
+          title: "Payment failed",
+          description: err instanceof Error ? err.message : "Something went wrong. Please try again.",
+          variant: "destructive",
+        });
+      }
     }
   };
 
@@ -612,6 +652,7 @@ export const AIDoctorConsult: React.FC = () => {
   // =============================================
   const handleSend = async () => {
     if ((!input.trim() && attachedFiles.length === 0) || isLoading) return;
+    if (!requestAiConsentIfNeeded(() => { void handleSend(); })) return;
 
     const patientMessage: AIDoctorMessage = {
       role: "patient",
@@ -702,6 +743,8 @@ export const AIDoctorConsult: React.FC = () => {
   //  VOICE RECORDING
   // =============================================
   const startRecording = async () => {
+    if (!requestAiConsentIfNeeded(() => { void startRecording(); })) return;
+
     if (typeof MediaRecorder === "undefined") {
       toast({
         title: "Not supported",
@@ -1309,13 +1352,25 @@ export const AIDoctorConsult: React.FC = () => {
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className="text-lg font-bold text-white">
-                    ₹{pricing ? Math.round(pricing.price_text_paise * 1.18) / 100 : "…"}
-                  </p>
-                  {pricing && (
-                    <p className="text-[10px] text-white/45 leading-tight">
-                      ₹{pricing.price_text_paise / 100} + ₹{Math.round(pricing.price_text_paise * 0.18) / 100} GST
-                    </p>
+                  {pricing ? (() => {
+                    const p = getPlatformCheckoutPriceDisplay("ai_doctor_text", pricing.price_text_paise, true);
+                    return (
+                      <>
+                        <p className="text-lg font-bold text-white">
+                          ₹{p.exactTotalRupees.toLocaleString("en-IN")}
+                        </p>
+                        {!isIOSPaymentPlatform() && (
+                          <p className="text-[10px] text-white/45 leading-tight">
+                            ₹{p.netRupees.toLocaleString("en-IN")} + ₹{p.gstRupees.toLocaleString("en-IN")} GST
+                          </p>
+                        )}
+                        {isIOSPaymentPlatform() && (
+                          <p className="text-[10px] text-white/45 leading-tight">App Store purchase</p>
+                        )}
+                      </>
+                    );
+                  })() : (
+                    <p className="text-lg font-bold text-white">…</p>
                   )}
                   <p className="text-[10px] text-white/40">24h access</p>
                 </div>
@@ -1346,13 +1401,25 @@ export const AIDoctorConsult: React.FC = () => {
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className="text-lg font-bold text-emerald-400">
-                    ₹{pricing ? Math.round(pricing.price_voice_paise * 1.18) / 100 : "…"}
-                  </p>
-                  {pricing && (
-                    <p className="text-[10px] text-white/45 leading-tight">
-                      ₹{pricing.price_voice_paise / 100} + ₹{Math.round(pricing.price_voice_paise * 0.18) / 100} GST
-                    </p>
+                  {pricing ? (() => {
+                    const p = getPlatformCheckoutPriceDisplay("ai_doctor_voice", pricing.price_voice_paise, true);
+                    return (
+                      <>
+                        <p className="text-lg font-bold text-emerald-400">
+                          ₹{p.exactTotalRupees.toLocaleString("en-IN")}
+                        </p>
+                        {!isIOSPaymentPlatform() && (
+                          <p className="text-[10px] text-white/45 leading-tight">
+                            ₹{p.netRupees.toLocaleString("en-IN")} + ₹{p.gstRupees.toLocaleString("en-IN")} GST
+                          </p>
+                        )}
+                        {isIOSPaymentPlatform() && (
+                          <p className="text-[10px] text-white/45 leading-tight">App Store purchase</p>
+                        )}
+                      </>
+                    );
+                  })() : (
+                    <p className="text-lg font-bold text-emerald-400">…</p>
                   )}
                   <p className="text-[10px] text-white/40">24h access</p>
                 </div>
@@ -1403,7 +1470,10 @@ export const AIDoctorConsult: React.FC = () => {
           )}
 
           <p className="mt-5 text-[10px] text-white/20 text-center max-w-xs">
-            Payments are processed securely via Razorpay. Dr. MonitraQ is an AI assistant, not a substitute for professional medical care.
+            {isIOSPaymentPlatform()
+              ? "Payments are processed securely via Apple In-App Purchase. "
+              : "Payments are processed securely via Razorpay. "}
+            Dr. MonitraQ is an AI assistant, not a substitute for professional medical care.
           </p>
         </div>
       )}
@@ -2282,6 +2352,26 @@ export const AIDoctorConsult: React.FC = () => {
           </div>
         </>
       )}
+
+      <AIDataSharingConsentDialog
+        open={showAiConsent}
+        onAccept={() => {
+          grantAIDataSharingConsent();
+          setShowAiConsent(false);
+          const next = pendingAiConsentActionRef.current;
+          pendingAiConsentActionRef.current = null;
+          next?.();
+        }}
+        onDecline={() => {
+          setShowAiConsent(false);
+          pendingAiConsentActionRef.current = null;
+          toast({
+            title: "Consent required",
+            description: "You need to agree before Health AI can process your health information.",
+            variant: "destructive",
+          });
+        }}
+      />
     </div>
   );
 };

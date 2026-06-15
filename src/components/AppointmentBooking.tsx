@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { payAndFulfil } from '@/lib/payment';
+import { getPlatformCheckoutPriceDisplay, payAndFulfil, type PaymentType } from '@/lib/payment';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -469,6 +469,17 @@ export const AppointmentBooking = () => {
     return format(addDays(new Date(), 90), 'yyyy-MM-dd');
   };
 
+  const formatConsultFeeLabel = (
+    feeRupees: number | null | undefined,
+    mode: 'video' | 'audio' = callMode,
+  ) => {
+    if (feeRupees == null) return '—';
+    const netPaise = Math.round(Number(feeRupees) * 100);
+    const paymentType: PaymentType = mode === 'video' ? 'appointment_video' : 'appointment_audio';
+    const display = getPlatformCheckoutPriceDisplay(paymentType, netPaise, false);
+    return `₹${display.exactTotalRupees.toLocaleString('en-IN')}`;
+  };
+
   if (!doctorId) {
     return (
       <div className="space-y-4 p-4 pt-safe-top w-full bg-[#080D1A] min-h-screen text-white">
@@ -783,9 +794,9 @@ export const AppointmentBooking = () => {
                         const fee = callMode === 'video' 
                           ? (doctor.video_consultation_fee ?? doctor.consultation_fee)
                           : (doctor.audio_consultation_fee ?? doctor.consultation_fee);
-                        return doctor.is_available_now 
-                          ? `Pay & Book Now ${fee ? `(₹${fee})` : ''}` 
-                          : `Pay & Book Next Available ${fee ? `(₹${fee})` : ''}`;
+                        return doctor.is_available_now
+                          ? `Pay & Book Now ${fee != null ? `(${formatConsultFeeLabel(fee)})` : ''}`
+                          : `Pay & Book Next Available ${fee != null ? `(${formatConsultFeeLabel(fee)})` : ''}`;
                       })()}
                     </Button>
                   </div>
@@ -897,7 +908,7 @@ export const AppointmentBooking = () => {
               </>
             ) : (() => {
               const v = callMode === 'video' ? (doctorInfo?.video_consultation_fee ?? doctorInfo?.consultation_fee) : (doctorInfo?.audio_consultation_fee ?? doctorInfo?.consultation_fee);
-              return v != null ? `Pay & Book (₹${v})` : 'Pay & Book';
+              return v != null ? `Pay & Book (${formatConsultFeeLabel(v)})` : 'Pay & Book';
             })()}
           </Button>
 

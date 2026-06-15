@@ -25,7 +25,7 @@ const WellueDeviceScanner = () => {
           >
             <ArrowLeft size={20} />
           </button>
-          <h1 className="text-2xl font-bold text-white">Wellue BP2 Scanner</h1>
+          <h1 className="text-2xl font-bold text-white">Wellue Device Scanner</h1>
         </div>
 
         <WellueSDKScanner />

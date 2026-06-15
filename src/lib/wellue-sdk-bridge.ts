@@ -62,6 +62,17 @@ export interface ECGData {
     mvPerCount?: number;
 }
 
+// O2 Ring real-time data interface
+export interface O2RingData {
+    spo2: number;
+    heartRate: number;
+    pi: number;
+    batteryPercent: number;
+    batteryState?: number;
+    state?: number; // VTMWOxiRunParams.sensor_state: 0=normal/finger ON, 1=no finger, 2=probe out, 3=fault
+    timestamp: Date;
+}
+
 // Callback interfaces
 export interface WellueSDKCallbacks {
     onDeviceFound?: (device: WellueDevice) => void;
@@ -73,6 +84,7 @@ export interface WellueSDKCallbacks {
     onRealTimeUpdate?: (data: RealTimeData) => void;
     onECGData?: (data: ECGData) => void;
     onECGLifecycle?: (state: 'start' | 'stop') => void;
+    onO2RingUpdate?: (data: O2RingData) => void;
     onBatteryUpdate?: (deviceId: string, battery: number) => void;
     onBluetoothStatusChanged?: (enabled: boolean) => void;
     onError?: (error: string, details?: any) => void;
@@ -84,7 +96,7 @@ export interface WellueSDKPlugin {
     isBluetoothEnabled(): Promise<{ enabled: boolean }>;
     startScan(): Promise<any>;
     stopScan(): Promise<any>;
-    connect(options: { address: string }): Promise<any>;
+    connect(options: { address: string; deviceId?: string; name?: string; model?: string }): Promise<any>;
     disconnect(options?: { address?: string }): Promise<any>;
     getBatteryLevel(options: { address: string }): Promise<any>;
     getDeviceInfo?(): Promise<any>;
@@ -102,8 +114,7 @@ export interface WellueSDKPlugin {
 }
 
 // Register the native plugin - Using Lepu SDK from official GitHub repository
-// Plugin name must match @CapacitorPlugin(name = "LepuSDK") in WelluePlugin.java
-const LepuSDK = registerPlugin<WellueSDKPlugin>('LepuSDK');
+const LepuSDK = registerPlugin<WellueSDKPlugin>('WellueSDK');
 
 // BP Measurement Manager
 class BPMeasurementManager {
@@ -643,7 +654,7 @@ class NativeWelluePlugin {
         // Detect plugin availability on this platform to avoid noisy errors
         try {
             const anyCap = Capacitor as any;
-            const capSays = typeof anyCap.isPluginAvailable === 'function' ? anyCap.isPluginAvailable('LepuSDK') : undefined;
+            const capSays = typeof anyCap.isPluginAvailable === 'function' ? anyCap.isPluginAvailable('WellueSDK') : undefined;
             const hasMethods = this.nativePlugin && typeof (this.nativePlugin as any).initialize === 'function';
             this.pluginAvailable = (capSays === true) || (!!hasMethods && Capacitor.isNativePlatform());
             console.log('🚀 [NATIVE WELLUE PLUGIN] Plugin available check result:', this.pluginAvailable);
@@ -974,6 +985,29 @@ class NativeWelluePlugin {
             if (state) this.callbacks.onECGLifecycle?.(state);
         });
 
+        // O2 Ring real-time updates listener
+        this.nativePlugin.addListener('o2RingRt', (data: any) => {
+            console.log('📡 [O2RING BRIDGE] Mapped O2 Ring real-time data:', JSON.stringify(data));
+            let state = data.state;
+            if (Capacitor.getPlatform() === 'android') {
+                if (state === 1) {
+                    state = 0;
+                } else if (state === 0) {
+                    state = 1;
+                }
+            }
+            const o2Data: O2RingData = {
+                spo2: data.spo2,
+                heartRate: data.pr || data.hr || data.heartRate,
+                pi: data.pi,
+                batteryPercent: data.battery || data.batteryPercent,
+                batteryState: data.batteryState,
+                state: state,
+                timestamp: new Date()
+            };
+            this.callbacks.onO2RingUpdate?.(o2Data);
+        });
+
         // Battery update event
         this.nativePlugin.addListener('batteryUpdate', (data: any) => {
             this.callbacks.onBatteryUpdate?.(data.deviceId, data.battery);
@@ -1072,13 +1106,18 @@ class NativeWelluePlugin {
         await this.nativePlugin.stopScan();
     }
 
-    async connect(deviceId: string): Promise<WellueDevice> {
+    async connect(deviceId: string, name?: string, model?: string): Promise<WellueDevice> {
         if (!this.isInitialized) {
             try { await this.initialize(); } catch { throw new Error('Wellue SDK not initialized'); }
         }
 
         try {
-            const deviceData = await this.nativePlugin.connect({ address: deviceId, deviceId: deviceId });
+            const deviceData = await this.nativePlugin.connect({ 
+                address: deviceId, 
+                deviceId: deviceId,
+                name: name,
+                model: model
+            });
             
             const device: WellueDevice = {
                 id: deviceId,
@@ -1353,8 +1392,8 @@ export class WellueSDKBridge {
         return this.plugin.stopScan();
     }
 
-    async connect(deviceId: string): Promise<WellueDevice> {
-        return this.plugin.connect(deviceId);
+    async connect(deviceId: string, name?: string, model?: string): Promise<WellueDevice> {
+        return this.plugin.connect(deviceId, name, model);
     }
 
     async disconnect(deviceId: string): Promise<void> {

@@ -70,6 +70,8 @@ public class WelluePlugin extends Plugin {
     // Map BP2 filename -> index (filled when fetching list) to support index-based
     // read fallbacks
     private final java.util.Map<String, Integer> bp2FileIndexMap = new java.util.HashMap<>();
+    private android.os.Handler oxyHandler = null;
+    private Runnable oxyPoller = null;
     private final android.os.Handler connHandler = new android.os.Handler(android.os.Looper.getMainLooper());
     private final Runnable connPoller = new Runnable() {
         @Override
@@ -91,7 +93,17 @@ public class WelluePlugin extends Plugin {
                             dev.put("deviceName", d.getName());
                             dev.put("deviceId", addr);
                             dev.put("address", addr);
-                            dev.put("model", "unknown");
+                            int storedModel = modelByAddress.getOrDefault(addr, com.lepu.blepro.objs.Bluetooth.MODEL_BP2);
+                            String modelStr = "BP2";
+                            if (storedModel == com.lepu.blepro.objs.Bluetooth.MODEL_O2RING) {
+                                modelStr = "O2Ring";
+                            } else {
+                                String dName = d.getName();
+                                if (dName != null && (dName.toLowerCase().contains("o2") || dName.toLowerCase().contains("ring") || dName.toLowerCase().contains("oxy"))) {
+                                    modelStr = "O2Ring";
+                                }
+                            }
+                            dev.put("model", modelStr);
                             notifyListeners("deviceConnected", dev);
                             Log.d(TAG, "✅ GATT connected: " + addr + " (" + d.getName() + ")");
                             // If this is the address we are trying to connect, mark as our active Wellue
@@ -140,8 +152,13 @@ public class WelluePlugin extends Plugin {
                             dev.put("deviceName", bt.getName());
                             dev.put("deviceId", bt.getDevice().getAddress());
                             dev.put("address", bt.getDevice().getAddress());
-                            dev.put("model", bt.getModel());
-                            notifyListeners("deviceFound", dev);
+                             int modelInt = bt.getModel();
+                             String modelStr = "BP2";
+                             if (modelInt == com.lepu.blepro.objs.Bluetooth.MODEL_O2RING) {
+                                 modelStr = "O2Ring";
+                             }
+                             dev.put("model", modelStr);
+                             notifyListeners("deviceFound", dev);
                             try {
                                 if (bt.getDevice() != null && bt.getDevice().getAddress() != null)
                                     modelByAddress.put(bt.getDevice().getAddress(), bt.getModel());
@@ -1315,8 +1332,10 @@ public class WelluePlugin extends Plugin {
                     return com.lepu.blepro.objs.Bluetooth.MODEL_BP2A;
                 if (m.contains("BP2T"))
                     return com.lepu.blepro.objs.Bluetooth.MODEL_BP2T;
-                if (m.contains("BP2"))
-                    return com.lepu.blepro.objs.Bluetooth.MODEL_BP2;
+                 if (m.contains("BP2"))
+                     return com.lepu.blepro.objs.Bluetooth.MODEL_BP2;
+                 if (m.contains("O2RING"))
+                     return com.lepu.blepro.objs.Bluetooth.MODEL_O2RING;
                 // numeric string
                 try {
                     return Integer.parseInt(m);
@@ -1331,6 +1350,136 @@ public class WelluePlugin extends Plugin {
         } catch (Throwable ignore) {
         }
         return def;
+    }
+
+    private boolean oxyObserverRegistered = false;
+
+    private void ensureOxyObserver() {
+        if (oxyObserverRegistered)
+            return;
+        try {
+            final String key = com.lepu.blepro.event.InterfaceEvent.Oxy.EventOxyRtParamData;
+            LiveEventBus.get(key, Object.class).observeForever(new Observer<Object>() {
+                @Override
+                public void onChanged(Object obj) {
+                    try {
+                        Log.d(TAG, "📡 Oxy Rt event received class=" + (obj != null ? obj.getClass().getName() : "null"));
+                        Object payload = obj;
+                        if (payload != null) {
+                            String[] unwrap = new String[] { "getObj", "getData", "getPayload", "getSecond", "component2" };
+                            for (String m : unwrap) {
+                                try {
+                                    java.lang.reflect.Method mm = payload.getClass().getMethod(m);
+                                    Object v = mm.invoke(payload);
+                                    if (v != null) {
+                                        payload = v;
+                                        break;
+                                    }
+                                } catch (Throwable ignore) {
+                                }
+                            }
+                        }
+                        
+                        if (payload != null) {
+                            Integer spo2 = null;
+                            Integer pr = null;
+                            Float pi = null;
+                            Integer battery = null;
+                            Integer batteryState = null;
+                            Integer state = null;
+                            
+                            try {
+                                Object v = payload.getClass().getMethod("getSpo2").invoke(payload);
+                                if (v instanceof Number) spo2 = ((Number) v).intValue();
+                            } catch (Throwable ignore) {}
+                            
+                            try {
+                                Object v = payload.getClass().getMethod("getPr").invoke(payload);
+                                if (v instanceof Number) pr = ((Number) v).intValue();
+                            } catch (Throwable ignore) {}
+                            
+                            if (pr == null) {
+                                try {
+                                    Object v = payload.getClass().getMethod("getHr").invoke(payload);
+                                    if (v instanceof Number) pr = ((Number) v).intValue();
+                                } catch (Throwable ignore) {}
+                            }
+                            
+                            try {
+                                Object v = payload.getClass().getMethod("getPi").invoke(payload);
+                                if (v instanceof Number) {
+                                    pi = ((Number) v).floatValue() / 10.0f;
+                                }
+                            } catch (Throwable ignore) {}
+                            
+                            try {
+                                Object v = payload.getClass().getMethod("getBattery").invoke(payload);
+                                if (v instanceof Number) battery = ((Number) v).intValue();
+                            } catch (Throwable ignore) {}
+                            
+                            try {
+                                Object v = payload.getClass().getMethod("getBatteryState").invoke(payload);
+                                if (v instanceof Number) batteryState = ((Number) v).intValue();
+                            } catch (Throwable ignore) {}
+                            
+                            try {
+                                Object v = payload.getClass().getMethod("getState").invoke(payload);
+                                if (v instanceof Number) state = ((Number) v).intValue();
+                            } catch (Throwable ignore) {}
+                            
+                            JSObject rt = new JSObject();
+                            rt.put("spo2", spo2 != null ? spo2 : 0);
+                            rt.put("pr", pr != null ? pr : 0);
+                            rt.put("pi", pi != null ? pi : 0.0f);
+                            rt.put("battery", battery != null ? battery : 0);
+                            rt.put("batteryState", batteryState != null ? batteryState : 0);
+                            rt.put("state", state != null ? state : 0);
+                            
+                            notifyListeners("o2RingRt", rt);
+                        }
+                    } catch (Throwable t) {
+                        Log.e(TAG, "Oxy Rt parse error", t);
+                    }
+                }
+            });
+            oxyObserverRegistered = true;
+            Log.d(TAG, "📡 Oxy Rt observer registered successfully");
+        } catch (Throwable t) {
+            Log.w(TAG, "Unable to register Oxy Rt observer", t);
+        }
+    }
+
+    private void startOxyPolling(int model) {
+        stopOxyPolling();
+        oxyHandler = new android.os.Handler(android.os.Looper.getMainLooper());
+        oxyPoller = new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    Object helper = getBleHelper();
+                    if (helper != null) {
+                        helper.getClass().getMethod("oxyGetRtParam", int.class).invoke(helper, model);
+                    }
+                } catch (Throwable t) {
+                    Log.w(TAG, "oxyGetRtParam poll error", t);
+                } finally {
+                    if (oxyHandler != null) {
+                        oxyHandler.postDelayed(this, 1000);
+                    }
+                }
+            }
+        };
+        oxyHandler.post(oxyPoller);
+        Log.d(TAG, "⏰ Oxy polling started for model=" + model);
+    }
+
+    private void stopOxyPolling() {
+        if (oxyHandler != null) {
+            oxyHandler.removeCallbacksAndMessages(null);
+            oxyHandler = null;
+        }
+        oxyPoller = null;
+        Log.d(TAG, "⏰ Oxy polling stopped");
     }
 
     @PluginMethod
@@ -1348,7 +1497,12 @@ public class WelluePlugin extends Plugin {
                 call.reject("BleServiceHelper unavailable");
                 return;
             }
-            helper.getClass().getMethod("startRtTask", int.class).invoke(helper, model);
+            if (model == com.lepu.blepro.objs.Bluetooth.MODEL_O2RING) {
+                ensureOxyObserver();
+                startOxyPolling(model);
+            } else {
+                helper.getClass().getMethod("startRtTask", int.class).invoke(helper, model);
+            }
             Log.d(TAG, "▶️ startRtTask(model=" + model + ") invoked");
             JSObject ok = new JSObject();
             ok.put("success", true);
@@ -1373,7 +1527,11 @@ public class WelluePlugin extends Plugin {
                 call.reject("BleServiceHelper unavailable");
                 return;
             }
-            helper.getClass().getMethod("stopRtTask", int.class).invoke(helper, model);
+            if (model == com.lepu.blepro.objs.Bluetooth.MODEL_O2RING) {
+                stopOxyPolling();
+            } else {
+                helper.getClass().getMethod("stopRtTask", int.class).invoke(helper, model);
+            }
             Log.d(TAG, "⏹️ stopRtTask(model=" + model + ") invoked");
             JSObject ok = new JSObject();
             ok.put("success", true);
@@ -1773,30 +1931,50 @@ public class WelluePlugin extends Plugin {
 
                                     // Enhanced logging to help identify BP2 device
                                     Log.d(TAG, "🛰️ ===== BLUETOOTH DEVICE FOUND =====");
-                                    Log.d(TAG, "🛰️ Device Name: " + (name != null ? name : "Unknown"));
-                                    Log.d(TAG, "🛰️ MAC Address: " + address);
-                                    Log.d(TAG, "🛰️ Signal Strength (RSSI): " + rssi + " dBm");
-                                    Log.d(TAG, "🛰️ Callback Type: " + callbackType);
+                                     Log.d(TAG, "🛰️ Device Name: " + (name != null ? name : "Unknown"));
+                                     Log.d(TAG, "🛰️ MAC Address: " + address);
+                                     Log.d(TAG, "🛰️ Signal Strength (RSSI): " + rssi + " dBm");
 
-                                    // Check if this looks like a BP2 device
-                                    boolean likelyBP2 = false;
-                                    if (name != null) {
-                                        String nameLower = name.toLowerCase();
-                                        if (nameLower.contains("bp2") || nameLower.contains("3049") ||
-                                                nameLower.contains("lepu") || nameLower.contains("viatom")) {
-                                            likelyBP2 = true;
-                                            Log.d(TAG, "🩺 ⭐ POSSIBLE BP2 DEVICE DETECTED! ⭐");
-                                        }
-                                    }
-                                    Log.d(TAG, "🛰️ =====================================");
+                                     boolean likelyBP2 = false;
+                                     boolean likelyO2 = false;
+                                     if (name != null) {
+                                         String nameLower = name.toLowerCase();
+                                         if (nameLower.contains("bp2") || nameLower.contains("3049") ||
+                                                 nameLower.contains("lepu") || nameLower.contains("viatom") ||
+                                                 nameLower.contains("bp-2") || nameLower.contains("bp2a") || nameLower.contains("bp2t")) {
+                                             likelyBP2 = true;
+                                             Log.d(TAG, "🩺 ⭐ POSSIBLE BP/WELLUE DEVICE DETECTED! ⭐");
+                                         }
+                                         if (nameLower.contains("o2") || nameLower.contains("ring") || nameLower.contains("oxy")) {
+                                             likelyO2 = true;
+                                             Log.d(TAG, "🩺 ⭐ POSSIBLE O2RING DEVICE DETECTED! ⭐");
+                                         }
+                                     }
 
-                                    JSObject dev = new JSObject();
-                                    dev.put("deviceName", name != null ? name : "Unknown");
-                                    dev.put("deviceId", address);
-                                    dev.put("address", address);
-                                    dev.put("model", likelyBP2 ? "BP2" : "unknown");
-                                    dev.put("rssi", rssi);
-                                    notifyListeners("deviceFound", dev);
+                                     JSObject dev = new JSObject();
+                                     dev.put("deviceName", name != null ? name : "Unknown");
+                                     dev.put("deviceId", address);
+                                     dev.put("address", address);
+                                     if (likelyO2) {
+                                         dev.put("model", "O2Ring");
+                                         modelByAddress.put(address, com.lepu.blepro.objs.Bluetooth.MODEL_O2RING);
+                                     } else if (likelyBP2) {
+                                         String nameLower = name != null ? name.toLowerCase() : "";
+                                         if (nameLower.contains("bp2a")) {
+                                             dev.put("model", "BP2A");
+                                             modelByAddress.put(address, com.lepu.blepro.objs.Bluetooth.MODEL_BP2A);
+                                         } else if (nameLower.contains("bp2t")) {
+                                             dev.put("model", "BP2T");
+                                             modelByAddress.put(address, com.lepu.blepro.objs.Bluetooth.MODEL_BP2T);
+                                         } else {
+                                             dev.put("model", "BP2");
+                                             modelByAddress.put(address, com.lepu.blepro.objs.Bluetooth.MODEL_BP2);
+                                         }
+                                     } else {
+                                         dev.put("model", "unknown");
+                                     }
+                                     dev.put("rssi", rssi);
+                                     notifyListeners("deviceFound", dev);
                                 } catch (Throwable ex) {
                                     Log.w(TAG, "sysScan onScanResult error", ex);
                                 }
@@ -1891,9 +2069,27 @@ public class WelluePlugin extends Plugin {
                 call.reject("Another Wellue device is already connected. Disconnect first.");
                 return;
             }
-            // Enforce BP2-only by interface: if model mapping says otherwise, coerce to BP2
-            // family
-            modelByAddress.put(deviceAddress, com.lepu.blepro.objs.Bluetooth.MODEL_BP2);
+            // Determine model dynamically instead of forcing BP2
+            int resolvedModel = com.lepu.blepro.objs.Bluetooth.MODEL_BP2;
+            if (modelByAddress.containsKey(deviceAddress)) {
+                resolvedModel = modelByAddress.get(deviceAddress);
+            } else {
+                android.bluetooth.BluetoothDevice device = bluetoothAdapter.getRemoteDevice(deviceAddress);
+                String name = device.getName();
+                if (name != null) {
+                    String nameLower = name.toLowerCase();
+                    if (nameLower.contains("o2") || nameLower.contains("ring") || nameLower.contains("oxy")) {
+                        resolvedModel = com.lepu.blepro.objs.Bluetooth.MODEL_O2RING;
+                    } else if (nameLower.contains("bp2a")) {
+                        resolvedModel = com.lepu.blepro.objs.Bluetooth.MODEL_BP2A;
+                    } else if (nameLower.contains("bp2t")) {
+                        resolvedModel = com.lepu.blepro.objs.Bluetooth.MODEL_BP2T;
+                    } else if (nameLower.contains("bp2") || nameLower.contains("3049") || nameLower.contains("lepu") || nameLower.contains("viatom") || nameLower.contains("bp-2")) {
+                        resolvedModel = com.lepu.blepro.objs.Bluetooth.MODEL_BP2;
+                    }
+                }
+                modelByAddress.put(deviceAddress, resolvedModel);
+            }
 
             if (deviceAddress == null || deviceAddress.isEmpty()) {
                 Log.e(TAG, "❌ Device address is required");

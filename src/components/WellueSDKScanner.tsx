@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { 
@@ -40,16 +40,56 @@ export const WellueSDKScanner: React.FC = () => {
     disconnectDevice,
     refreshBattery,
     manualInitializeSDK,
-    forceBluetoothStatusCheck
+    forceBluetoothStatusCheck,
+    wellueSDK
   } = useDevice();
+
+  const isScanningRef = useRef(isScanning);
+  const availableDevicesRef = useRef(availableDevices);
+  const hasAttemptedInitRef = useRef(false);
+
+  useEffect(() => {
+    isScanningRef.current = isScanning;
+  }, [isScanning]);
+
+  useEffect(() => {
+    availableDevicesRef.current = availableDevices;
+  }, [availableDevices]);
 
   useEffect(() => {
     setIsMobile(Capacitor.isNativePlatform());
   }, []);
 
+  const fetchBondedDevices = async () => {
+    if (isMobile && isInitialized) {
+      try {
+        const devices = await wellueSDK.getBondedDevices();
+        setBonded(devices || []);
+      } catch (err) {
+        console.error('Failed to get bonded devices:', err);
+      }
+    }
+  };
+
+  // Fetch bonded devices on initialization
+  useEffect(() => {
+    if (isInitialized) {
+      fetchBondedDevices();
+    }
+  }, [isInitialized]);
+
+  const handleTabChange = (showPairedTab: boolean) => {
+    setShowFound(!showPairedTab);
+    setShowPaired(showPairedTab);
+    if (showPairedTab) {
+      fetchBondedDevices();
+    }
+  };
+
   // Auto-initialize SDK silently on native
   useEffect(() => {
-    if (isMobile && !isInitialized) {
+    if (isMobile && !isInitialized && !hasAttemptedInitRef.current) {
+      hasAttemptedInitRef.current = true;
       (async () => {
         try {
           await manualInitializeSDK();
@@ -67,7 +107,7 @@ export const WellueSDKScanner: React.FC = () => {
           setHasAutoScanned(true);
           await startScan();
           setTimeout(() => {
-            if (isScanning) {
+            if (isScanningRef.current) {
               stopScan();
             }
           }, 10000);
@@ -77,7 +117,7 @@ export const WellueSDKScanner: React.FC = () => {
       };
       tryAutoScan();
     }
-  }, [isMobile, hasAutoScanned, bluetoothEnabled, isScanning, startScan, stopScan]);
+  }, [isMobile, hasAutoScanned, bluetoothEnabled, startScan, stopScan]);
 
   const manualInitialize = async () => {
     if (!isInitialized) {
@@ -225,7 +265,7 @@ export const WellueSDKScanner: React.FC = () => {
                   stopScan();
                   toast({
                     title: "Scan complete",
-                    description: `Found ${availableDevices.length} device(s)`,
+                    description: `Found ${availableDevicesRef.current.length} device(s)`,
                   });
                 }, 3000);
               } catch (error) {
@@ -258,7 +298,7 @@ export const WellueSDKScanner: React.FC = () => {
         {/* Device Tabs */}
         <div className="flex border-b border-gray-700">
           <button
-            onClick={() => setShowFound(true)}
+            onClick={() => handleTabChange(false)}
             className={`px-4 py-2 text-sm font-medium ${
               showFound
                 ? 'border-b-2 border-blue-400 text-blue-400'
@@ -268,7 +308,7 @@ export const WellueSDKScanner: React.FC = () => {
             Found Devices ({availableDevices.length})
           </button>
           <button
-            onClick={() => setShowPaired(true)}
+            onClick={() => handleTabChange(true)}
             className={`px-4 py-2 text-sm font-medium ${
               showPaired
                 ? 'border-b-2 border-blue-400 text-blue-400'

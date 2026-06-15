@@ -179,6 +179,11 @@ export const HealthDashboard = () => {
     kardiaStatusText,
   } = useDevice();
 
+  const availableDevicesRef = useRef(availableDevices);
+  useEffect(() => {
+    availableDevicesRef.current = availableDevices;
+  }, [availableDevices]);
+
   // Ensure the banner doesn't show a stale Bluetooth error when Bluetooth is ON
   const bannerError = bluetoothEnabled && deviceError === 'Bluetooth is disabled' ? null : deviceError;
 
@@ -226,10 +231,21 @@ export const HealthDashboard = () => {
 
   const [isConnecting, setIsConnecting] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState("");
+  const [isConnectingO2, setIsConnectingO2] = useState(false);
+  const [connectionStatusO2, setConnectionStatusO2] = useState("");
   const previewCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const [deviceStatusExpanded, setDeviceStatusExpanded] = useState(true);
   const [cameraConnected, setCameraConnected] = useState(false);
   const [cgmConnected, setCgmConnected] = useState(false);
+
+  const isO2Ring = (device: any) => {
+    if (!device) return false;
+    const name = (device.name || "").toLowerCase();
+    return name.includes("o2") || name.includes("ring") || name.includes("oxy") || device.model === "O2Ring";
+  };
+
+  const isOximeterConnected = connectedDevice ? isO2Ring(connectedDevice) : false;
+  const isBPDeviceConnected = connectedDevice ? !isO2Ring(connectedDevice) : false;
 
   // Auto-collapse device status when all three devices are connected
   useEffect(() => {
@@ -768,10 +784,10 @@ export const HealthDashboard = () => {
                   </div>
                   <div>
                     <p className="text-xs font-bold text-white">BP & ECG Device</p>
-                    <p className="text-[10px] text-slate-400 font-medium">{connectedDevice ? connectedDevice.name : "Not connected"}</p>
+                    <p className="text-[10px] text-slate-400 font-medium">{isBPDeviceConnected ? connectedDevice.name : "Not connected"}</p>
                   </div>
                 </div>
-                {connectedDevice ? (
+                {isBPDeviceConnected ? (
                   <div className="flex items-center gap-1">
                     <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
                     <span className="text-[10px] font-bold text-emerald-400">Connected</span>
@@ -798,17 +814,21 @@ export const HealthDashboard = () => {
 
                         let scanTime = 0;
                         const scanTimeout = 4000;
-                        while (scanTime < scanTimeout && availableDevices.length === 0) {
+                        const hasBPDevice = () => availableDevicesRef.current.some(device => {
+                          const name = (device.name || "").toLowerCase();
+                          return name.includes('bp2') || name.includes('3049');
+                        });
+                        while (scanTime < scanTimeout && !hasBPDevice()) {
                           await new Promise(resolve => setTimeout(resolve, 200));
                           scanTime += 200;
                         }
 
-                        if (availableDevices.length > 0) {
-                          const bp2Device = availableDevices.find(device =>
-                            device.name.toLowerCase().includes('bp2') ||
-                            device.name.toLowerCase().includes('3049')
-                          ) || availableDevices[0];
+                        const bp2Device = availableDevicesRef.current.find(device => {
+                          const name = (device.name || "").toLowerCase();
+                          return name.includes('bp2') || name.includes('3049');
+                        });
 
+                        if (bp2Device) {
                           await connectToDevice(bp2Device);
                           localStorage.setItem("lastConnectedDevice", bp2Device.id);
                           toast({
@@ -835,6 +855,91 @@ export const HealthDashboard = () => {
                     className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 text-white text-[10px] font-extrabold px-3 py-1.5 rounded-xl transition-all shadow-sm"
                   >
                     {isConnecting ? (connectionStatus || "Connecting...") : "Connect"}
+                  </button>
+                )}
+              </div>
+
+              {/* O2 Ring Device */}
+              <div className="bg-[#0F172A]/70 border border-slate-800/45 rounded-2xl p-2.5 flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-rose-950/40 flex items-center justify-center text-rose-450 border border-rose-900/50">
+                    <Heart className="w-4.5 h-4.5 animate-pulse" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-white">O2 Ring</p>
+                    <p className="text-[10px] text-slate-400 font-medium">
+                      {isOximeterConnected ? connectedDevice.name : "Not connected"}
+                    </p>
+                  </div>
+                </div>
+                {isOximeterConnected ? (
+                  <div className="flex items-center gap-1">
+                    <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
+                    <span className="text-[10px] font-bold text-emerald-400">Connected</span>
+                  </div>
+                ) : (
+                  <button
+                    onClick={async () => {
+                      if (!bluetoothEnabled) {
+                        toast({
+                          title: "Bluetooth Required",
+                          description: "Please enable Bluetooth to connect to your O2 Ring",
+                          variant: "destructive",
+                        });
+                        return;
+                      }
+
+                      try {
+                        setIsConnectingO2(true);
+                        setConnectionStatusO2("Scanning...");
+                        if (!isInitialized) {
+                          await manualInitializeSDK();
+                        }
+                        await startScan();
+
+                        let scanTime = 0;
+                        const scanTimeout = 4000;
+                        const hasO2Device = () => availableDevicesRef.current.some(device => {
+                          const name = (device.name || "").toLowerCase();
+                          return name.includes('o2') || name.includes('ring') || name.includes('oxy') || device.model === 'O2Ring';
+                        });
+                        while (scanTime < scanTimeout && !hasO2Device()) {
+                          await new Promise(resolve => setTimeout(resolve, 200));
+                          scanTime += 200;
+                        }
+
+                        const o2Device = availableDevicesRef.current.find(device => {
+                          const name = (device.name || "").toLowerCase();
+                          return name.includes('o2') || name.includes('ring') || name.includes('oxy') || device.model === 'O2Ring';
+                        });
+
+                        if (o2Device) {
+                          await connectToDevice(o2Device);
+                          localStorage.setItem("lastConnectedDevice", o2Device.id);
+                          toast({
+                            title: "Connected!",
+                            description: `Connected to ${o2Device.name}`,
+                          });
+                        } else {
+                          throw new Error("No O2 Ring devices found nearby.");
+                        }
+
+                      } catch (error) {
+                        console.error("O2 Connect failed:", error);
+                        toast({
+                          title: "Connection Failed",
+                          description: error instanceof Error ? error.message : "Failed to connect to O2 Ring",
+                          variant: "destructive",
+                        });
+                      } finally {
+                        setIsConnectingO2(false);
+                        setConnectionStatusO2("");
+                      }
+                    }}
+                    disabled={isConnectingO2 || !bluetoothEnabled}
+                    className="bg-rose-600 hover:bg-rose-700 disabled:bg-rose-300 text-white text-[10px] font-extrabold px-3 py-1.5 rounded-xl transition-all shadow-sm"
+                  >
+                    {isConnectingO2 ? (connectionStatusO2 || "Connecting...") : "Connect"}
                   </button>
                 )}
               </div>
@@ -923,7 +1028,8 @@ export const HealthDashboard = () => {
           <div className="flex items-center justify-between pt-2.5 border-t border-slate-800/40">
             <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide py-0.5">
               <span className="text-[9px] font-extrabold px-2.5 py-1 rounded-full bg-indigo-950/50 text-indigo-400 border border-indigo-900/50">All Devices</span>
-              <span className={`text-[9px] font-bold px-2.5 py-1 rounded-full ${connectedDevice ? "bg-emerald-950/50 text-emerald-400 border border-emerald-900/50" : "bg-slate-900 text-slate-550"}`}>BP/ECG</span>
+              <span className={`text-[9px] font-bold px-2.5 py-1 rounded-full ${isBPDeviceConnected ? "bg-emerald-950/50 text-emerald-400 border border-emerald-900/50" : "bg-slate-900 text-slate-550"}`}>BP/ECG</span>
+              <span className={`text-[9px] font-bold px-2.5 py-1 rounded-full ${isOximeterConnected ? "bg-emerald-950/50 text-emerald-400 border border-emerald-900/50" : "bg-slate-900 text-slate-550"}`}>O2 Ring</span>
               <span className={`text-[9px] font-bold px-2.5 py-1 rounded-full ${cgmConnected ? "bg-emerald-950/50 text-emerald-400 border border-emerald-900/50" : "bg-slate-900 text-slate-555"}`}>CGM</span>
               <span className={`text-[9px] font-bold px-2.5 py-1 rounded-full ${aliveCorConnected ? "bg-emerald-950/50 text-emerald-400 border border-emerald-900/50" : "bg-slate-900 text-slate-555"}`}>Kardia</span>
             </div>
@@ -998,6 +1104,18 @@ export const HealthDashboard = () => {
                   </span>
                 </span>
               )}
+            </button>
+
+            {/* O2 Ring Monitor */}
+            <button
+              onClick={() => navigate("/o2ring-monitor")}
+              className="flex-shrink-0 w-36 snap-start bg-[#1A243D] hover:bg-[#1A243D]/80 border border-slate-700/40 p-4 rounded-3xl flex flex-col items-center justify-center gap-2.5 transition-all text-center group shadow-md"
+            >
+              <Heart className="h-7 w-7 text-rose-400 group-hover:scale-105 transition-transform" />
+              <div>
+                <h4 className="font-extrabold text-xs text-white">O2 Ring</h4>
+                <p className="text-[9px] text-slate-400 font-semibold mt-0.5">Pulse Oximeter</p>
+              </div>
             </button>
 
             {/* 6-Channel ECG */}

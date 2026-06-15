@@ -25,27 +25,13 @@ public class IAPPlugin: CAPPlugin {
         call.resolve(["canMakePayments": canMakePayments])
     }
     
+    /// Mock IAP only on the iOS Simulator. Real devices (including App Store review sandbox) must use StoreKit.
     private func isMockEnabled() -> Bool {
         #if targetEnvironment(simulator)
         return true
-        #endif
-        
-        #if DEBUG
-        return true
-        #endif
-        
-        if let receiptURL = Bundle.main.appStoreReceiptURL {
-            let receiptPath = receiptURL.path
-            if receiptPath.contains("sandboxReceipt") {
-                return true
-            }
-        }
-        
-        if Bundle.main.path(forResource: "embedded", ofType: "mobileprovision") != nil {
-            return true
-        }
-        
+        #else
         return false
+        #endif
     }
     
     @objc public func loadProducts(_ call: CAPPluginCall) {
@@ -88,7 +74,8 @@ public class IAPPlugin: CAPPlugin {
             "success": true, 
             "transaction": [
                 "transactionId": "mock_tx_\(Int(Date().timeIntervalSince1970))", 
-                "receipt": mockReceipt
+                "receipt": mockReceipt,
+                "productId": productId
             ]
         ])
     }
@@ -125,15 +112,32 @@ public class IAPPlugin: CAPPlugin {
                         receipt = data.base64EncodedString()
                     }
                     
-                    print("🛒 [IAP] Purchase successful! Transaction ID: \(transaction.id)")
+                    print("🛒 [IAP] Purchase successful! Transaction ID: \(transaction.id), product: \(transaction.productID)")
+                    
+                    // Refresh app receipt (may stay empty for StoreKit 2 consumables — server handles fallback)
+                    if receipt.isEmpty {
+                        try? await AppStore.sync()
+                        if let receiptURL = Bundle.main.appStoreReceiptURL,
+                           let data = try? Data(contentsOf: receiptURL) {
+                            receipt = data.base64EncodedString()
+                        }
+                    }
+                    
                     await transaction.finish()
                     
+                    var txPayload: [String: Any] = [
+                        "transactionId": String(transaction.id),
+                        "receipt": receipt,
+                        "productId": transaction.productID,
+                        "originalTransactionId": String(transaction.originalID),
+                    ]
+                    if let expirationDate = transaction.expirationDate {
+                        txPayload["expirationDateMs"] = Int64(expirationDate.timeIntervalSince1970 * 1000)
+                    }
+                    
                     call.resolve([
-                        "success": true, 
-                        "transaction": [
-                            "transactionId": String(transaction.id), 
-                            "receipt": receipt
-                        ]
+                        "success": true,
+                        "transaction": txPayload
                     ])
                     
                 case .userCancelled:

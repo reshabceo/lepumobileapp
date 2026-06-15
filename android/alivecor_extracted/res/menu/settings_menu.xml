@@ -1,7 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<menu xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:id="@+id/change_device"
-        android:title="@string/ecg_realtime_change_device"/>
-    <item android:id="@+id/record_settings"
-        android:title="@string/ecg_realtime_record_settings"/>
-</menu>

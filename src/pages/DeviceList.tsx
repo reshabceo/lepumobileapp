@@ -214,7 +214,7 @@ const DeviceList = () => {
                                         <Bluetooth className="h-6 w-6 text-blue-400" />
                                     </div>
                                     <div>
-                                        <h3 className="text-lg font-semibold text-white">Wellue BP2 Scanner</h3>
+                                        <h3 className="text-lg font-semibold text-white">Wellue Device Scanner</h3>
                                         <p className="text-sm text-gray-400">Official SDK for accurate readings</p>
                                     </div>
                                 </div>
@@ -223,7 +223,7 @@ const DeviceList = () => {
                                     className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-all duration-200 flex items-center gap-2"
                                 >
                                     <Bluetooth className="h-4 w-4" />
-                                    Connect BP2
+                                    Open Scanner
                                 </button>
                             </div>
                         </div>
@@ -402,7 +402,7 @@ const DeviceList = () => {
                   </div>
                   <div>
                     <h3 className="text-lg font-semibold text-white">
-                      Wellue BP2 Scanner
+                      Wellue Device Scanner
                     </h3>
                     <p className="text-sm text-gray-400">
                       Official SDK for accurate readings
@@ -414,7 +414,7 @@ const DeviceList = () => {
                   className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-all duration-200 flex items-center gap-2"
                 >
                   <Bluetooth className="h-4 w-4" />
-                  Connect BP2
+                  Open Scanner
                 </button>
               </div>
             </div>

@@ -1,4 +1,4 @@
-package com.monitraq.com;
+package com.monitraq.mobile;
 
 import android.Manifest;
 import android.content.pm.PackageManager;
@@ -14,9 +14,9 @@ import androidx.core.splashscreen.SplashScreen;
 
 import com.getcapacitor.BridgeActivity;
 import com.monitraq.wellue.WelluePlugin;
-import com.monitraq.com.plugins.Bp2Plugin;
-import com.monitraq.com.plugins.AliveCorPlugin;
-import com.monitraq.com.plugins.CameraBridgePlugin;
+import com.monitraq.mobile.plugins.Bp2Plugin;
+// import com.monitraq.mobile.plugins.AliveCorPlugin;
+import com.monitraq.mobile.plugins.CameraBridgePlugin;
 
 public class MainActivity extends BridgeActivity {
 
@@ -35,7 +35,7 @@ public class MainActivity extends BridgeActivity {
         // added to initialPlugins first
         Log.d(TAG, "MainActivity onCreate - Registering Lepu SDK plugins BEFORE bridge creation");
         Log.d(TAG, "Using Lepu SDK from: https://github.com/viatom-develop/LepuDemo.git");
-        Log.d(TAG, "AAR Version: lepu-blepro-1.0.8.aar (supports BP2 device)");
+        Log.d(TAG, "AAR Version: lepu-blepro-1.3.4.aar (supports BP2/O2Ring devices)");
 
         try {
             initialPlugins.add(WelluePlugin.class);
@@ -51,12 +51,15 @@ public class MainActivity extends BridgeActivity {
             Log.e(TAG, "❌ Failed to add Bp2Plugin: " + e.getMessage(), e);
         }
 
+        // AliveCorPlugin registration removed because it is disabled in the Android build.
+        /*
         try {
             initialPlugins.add(AliveCorPlugin.class);
             Log.d(TAG, "✅ AliveCorPlugin added to initialPlugins");
         } catch (Exception e) {
             Log.e(TAG, "❌ Failed to add AliveCorPlugin: " + e.getMessage(), e);
         }
+        */
 
         try {
             initialPlugins.add(CameraBridgePlugin.class);
