@@ -6,6 +6,10 @@ import VTMProductLib
 // Retroactively conform VTMURATUtils to CBPeripheralDelegate so Swift casts (as? CBPeripheralDelegate) succeed.
 extension VTMURATUtils: CBPeripheralDelegate {}
 
+// Retroactively conform VTMBLEDevice to CBPeripheralDelegate so Swift casts (as? CBPeripheralDelegate) succeed.
+extension VTMBLEDevice: CBPeripheralDelegate {}
+
+
 // MARK: - VTMProductURATUtils Singleton
 // VTMProductURATUtils is defined in the Viatom demo project (VTMProductSDK/) but is NOT
 // exported in VTMProductLib.xcframework's public headers. Every demo file uses this singleton
@@ -34,13 +38,21 @@ extension VTMURATUtils: CBPeripheralDelegate {}
 }
 
 @objc(WellueSDK)
-public class WellueSDK: CAPPlugin, CBCentralManagerDelegate, CBPeripheralDelegate, VTMURATDeviceDelegate, VTMURATUtilsDelegate {
+public class WellueSDK: CAPPlugin, CBCentralManagerDelegate, CBPeripheralDelegate, VTMURATDeviceDelegate, VTMURATUtilsDelegate, VTO2CommunicateDelegate, VTO2A5RespDelegate {
     public static var shared: WellueSDK?
     private static var activePluginForJS: WellueSDK?
     
     // Direct references to characteristics
     private var o2RingTxChar: CBCharacteristic?
     private var o2RingRxChar: CBCharacteristic?
+
+    // O2Ring real-time self-parse buffer.
+    // This device streams 21-byte real-time frames (20-byte body + 1-byte CRC) with a 0x55
+    // header that the Viatom SDK's A5 parser rejects (VTA5RespHeadError 0xCC). We assemble
+    // and parse these frames ourselves and emit `o2RingRt` directly.
+    private var o2RxBuffer = [UInt8]()
+    private let O2_FRAME_HEADER: UInt8 = 0x55
+    private let O2_FRAME_LEN = 21
 
     public override func notifyListeners(_ eventName: String, data: [String : Any]?, retainUntilConsumed retain: Bool) {
         let selfPtr = Unmanaged.passUnretained(self).toOpaque()
@@ -65,7 +77,41 @@ public class WellueSDK: CAPPlugin, CBCentralManagerDelegate, CBPeripheralDelegat
     private var currentDevice: CBPeripheral?
     private func isO2RingDeviceName(_ name: String) -> Bool {
         let nameLower = name.lowercased()
-        return nameLower.contains("o2") || nameLower.contains("ring") || nameLower.contains("oxy") || nameLower.contains("jodu")
+        return nameLower.contains("o2") || nameLower.contains("ring") || nameLower.contains("oxy")
+    }
+    
+    private func injectO2Chars(from service: CBService, into o2Comm: VTO2Communicate, peripheral: CBPeripheral) {
+        guard let chars = service.characteristics else { return }
+        for char in chars {
+            let uuid = char.uuid.uuidString.uppercased()
+            if uuid == "E8FB0002-A14B-98F9-831B-4E2941D01248" || uuid == "8B00ACE7-EB0B-49B0-BBE9-9AEE0A26E1A3" ||
+               (o2Comm.txcharacteristic == nil && (char.properties.contains(.write) || char.properties.contains(.writeWithoutResponse))) {
+                if o2Comm.txcharacteristic == nil {
+                    o2Comm.txcharacteristic = char
+                    self.o2RingTxChar = char
+                    if let bleDevice = o2Comm.bleDevice {
+                        bleDevice.a5_TxCharacteristic = char
+                        bleDevice.aa_TxCharacteristic = char
+                    }
+                    NSLog("✅ [O2 INJECT HELPER] TX: \(char.uuid.uuidString)")
+                }
+            }
+            if uuid == "E8FB0003-A14B-98F9-831B-4E2941D01248" || uuid == "0734594A-A8E7-4B1A-A6B1-CD5243059A57" ||
+               (o2Comm.rxcharacteristic == nil && char.properties.contains(.notify)) {
+                if o2Comm.rxcharacteristic == nil {
+                    o2Comm.rxcharacteristic = char
+                    self.o2RingRxChar = char
+                    if let bleDevice = o2Comm.bleDevice {
+                        bleDevice.a5_RxCharacteristic = char
+                        bleDevice.aa_RxCharacteristic = char
+                    }
+                    if !char.isNotifying {
+                        peripheral.setNotifyValue(true, for: char)
+                    }
+                    NSLog("✅ [O2 INJECT HELPER] RX: \(char.uuid.uuidString)")
+                }
+            }
+        }
     }
     private var isConnectingO2Ring: Bool {
         if let model = targetModel, model == "O2Ring" {
@@ -93,7 +139,7 @@ public class WellueSDK: CAPPlugin, CBCentralManagerDelegate, CBPeripheralDelegat
     private var lastDataReceivedTime: Date?  // Track when we last received data
     private var healthCheckTimer: Timer?  // Periodic health check
     private let HEALTH_CHECK_INTERVAL = 3.0  // Check every 3 seconds
-    private let DATA_TIMEOUT_THRESHOLD = 10.0  // If no data for 10 seconds, SDK is dead
+    private let DATA_TIMEOUT_THRESHOLD = 15.0  // If no data for 15 seconds, SDK is dead
     
     // BP2 Service and Characteristic UUIDs (from Viatom LepuDemo + Android implementation)
     private let BP2_SERVICE_UUID = CBUUID(string: "14839AC4-7D7E-415C-9A42-167340CF2339")
@@ -107,6 +153,9 @@ public class WellueSDK: CAPPlugin, CBCentralManagerDelegate, CBPeripheralDelegat
     
     // Alternative approach: Scan with BP2 service UUID filter (like Android does)
     private var scanWithServiceFilter = false  // Set to true to enable UUID filtering
+    
+    // Store SDK's VTMBLEDevice so we can forward peripheral delegate calls
+    private weak var sdkBLEDeviceDelegate: CBPeripheralDelegate?
     
     // Debug logging
     private let debugPrefix = "🔵 [WELLUE SDK]"
@@ -157,8 +206,9 @@ public class WellueSDK: CAPPlugin, CBCentralManagerDelegate, CBPeripheralDelegat
         centralManager = CBCentralManager(delegate: self, queue: nil)
         debugLog("CBCentralManager initialized")
         
-        // Dump VTMURATUtils structure
+        // Dump VTMURATUtils and VTO2Communicate structure
         dumpClassInfo(cls: VTMURATUtils.self)
+        dumpClassInfo(cls: VTO2Communicate.self)
         
         // ✅ FIX #1: Use the SDK-provided singleton subclass.
         // VTMProductURATUtils is the singleton the SDK binary uses internally.
@@ -297,10 +347,6 @@ public class WellueSDK: CAPPlugin, CBCentralManagerDelegate, CBPeripheralDelegat
         
         if isPeriFriendly {
             resolvedName = periClean
-        } else if periLower.contains("jodu") {
-            resolvedName = periClean
-        } else if advLower.contains("jodu") && !periClean.isEmpty {
-            resolvedName = periClean
         } else if !advClean.isEmpty {
             resolvedName = advClean
         } else {
@@ -322,8 +368,7 @@ public class WellueSDK: CAPPlugin, CBCentralManagerDelegate, CBPeripheralDelegat
         let startsWithBP = nameLower.hasPrefix("bp") || nameLower.hasPrefix("wellue") || nameLower.hasPrefix("viatom")
         let containsBP2 = nameLower.contains("bp2") || nameLower.contains("bp-2")
         let isBrandMatch = nameLower.contains("wellue") || nameLower.contains("viatom")
-        let containsO2 = nameLower.contains("o2") || nameLower.contains("ring") || nameLower.contains("oxy") || nameLower.contains("jodu") ||
-                         advLower.contains("jodu") || periLower.contains("jodu")
+        let containsO2 = nameLower.contains("o2") || nameLower.contains("ring") || nameLower.contains("oxy")
         let isNotAudio = !nameLower.contains("airpod") && !nameLower.contains("headphone") && !nameLower.contains("earbud")
         let looksLikeWellue = (startsWithBP || containsBP2 || isBrandMatch || containsO2) && isNotAudio
 
@@ -465,7 +510,13 @@ public class WellueSDK: CAPPlugin, CBCentralManagerDelegate, CBPeripheralDelegat
             NSLog("⚠️ [HEALTH] SDK TIMEOUT! No data for \(Int(timeSinceLastData)) seconds")
             NSLog("🔄 [HEALTH] SDK appears dead - triggering auto-recovery...")
             
-            // Auto-recovery: Re-deploy SDK
+            // First try: re-enable notifications (most common cause of data loss)
+            if let rx = self.o2RingRxChar, let peripheral = self.currentDevice, peripheral.state == .connected {
+                NSLog("🔄 [HEALTH] Re-enabling notifications on RX char...")
+                peripheral.setNotifyValue(true, for: rx)
+            }
+            
+            // Then re-deploy SDK as last resort
             if isSdkDeployed {
                 NSLog("🔄 [HEALTH] Marking SDK as not deployed, forcing re-deployment...")
                 isSdkDeployed = false
@@ -484,8 +535,8 @@ public class WellueSDK: CAPPlugin, CBCentralManagerDelegate, CBPeripheralDelegat
     }
     
     private func markDataReceived() {
-        // Update timestamp whenever we receive ANY data from SDK
         lastDataReceivedTime = Date()
+        directWriteRetryCount = 0
     }
     
     // MARK: - SDK Deployment Management
@@ -500,6 +551,20 @@ public class WellueSDK: CAPPlugin, CBCentralManagerDelegate, CBPeripheralDelegat
             return
         }
         
+        let isO2Ring = self.isConnectingO2Ring
+        
+        // Instantiate the correct VTMURATUtils subclass based on device model
+        if isO2Ring {
+            NSLog("🔧 [SDK DEPLOY] Instantiating VTO2Communicate for O2 Ring...")
+            let o2Comm = VTO2Communicate()
+            o2Comm.o2Delegate = self
+            o2Comm.a5Delegate = self
+            viatomUtils = o2Comm
+        } else {
+            NSLog("🔧 [SDK DEPLOY] Using VTMProductURATUtils singleton for BP/ECG")
+            viatomUtils = VTMProductURATUtils.sharedInstance()
+        }
+        
         guard let utils = viatomUtils else {
             NSLog("❌ [SDK DEPLOY] viatomUtils not initialized")
             return
@@ -508,51 +573,51 @@ public class WellueSDK: CAPPlugin, CBCentralManagerDelegate, CBPeripheralDelegat
         // Reset deployment state to ensure we always run the handshake
         isSdkDeployed = false
         
-        // Force the SDK to re-run its internal setter by clearing it first via KVC (peripheral is non-optional in Swift)
-        utils.setValue(nil, forKey: "peripheral")
+        NSLog("🔄 [SDK DEPLOY] Triggering SDK deployment for device: \(device.name ?? "Unknown") isO2Ring=\(isO2Ring)")
         
-        if isConnectingO2Ring {
-            let originalName = device.name ?? "O2Ring"
-            if !originalName.hasPrefix("BP2") {
-                let tempBP2Name = "BP2-\(originalName)"
-                NSLog("🔧 [O2RING DEPLOY] Temporary renaming peripheral to '\(tempBP2Name)' to satisfy SDK prefix checks...")
-                device.setValue(tempBP2Name, forKey: "name")
-            }
-        }
-        
-        NSLog("🔄 [SDK DEPLOY] Triggering SDK deployment for device: \(device.name ?? "Unknown")")
-        
-        // Cancel any stale deployment timer (but do NOT restart peripheral assignment)
+        // Cancel any stale deployment timer
         deploymentTimer?.invalidate()
         deploymentRetryCount = 0
         
-        // ✅ FIX #2: Correct delegate ordering — extension MUST be set before peripheral.
-        // 'extension' supplies the name-prefix map used for device-type inference.
-        // 'peripheral' assignment triggers discoverServices() internally inside the SDK.
-        utils.extension = self       // ← 1st: type-inference prefix map
-        utils.deviceDelegate = self  // ← 2nd: deployment completion callback
-        utils.delegate = self        // ← 3rd: command completion callbacks
-        utils.peripheral = device    // ← 4th: triggers SDK-owned GATT discovery
+        // Set delegates BEFORE peripheral assignment (which triggers GATT discovery)
+        utils.extension = self       // 1st: type-inference prefix map
+        utils.deviceDelegate = self  // 2nd: deployment completion callback
+        utils.delegate = self        // 3rd: command completion callbacks
         
-        // 🧪 DELEGATE INTERCEPT: Route CBPeripheralDelegate through the plugin so we can 
-        // inject write/notify characteristics dynamically during discovery. All calls are forwarded.
-        // device.delegate = self
-        
-        // ✅ DIAGNOSTIC: Verify the delegate was successfully set.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-            NSLog("🔬 [DELEGATE AUDIT] peripheral.delegate class = \(type(of: device.delegate as AnyObject))")
-            NSLog("🔬 [DELEGATE AUDIT] Is plugin delegate: \(device.delegate is WellueSDK)")
+        if let o2Comm = utils as? VTO2Communicate {
+            o2Comm.o2Delegate = self
+            o2Comm.a5Delegate = self
         }
         
-        // ✅ FIX #3: 15-second timeout — O2Ring is slower than BP2.
-        // CRITICAL: Do NOT re-assign utils.peripheral on timeout.
-        // Re-assigning peripheral restarts service discovery and breaks ongoing deployment.
+        // For BP2, we act as peripheral delegate directly.
+        // For O2Ring, SDK will set VTMBLEDevice as delegate when we assign .peripheral.
+        // We'll capture and override in utilDeployCompletion.
+        if !isO2Ring {
+            device.delegate = self
+        }
+        
+        // Assign peripheral LAST — this triggers SDK's internal discoverServices()
+        utils.peripheral = device
+        
+        // For O2Ring: After SDK sets VTMBLEDevice as delegate, we'll intercept it in
+        // utilDeployCompletion and install our forwarding delegate.
+        if isO2Ring {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                guard let self = self else { return }
+                if let existingDelegate = device.delegate, !(existingDelegate is WellueSDK) {
+                    self.sdkBLEDeviceDelegate = existingDelegate
+                    device.delegate = self
+                    NSLog("🔧 [DELEGATE SETUP] Installed forwarding delegate after SDK setup. Captured: \(type(of: existingDelegate))")
+                }
+            }
+        }
+        
+        // 15-second timeout for deployment
         deploymentTimer = Timer.scheduledTimer(withTimeInterval: 15.0, repeats: false) { [weak self] _ in
             guard let self = self else { return }
             
             if !self.isSdkDeployed {
                 NSLog("⏰ [SDK DEPLOY] Timeout! utilDeployCompletion not received within 15 seconds")
-                NSLog("⏰ [SDK DEPLOY] IMPORTANT: NOT re-assigning peripheral (would cancel discovery)")
                 
                 if let device = self.currentDevice {
                     let currentName = device.name ?? ""
@@ -563,14 +628,13 @@ public class WellueSDK: CAPPlugin, CBCentralManagerDelegate, CBPeripheralDelegat
                     }
                 }
                 
-                // Notify JavaScript layer — do not restart discovery
                 var result = JSObject()
                 result["error"] = "SDK deployment timeout after 15 seconds"
                 self.notifyListeners("sdkDeploymentFailed", data: result)
             }
         }
         
-        NSLog("⏰ [SDK DEPLOY] Deployment started — 15-second timeout set (no re-trigger on timeout)")
+        NSLog("⏰ [SDK DEPLOY] Deployment started — 15-second timeout set")
     }
     
     // MARK: - VTMURATDeviceDelegate & VTMURATUtilsDelegate
@@ -591,7 +655,6 @@ public class WellueSDK: CAPPlugin, CBCentralManagerDelegate, CBPeripheralDelegat
         NSLog("✅ [SDK DEPLOY] Deployment successful, timer cancelled")
         
         // ✅ DIAGNOSTIC: Confirm the deployed util IS the singleton (addresses must match).
-        // If addresses differ, the singleton fix did not take effect.
         let utilPtr  = Unmanaged.passUnretained(util).toOpaque()
         let localPtr  = viatomUtils.map { Unmanaged.passUnretained($0).toOpaque() }
         NSLog("🔬 [INSTANCE AUDIT] deployed util ptr = \(utilPtr)")
@@ -600,13 +663,12 @@ public class WellueSDK: CAPPlugin, CBCentralManagerDelegate, CBPeripheralDelegat
         
         viatomUtils = util
         viatomUtils?.extension = self
-        viatomUtils?.delegate = self  // Ensure callbacks flow to us
-        isSdkDeployed = true  // ✅ SDK is now ready to accept commands
-        
-        // 🧪 DELEGATE KEEP-ALIVE: Do NOT hand back delegate directly to SDK.
-        // Keeping WellueSDK as the CBPeripheralDelegate allows us to intercept/preserve
-        // injected characteristics, while forwardingTarget(for:) routes all unimplemented events dynamically.
-        // util.peripheral.delegate = util
+        viatomUtils?.delegate = self
+        if let o2Comm = util as? VTO2Communicate {
+            o2Comm.o2Delegate = self
+            o2Comm.a5Delegate = self
+        }
+        isSdkDeployed = true
         
         // Determine the connected device model
         if let device = currentDevice {
@@ -615,7 +677,7 @@ public class WellueSDK: CAPPlugin, CBCentralManagerDelegate, CBPeripheralDelegat
             
             NSLog("🔬 [DEPLOY] util.currentType = \(utilsType.rawValue) (6=WOxi expected for O2Ring)")
             
-            if utilsType == VTMDeviceTypeWOxi || self.isO2RingDeviceName(device.name ?? "") || self.targetModel == "O2Ring" {
+            if utilsType == VTMDeviceTypeWOxi || self.isO2RingDeviceName(device.name ?? "") || self.targetModel == "O2Ring" || util is VTO2Communicate {
                 self.connectedModel = "O2Ring"
             } else if nameLower.contains("bp2a") {
                 self.connectedModel = "BP2A"
@@ -626,10 +688,21 @@ public class WellueSDK: CAPPlugin, CBCentralManagerDelegate, CBPeripheralDelegat
             }
             NSLog("✅ [SDK DEPLOY] Determined connected device model: \(self.connectedModel)")
             NSLog("🔬 [DEPLOY] device.name=\(device.name ?? "nil"), services=\(device.services?.count ?? -1)")
+            if let services = device.services {
+                for svc in services {
+                    let charCount = svc.characteristics?.count ?? 0
+                    NSLog("🔬 [DEPLOY] Service: \(svc.uuid.uuidString) chars=\(charCount)")
+                    if let chars = svc.characteristics {
+                        for c in chars {
+                            NSLog("🔬 [DEPLOY]   Char: \(c.uuid.uuidString) props=\(c.properties.rawValue)")
+                        }
+                    }
+                }
+            }
             
             if self.connectedModel == "O2Ring" {
-                NSLog("🔧 [O2RING DEPLOY] Keeping currentType as BP (2) post-handshake to receive notifications on 0734...")
-                // util.currentType = VTMDeviceTypeWOxi
+                NSLog("🔧 [O2RING DEPLOY] Setting currentType to WOxi (6) post-handshake...")
+                util.setValue(VTMDeviceTypeWOxi.rawValue, forKey: "currentType")
                 
                 // Restore original name to peripheral
                 let currentName = device.name ?? ""
@@ -645,18 +718,109 @@ public class WellueSDK: CAPPlugin, CBCentralManagerDelegate, CBPeripheralDelegat
                 
                 NSLog("🔧 [O2RING DEPLOY] Cached characteristics. tx: \(self.o2RingTxChar?.uuid.uuidString ?? "nil"), rx: \(self.o2RingRxChar?.uuid.uuidString ?? "nil")")
                 
-                // Double check and re-inject for maximum stability
-                self.injectO2RingCharacteristics()
+                // PRIORITY: Copy characteristics from bleDevice's internal storage into o2Comm
+                // Also cross-populate AA ↔ A5 so BOTH protocol paths have valid chars
+                if let bleDevice = util.bleDevice {
+                    NSLog("🔧 [O2RING DEPLOY] Checking bleDevice internal chars...")
+                    if let tx = bleDevice.a5_TxCharacteristic {
+                        util.txcharacteristic = tx
+                        self.o2RingTxChar = tx
+                        bleDevice.aa_TxCharacteristic = tx
+                        NSLog("✅ [O2RING DEPLOY] Copied a5_TxCharacteristic from bleDevice: \(tx.uuid.uuidString) (also set aa_Tx)")
+                    } else if let tx = bleDevice.aa_TxCharacteristic {
+                        util.txcharacteristic = tx
+                        self.o2RingTxChar = tx
+                        bleDevice.a5_TxCharacteristic = tx
+                        NSLog("✅ [O2RING DEPLOY] Copied aa_TxCharacteristic from bleDevice: \(tx.uuid.uuidString) (also set a5_Tx)")
+                    }
+                    if let rx = bleDevice.a5_RxCharacteristic {
+                        util.rxcharacteristic = rx
+                        self.o2RingRxChar = rx
+                        bleDevice.aa_RxCharacteristic = rx
+                        NSLog("🔔 [O2RING DEPLOY] RX char isNotifying=\(rx.isNotifying) — FORCING setNotifyValue(true)")
+                        device.setNotifyValue(true, for: rx)
+                        NSLog("✅ [O2RING DEPLOY] Copied a5_RxCharacteristic from bleDevice: \(rx.uuid.uuidString) (also set aa_Rx)")
+                    } else if let rx = bleDevice.aa_RxCharacteristic {
+                        util.rxcharacteristic = rx
+                        self.o2RingRxChar = rx
+                        bleDevice.a5_RxCharacteristic = rx
+                        NSLog("🔔 [O2RING DEPLOY] RX char isNotifying=\(rx.isNotifying) — FORCING setNotifyValue(true)")
+                        device.setNotifyValue(true, for: rx)
+                        NSLog("✅ [O2RING DEPLOY] Copied aa_RxCharacteristic from bleDevice: \(rx.uuid.uuidString) (also set a5_Rx)")
+                    }
+                } else {
+                    NSLog("🔧 [O2RING DEPLOY] bleDevice is nil — cannot copy chars")
+                }
+                
+                // If SDK didn't bind chars internally, inject them from discovered services
+                if util.txcharacteristic == nil || util.rxcharacteristic == nil {
+                    NSLog("🔧 [O2RING DEPLOY] SDK chars still nil — performing manual injection from peripheral services...")
+                    if let o2Cast = util as? VTO2Communicate, let services = device.services {
+                        for service in services {
+                            self.injectO2Chars(from: service, into: o2Cast, peripheral: device)
+                        }
+                    }
+                    // If still nil after scanning existing services, temporarily become delegate to discover chars
+                    if util.txcharacteristic == nil {
+                        NSLog("🔧 [O2RING DEPLOY] Still nil — temporarily taking delegate to discover characteristics...")
+                        let originalDelegate = device.delegate
+                        device.delegate = self
+                        if let services = device.services {
+                            for service in services {
+                                NSLog("🔧 [O2RING DEPLOY] Discovering chars for service: \(service.uuid.uuidString)")
+                                device.discoverCharacteristics(nil, for: service)
+                            }
+                        }
+                        // Restore delegate after discovery completes (give it 2s)
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+                            guard let self = self, let device = self.currentDevice else { return }
+                            NSLog("🔧 [O2RING DEPLOY RETRY] Restoring delegate and checking chars...")
+                            // Restore the SDK delegate
+                            if let origDel = originalDelegate {
+                                device.delegate = origDel
+                                NSLog("🔧 [O2RING DEPLOY RETRY] Restored delegate to \(type(of: origDel))")
+                            }
+                            // Try injection one more time with whatever chars are now discovered
+                            if let o2Cast = util as? VTO2Communicate, let services = device.services {
+                                for service in services {
+                                    self.injectO2Chars(from: service, into: o2Cast, peripheral: device)
+                                }
+                            }
+                            if util.txcharacteristic != nil {
+                                NSLog("✅ [O2RING DEPLOY RETRY] TX now set: \(util.txcharacteristic!.uuid.uuidString)")
+                            } else {
+                                NSLog("❌ [O2RING DEPLOY RETRY] TX still nil after retry")
+                            }
+                        }
+                    }
+                }
                 
                 if let tx = util.txcharacteristic {
-                    NSLog("🔧 [O2RING KVC FIX] Verification: txcharacteristic is now \(tx.uuid.uuidString)")
+                    NSLog("✅ [O2RING KVC FIX] Verification: txcharacteristic is now \(tx.uuid.uuidString)")
                 } else {
                     NSLog("❌ [O2RING KVC FIX] Verification failed: txcharacteristic is still nil")
                 }
                 if let rx = util.rxcharacteristic {
-                    NSLog("🔧 [O2RING KVC FIX] Verification: rxcharacteristic is now \(rx.uuid.uuidString)")
+                    NSLog("✅ [O2RING KVC FIX] Verification: rxcharacteristic is now \(rx.uuid.uuidString)")
                 } else {
                     NSLog("❌ [O2RING KVC FIX] Verification failed: rxcharacteristic is still nil")
+                }
+                
+                // FORWARDING DELEGATE: We become peripheral.delegate but forward ALL calls
+                // to VTMBLEDevice so the SDK's packet assembly still works. This gives us
+                // visibility into raw BLE data flow.
+                if let existingDelegate = device.delegate, !(existingDelegate is WellueSDK) {
+                    self.sdkBLEDeviceDelegate = existingDelegate
+                    NSLog("🔧 [O2RING DEPLOY] Captured SDK's VTMBLEDevice delegate: \(type(of: existingDelegate))")
+                    device.delegate = self
+                    NSLog("🔧 [O2RING DEPLOY] Set plugin as peripheral.delegate (forwarding to VTMBLEDevice)")
+                } else {
+                    NSLog("🔧 [O2RING DEPLOY] peripheral.delegate already WellueSDK, forwarding already set up")
+                }
+            } else {
+                // For BP2/ECG devices, we can safely be the delegate since we forward calls
+                if let device = currentDevice {
+                    device.delegate = self
                 }
             }
         }
@@ -684,28 +848,23 @@ public class WellueSDK: CAPPlugin, CBCentralManagerDelegate, CBPeripheralDelegat
         
         if self.connectedModel == "O2Ring" {
             NSLog("✅ [SDK DEPLOY] O2Ring deployed. Starting RT data polling after 2s delay.")
-            // Auto-start real-time polling with a 2.0s delay after deployment
-            // to allow certain O2Ring firmware versions to settle before receiving commands
             DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
                 guard let self = self else { return }
                 self.startO2RingPollingTimer()
             }
         } else {
-            // Begin real-time BP stream immediately so device-initiated measurements are detected
             debugLog("Requesting BP real-time data stream after deployment")
             viatomUtils?.requestBPRealData()
-
-            // Request periodic status updates (battery, measuring state)
             viatomUtils?.bp_requestRealStatus()
         }
     }
 
     // MARK: - VTMURATUtilsDelegate (generic command callbacks)
-    @objc public func util(_ util: VTMURATUtils, commandCompletion cmdType: UInt8, deviceType: VTMDeviceType, response: NSData?) {
+    @objc public func util(_ util: VTMURATUtils, commandCompletion cmdType: u_char, deviceType: VTMDeviceType, response: Data?) {
         // 🏥 Mark data as received (SDK is alive!)
         markDataReceived()
         
-        let data = response as Data?
+        let data = response
         let currentType = util.currentType.rawValue
         
         // Log EVERY command so we can diagnose what the O2Ring actually sends back
@@ -734,6 +893,16 @@ public class WellueSDK: CAPPlugin, CBCentralManagerDelegate, CBPeripheralDelegat
             } else if cmdType == 0x00 { // config response
                 let config = VTMBLEParser.woxi_parseConfig(data)
                 NSLog("📡 [OXI] Config: displayMode=\(config.display_mode) brightness=\(config.brightness) spo2Thr=\(config.spo2_thr)")
+            } else if cmdType == VTMBLECmdGetBattery.rawValue {
+                let bat = VTMBLEParser.parseBatteryInfo(data)
+                var batteryData = JSObject()
+                batteryData["batteryLevel"] = Int(bat.percent)
+                batteryData["deviceId"] = currentDevice?.identifier.uuidString
+                notifyListeners("batteryInfo", data: batteryData)
+                if let call = pendingBatteryCall {
+                    call.resolve(["batteryLevel": Int(bat.percent)])
+                    pendingBatteryCall = nil
+                }
             } else {
                 NSLog("📡 [OXI] Other cmd=0x\(String(format: "%02X", cmdType)) size=\(data.count)")
             }
@@ -814,14 +983,15 @@ public class WellueSDK: CAPPlugin, CBCentralManagerDelegate, CBPeripheralDelegat
         }
     }
 
-    @objc public func util(_ util: VTMURATUtils, commandFailed cmdType: UInt8, deviceType: VTMDeviceType, failedType: VTMBLEPkgType) {
+    @objc public func util(_ util: VTMURATUtils, commandFailed cmdType: u_char, deviceType: VTMDeviceType, failedType: VTMBLEPkgType) {
         NSLog("❌ [UTIL] CMD FAILED: cmdType=0x\(String(format: "%02X", cmdType)), deviceType=\(deviceType.rawValue), failedType=\(failedType.rawValue)")
         errorLog("Command failed. cmdType=\(cmdType) deviceType=\(deviceType) failedType=\(failedType.rawValue)")
     }
     
-    @objc public func util(_ util: VTMURATUtils, commandSendFailed errorCode: UInt8) {
+    private var directWriteRetryCount: Int = 0
+
+    @objc public func util(_ util: VTMURATUtils, commandSendFailed errorCode: u_char) {
         let pluginPtr = Unmanaged.passUnretained(self).toOpaque()
-        // errorCode: 0=peripheral nil, 1=txCharacteristic nil, 2=peripheral not connected, 3=timeout
         let errorMeaning: String
         switch errorCode {
         case 0: errorMeaning = "peripheral is nil"
@@ -831,17 +1001,52 @@ public class WellueSDK: CAPPlugin, CBCentralManagerDelegate, CBPeripheralDelegat
         default: errorMeaning = "unknown"
         }
         NSLog("❌ [UTIL] SEND FAILED: errorCode=\(errorCode) (\(errorMeaning)) connectedModel=\(self.connectedModel) currentType=\(util.currentType.rawValue) plugin_ptr=\(pluginPtr)")
-        errorLog("Command send failed. errorCode=\(errorCode) (\(errorMeaning))")
-        
-        // ✅ DIAGNOSTIC: Compare instance pointers to verify singleton fix is effective.
-        // If 'util' and 'viatomUtils' have DIFFERENT addresses, we are still using
-        // two separate instances — which means txCharacteristic is on one, commands on the other.
+
+        if errorCode == 1, connectedModel == "O2Ring" {
+            // Force re-inject characteristics into bleDevice for both protocols
+            if let bleDevice = util.bleDevice, let tx = self.o2RingTxChar {
+                bleDevice.a5_TxCharacteristic = tx
+                bleDevice.aa_TxCharacteristic = tx
+                if let rx = self.o2RingRxChar {
+                    bleDevice.a5_RxCharacteristic = rx
+                    bleDevice.aa_RxCharacteristic = rx
+                }
+                util.txcharacteristic = tx
+                NSLog("🔧 [SEND FAIL] Re-injected chars into bleDevice. a5_Tx=\(tx.uuid.uuidString)")
+
+                // Try direct peripheral write as last resort (max 3 retries per session)
+                if directWriteRetryCount < 3, let peripheral = currentDevice, peripheral.state == .connected {
+                    directWriteRetryCount += 1
+                    NSLog("🔧 [SEND FAIL] Attempting direct peripheral write (retry \(directWriteRetryCount)/3)")
+                    peripheral.writeValue(buildWOxiRealDataRequest(), for: tx, type: .withoutResponse)
+                }
+            }
+        }
+
         let utilPtr = Unmanaged.passUnretained(util).toOpaque()
         let localPtr = viatomUtils.map { Unmanaged.passUnretained($0).toOpaque() }
-        NSLog("🔬 [SEND FAIL DIAG] util ptr=\(utilPtr)  viatomUtils ptr=\(String(describing: localPtr))")
-        NSLog("🔬 [SEND FAIL DIAG] Same instance: \(localPtr.map { $0 == utilPtr } ?? false)")
-        NSLog("🔬 [SEND FAIL DIAG] util.currentType=\(util.currentType.rawValue), peripheral services: \(util.peripheral.services?.map { $0.uuid.uuidString } ?? [])")
+        NSLog("🔬 [SEND FAIL DIAG] util ptr=\(utilPtr)  viatomUtils ptr=\(String(describing: localPtr))  Same=\(localPtr.map { $0 == utilPtr } ?? false)")
         NSLog("🔬 [SEND FAIL DIAG] peripheral.state=\(util.peripheral.state.rawValue) (2=connected)")
+    }
+
+    /// Builds an A5-protocol "get real data" command packet for WOxi devices.
+    /// Format: [0xA5] [len_lo] [len_hi] [~len_lo] [~len_hi] [cmd=0x04] [type=0x00] [CRC8]
+    private func buildWOxiRealDataRequest() -> Data {
+        let cmd: UInt8 = 0x04  // VTMWOxiCmdGetRealData
+        let pkgType: UInt8 = 0x00  // request
+        let payload: [UInt8] = []
+        let dataLen = UInt16(payload.count + 2) // cmd + pkgType + payload
+        let lenLo = UInt8(dataLen & 0xFF)
+        let lenHi = UInt8((dataLen >> 8) & 0xFF)
+        var packet: [UInt8] = [0xA5, lenLo, lenHi, ~lenLo, ~lenHi, cmd, pkgType]
+        packet.append(contentsOf: payload)
+        // CRC8 over everything after header (len bytes + data)
+        let crcData = Array(packet[1...])
+        var crc: UInt8 = 0
+        for byte in crcData { crc = crc &+ byte }
+        packet.append(crc)
+        NSLog("🔧 [DIRECT WRITE] Sending WOxi real data request: \(packet.map { String(format: "%02X", $0) }.joined(separator: " "))")
+        return Data(packet)
     }
 
     @objc public func utilDeployFailed(_ util: VTMURATUtils) {
@@ -1444,6 +1649,17 @@ public class WellueSDK: CAPPlugin, CBCentralManagerDelegate, CBPeripheralDelegat
             }
         }
         
+        if let bleDevice = util.bleDevice {
+            if let tx = self.o2RingTxChar {
+                bleDevice.a5_TxCharacteristic = tx
+                bleDevice.aa_TxCharacteristic = tx
+            }
+            if let rx = self.o2RingRxChar {
+                bleDevice.a5_RxCharacteristic = rx
+                bleDevice.aa_RxCharacteristic = rx
+            }
+        }
+        
         let txAfter = util.txcharacteristic
         let rxAfter = util.rxcharacteristic
         
@@ -1486,20 +1702,8 @@ public class WellueSDK: CAPPlugin, CBCentralManagerDelegate, CBPeripheralDelegat
     }
     
     private func calculateViatomCRC8(_ data: Data) -> UInt8 {
-        var crc: UInt8 = 0
-        for b in data {
-            let chk = crc ^ b
-            crc = 0
-            if (chk & 0x01) != 0 { crc ^= 0x07 }
-            if (chk & 0x02) != 0 { crc ^= 0x0e }
-            if (chk & 0x04) != 0 { crc ^= 0x1c }
-            if (chk & 0x08) != 0 { crc ^= 0x38 }
-            if (chk & 0x10) != 0 { crc ^= 0x70 }
-            if (chk & 0x20) != 0 { crc ^= 0xe0 }
-            if (chk & 0x40) != 0 { crc ^= 0xc7 }
-            if (chk & 0x80) != 0 { crc ^= 0x89 }
-        }
-        return crc
+        var bytes = [UInt8](data)
+        return VTMCalibrate.calCRC8(&bytes, bufSize: UInt32(data.count))
     }
     
     /// Starts the O2Ring real-time polling timer. Safe to call multiple times (idempotent).
@@ -1507,36 +1711,66 @@ public class WellueSDK: CAPPlugin, CBCentralManagerDelegate, CBPeripheralDelegat
         let selfPtr = Unmanaged.passUnretained(self).toOpaque()
         DispatchQueue.main.async {
             self.realTimeDataTimer?.invalidate()
-            self.viatomUtils?.delegate = self
+            
+            // Ensure o2Delegate AND a5Delegate are set for both protocol response paths
+            if let o2Comm = self.viatomUtils as? VTO2Communicate {
+                o2Comm.o2Delegate = self
+                o2Comm.a5Delegate = self
+                NSLog("✅ [O2RING] Confirmed o2Delegate + a5Delegate set on VTO2Communicate")
+            } else {
+                self.viatomUtils?.delegate = self
+            }
+            
+            // ✅ CRITICAL: Do NOT override peripheral.delegate here.
+            // VTO2Communicate's internal VTMBLEDevice must remain the CBPeripheralDelegate
+            // to handle packet reassembly. We receive data via VTO2CommunicateDelegate.
+            
             let currentType = self.viatomUtils?.currentType.rawValue ?? 0
-            NSLog("✅ [O2RING] RT polling timer starting. currentType=\(currentType), peripheral=\(self.viatomUtils?.peripheral.name ?? "nil"), peripheralState=\(self.viatomUtils?.peripheral.state.rawValue ?? -1) plugin_ptr=\(selfPtr)")
-            self.realTimeDataTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+            let peripheralDelegateClass = self.currentDevice?.delegate.map { type(of: $0) } ?? nil
+            NSLog("✅ [O2RING] RT polling timer starting. currentType=\(currentType), peripheral=\(self.viatomUtils?.peripheral.name ?? "nil"), peripheralState=\(self.viatomUtils?.peripheral.state.rawValue ?? -1), peripheral.delegate=\(String(describing: peripheralDelegateClass)) plugin_ptr=\(selfPtr)")
+            
+            self.realTimeDataTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
                 guard let self = self else { return }
                 guard self.isSdkDeployed else {
-                    NSLog("⏰ [RT TIMER] O2Ring poll tick – SDK not deployed, skipping real data request")
+                    NSLog("⏰ [RT TIMER] O2Ring poll tick – SDK not deployed, skipping")
                     return
                 }
-                guard self.connectedModel == "O2Ring" || self.viatomUtils?.currentType == VTMDeviceTypeWOxi else {
-                    NSLog("⏰ [RT TIMER] O2Ring poll tick – device is not O2Ring and type is not WOxi, skipping real data request")
+                guard self.connectedModel == "O2Ring" || self.viatomUtils?.currentType == VTMDeviceTypeWOxi || self.viatomUtils is VTO2Communicate else {
+                    NSLog("⏰ [RT TIMER] O2Ring poll tick – not O2Ring, skipping")
                     return
                 }
                 
-                // Keep currentType as BP to ensure notification reception on BP characteristic
-                // self.viatomUtils?.currentType = VTMDeviceTypeWOxi
-                
-                // Dynamically re-inject characteristics before call to prevent SDK resetting them
-                self.injectO2RingCharacteristics()
-                
-                let ct = self.viatomUtils?.currentType.rawValue ?? 0
-                NSLog("⏰ [RT TIMER] O2Ring poll tick – requesting real data. currentType=\(ct) plugin_ptr=\(selfPtr)")
-                
-                // Try SDK path first
-                self.viatomUtils?.woxi_requestWOxiRealData()
-                
-                // Direct write fallback
-                self.sendO2RingRealDataRequestDirectly()
+                // Ensure notifications are enabled on RX every poll tick
+                if let rx = self.o2RingRxChar, let peripheral = self.currentDevice {
+                    if !rx.isNotifying {
+                        NSLog("🔔 [RT TIMER] RX not notifying! Enabling notifications...")
+                        peripheral.setNotifyValue(true, for: rx)
+                    }
+                }
+
+                if self.viatomUtils?.currentType != VTMDeviceTypeWOxi {
+                    self.viatomUtils?.setValue(VTMDeviceTypeWOxi.rawValue, forKey: "currentType")
+                }
+
+                // beginGetRealData() is what actually makes THIS device emit its 0x55
+                // real-time frame (woxi_requestWOxiRealData alone yields nothing). However the
+                // device's reply fails the SDK's own parser (commandFailed 0xCC), so the AA
+                // command never "completes" and the aa_cmdArr queue gets stuck — blocking every
+                // subsequent request until a re-deploy. We clear the stuck command each tick so
+                // the request can re-fire continuously (we parse the reply ourselves anyway).
+                if let o2Comm = self.viatomUtils as? VTO2Communicate {
+                    if let cmdArr = o2Comm.value(forKey: "aa_cmdArr") as? NSMutableArray, cmdArr.count > 0 {
+                        cmdArr.removeAllObjects()
+                    }
+                    NSLog("⏰ [RT TIMER] O2Ring poll tick – beginGetRealData() + woxi_requestWOxiRealData()")
+                    o2Comm.beginGetRealData()
+                    self.viatomUtils?.woxi_requestWOxiRealData()
+                } else {
+                    NSLog("⏰ [RT TIMER] O2Ring poll tick – woxi_requestWOxiRealData() (A5 protocol)")
+                    self.viatomUtils?.woxi_requestWOxiRealData()
+                }
             }
-            NSLog("✅ [O2RING] RT polling timer started")
+            NSLog("✅ [O2RING] RT polling timer started (interval=2s)")
         }
     }
     
@@ -1584,20 +1818,26 @@ public class WellueSDK: CAPPlugin, CBCentralManagerDelegate, CBPeripheralDelegat
         NSLog("📊 [RT TASK] utilsType: \(String(describing: utilsType?.rawValue))")
         let isOxy = (utilsType == VTMDeviceTypeWOxi) || 
                     (self.connectedModel == "O2Ring") ||
-                    self.isO2RingDeviceName(device.name ?? "")
+                    self.isO2RingDeviceName(device.name ?? "") ||
+                    (self.viatomUtils is VTO2Communicate)
         
         NSLog("📊 [RT TASK] isOxy evaluated to: \(isOxy)")
         
         if isOxy {
-            // Set delegate to be absolutely sure we receive command completion callbacks
-            viatomUtils?.delegate = self
-            
-            // Dynamically inject/preserve characteristics before starting timer
-            self.injectO2RingCharacteristics()
+            // Ensure delegate is set for VTO2Communicate callbacks
+            if let o2Comm = self.viatomUtils as? VTO2Communicate {
+                o2Comm.o2Delegate = self
+                o2Comm.a5Delegate = self
+                NSLog("📊 [RT TASK] VTO2Communicate o2Delegate + a5Delegate confirmed")
+            } else {
+                viatomUtils?.delegate = self
+                // Only inject characteristics for the fallback (non-VTO2Communicate) path
+                self.injectO2RingCharacteristics()
+            }
             
             // Start (or restart) the RT polling timer
             self.startO2RingPollingTimer()
-            NSLog("📊 [RT TASK] O2Ring detected, started/restarted 1s polling timer")
+            NSLog("📊 [RT TASK] O2Ring detected, started/restarted polling timer")
         } else {
             NSLog("📊 [RT TASK] ✅ SDK is deployed! Ready to receive automatic real-time data for device: \(device.name ?? "Unknown")")
             NSLog("📊 [RT TASK] The bpRealData delegate will automatically fire when device button is pressed")
@@ -1726,65 +1966,137 @@ public class WellueSDK: CAPPlugin, CBCentralManagerDelegate, CBPeripheralDelegat
         call.resolve(["fileType": 0, "fileContent": ""])
     }
     
-    // MARK: - CBPeripheralDelegate Interception & Proxying
-    // We proxy peripheral callbacks to the SDK singleton (viatomUtils) to inspect and override 
-    // properties in real time (specifically injecting O2Ring tx/rxcharacteristics) before the 
-    // SDK attempts its initialization handshake.
-    
-    public override func responds(to aSelector: Selector!) -> Bool {
-        if let sdk = viatomUtils, sdk.responds(to: aSelector) {
-            return true
-        }
-        return super.responds(to: aSelector)
-    }
-    
-    public override func forwardingTarget(for aSelector: Selector!) -> Any? {
-        if let sdk = viatomUtils, sdk.responds(to: aSelector) {
-            NSLog("🔧 [BLE INTERCEPT] Dynamic forwarding selector \(NSStringFromSelector(aSelector)) to SDK")
-            return sdk
-        }
-        return super.forwardingTarget(for: aSelector)
-    }
+    // MARK: - CBPeripheralDelegate (FORWARDING for O2Ring, direct for BP2/ECG)
+    // We intercept ALL BLE callbacks for diagnostics, then forward to VTMBLEDevice.
     
     @objc(peripheral:didUpdateValueForCharacteristic:error:)
     public func peripheral(_ peripheral: CBPeripheral, didUpdateValueFor characteristic: CBCharacteristic, error: Error?) {
-        NSLog("🔧 [BLE INTERCEPT] didUpdateValueFor: \(characteristic.uuid.uuidString)")
+        let value = characteristic.value
+        let dataLen = value?.count ?? 0
+        // Log the FULL packet (not just a prefix) so the exact frame layout is always visible.
+        let fullHex = value?.map { String(format: "%02X", $0) }.joined(separator: " ") ?? "nil"
+        NSLog("📥 [BLE DATA] didUpdateValueFor: \(characteristic.uuid.uuidString) len=\(dataLen) data=\(fullHex)")
         if let error = error {
-            NSLog("❌ [BLE INTERCEPT] didUpdateValueFor error: \(error.localizedDescription)")
+            NSLog("❌ [BLE DATA] error: \(error.localizedDescription)")
         }
-        if let sdk = viatomUtils {
-            (sdk as AnyObject).peripheral?(peripheral, didUpdateValueFor: characteristic, error: error)
+
+        // SELF-PARSE: The Viatom SDK's A5 parser rejects this O2Ring's 0x55 frames
+        // (commandFailed cmdType=0xCC). Parse the real-time stream ourselves and emit o2RingRt.
+        if let value = value, dataLen > 0, isO2RingRxChar(characteristic) {
+            handleO2RingRealtimeData(value)
         }
+
+        // Forward to SDK's VTMBLEDevice for packet assembly (guard against self-recursion)
+        if let fwd = self.sdkBLEDeviceDelegate, !(fwd is WellueSDK) {
+            fwd.peripheral?(peripheral, didUpdateValueFor: characteristic, error: error)
+        }
+    }
+
+    /// Returns true if the characteristic is the O2Ring/BP2-service notify characteristic.
+    private func isO2RingRxChar(_ characteristic: CBCharacteristic) -> Bool {
+        let uuid = characteristic.uuid.uuidString
+        if uuid.caseInsensitiveCompare(BP2_NOTIFY_CHAR_UUID.uuidString) == .orderedSame { return true }
+        if uuid.caseInsensitiveCompare(O2RING_NOTIFY_CHAR_UUID.uuidString) == .orderedSame { return true }
+        if let rx = self.o2RingRxChar, rx.uuid == characteristic.uuid { return true }
+        return false
+    }
+
+    /// Accumulates BLE notification fragments and extracts complete 21-byte O2Ring real-time
+    /// frames (0x55 header). Each complete frame is parsed and emitted as `o2RingRt`.
+    private func handleO2RingRealtimeData(_ chunk: Data) {
+        // Any inbound notification means the stream is alive — keep the health watchdog calm
+        // so it stops the destructive re-deploy churn.
+        markDataReceived()
+
+        o2RxBuffer.append(contentsOf: chunk)
+        if o2RxBuffer.count > 512 {
+            o2RxBuffer.removeFirst(o2RxBuffer.count - 512)
+        }
+
+        // Resync to the 0x55 frame header and extract fixed-length frames.
+        while true {
+            guard let start = o2RxBuffer.firstIndex(of: O2_FRAME_HEADER) else {
+                o2RxBuffer.removeAll(keepingCapacity: true)
+                break
+            }
+            if start > 0 { o2RxBuffer.removeFirst(start) }
+            guard o2RxBuffer.count >= O2_FRAME_LEN else { break }
+            let frame = Array(o2RxBuffer.prefix(O2_FRAME_LEN))
+            parseAndEmitO2Frame(frame)
+            o2RxBuffer.removeFirst(O2_FRAME_LEN)
+        }
+    }
+
+    /// Parses a raw 21-byte O2Ring real-time frame. Layout decoded from the live device stream:
+    ///   [0]   = 0x55  frame header
+    ///   [1-2] = 0x00 0xFF  (cmd / ~cmd)
+    ///   [3-4] = 0x00 0x00
+    ///   [5]   = 0x0D  payload length (13)
+    ///   [6]   = 0x00
+    ///   [7]   = SpO2 (%)
+    ///   [8-9] = PR (bpm, little-endian)
+    ///   [14]  = battery (%)
+    ///   [16]  = PI (×10, e.g. 0x36 → 5.4)
+    ///   [20]  = checksum
+    private func parseAndEmitO2Frame(_ frame: [UInt8]) {
+        NSLog("🧬 [O2 FRAME] len=\(frame.count) \(frame.map { String(format: "%02X", $0) }.joined(separator: " "))")
+
+        guard frame.count >= 17, frame[0] == O2_FRAME_HEADER else {
+            NSLog("⚠️ [O2 SELF-PARSE] Unrecognized frame layout, ignoring")
+            return
+        }
+
+        let spo2 = Int(frame[7])
+        let pr = Int(frame[8]) | (Int(frame[9]) << 8)
+        let piRaw = Int(frame[16])
+        let batteryRaw = Int(frame[14])
+        let battery = batteryRaw <= 100 ? batteryRaw : 0
+
+        // Finger-in when SpO2/PR are in physiological range; otherwise treat as finger-out.
+        let fingerIn = spo2 >= 1 && spo2 <= 100 && pr >= 1 && pr <= 511
+        if fingerIn {
+            NSLog("✅ [O2 SELF-PARSE] Finger-in reading: spo2=\(spo2) pr=\(pr) pi=\(Double(piRaw)/10.0) battery=\(battery)%")
+            emitO2Rt(spo2: spo2, pr: pr, pi: piRaw, battery: battery, battState: 0, sensorState: 0, runState: 2)
+        } else {
+            NSLog("ℹ️ [O2 SELF-PARSE] Finger out / no reading (spo2=\(spo2) pr=\(pr)). Emitting finger-out status.")
+            emitO2Rt(spo2: 0, pr: 0, pi: 0, battery: battery, battState: 0, sensorState: 1, runState: 0)
+        }
+    }
+
+    /// Emits a normalized o2RingRt event to JavaScript.
+    private func emitO2Rt(spo2: Int, pr: Int, pi: Int, battery: Int, battState: Int, sensorState: Int, runState: Int) {
+        var rt = JSObject()
+        rt["spo2"] = spo2
+        rt["pr"] = pr
+        rt["pi"] = Double(pi) / 10.0
+        rt["battery"] = battery
+        rt["batteryState"] = battState
+        rt["state"] = sensorState
+        rt["runStatus"] = runState
+        NSLog("📡 [O2 SELF-PARSE] ✅ Emitting o2RingRt: spo2=\(spo2) pr=\(pr) pi=\(Double(pi)/10.0) battery=\(battery) sensor=\(sensorState)")
+        notifyListeners("o2RingRt", data: rt)
     }
     
     @objc(peripheral:didWriteValueForCharacteristic:error:)
     public func peripheral(_ peripheral: CBPeripheral, didWriteValueFor characteristic: CBCharacteristic, error: Error?) {
-        NSLog("🔧 [BLE INTERCEPT] didWriteValueFor: \(characteristic.uuid.uuidString)")
         if let error = error {
-            NSLog("❌ [BLE INTERCEPT] didWriteValueFor error: \(error.localizedDescription)")
+            NSLog("❌ [BLE WRITE] didWriteValueFor \(characteristic.uuid.uuidString) error: \(error.localizedDescription)")
+        } else {
+            NSLog("✅ [BLE WRITE] didWriteValueFor \(characteristic.uuid.uuidString) success")
         }
-        if let sdk = viatomUtils {
-            (sdk as AnyObject).peripheral?(peripheral, didWriteValueFor: characteristic, error: error)
+        if let fwd = self.sdkBLEDeviceDelegate, !(fwd is WellueSDK) {
+            fwd.peripheral?(peripheral, didWriteValueFor: characteristic, error: error)
         }
     }
     
     @objc(peripheral:didUpdateNotificationStateForCharacteristic:error:)
     public func peripheral(_ peripheral: CBPeripheral, didUpdateNotificationStateFor characteristic: CBCharacteristic, error: Error?) {
-        NSLog("🔧 [BLE INTERCEPT] didUpdateNotificationStateFor: \(characteristic.uuid.uuidString)")
+        NSLog("🔔 [BLE NOTIFY] didUpdateNotificationState: \(characteristic.uuid.uuidString) isNotifying=\(characteristic.isNotifying)")
         if let error = error {
-            NSLog("❌ [BLE INTERCEPT] didUpdateNotificationStateFor error: \(error.localizedDescription)")
+            NSLog("❌ [BLE NOTIFY] error: \(error.localizedDescription)")
         }
-        if let sdk = viatomUtils {
-            (sdk as AnyObject).peripheral?(peripheral, didUpdateNotificationStateFor: characteristic, error: error)
-        }
-        // Re-inject after SDK may have reset them
-        self.injectO2RingCharacteristics()
-        // Also restore our direct references
-        if let tx = self.o2RingTxChar {
-            self.viatomUtils?.txcharacteristic = tx
-        }
-        if let rx = self.o2RingRxChar {
-            self.viatomUtils?.rxcharacteristic = rx
+        if let fwd = self.sdkBLEDeviceDelegate, !(fwd is WellueSDK) {
+            fwd.peripheral?(peripheral, didUpdateNotificationStateFor: characteristic, error: error)
         }
     }
     
@@ -1799,9 +2111,8 @@ public class WellueSDK: CAPPlugin, CBCentralManagerDelegate, CBPeripheralDelegat
                 NSLog("   🔬 [SERVICE DISCOVERED] UUID: \(service.uuid.uuidString)")
             }
         }
-        if let sdk = viatomUtils {
-            NSLog("   👉 Forwarding didDiscoverServices to SDK using AnyObject dynamic dispatch")
-            (sdk as AnyObject).peripheral?(peripheral, didDiscoverServices: error)
+        if let fwd = self.sdkBLEDeviceDelegate, !(fwd is WellueSDK) {
+            fwd.peripheral?(peripheral, didDiscoverServices: error)
         }
     }
     
@@ -1817,77 +2128,36 @@ public class WellueSDK: CAPPlugin, CBCentralManagerDelegate, CBPeripheralDelegat
             }
         }
         
-        let injectBlock = { [weak self] in
-            guard let self = self else { return }
-            let deviceName = self.currentDevice?.name ?? self.connectedDevice?.name ?? ""
-            let isOxi = (self.viatomUtils?.currentType == VTMDeviceTypeWOxi) || 
-                        (self.connectedModel == "O2Ring") ||
-                        self.isO2RingDeviceName(deviceName)
-            
-            if isOxi {
-                if service.uuid.uuidString.caseInsensitiveCompare(self.O2RING_SERVICE_UUID.uuidString) == .orderedSame {
-                    if let characteristics = service.characteristics {
-                        for char in characteristics {
-                            if char.uuid.uuidString.caseInsensitiveCompare(self.O2RING_WRITE_CHAR_UUID.uuidString) == .orderedSame {
-                                NSLog("🔧 [O2RING KVC INTERCEPT] Injecting O2Ring S txcharacteristic: \(char.uuid.uuidString)")
-                                self.viatomUtils?.txcharacteristic = char
-                                self.o2RingTxChar = char
-                            } else if char.uuid.uuidString.caseInsensitiveCompare(self.O2RING_NOTIFY_CHAR_UUID.uuidString) == .orderedSame {
-                                NSLog("🔧 [O2RING KVC INTERCEPT] Injecting O2Ring S rxcharacteristic: \(char.uuid.uuidString)")
-                                self.viatomUtils?.rxcharacteristic = char
-                                self.o2RingRxChar = char
-                            }
-                        }
-                    }
-                } else if service.uuid.uuidString.caseInsensitiveCompare(self.BP2_SERVICE_UUID.uuidString) == .orderedSame {
-                    if let characteristics = service.characteristics {
-                        for char in characteristics {
-                            if char.uuid.uuidString.caseInsensitiveCompare(self.BP2_WRITE_CHAR_UUID.uuidString) == .orderedSame {
-                                NSLog("🔧 [O2RING KVC INTERCEPT] Injecting PO2/O2Ring txcharacteristic: \(char.uuid.uuidString)")
-                                self.viatomUtils?.txcharacteristic = char
-                                self.o2RingTxChar = char
-                            } else if char.uuid.uuidString.caseInsensitiveCompare(self.BP2_NOTIFY_CHAR_UUID.uuidString) == .orderedSame {
-                                NSLog("🔧 [O2RING KVC INTERCEPT] Injecting PO2/O2Ring rxcharacteristic: \(char.uuid.uuidString)")
-                                self.viatomUtils?.rxcharacteristic = char
-                                self.o2RingRxChar = char
-                            }
-                        }
-                    }
+        // Cache O2Ring characteristics if discovered (for diagnostics and fallback)
+        let deviceName = self.currentDevice?.name ?? self.connectedDevice?.name ?? ""
+        let isOxi = (self.viatomUtils?.currentType == VTMDeviceTypeWOxi) || 
+                    (self.connectedModel == "O2Ring") ||
+                    self.isO2RingDeviceName(deviceName) ||
+                    (self.viatomUtils is VTO2Communicate)
+        
+        if isOxi, let o2Comm = self.viatomUtils as? VTO2Communicate {
+            NSLog("🔧 [O2RING CHAR DISCOVERY] Injecting chars from service \(service.uuid.uuidString) into o2Comm...")
+            self.injectO2Chars(from: service, into: o2Comm, peripheral: peripheral)
+            if o2Comm.txcharacteristic != nil && o2Comm.rxcharacteristic != nil {
+                NSLog("✅ [O2RING CHAR DISCOVERY] Both TX and RX now set!")
+            }
+        } else if isOxi, let characteristics = service.characteristics {
+            for char in characteristics {
+                if char.uuid.uuidString.caseInsensitiveCompare(O2RING_WRITE_CHAR_UUID.uuidString) == .orderedSame ||
+                   char.uuid.uuidString.caseInsensitiveCompare(BP2_WRITE_CHAR_UUID.uuidString) == .orderedSame {
+                    self.o2RingTxChar = char
+                    NSLog("🔧 [O2RING] Cached txChar: \(char.uuid.uuidString)")
+                } else if char.uuid.uuidString.caseInsensitiveCompare(O2RING_NOTIFY_CHAR_UUID.uuidString) == .orderedSame ||
+                          char.uuid.uuidString.caseInsensitiveCompare(BP2_NOTIFY_CHAR_UUID.uuidString) == .orderedSame {
+                    self.o2RingRxChar = char
+                    NSLog("🔧 [O2RING] Cached rxChar: \(char.uuid.uuidString)")
                 }
             }
         }
         
-        // 1. Inject BEFORE forwarding so synchronous handshake writes find them non-nil
-        injectBlock()
-        
-        // 2. Forward first to let SDK run its own logic
-        if let sdk = viatomUtils {
-            NSLog("   👉 Forwarding didDiscoverCharacteristicsFor to SDK using AnyObject dynamic dispatch")
-            (sdk as AnyObject).peripheral?(peripheral, didDiscoverCharacteristicsFor: service, error: error)
-        }
-        
-        // 3. Inject AFTER forwarding (just in case the SDK overwrote them to nil)
-        injectBlock()
-        
-        // Log verification results
-        let deviceName = self.currentDevice?.name ?? self.connectedDevice?.name ?? ""
-        let isOxi = (self.viatomUtils?.currentType == VTMDeviceTypeWOxi) || 
-                    (self.connectedModel == "O2Ring") ||
-                    self.isO2RingDeviceName(deviceName)
-        if isOxi {
-            if let tx = viatomUtils?.txcharacteristic {
-                NSLog("🔧 [O2RING KVC INTERCEPT] Verification: txcharacteristic successfully set to \(tx.uuid.uuidString)")
-            } else {
-                NSLog("❌ [O2RING KVC INTERCEPT] Verification failed: txcharacteristic remains nil")
-            }
-            if let rx = viatomUtils?.rxcharacteristic {
-                NSLog("🔧 [O2RING KVC INTERCEPT] Verification: rxcharacteristic successfully set to \(rx.uuid.uuidString)")
-            } else {
-                NSLog("❌ [O2RING KVC INTERCEPT] Verification failed: rxcharacteristic remains nil")
-            }
-            
-            // Handshake will be triggered and completed natively by the SDK central manager and delegate.
-            NSLog("🔧 [O2RING KVC INTERCEPT] PO2/O2Ring detected on BP2 service. Awaiting native SDK handshake and utilDeployCompletion...")
+        // Forward to SDK's VTMBLEDevice (guard against self-recursion)
+        if let fwd = self.sdkBLEDeviceDelegate, !(fwd is WellueSDK) {
+            fwd.peripheral?(peripheral, didDiscoverCharacteristicsFor: service, error: error)
         }
     }
 
@@ -1899,9 +2169,9 @@ extension WellueSDK: VTMURATDeviceExtension {
         let prefixes: [String]?
         switch type {
         case VTMDeviceTypeWOxi:
-            prefixes = ["O2RingS", "JODU"]
+            prefixes = ["O2", "O2Ring", "O2RingS", "OxyLink", "Oximeter", "WearOxi", "OxiBand"]
         case VTMDeviceTypeBP:
-            prefixes = ["BP2", "BP2A", "BP2T", "BP2W", "BP2Pro", "BPW1", "Monitraq", "O2", "O2Ring", "OxyLink", "Oximeter", "WearOxi", "OxiBand", "JODU"]
+            prefixes = ["BP2", "BP2A", "BP2T", "BP2W", "BP2Pro", "BPW1", "Monitraq"]
         case VTMDeviceTypeECG:
             prefixes = ["ER1", "ER2", "VBeat", "DuoEK", "DuoEKS"]
         default:
@@ -1909,5 +2179,226 @@ extension WellueSDK: VTMURATDeviceExtension {
         }
         NSLog("🔧 [VTM EXTENSION] Name prefixes requested for type \(type.rawValue): \(String(describing: prefixes))")
         return prefixes
+    }
+}
+
+extension WellueSDK {
+    // MARK: - VTO2CommunicateDelegate
+
+    @objc(o2_serviceDeployed:)
+    public func o2_serviceDeployed(_ completed: Bool) {
+        let selfPtr = Unmanaged.passUnretained(self).toOpaque()
+        NSLog("🎉🎉🎉 [O2 COMMUNICATE] SERVICE DEPLOYED! completed=\(completed) self=\(selfPtr)")
+        
+        if completed {
+            if !isSdkDeployed {
+                if let o2Comm = self.viatomUtils as? VTO2Communicate {
+                    NSLog("✅ [O2 COMMUNICATE] Triggering utilDeployCompletion via VTO2Communicate delegate")
+                    
+                    // The SDK completed service discovery but may not have bound txcharacteristic.
+                    // Manually scan ALL discovered services to find and inject O2Ring characteristics.
+                    if let peripheral = self.currentDevice ?? self.connectedDevice {
+                        if o2Comm.txcharacteristic == nil || o2Comm.rxcharacteristic == nil {
+                            NSLog("🔧 [O2 COMMUNICATE] Chars nil after deploy — scanning ALL services to inject...")
+                            if let services = peripheral.services {
+                                for service in services {
+                                    NSLog("🔧 [O2 COMMUNICATE] Checking service: \(service.uuid.uuidString) chars=\(service.characteristics?.count ?? 0)")
+                                    self.injectO2Chars(from: service, into: o2Comm, peripheral: peripheral)
+                                }
+                            }
+                            NSLog("🔧 [O2 COMMUNICATE] Post-injection: tx=\(o2Comm.txcharacteristic?.uuid.uuidString ?? "STILL NIL"), rx=\(o2Comm.rxcharacteristic?.uuid.uuidString ?? "STILL NIL")")
+                            
+                            // If still nil, trigger characteristic discovery and retry
+                            if o2Comm.txcharacteristic == nil {
+                                NSLog("⚠️ [O2 COMMUNICATE] Chars still nil — triggering discovery + scheduling retry...")
+                                if let services = peripheral.services {
+                                    for service in services {
+                                        if service.characteristics == nil || service.characteristics?.isEmpty == true {
+                                            NSLog("🔧 [O2 RETRY] Discovering characteristics for \(service.uuid.uuidString)...")
+                                            peripheral.discoverCharacteristics(nil, for: service)
+                                        }
+                                    }
+                                }
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
+                                    guard let self = self,
+                                          let o2 = self.viatomUtils as? VTO2Communicate,
+                                          o2.txcharacteristic == nil,
+                                          let p = self.currentDevice ?? self.connectedDevice,
+                                          let services = p.services else { return }
+                                    NSLog("🔧 [O2 RETRY] Retrying injection after 1s delay...")
+                                    for service in services {
+                                        self.injectO2Chars(from: service, into: o2, peripheral: p)
+                                    }
+                                    if o2.txcharacteristic != nil {
+                                        NSLog("✅ [O2 RETRY] TX now set: \(o2.txcharacteristic!.uuid.uuidString)")
+                                    } else {
+                                        NSLog("❌ [O2 RETRY] TX still nil after retry")
+                                    }
+                                }
+                            }
+                        } else {
+                            self.o2RingTxChar = o2Comm.txcharacteristic
+                            self.o2RingRxChar = o2Comm.rxcharacteristic
+                            NSLog("✅ [O2 COMMUNICATE] Post-deploy chars already set: tx=\(o2Comm.txcharacteristic?.uuid.uuidString ?? "nil"), rx=\(o2Comm.rxcharacteristic?.uuid.uuidString ?? "nil")")
+                        }
+                    }
+                    
+                    self.utilDeployCompletion(o2Comm)
+                }
+            } else {
+                NSLog("⚠️ [O2 COMMUNICATE] Already deployed, ignoring duplicate o2_serviceDeployed")
+            }
+        } else {
+            NSLog("❌ [O2 COMMUNICATE] Service deployment failed")
+            self.utilDeployFailed(self.viatomUtils ?? VTMURATUtils())
+        }
+    }
+
+    @objc(realDataCallBackWithData:)
+    public func realDataCallBack(with realData: Data?) {
+        markDataReceived()
+        
+        guard let realData = realData else {
+            NSLog("❌ [O2 COMMUNICATE] realDataCallBack received nil data")
+            return
+        }
+        
+        NSLog("📊 [O2 COMMUNICATE] realDataCallBack received \(realData.count) bytes: \(realData.prefix(16).map { String(format: "%02X", $0) }.joined(separator: " "))")
+        let realObj = VTO2Parser.parseO2RealObject(with: realData)
+        var rt = JSObject()
+        rt["spo2"] = Int(realObj.spo2)
+        rt["pr"] = Int(realObj.hr)
+        rt["pi"] = Double(realObj.pi) / 10.0
+        rt["battery"] = Int(realObj.battery)
+        rt["batteryState"] = Int(realObj.batState)
+        rt["state"] = Int(realObj.leadState)
+        rt["runStatus"] = 0
+        
+        NSLog("📡 [O2 COMMUNICATE DELEGATE] ✅ Emitting o2RingRt: spo2=\(realObj.spo2) hr=\(realObj.hr) pi=\(realObj.pi) battery=\(realObj.battery) sensorState=\(realObj.leadState)")
+        notifyListeners("o2RingRt", data: rt)
+    }
+    
+    // MARK: - VTO2A5RespDelegate (A5 protocol real-time data from WOxi devices)
+
+    @objc public func a5_realParams(_ params: VTParameters) {
+        markDataReceived()
+        NSLog("📡 [A5 DELEGATE] ✅ a5_realParams: spo2=\(params.spo2) pr=\(params.pr) pi=\(params.pi) battery=\(params.battery_percent) sensor=\(params.sensor_state)")
+        var rt = JSObject()
+        rt["spo2"] = Int(params.spo2)
+        rt["pr"] = Int(params.pr)
+        rt["pi"] = Double(params.pi) / 10.0
+        rt["battery"] = Int(params.battery_percent)
+        rt["batteryState"] = Int(params.battery_state)
+        rt["state"] = Int(params.sensor_state)
+        rt["runStatus"] = Int(params.run_state)
+        notifyListeners("o2RingRt", data: rt)
+    }
+
+    @objc public func a5_realRunParams(_ params: VTO2SleepRunParams) {
+        markDataReceived()
+        NSLog("📡 [A5 DELEGATE] ✅ a5_realRunParams: spo2=\(params.spo2) pr=\(params.pr) pi=\(params.pi) battery=\(params.battery_percent) sensor=\(params.sensor_state) runStatus=\(params.run_status)")
+        var rt = JSObject()
+        rt["spo2"] = Int(params.spo2)
+        rt["pr"] = Int(params.pr)
+        rt["pi"] = Double(params.pi) / 10.0
+        rt["battery"] = Int(params.battery_percent)
+        rt["batteryState"] = Int(params.battery_state)
+        rt["state"] = Int(params.sensor_state)
+        rt["runStatus"] = Int(params.run_status)
+        notifyListeners("o2RingRt", data: rt)
+    }
+
+    @objc public func a5_responseError(_ respRes: VTA5RespRes, withCmd cmd: Int32) {
+        NSLog("❌ [A5 DELEGATE] a5_responseError: respRes=\(respRes.rawValue) cmd=0x\(String(format: "%02X", cmd))")
+    }
+
+    @objc(writeDataErrorCode:)
+    public func writeDataErrorCode(_ errorCode: Int32) {
+        NSLog("❌ [O2 COMMUNICATE DELEGATE] writeDataErrorCode: \(errorCode) (300=disconnected, 301=txChar nil)")
+        
+        // If txChar is nil (301), scan services and inject characteristics
+        if errorCode == 301 {
+            guard let o2Comm = self.viatomUtils as? VTO2Communicate else { return }
+            
+            // First try cached
+            if let tx = self.o2RingTxChar {
+                o2Comm.txcharacteristic = tx
+                if let bleDevice = o2Comm.bleDevice {
+                    bleDevice.a5_TxCharacteristic = tx
+                    bleDevice.aa_TxCharacteristic = tx
+                }
+                NSLog("🔧 [O2 RECOVER] Re-injected cached txChar: \(tx.uuid.uuidString)")
+                return
+            }
+            
+            // Try reading from bleDevice's internal char storage
+            if let bleDevice = o2Comm.bleDevice {
+                let tx = bleDevice.a5_TxCharacteristic ?? bleDevice.aa_TxCharacteristic
+                let rx = bleDevice.a5_RxCharacteristic ?? bleDevice.aa_RxCharacteristic
+                if let tx = tx {
+                    o2Comm.txcharacteristic = tx
+                    self.o2RingTxChar = tx
+                    NSLog("✅ [O2 RECOVER] Got TX from bleDevice: \(tx.uuid.uuidString)")
+                    if let rx = rx {
+                        o2Comm.rxcharacteristic = rx
+                        self.o2RingRxChar = rx
+                        NSLog("✅ [O2 RECOVER] Got RX from bleDevice: \(rx.uuid.uuidString)")
+                    }
+                    return
+                }
+            }
+            
+            // If no cache and no bleDevice chars, scan peripheral services
+            guard let peripheral = self.currentDevice ?? self.connectedDevice,
+                  let services = peripheral.services else {
+                NSLog("❌ [O2 RECOVER] No peripheral or services available")
+                return
+            }
+
+            NSLog("🔧 [O2 RECOVER] No cached chars — scanning ALL \(services.count) services...")
+            var needsDiscovery = false
+            for service in services {
+                let svcUUID = service.uuid.uuidString.uppercased()
+                if service.characteristics == nil || service.characteristics?.isEmpty == true {
+                    NSLog("🔧 [O2 RECOVER] Service \(svcUUID) has no chars — will trigger discovery...")
+                    needsDiscovery = true
+                } else {
+                    NSLog("🔧 [O2 RECOVER] Service \(svcUUID) has \(service.characteristics?.count ?? 0) chars — injecting...")
+                    self.injectO2Chars(from: service, into: o2Comm, peripheral: peripheral)
+                }
+            }
+            
+            // If injection succeeded, we're done
+            if o2Comm.txcharacteristic != nil {
+                NSLog("✅ [O2 RECOVER] TX injected successfully: \(o2Comm.txcharacteristic!.uuid.uuidString)")
+                self.o2RingTxChar = o2Comm.txcharacteristic
+                return
+            }
+            
+            // Need to discover characteristics — temporarily take delegate
+            if needsDiscovery {
+                NSLog("🔧 [O2 RECOVER] Temporarily taking delegate for char discovery...")
+                let originalDelegate = peripheral.delegate
+                peripheral.delegate = self
+                for service in services {
+                    if service.characteristics == nil || service.characteristics?.isEmpty == true {
+                        peripheral.discoverCharacteristics(nil, for: service)
+                    }
+                }
+                // Restore delegate after discovery
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
+                    guard let self = self else { return }
+                    if let origDel = originalDelegate {
+                        peripheral.delegate = origDel
+                    }
+                    NSLog("🔧 [O2 RECOVER] Delegate restored after discovery window")
+                }
+            }
+        }
+    }
+    
+    @objc(commonResponse:andResult:)
+    public func commonResponse(_ cmdType: VTCmd, andResult result: VTCommonResult) {
+        NSLog("📡 [O2 COMMUNICATE DELEGATE] commonResponse: cmd=\(cmdType.rawValue) result=\(result.rawValue)")
     }
 }

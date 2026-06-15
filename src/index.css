@@ -203,3 +203,23 @@ All colors MUST be HSL.
 .pr-safe-right {
   padding-right: max(1rem, env(safe-area-inset-right));
 }
+
+/* Razorpay checkout — respect iOS notch / Dynamic Island (CSS + one-shot JS apply) */
+:root {
+  --razorpay-safe-top: env(safe-area-inset-top, 0px);
+  --razorpay-safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+body.razorpay-checkout-open .razorpay-container,
+.razorpay-container {
+  top: var(--razorpay-safe-top) !important;
+  height: calc(100% - var(--razorpay-safe-top) - var(--razorpay-safe-bottom)) !important;
+  max-height: calc(100% - var(--razorpay-safe-top) - var(--razorpay-safe-bottom)) !important;
+  box-sizing: border-box !important;
+}
+
+body.razorpay-checkout-open .razorpay-container iframe,
+.razorpay-container iframe {
+  height: 100% !important;
+  max-height: 100% !important;
+}

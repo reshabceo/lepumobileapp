@@ -39,3 +39,19 @@ backend/src/firebase-service-account.json
 # `npm run build:camera-bridge`; large platform artifacts, do not commit)
 android/app/libs/camerabridge.aar
 ios/App/Frameworks/Mobile.xcframework/
+
+# Vendor SDK archives (download separately — exceed GitHub 100MB limit)
+Monitraq/Android-SDK-*.zip
+Monitraq/iOS-SDK-*.zip
+
+# Lepu demo reference project — build outputs and local tooling
+LepuDemo/app/release/
+LepuDemo/.gradle/
+LepuDemo/**/*.apk
+LepuDemo/lepudemo.jks
+LepuDemo/lepudemokey.txt
+
+# Credentials and signing keys (never commit)
+*.jks
+Monitraq/staging credentials.txt
+Untitled.jks

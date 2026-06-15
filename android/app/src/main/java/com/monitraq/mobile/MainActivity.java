@@ -15,7 +15,7 @@ import androidx.core.splashscreen.SplashScreen;
 import com.getcapacitor.BridgeActivity;
 import com.monitraq.wellue.WelluePlugin;
 import com.monitraq.mobile.plugins.Bp2Plugin;
-import com.monitraq.mobile.plugins.AliveCorPlugin;
+// import com.monitraq.mobile.plugins.AliveCorPlugin;
 import com.monitraq.mobile.plugins.CameraBridgePlugin;
 
 public class MainActivity extends BridgeActivity {
@@ -51,12 +51,15 @@ public class MainActivity extends BridgeActivity {
             Log.e(TAG, "❌ Failed to add Bp2Plugin: " + e.getMessage(), e);
         }
 
+        // AliveCorPlugin registration removed because it is disabled in the Android build.
+        /*
         try {
             initialPlugins.add(AliveCorPlugin.class);
             Log.d(TAG, "✅ AliveCorPlugin added to initialPlugins");
         } catch (Exception e) {
             Log.e(TAG, "❌ Failed to add AliveCorPlugin: " + e.getMessage(), e);
         }
+        */
 
         try {
             initialPlugins.add(CameraBridgePlugin.class);

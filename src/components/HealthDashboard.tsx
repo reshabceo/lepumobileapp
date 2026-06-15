@@ -814,17 +814,21 @@ export const HealthDashboard = () => {
 
                         let scanTime = 0;
                         const scanTimeout = 4000;
-                        while (scanTime < scanTimeout && availableDevicesRef.current.length === 0) {
+                        const hasBPDevice = () => availableDevicesRef.current.some(device => {
+                          const name = (device.name || "").toLowerCase();
+                          return name.includes('bp2') || name.includes('3049');
+                        });
+                        while (scanTime < scanTimeout && !hasBPDevice()) {
                           await new Promise(resolve => setTimeout(resolve, 200));
                           scanTime += 200;
                         }
 
-                        if (availableDevicesRef.current.length > 0) {
-                          const bp2Device = availableDevicesRef.current.find(device =>
-                            device.name.toLowerCase().includes('bp2') ||
-                            device.name.toLowerCase().includes('3049')
-                          ) || availableDevicesRef.current[0];
+                        const bp2Device = availableDevicesRef.current.find(device => {
+                          const name = (device.name || "").toLowerCase();
+                          return name.includes('bp2') || name.includes('3049');
+                        });
 
+                        if (bp2Device) {
                           await connectToDevice(bp2Device);
                           localStorage.setItem("lastConnectedDevice", bp2Device.id);
                           toast({
@@ -895,19 +899,21 @@ export const HealthDashboard = () => {
 
                         let scanTime = 0;
                         const scanTimeout = 4000;
-                        while (scanTime < scanTimeout && availableDevicesRef.current.length === 0) {
+                        const hasO2Device = () => availableDevicesRef.current.some(device => {
+                          const name = (device.name || "").toLowerCase();
+                          return name.includes('o2') || name.includes('ring') || name.includes('oxy') || device.model === 'O2Ring';
+                        });
+                        while (scanTime < scanTimeout && !hasO2Device()) {
                           await new Promise(resolve => setTimeout(resolve, 200));
                           scanTime += 200;
                         }
 
-                        const o2Devices = availableDevicesRef.current.filter(device =>
-                          device.name.toLowerCase().includes('o2') ||
-                          device.name.toLowerCase().includes('ring') ||
-                          device.name.toLowerCase().includes('oxy')
-                        );
+                        const o2Device = availableDevicesRef.current.find(device => {
+                          const name = (device.name || "").toLowerCase();
+                          return name.includes('o2') || name.includes('ring') || name.includes('oxy') || device.model === 'O2Ring';
+                        });
 
-                        if (o2Devices.length > 0) {
-                          const o2Device = o2Devices[0];
+                        if (o2Device) {
                           await connectToDevice(o2Device);
                           localStorage.setItem("lastConnectedDevice", o2Device.id);
                           toast({

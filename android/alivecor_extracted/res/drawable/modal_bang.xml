@@ -1,9 +1,0 @@
-<vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="72dp"
-    android:height="72dp"
-    android:viewportWidth="72"
-    android:viewportHeight="72">
-    <path
-        android:fillColor="@color/kardia_error_border"
-        android:pathData="M39.2,38.6002H32.8V25.8002H39.2V38.6002ZM39.2,51.4002H32.8V45.0002H39.2V51.4002ZM0.8,61.0002H71.2L36,0.2002L0.8,61.0002Z" />
-</vector>

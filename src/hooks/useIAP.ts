@@ -1,78 +1,65 @@
 import { useState } from 'react';
+import { Capacitor } from '@capacitor/core';
 import { iapService } from '../services/iapService';
-import { type IAPServiceType } from '../config/iap-products';
-import { supabase } from '../lib/supabase';
+import {
+  getIAPProductIdForPayment,
+  isAIConsultIAPType,
+  normalizeNetPaise,
+} from '../config/iap-products';
+import { payAndFulfil } from '../lib/payment';
 import { useToast } from './use-toast';
 
 export function usePurchaseIAP() {
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
-  const purchase = async (type: IAPServiceType, metadata: any) => {
+  const purchase = async (type: 'ai_doctor_text' | 'ai_doctor_voice', metadata: Record<string, unknown>) => {
+    if (Capacitor.getPlatform() !== 'ios') {
+      throw new Error('In-app purchase is only available on iOS.');
+    }
+    if (!isAIConsultIAPType(type)) {
+      throw new Error('Only AI Doctor consultations use In-App Purchase on iOS.');
+    }
+
     setLoading(true);
     try {
-      // 1. Native Purchase via Bridge
-      const { getIAPProduct } = await import('../config/iap-products');
-      const product = getIAPProduct(type);
-      if (!product) throw new Error('Invalid product type');
-      
-      const transaction = await iapService.purchase(product.productId);
-      
-      if (!transaction) {
-        throw new Error('Purchase cancelled or failed');
+      const netPaise = normalizeNetPaise(
+        Number(metadata?.net_amount_paise ?? metadata?.amount_paise) || 0,
+      );
+      const productId = getIAPProductIdForPayment(type, netPaise);
+      await iapService.preloadProducts();
+      const available = await iapService.isProductAvailable(productId);
+      if (!available) {
+        throw new Error(`Product not found: ${productId}`);
       }
 
-      // 2. Backend Verification & Fulfillment
-      const isMock = transaction.receipt && transaction.receipt.startsWith("MOCK_RECEIPT_BASE64_");
-      if (isMock) {
-        console.log("⚠️ [IAP] Mock receipt detected on hook, bypassing backend verification and fulfilling directly.");
-        if (type === 'emergency') {
-          const { appointment, alert } = metadata;
-          await supabase.from('appointments').insert(appointment);
-          await supabase.from('emergency_alerts').insert(alert);
-        } else if (type === 'ai_doctor_text' || type === 'ai_doctor_voice') {
-          const { session_id, consult_mode } = metadata;
-          const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
-          await supabase.from('ai_doctor_sessions')
-            .update({ 
-              payment_status: 'paid', 
-              expires_at: expiresAt,
-              consult_mode: consult_mode || (type === 'ai_doctor_voice' ? 'voice' : 'text'),
-              paid_amount_paise: metadata.amount_paise
-            })
-            .eq('id', session_id);
-        } else if (type.startsWith('appointment_')) {
-          await supabase.from('appointments').insert(metadata.appointment);
-        } else if (type === 'radiologist_review') {
-          await supabase.from('radiologist_requests').insert(metadata.request);
-        }
-      } else {
-        const { data, error } = await supabase.functions.invoke('verify-iap-receipt', {
-          body: { 
-            receipt: transaction.receipt, 
-            transactionId: transaction.transactionId,
-            type,
-            metadata
-          }
-        });
-
-        if (error || !data?.success) {
-          throw new Error(error?.message || data?.error || 'Verification failed');
-        }
-      }
-
-      toast({
-        title: "Purchase Successful",
-        description: "Your payment has been verified and service activated.",
+      let fulfilled = false;
+      await payAndFulfil({
+        type,
+        amount_paise: netPaise,
+        metadata,
+        onSuccess: () => {
+          fulfilled = true;
+        },
+        onError: (err) => {
+          throw err;
+        },
       });
 
-      return true;
-    } catch (error: any) {
+      if (fulfilled) {
+        toast({
+          title: 'Purchase Successful',
+          description: 'Your payment has been verified and service activated.',
+        });
+      }
+      return fulfilled;
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Failed to complete purchase.';
       console.error('IAP Error:', error);
       toast({
-        title: "Purchase Failed",
-        description: error.message || "Failed to complete purchase.",
-        variant: "destructive",
+        title: 'Purchase Failed',
+        description: message,
+        variant: 'destructive',
       });
       return false;
     } finally {

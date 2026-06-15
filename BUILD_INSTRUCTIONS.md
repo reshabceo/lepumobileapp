@@ -67,7 +67,7 @@ xcrun devicectl device install app \
 # 6. Launch app
 xcrun devicectl device process launch \
       --device 00008140-001C65993AE3001C \
-      com.monitraq.app
+      com.monitraq.mobile
 ```
 
 ---
@@ -116,7 +116,7 @@ xcodebuild -workspace App.xcworkspace -scheme App -configuration Debug -destinat
 xcrun devicectl device install app --device 00008140-001C65993AE3001C ~/Library/Developer/Xcode/DerivedData/App-cvvdaoljxzghrlezsanitckwqigw/Build/Products/Debug-iphoneos/App.app
 
 # Launch
-xcrun devicectl device process launch --device 00008140-001C65993AE3001C com.monitraq.app
+xcrun devicectl device process launch --device 00008140-001C65993AE3001C com.monitraq.mobile
 ```
 
 ---

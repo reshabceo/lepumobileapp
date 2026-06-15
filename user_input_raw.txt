@@ -1,0 +1,52 @@
+<USER_REQUEST>
+warning: (arm64) /Users/mdsahil/Library/Developer/Xcode/DerivedData/App-hlfzhnjighxsuhfirzkzqmkcwkbg/Build/Products/Debug-iphoneos/App.app/App empty dSYM file detected, dSYM was created with an executable with no debug info.
+🔧 [NATIVE REGISTRY] Monitraq native plugins registry initializing...
+🔧 [NATIVE REGISTRY] ✅ Found class: IAPPlugin
+🔧 [NATIVE REGISTRY] ✅ Found class: AliveCorSDK
+`UIScene` lifecycle will soon be required. Failure to adopt will result in an assert in the future.
+Reading from public effective user settings.
+Could not create a sandbox extension for '/var/containers/Bundle/Application/0156B0F4-1A7A-456E-84BD-1B7E6F38C547/App.app'
+Loading network plugin
+🔧 [ViewController] Registering custom local Capacitor plugins...
+🚀🚀🚀🚀🚀 [WELLUE LOAD] ===========================================
+🚀🚀🚀🚀🚀 [WELLUE LOAD] PLUGIN LOAD() METHOD EXECUTED self=0x00000001188c0700 !!!!!!!!!
+🚀🚀🚀🚀🚀 [WELLUE LOAD] ===========================================
+🚀 [WELLUE LOAD] Set WellueSDK.shared to 0x00000001188c0700
+🚀🚀🚀🚀🚀 [WELLUE LOAD] PLUGIN LOAD() METHOD EXECUTED FOR REAL!!!!!!!!
+🔵 [WELLUE SDK] [load():156] Plugin loaded - Starting initialization
+🔵 [WELLUE SDK] [load():158] CBCentralManager initialized
+🔬 [IVAR DUMP] VTMURATUtils: requestQueue
+🔬 [IVAR DUMP] VTMURATUtils: _notifyHeartRate
+🔬 [IVAR DUMP] VTMURATUtils: _notifyDeviceRSSI
+🔬 [IVAR DUMP] VTMURATUtils: _currentType
+🔬 [IVAR DUMP] VTMURATUtils: _defaultRate
+🔬 [IVAR DUMP] VTMURATUtils: _delegate
+🔬 [IVAR DUMP] VTMURATUtils: _deviceDelegate
+🔬 [IVAR DUMP] VTMURATUtils: _extension
+🔬 [IVAR DUMP] VTMURATUtils: _advertisementData
+🔬 [IVAR DUMP] VTMURATUtils: _peripheral
+🔬 [IVAR DUMP] VTMURATUtils: _wearablePPGKey
+🔬 [IVAR DUMP] VTMURATUtils: _bleDevice
+🔬 [IVAR DUMP] VTMURATUtils: _dataPool
+🔬 [IVAR DUMP] VTMURATUtils: _fileDataPool
+🔬 [IVAR DUMP] VTMURATUtils: _mtu
+🔬 [IVAR DUMP] VTMURATUtils: _cmdArr
+🔬 [IVA
+<truncated 45219 bytes>
+📱 [BLE DISCOVERY] Device: JODU51741195349 (rawName: JODU51741195349, advName: ) UUID: 39791B64-1315-7615-378C-815E373A0CA8 RSSI: -97
+🔵 [WELLUE SDK] [centralManager(_:didDiscover:advertisementData:rssi:):313] Discovered device: JODU51741195349 (ID: 39791B64-1315-7615-378C-815E373A0CA8)  RSSI=-97
+✅ [BLE DISCOVERY] Wellue device detected, emitting to JS: JODU51741195349
+🔵 [WELLUE SDK] [centralManager(_:didDiscover:advertisementData:rssi:):355] Notifying listeners of discovered Wellue device (deviceFound)
+📡 [LISTENERS] Emitting event 'deviceFound' from plugin instance (0x00000001188c0700)
+⚡️  TO JS {"name":"JODU51741195349","wellueHint":true,"id":"39791B64-1315-7615-378C-815E373A0CA8","model":"O2Ring","rssi":-97,"deviceId":"39791B64-1315-7615-378C-815E373A0CA8","deviceName":"JODU51741195349","address":"39791B64-1315-7615-378C-815E373A0CA8"}
+📱📱📱 [BLE DISCOVERY] Device: JODU51741195349 (rawName: JODU51741195349, advName: JODU51741195349) UUID: 39791B64-1315-7615-378C-815E373A0CA8 RSSI: -97
+🔵 [WELLUE SDK] [centralManager(_:didDiscover:advertisementData:rssi:):313] Discovered device: JODU51741195349 (ID: 39791B64-1315-7615-378C-815E373A0CA8)  RSSI=-97
+📱 [BLE DISCOVERY] Adv name: JODU51741195349
+🔵 [WELLUE SDK] [centralManager(_:didDiscover:advertisementData:rssi:):316] Adv local name: JODU51741195349
+✅ [BLE DISCOVERY] Wellue device detected, emitting to JS: JODU51741195349
+🔵 [WELLUE SDK] [centralManager(_:didDiscover:advertisementData:rssi:):355] Notifying listeners of discovered Wellue device (deviceFound)
+📡 [LISTENERS] Emitting event 'deviceFound' from plugin instance (0x00000001188c0700)
+⚡️  TO JS {"name":"JODU51741195349","wellueHint":true,"id":"39791B64-1315-7615-378C-815E373A0CA8","model":"O2Ring","rssi":-97,"deviceId":"39791B64-1315-7615-378C-815E373A0CA8","deviceName":"JODU51741195349","address
+<truncated 235952 bytes>
+
+NOTE: The output was truncated because it was too long. Use a more targeted query or a smaller range to get the information you need.
