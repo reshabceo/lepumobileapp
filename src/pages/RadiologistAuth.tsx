@@ -189,7 +189,7 @@ export default function RadiologistAuth() {
                       <Label htmlFor="signup-name">Full Name *</Label>
                       <Input
                         id="signup-name"
-                        placeholder="Dr. John Doe"
+                        placeholder="Full legal name"
                         value={signupData.full_name}
                         onChange={(e) => setSignupData({ ...signupData, full_name: e.target.value })}
                         required

@@ -1,7 +1,7 @@
 // swift-interface-format-version: 1.0
-// swift-compiler-version: Apple Swift version 6.0.3 effective-5.10 (swiftlang-6.0.3.1.10 clang-1600.0.30.1)
-// swift-module-flags: -target arm64-apple-ios15.0 -enable-objc-interop -enable-library-evolution -swift-version 5 -enforce-exclusivity=checked -O -enable-bare-slash-regex -module-name AliveCorKitLite
-// swift-module-flags-ignorable: -no-verify-emitted-module-interface
+// swift-compiler-version: Apple Swift version 6.3 effective-5.10 (swiftlang-6.3.0.123.5 clang-2100.0.123.102)
+// swift-module-flags: -target arm64-apple-ios15.0 -enable-objc-interop -enable-library-evolution -swift-version 5 -O -enable-experimental-feature DebugDescriptionMacro -enable-bare-slash-regex -module-name AliveCorKitLite
+// swift-module-flags-ignorable: -no-verify-emitted-module-interface -formal-cxx-interoperability-mode=off -interface-compiler-version 6.3
 @_exported import AliveCorKitLite
 import CoreData
 import CoreGraphics
@@ -40,8 +40,8 @@ import _SwiftConcurrencyShims
   @objc dynamic public class func invalidDeviceError(_ status: Swift.String, _ serialNumber: Swift.String) -> Foundation.NSError
   @objc dynamic public class func deviceNotFoundError() -> Foundation.NSError
 }
-@_inheritsConvenienceInitializers @objc(TeamPatientSetting) public class TeamPatientSetting : CoreData.NSManagedObject {
-  @objc override dynamic public init(entity: CoreData.NSEntityDescription, insertInto context: CoreData.NSManagedObjectContext?)
+@_inheritsConvenienceInitializers @objc(TeamPatientSetting) nonisolated public class TeamPatientSetting : CoreData.NSManagedObject {
+  @objc override nonisolated dynamic public init(entity: CoreData.NSEntityDescription, insertInto context: CoreData.NSManagedObjectContext?)
   @objc deinit
 }
 @objc @_hasMissingDesignatedInitializers public class TeamPatientSettingModel : ObjectiveC.NSObject, Swift.Codable {
@@ -108,8 +108,8 @@ extension AliveCorKitLite.ACKManagerKardiaCore {
   @objc dynamic public func isValidConfiguration() -> Swift.Bool
   @objc dynamic public func deleteAccessToken()
 }
-@_inheritsConvenienceInitializers @objc(EcgRecord) public class EcgRecord : CoreData.NSManagedObject {
-  @objc override dynamic public init(entity: CoreData.NSEntityDescription, insertInto context: CoreData.NSManagedObjectContext?)
+@_inheritsConvenienceInitializers @objc(EcgRecord) nonisolated public class EcgRecord : CoreData.NSManagedObject {
+  @objc override nonisolated dynamic public init(entity: CoreData.NSEntityDescription, insertInto context: CoreData.NSManagedObjectContext?)
   @objc deinit
 }
 @objc @_hasMissingDesignatedInitializers public class EntitlementModel : ObjectiveC.NSObject, Swift.Codable {
@@ -140,8 +140,8 @@ extension AliveCorKitLite.TokenQuery : AliveCorKitLite.KeyChainQuery {
   public func encode(to encoder: any Swift.Encoder) throws
   @objc deinit
 }
-@_inheritsConvenienceInitializers @objc(Device) public class Device : CoreData.NSManagedObject {
-  @objc override dynamic public init(entity: CoreData.NSEntityDescription, insertInto context: CoreData.NSManagedObjectContext?)
+@_inheritsConvenienceInitializers @objc(Device) nonisolated public class Device : CoreData.NSManagedObject {
+  @objc override nonisolated dynamic public init(entity: CoreData.NSEntityDescription, insertInto context: CoreData.NSManagedObjectContext?)
   @objc deinit
 }
 @_hasMissingDesignatedInitializers @objc public class DeviceModel : ObjectiveC.NSObject, Swift.Codable {
@@ -171,12 +171,12 @@ extension AliveCorKitLite.TokenQuery : AliveCorKitLite.KeyChainQuery {
   @objc deinit
 }
 extension AliveCorKitLite.Feature {
-  @objc override dynamic public var description: Swift.String {
+  @objc override nonisolated dynamic public var description: Swift.String {
     @objc get
   }
 }
-@_inheritsConvenienceInitializers @objc(Feature) public class Feature : CoreData.NSManagedObject {
-  @objc override dynamic public init(entity: CoreData.NSEntityDescription, insertInto context: CoreData.NSManagedObjectContext?)
+@_inheritsConvenienceInitializers @objc(Feature) nonisolated public class Feature : CoreData.NSManagedObject {
+  @objc override nonisolated dynamic public init(entity: CoreData.NSEntityDescription, insertInto context: CoreData.NSManagedObjectContext?)
   @objc deinit
 }
 public enum ValidationError : Swift.Error {
@@ -223,7 +223,7 @@ public struct IDTokenValidation {
   @objc deinit
 }
 extension AliveCorKitLite.Device {
-  @objc override dynamic public var description: Swift.String {
+  @objc override nonisolated dynamic public var description: Swift.String {
     @objc get
   }
 }
@@ -294,7 +294,7 @@ extension Swift.CodingUserInfoKey {
   public static let moc: Swift.CodingUserInfoKey?
 }
 extension AliveCorKitLite.TeamPatientSetting {
-  @objc override dynamic public var description: Swift.String {
+  @objc override nonisolated dynamic public var description: Swift.String {
     @objc get
   }
 }
@@ -347,90 +347,90 @@ extension AliveCorKitLite.JWT {
 }
 extension AliveCorKitLite.EcgRecord {
   @nonobjc public class func fetchRequest() -> CoreData.NSFetchRequest<AliveCorKitLite.EcgRecord>
-  @objc @NSManaged dynamic public var atcEnhancedFilePath: Swift.String? {
+  @objc @NSManaged nonisolated dynamic public var atcEnhancedFilePath: Swift.String? {
     @objc get
     @objc set
   }
-  @objc @NSManaged dynamic public var atcOriginalFilePath: Swift.String? {
+  @objc @NSManaged nonisolated dynamic public var atcOriginalFilePath: Swift.String? {
     @objc get
     @objc set
   }
-  @objc @NSManaged dynamic public var bpm: Swift.Int32 {
+  @objc @NSManaged nonisolated dynamic public var bpm: Swift.Int32 {
     @objc get
     @objc set
   }
-  @objc @NSManaged dynamic public var clientId: Swift.String? {
+  @objc @NSManaged nonisolated dynamic public var clientId: Swift.String? {
     @objc get
     @objc set
   }
-  @objc @NSManaged dynamic public var device: Swift.String? {
+  @objc @NSManaged nonisolated dynamic public var device: Swift.String? {
     @objc get
     @objc set
   }
-  @objc @NSManaged dynamic public var errorMessage: Swift.String? {
+  @objc @NSManaged nonisolated dynamic public var errorMessage: Swift.String? {
     @objc get
     @objc set
   }
-  @objc @NSManaged dynamic public var isInverted: Swift.Bool {
+  @objc @NSManaged nonisolated dynamic public var isInverted: Swift.Bool {
     @objc get
     @objc set
   }
-  @objc @NSManaged dynamic public var kaiResult: Swift.String? {
+  @objc @NSManaged nonisolated dynamic public var kaiResult: Swift.String? {
     @objc get
     @objc set
   }
-  @objc @NSManaged dynamic public var kaiVersion: Swift.String? {
+  @objc @NSManaged nonisolated dynamic public var kaiVersion: Swift.String? {
     @objc get
     @objc set
   }
-  @objc @NSManaged dynamic public var leadsConfig: Swift.Int16 {
+  @objc @NSManaged nonisolated dynamic public var leadsConfig: Swift.Int16 {
     @objc get
     @objc set
   }
-  @objc @NSManaged dynamic public var needsUpload: Swift.Bool {
+  @objc @NSManaged nonisolated dynamic public var needsUpload: Swift.Bool {
     @objc get
     @objc set
   }
-  @objc @NSManaged dynamic public var needsUploadActivity: Swift.Bool {
+  @objc @NSManaged nonisolated dynamic public var needsUploadActivity: Swift.Bool {
     @objc get
     @objc set
   }
-  @objc @NSManaged dynamic public var needsUploadSymptoms: Swift.Bool {
+  @objc @NSManaged nonisolated dynamic public var needsUploadSymptoms: Swift.Bool {
     @objc get
     @objc set
   }
-  @objc @NSManaged dynamic public var publicId: Swift.String? {
+  @objc @NSManaged nonisolated dynamic public var publicId: Swift.String? {
     @objc get
     @objc set
   }
-  @objc @NSManaged dynamic public var recordedAtISO8601: Foundation.Date? {
+  @objc @NSManaged nonisolated dynamic public var recordedAtISO8601: Foundation.Date? {
     @objc get
     @objc set
   }
-  @objc @NSManaged dynamic public var requestQt: Swift.Bool {
+  @objc @NSManaged nonisolated dynamic public var requestQt: Swift.Bool {
     @objc get
     @objc set
   }
-  @objc @NSManaged dynamic public var timeZoneOffset: Swift.Int32 {
+  @objc @NSManaged nonisolated dynamic public var timeZoneOffset: Swift.Int32 {
     @objc get
     @objc set
   }
-  @objc @NSManaged dynamic public var algorithmPackage: Swift.String? {
+  @objc @NSManaged nonisolated dynamic public var algorithmPackage: Swift.String? {
     @objc get
     @objc set
   }
-  @objc @NSManaged dynamic public var deviceSerialNumber: Swift.String? {
+  @objc @NSManaged nonisolated dynamic public var deviceSerialNumber: Swift.String? {
     @objc get
     @objc set
   }
-  @objc @NSManaged dynamic public var symptoms: Foundation.NSSet? {
+  @objc @NSManaged nonisolated dynamic public var symptoms: Foundation.NSSet? {
     @objc get
     @objc set
   }
 }
 extension AliveCorKitLite.EcgRecord {
-  @objc(addSymptoms:) @NSManaged dynamic public func addToSymptoms(_ values: Foundation.NSSet)
-  @objc(removeSymptoms:) @NSManaged dynamic public func removeFromSymptoms(_ values: Foundation.NSSet)
+  @objc(addSymptoms:) @NSManaged nonisolated dynamic public func addToSymptoms(_ values: Foundation.NSSet)
+  @objc(removeSymptoms:) @NSManaged nonisolated dynamic public func removeFromSymptoms(_ values: Foundation.NSSet)
 }
 extension AliveCorKitLite.EcgRecord {
   public static var entityName: Swift.String {
@@ -508,19 +508,19 @@ extension AliveCorKitLite.EcgRecord {
 }
 extension AliveCorKitLite.Feature {
   @nonobjc public class func fetchRequest() -> CoreData.NSFetchRequest<AliveCorKitLite.Feature>
-  @objc @NSManaged dynamic public var createdAt: Foundation.Date? {
+  @objc @NSManaged nonisolated dynamic public var createdAt: Foundation.Date? {
     @objc get
     @objc set
   }
-  @objc @NSManaged dynamic public var featureName: Swift.String? {
+  @objc @NSManaged nonisolated dynamic public var featureName: Swift.String? {
     @objc get
     @objc set
   }
-  @objc @NSManaged dynamic public var publicId: Swift.String? {
+  @objc @NSManaged nonisolated dynamic public var publicId: Swift.String? {
     @objc get
     @objc set
   }
-  @objc @NSManaged dynamic public var configuration: AliveCorKitLite.Configuration? {
+  @objc @NSManaged nonisolated dynamic public var configuration: AliveCorKitLite.Configuration? {
     @objc get
     @objc set
   }
@@ -540,6 +540,7 @@ public enum DecodeError : Foundation.LocalizedError {
   final public let website: Swift.String?
   final public let avatarURL: Swift.String?
   final public let isDeviceTutorialsEnabled: Swift.Bool?
+  final public let isInversionDetectionEnabled: Swift.Bool?
   required public init(from decoder: any Swift.Decoder) throws
   public func encode(to encoder: any Swift.Encoder) throws
   @objc deinit
@@ -562,82 +563,82 @@ public enum DecodeError : Foundation.LocalizedError {
 }
 extension AliveCorKitLite.TeamPatientSetting {
   @nonobjc public class func fetchRequest() -> CoreData.NSFetchRequest<AliveCorKitLite.TeamPatientSetting>
-  @objc @NSManaged dynamic public var id: Swift.String? {
+  @objc @NSManaged nonisolated dynamic public var id: Swift.String? {
     @objc get
     @objc set
   }
-  @objc @NSManaged dynamic public var teamId: Swift.String? {
+  @objc @NSManaged nonisolated dynamic public var teamId: Swift.String? {
     @objc get
     @objc set
   }
-  @objc @NSManaged dynamic public var name: Swift.String? {
+  @objc @NSManaged nonisolated dynamic public var name: Swift.String? {
     @objc get
     @objc set
   }
-  @objc @NSManaged dynamic public var isVisible: Swift.Bool {
+  @objc @NSManaged nonisolated dynamic public var isVisible: Swift.Bool {
     @objc get
     @objc set
   }
-  @objc @NSManaged dynamic public var createdAt: Foundation.Date? {
+  @objc @NSManaged nonisolated dynamic public var createdAt: Foundation.Date? {
     @objc get
     @objc set
   }
-  @objc @NSManaged dynamic public var updatedAt: Foundation.Date? {
+  @objc @NSManaged nonisolated dynamic public var updatedAt: Foundation.Date? {
     @objc get
     @objc set
   }
 }
 extension AliveCorKitLite.Device {
   @nonobjc public class func fetchRequest() -> CoreData.NSFetchRequest<AliveCorKitLite.Device>
-  @objc @NSManaged dynamic public var checkInDurationSeconds: Foundation.NSNumber? {
+  @objc @NSManaged nonisolated dynamic public var checkInDurationSeconds: Foundation.NSNumber? {
     @objc get
     @objc set
   }
-  @objc @NSManaged dynamic public var durationSeconds: Foundation.NSNumber? {
+  @objc @NSManaged nonisolated dynamic public var durationSeconds: Foundation.NSNumber? {
     @objc get
     @objc set
   }
-  @objc @NSManaged dynamic public var expiry: Foundation.Date? {
+  @objc @NSManaged nonisolated dynamic public var expiry: Foundation.Date? {
     @objc get
     @objc set
   }
-  @objc @NSManaged dynamic public var id: Swift.String? {
+  @objc @NSManaged nonisolated dynamic public var id: Swift.String? {
     @objc get
     @objc set
   }
-  @objc @NSManaged dynamic public var name: Swift.String? {
+  @objc @NSManaged nonisolated dynamic public var name: Swift.String? {
     @objc get
     @objc set
   }
-  @objc @NSManaged dynamic public var planId: Swift.String? {
+  @objc @NSManaged nonisolated dynamic public var planId: Swift.String? {
     @objc get
     @objc set
   }
-  @objc @NSManaged dynamic public var recordingLimit: Foundation.NSNumber? {
+  @objc @NSManaged nonisolated dynamic public var recordingLimit: Foundation.NSNumber? {
     @objc get
     @objc set
   }
-  @objc @NSManaged dynamic public var recordingsTaken: Foundation.NSNumber? {
+  @objc @NSManaged nonisolated dynamic public var recordingsTaken: Foundation.NSNumber? {
     @objc get
     @objc set
   }
-  @objc @NSManaged dynamic public var registeredAt: Foundation.Date? {
+  @objc @NSManaged nonisolated dynamic public var registeredAt: Foundation.Date? {
     @objc get
     @objc set
   }
-  @objc @NSManaged dynamic public var serialNumber: Swift.String? {
+  @objc @NSManaged nonisolated dynamic public var serialNumber: Swift.String? {
     @objc get
     @objc set
   }
-  @objc @NSManaged dynamic public var status: Swift.String? {
+  @objc @NSManaged nonisolated dynamic public var status: Swift.String? {
     @objc get
     @objc set
   }
-  @objc @NSManaged dynamic public var teamId: Swift.String? {
+  @objc @NSManaged nonisolated dynamic public var teamId: Swift.String? {
     @objc get
     @objc set
   }
-  @objc @NSManaged dynamic public var lastUpdateDate: Foundation.Date? {
+  @objc @NSManaged nonisolated dynamic public var lastUpdateDate: Foundation.Date? {
     @objc get
     @objc set
   }
@@ -649,39 +650,39 @@ extension AliveCorKitLite.Device {
 }
 extension AliveCorKitLite.Configuration {
   @nonobjc public class func fetchRequest() -> CoreData.NSFetchRequest<AliveCorKitLite.Configuration>
-  @objc @NSManaged dynamic public var algVersion: Swift.String? {
+  @objc @NSManaged nonisolated dynamic public var algVersion: Swift.String? {
     @objc get
     @objc set
   }
-  @objc @NSManaged dynamic public var clientId: Swift.String? {
+  @objc @NSManaged nonisolated dynamic public var clientId: Swift.String? {
     @objc get
     @objc set
   }
-  @objc @NSManaged dynamic public var expirationDate: Foundation.Date? {
+  @objc @NSManaged nonisolated dynamic public var expirationDate: Foundation.Date? {
     @objc get
     @objc set
   }
-  @objc @NSManaged dynamic public var lastUpdateDate: Foundation.Date? {
+  @objc @NSManaged nonisolated dynamic public var lastUpdateDate: Foundation.Date? {
     @objc get
     @objc set
   }
-  @objc @NSManaged dynamic public var phoneHomeFrequency: Foundation.NSNumber? {
+  @objc @NSManaged nonisolated dynamic public var phoneHomeFrequency: Foundation.NSNumber? {
     @objc get
     @objc set
   }
-  @objc @NSManaged dynamic public var features: Foundation.NSSet? {
+  @objc @NSManaged nonisolated dynamic public var features: Foundation.NSSet? {
     @objc get
     @objc set
   }
 }
 extension AliveCorKitLite.Configuration {
-  @objc(addFeaturesObject:) @NSManaged dynamic public func addToFeatures(_ value: AliveCorKitLite.Feature)
-  @objc(removeFeaturesObject:) @NSManaged dynamic public func removeFromFeatures(_ value: AliveCorKitLite.Feature)
-  @objc(addFeatures:) @NSManaged dynamic public func addToFeatures(_ values: Foundation.NSSet)
-  @objc(removeFeatures:) @NSManaged dynamic public func removeFromFeatures(_ values: Foundation.NSSet)
+  @objc(addFeaturesObject:) @NSManaged nonisolated dynamic public func addToFeatures(_ value: AliveCorKitLite.Feature)
+  @objc(removeFeaturesObject:) @NSManaged nonisolated dynamic public func removeFromFeatures(_ value: AliveCorKitLite.Feature)
+  @objc(addFeatures:) @NSManaged nonisolated dynamic public func addToFeatures(_ values: Foundation.NSSet)
+  @objc(removeFeatures:) @NSManaged nonisolated dynamic public func removeFromFeatures(_ values: Foundation.NSSet)
 }
 extension AliveCorKitLite.Configuration {
-  @objc override dynamic public var description: Swift.String {
+  @objc override nonisolated dynamic public var description: Swift.String {
     @objc get
   }
 }
@@ -704,8 +705,8 @@ extension AliveCorKitLite.Configuration {
   @objc public class func decode(jwt jwtValue: Swift.String) throws -> AliveCorKitLite._JWT
   @objc deinit
 }
-@_inheritsConvenienceInitializers @objc(Configuration) public class Configuration : CoreData.NSManagedObject {
-  @objc override dynamic public init(entity: CoreData.NSEntityDescription, insertInto context: CoreData.NSManagedObjectContext?)
+@_inheritsConvenienceInitializers @objc(Configuration) nonisolated public class Configuration : CoreData.NSManagedObject {
+  @objc override nonisolated dynamic public init(entity: CoreData.NSEntityDescription, insertInto context: CoreData.NSManagedObjectContext?)
   @objc deinit
 }
 extension Foundation.NSError.ACKCode : Swift.Equatable {}

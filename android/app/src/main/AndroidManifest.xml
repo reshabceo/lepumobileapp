@@ -40,11 +40,10 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
 
-    <!-- AliveCor SDK specific permissions (disabled)
+    <!-- AliveCor SDK specific permissions -->
     <uses-permission android:name="android.permission.NFC" />
     <uses-permission android:name="android.permission.BODY_SENSORS" />
     <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
-    -->
 
     <application
         android:name=".MainApplication"

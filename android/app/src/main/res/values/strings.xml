@@ -5,4 +5,6 @@
     <string name="package_name">com.monitraq.mobile</string>
     <string name="custom_url_scheme">com.monitraq.mobile</string>
     <string name="camera_bridge_notification_text">Streaming camera for remote monitoring…</string>
+    <!-- AliveCor SDK: localized "hr" exists but no default values/ entry -->
+    <string name="hr">hr</string>
 </resources>

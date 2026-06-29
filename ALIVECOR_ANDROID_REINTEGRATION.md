@@ -7,9 +7,9 @@ This document details the step-by-step instructions required to re-integrate the
 ## 🛠 Re-integration Steps
 
 ### 1. Restore the Binary AAR SDK
-Copy the backed-up SDK library from the vendor folders to the local libs folder:
+Copy the SDK library from the vendor zip to the local libs folder:
 ```bash
-cp Monitraq/aliveCor-Android-SDK-1.6.10/alivecorkit-core-1.6.10-914f71ed.aar android/app/libs/
+unzip -j Monitraq/Android-SDK-1.7.3.zip "Android-SDK-1.7.3/AliveCorKitLite-core-1.7.3-ec954cb3.aar" -d android/app/libs/
 ```
 
 ### 2. Re-enable the Capacitor Plugin File
@@ -23,8 +23,8 @@ In [android/app/build.gradle](file:///Users/mdsahil/development/lepumobileapp/an
 
 Uncomment these sections:
 ```gradle
-    // AliveCor SDK integration - REQUIRED dependencies for the AAR
-    implementation files('libs/alivecorkit-core-1.6.10-914f71ed.aar')
+    // AliveCor SDK integration - REQUIRED dependencies for the AAR (v1.7.3)
+    implementation files('libs/AliveCorKitLite-core-1.7.3-ec954cb3.aar')
     implementation 'net.danlew:android.joda:2.12.5'
     implementation 'com.squareup.retrofit2:retrofit:2.9.0'
     implementation 'com.squareup.retrofit2:converter-gson:2.9.0'

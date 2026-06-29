@@ -356,6 +356,13 @@ export default function Subscription() {
         const effectiveDate = swRow.current_period_end
           ? new Date(swRow.current_period_end).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
           : 'end of current period';
+        if (Capacitor.getPlatform() === 'ios' && activeSub?.source === 'apple_iap') {
+          if (!confirm(
+            `To switch to ${plan.display_name}, manage your subscription in the Apple Subscriptions settings. Your current plan stays active until you change it. Open Apple Subscriptions now?`
+          )) return;
+          await Browser.open({ url: 'https://apps.apple.com/account/subscriptions' });
+          return;
+        }
         if (!confirm(
           `Downgrade scheduled: you stay on ${swRow.current_plan_code} until ${effectiveDate}, then ${plan.display_name} starts. No charge today. Continue?`
         )) return;
@@ -388,13 +395,26 @@ export default function Subscription() {
           ? new Date(swRow.current_period_end).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
           : 'end of current period';
         if (!confirm(
-          `You cancelled your current plan — access continues until ${handoverDate}. Subscribe to ${plan.display_name} now: you authorize today, first charge happens on ${handoverDate} so there's no gap. Continue?`
+          Capacitor.getPlatform() === 'ios'
+            ? `Your current plan access continues until ${handoverDate}. Subscribe to ${plan.display_name} now via Apple In-App Purchase?`
+            : `You cancelled your current plan — access continues until ${handoverDate}. Subscribe to ${plan.display_name} now: you authorize today, first charge happens on ${handoverDate} so there's no gap. Continue?`
         )) return;
-        const periodEndUnix = swRow.current_period_end
-          ? Math.floor(new Date(swRow.current_period_end).getTime() / 1000)
-          : undefined;
         setBusyCode(plan.code);
         try {
+          if (Capacitor.getPlatform() === 'ios' && getAppleProductIdForPlan(plan)) {
+            await purchaseSubscriptionViaIAP(plan);
+            const activated = await waitForSubscriptionActivation(180000, 4000);
+            if (activated) {
+              toast.success('Subscription renewed via Apple In-App Purchase.');
+              navigate('/profile', { replace: true });
+            } else {
+              toast.info('If payment is done, refresh this page in a few moments.');
+            }
+            return;
+          }
+          const periodEndUnix = swRow.current_period_end
+            ? Math.floor(new Date(swRow.current_period_end).getTime() / 1000)
+            : undefined;
           const { data, error } = await (supabase as any).functions.invoke('razorpay-subscription-create', {
             body: { plan_code: plan.code, start_at_unix: periodEndUnix },
           });
@@ -525,6 +545,19 @@ export default function Subscription() {
   ) => {
     setBusyCode(plan.code);
     try {
+      // iOS: all subscription changes must go through Apple IAP (Guideline 3.1.1)
+      if (Capacitor.getPlatform() === 'ios' && getAppleProductIdForPlan(plan)) {
+        await purchaseSubscriptionViaIAP(plan);
+        const activated = await waitForSubscriptionActivation(180000, 4000);
+        if (activated) {
+          toast.success('Plan updated via Apple In-App Purchase.');
+          navigate('/profile', { replace: true });
+        } else {
+          toast.info('If payment is done, refresh this page in a few moments.');
+        }
+        return;
+      }
+
       const { data, error } = await (supabase as any).functions.invoke('razorpay-subscription-switch', {
         body: { action: 'upgrade', new_plan_code: plan.code, current_subscription_id: currentSubscriptionId },
       });
@@ -753,6 +786,9 @@ export default function Subscription() {
           </ul>
           <p className="text-[11px] text-slate-400 mt-3 pt-3 border-t border-slate-700/50">
             Appointments + AI doctor sessions remain separately paid per use, on both Free and Monitraq+.
+            {Capacitor.getPlatform() === 'ios' && (
+              <> On iPhone, Monitraq+ and Health AI use Apple In-App Purchase. Appointments and emergency use Razorpay.</>
+            )}
           </p>
         </Card>
       </div>
@@ -762,7 +798,9 @@ export default function Subscription() {
           <DialogHeader>
             <DialogTitle className="text-amber-100">Confirm plan switch</DialogTitle>
             <DialogDescription className="text-slate-200">
-              Confirm the upgrade details, then continue to Razorpay.
+              {Capacitor.getPlatform() === 'ios'
+                ? 'Confirm the upgrade, then complete payment with Apple In-App Purchase.'
+                : 'Confirm the upgrade details, then continue to Razorpay.'}
             </DialogDescription>
           </DialogHeader>
 

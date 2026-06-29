@@ -2,7 +2,7 @@ package com.monitraq.mobile;
 
 import android.app.Application;
 import android.util.Log;
-// import net.danlew.android.joda.JodaTimeAndroid;
+import net.danlew.android.joda.JodaTimeAndroid;
 
 // Prefer reflection to avoid Kotlin Companion API mismatch across SDK versions
 
@@ -22,8 +22,8 @@ public class MainApplication extends Application {
     @Override
     public void onCreate() {
         super.onCreate();
-        // Initialize Joda-Time for AliveCor SDK (disabled)
-        // JodaTimeAndroid.init(this);
+        // Initialize Joda-Time for AliveCor SDK
+        JodaTimeAndroid.init(this);
 
         Log.d(TAG, "MainApplication onCreate - Initializing Lepu SDK BleServiceHelper");
         Log.d(TAG, "SDK Source: https://github.com/viatom-develop/LepuDemo.git");

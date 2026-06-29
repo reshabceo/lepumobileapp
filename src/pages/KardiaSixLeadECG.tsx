@@ -13,7 +13,7 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { ResponsiveContainer, LineChart, Line, XAxis, YAxis } from "recharts";
+import { ECGSixLeadView, ECGMiniPreview } from "@/components/ECGLeadCanvas";
 import {
   Loader2,
   Activity,
@@ -49,68 +49,7 @@ import { buildAliveCorIngestPayload } from "@/lib/aliveCorKardia";
 import { AliveCorEcgResult } from "@/plugins/alivecor";
 import { useDevice } from "@/contexts/DeviceContext";
 
-// ─── ECG waveform mini-visualiser ─────────────────────────────────────────────
-const ECGWaveformPreview: React.FC<{ leads?: Record<string, number[]> }> = ({ leads }) => {
-  const canvasRefs = useRef<Record<string, HTMLCanvasElement | null>>({});
-
-  useEffect(() => {
-    if (!leads) return;
-    Object.entries(leads).forEach(([leadName, leadData]) => {
-      const canvas = canvasRefs.current[leadName];
-      if (!canvas || !leadData || leadData.length === 0) return;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return;
-
-      const W = canvas.width;
-      const H = canvas.height;
-      ctx.clearRect(0, 0, W, H);
-
-      // Grid
-      ctx.strokeStyle = "rgba(99,102,241,0.08)";
-      ctx.lineWidth = 0.5;
-      for (let x = 0; x < W; x += 20) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); }
-      for (let y = 0; y < H; y += 20) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
-
-      // Waveform
-      const samples = leadData.slice(0, Math.min(leadData.length, W * 2));
-      const min = Math.min(...samples);
-      const max = Math.max(...samples);
-      const range = max - min || 1;
-
-      ctx.beginPath();
-      ctx.strokeStyle = "#6366f1";
-      ctx.lineWidth = 1.5;
-      ctx.shadowColor = "#6366f1";
-      ctx.shadowBlur = 4;
-      samples.forEach((v, i) => {
-        const x = (i / samples.length) * W;
-        const y = H - ((v - min) / range) * (H * 0.8) - H * 0.1;
-        i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
-      });
-      ctx.stroke();
-    });
-  }, [leads]);
-
-  if (!leads) return null;
-  const leadNames = ["I", "II", "III", "aVR", "aVL", "aVF"];
-
-  return (
-    <div className="grid grid-cols-2 gap-2">
-      {leadNames.map((name) => (
-        <div key={name} className="space-y-1">
-          <p className="text-[9px] font-bold text-gray-500">{name}</p>
-          <canvas
-            ref={(el) => (canvasRefs.current[name] = el)}
-            width={160}
-            height={60}
-            className="w-full rounded-lg"
-            style={{ background: "#121B32", border: "1px solid rgba(148, 163, 184, 0.15)" }}
-          />
-        </div>
-      ))}
-    </div>
-  );
-};
+// ECGWaveformPreview replaced by ECGMiniPreview (from ECGLeadCanvas) — shared amplitude scale
 
 // ─── Moving Waveform Animation ────────────────────────────────────────────────
 const MovingWaveform: React.FC<{ color?: string; height?: number; speed?: number; delay?: number }> = ({
@@ -196,30 +135,7 @@ const KardiaSixLeadECG: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   // ── Helper Functions for Modal ─────────────────────────────────────────────
-  const prepareChartData = (leads: Record<string, number[]> | undefined, lead: string = "I") => {
-    if (!leads) return [];
-    let samples: number[] = [];
-    if (Array.isArray(leads)) samples = leads;
-    else if (leads[lead]) samples = leads[lead];
-    else if (leads.I && lead === "I") samples = leads.I;
-    
-    // Dynamic expansion of lightweight placeholder baselines for visual consistency
-    if (samples.length < 100) {
-      samples = Array(1500).fill(0);
-    }
-    
-    return samples.slice(0, 1500).map((val, idx) => ({
-      time: idx,
-      value: val
-    }));
-  };
-
-  const getAvailableLeads = (leads: Record<string, number[]> | undefined) => {
-    if (!leads) return ["I"];
-    if (Array.isArray(leads)) return ["I"];
-    const possibleLeads = ["I", "II", "III", "aVR", "aVL", "aVF"];
-    return possibleLeads.filter(l => !!leads[l]);
-  };
+  // prepareChartData and getAvailableLeads removed — rendering now done by ECGSixLeadView / ECGMiniPreview
   // ── Cleanup on unmount ──────────────────────────────────────────────────────
   useEffect(() => {
     return () => {
@@ -509,7 +425,7 @@ const KardiaSixLeadECG: React.FC = () => {
       if (!jwtToken || jwtToken.trim().length < 20 || jwtToken === "my_token_121") {
         const errMsg =
           "A valid AliveCor JWT is required. " +
-          "Your backend at alivecorapi.monitraq.com must return a real token. " +
+          `Your AliveCor backend (${import.meta.env.VITE_ALIVECOR_BACKEND_URL || 'https://alivecor.monitraq.com'}) must return a real token. ` +
           "Currently received an invalid or placeholder token.";
         setJwtError(errMsg);
         toast({ title: "Invalid JWT Token", description: errMsg, variant: "destructive" });
@@ -565,7 +481,7 @@ const KardiaSixLeadECG: React.FC = () => {
       setLastResult(result);
 
       // ── Step 5: Store & analyze ──────────────────────────────────────────
-      // POST to https://alivecorapi.monitraq.com/api/alivecor/ecg
+      // POST to {VITE_ALIVECOR_BACKEND_URL}/api/alivecor/ecg
       if (result.success) {
         try {
           const payload = buildAliveCorIngestPayload(
@@ -928,7 +844,7 @@ const KardiaSixLeadECG: React.FC = () => {
                         View Detailed Report
                       </button>
                     </div>
-                    <ECGWaveformPreview leads={lastResult.waveformLeads} />
+                    <ECGMiniPreview leads={lastResult.waveformLeads} />
                   </div>
                 )}
               </>
@@ -993,62 +909,18 @@ const KardiaSixLeadECG: React.FC = () => {
             </div>
           </div>
 
-          {/* ECG Grid Content */}
-          <div className="flex-1 overflow-y-auto bg-[#080D1A] relative scrollbar-hide">
-            {/* Calibration Marker */}
-            <div className="sticky top-2 left-1/2 -translate-x-1/2 z-10">
-              <div className="bg-[#121B32]/90 backdrop-blur shadow-sm border border-slate-700/40 rounded-full px-3 py-1 text-[10px] font-bold text-gray-400 uppercase tracking-tighter">
-                25mm/s, 10mm/mV
-              </div>
-            </div>
-
-            <div className="ecg-paper-grid min-h-full py-4 overflow-x-auto scrollbar-thin">
-              {lastResult?.waveformLeads ? (
-                <div className="space-y-0 px-2" style={{ minWidth: "2000px" }}>
-                  {getAvailableLeads(lastResult.waveformLeads).map((lead) => (
-                    <div key={lead} className="h-[120px] relative border-b border-slate-700/20 last:border-none">
-                      <div className="absolute top-1/2 -translate-y-1/2 left-2 z-10">
-                        <span className="text-xs font-black text-white opacity-60">
-                          {lead}
-                        </span>
-                      </div>
-                      <ResponsiveContainer width="100%" height="100%">
-                        <LineChart 
-                          data={prepareChartData(lastResult.waveformLeads, lead)}
-                          margin={{ top: 10, right: 10, left: 10, bottom: 10 }}
-                        >
-                          <XAxis dataKey="time" hide />
-                          <YAxis hide domain={['auto', 'auto']} />
-                          <Line 
-                            type="monotone" 
-                            dataKey="value" 
-                            stroke="#6366f1" 
-                            strokeWidth={1.2} 
-                            dot={false} 
-                            isAnimationActive={false}
-                          />
-                        </LineChart>
-                      </ResponsiveContainer>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="flex flex-col items-center justify-center py-40 text-gray-500">
-                  <Activity size={48} className="opacity-20 mb-4" />
-                  <p className="text-sm font-bold">Waveform Data Unavailable</p>
-                </div>
-              )}
-
-            </div>
-
-            {/* Heart Rate Badge Overlay - absolute position at top right of waves container */}
-            {lastResult?.heartRate && (
-              <div className="absolute top-4 right-4 z-20">
-                <div className="bg-[#121B32]/95 backdrop-blur shadow-xl border border-slate-700/40 rounded-full px-4 py-2 flex items-center gap-2">
-                  <Heart size={16} className="text-rose-500 fill-rose-500 animate-pulse" />
-                  <span className="font-bold text-white">{lastResult.heartRate}</span>
-                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">bpm</span>
-                </div>
+          {/* ECG Grid Content — canvas-based, shared amplitude scale across all leads */}
+          <div className="flex-1 relative overflow-hidden">
+            {lastResult?.waveformLeads ? (
+              <ECGSixLeadView
+                leads={lastResult.waveformLeads}
+                heartRate={lastResult.heartRate}
+                theme="dark"
+              />
+            ) : (
+              <div className="flex flex-col items-center justify-center h-full py-40 text-gray-500">
+                <Activity size={48} className="opacity-20 mb-4" />
+                <p className="text-sm font-bold">Waveform Data Unavailable</p>
               </div>
             )}
           </div>
@@ -1075,24 +947,6 @@ const KardiaSixLeadECG: React.FC = () => {
         </DialogContent>
       </Dialog>
 
-      <style>{`
-        .ecg-paper-grid {
-          background-color: #080D1A;
-          background-image: 
-            linear-gradient(to right, rgba(99, 102, 241, 0.05) 1px, transparent 1px),
-            linear-gradient(to bottom, rgba(99, 102, 241, 0.05) 1px, transparent 1px),
-            linear-gradient(to right, rgba(99, 102, 241, 0.15) 1px, transparent 1px),
-            linear-gradient(to bottom, rgba(99, 102, 241, 0.15) 1px, transparent 1px);
-          background-size: 5px 5px, 5px 5px, 25px 25px, 25px 25px;
-        }
-        .scrollbar-hide::-webkit-scrollbar {
-          display: none;
-        }
-        .scrollbar-hide {
-          -ms-overflow-style: none;
-          scrollbar-width: none;
-        }
-      `}</style>
     </div>
   );
 };

@@ -6,59 +6,63 @@
 	<dict>
 		<key>ACK-SDK.momd/ACK-SDK 10.mom</key>
 		<data>
-		VFMvgtmJD3/VR2dPEvCzB16oG/s=
+		0Zw/E0YaRWpXO9MuoHy966kJX8g=
 		</data>
 		<key>ACK-SDK.momd/ACK-SDK 11.mom</key>
 		<data>
-		2lw3qPE0/ggebJ9QWOhBxTuIzD0=
+		8KPph8WOrjvvun+gwdWuF+QPkDs=
 		</data>
 		<key>ACK-SDK.momd/ACK-SDK 12.mom</key>
 		<data>
-		qbZ6cu+l7RBkHA1pCHZVjwmDtMU=
+		QPCOKvS/4dGXSCtEY4DSVwZaWoo=
 		</data>
 		<key>ACK-SDK.momd/ACK-SDK 13.mom</key>
 		<data>
-		kuleWJrjrSVN4YSLuaKSSuZbuqI=
+		RJJ2MYTdCJASVLlV7iC+t4Ve1fA=
 		</data>
 		<key>ACK-SDK.momd/ACK-SDK 14.mom</key>
 		<data>
-		tY4Nvid3OzejjgdeLvDqINb7VwQ=
+		Ugy0y1MHm9y5gUjJzY5diJTUcRc=
 		</data>
-		<key>ACK-SDK.momd/ACK-SDK 14.omo</key>
+		<key>ACK-SDK.momd/ACK-SDK 15.mom</key>
 		<data>
-		5zd2ugkuZFuXMb/1YJhqcpyhJKc=
+		WAkDplGnaRhe5s7oXe2r5Tqh6qI=
+		</data>
+		<key>ACK-SDK.momd/ACK-SDK 15.omo</key>
+		<data>
+		z29Yi3Haj9s8mcXs6lfD/la2dHQ=
 		</data>
 		<key>ACK-SDK.momd/ACK-SDK 2.mom</key>
 		<data>
-		ZzLaZy9s6hmP+ZF60seo/IMFgnw=
+		0xGGMiPmxU+3aULp0xfP3yBhYrs=
 		</data>
 		<key>ACK-SDK.momd/ACK-SDK 3.mom</key>
 		<data>
-		7S/FAUWE7u51SIDaEvgDUOqVhsA=
+		ws+bvAb3OhUHdafc3AVkkmDDWjA=
 		</data>
 		<key>ACK-SDK.momd/ACK-SDK 4.mom</key>
 		<data>
-		jKqMfBjMEWD9/M1Vz0xPn/LpYWs=
+		t2l5Wx1k4m4OOWAGSNDmbyyE6vk=
 		</data>
 		<key>ACK-SDK.momd/ACK-SDK 5.mom</key>
 		<data>
-		1R9BMShMwVzq4ltV/17Qqeaet5o=
+		9xD18wh/R89cWMgeWalKvUqHlw8=
 		</data>
 		<key>ACK-SDK.momd/ACK-SDK 6.mom</key>
 		<data>
-		x1NCbIPB42hbkLHKlRngf1AdVUs=
+		Rm8PzsMWj1qw96deGOL+v8Q+56U=
 		</data>
 		<key>ACK-SDK.momd/ACK-SDK.mom</key>
 		<data>
-		Ng92cdwHKOEXbdU1FLIUvWrtDOo=
+		rqKDm1V4Plm/fIyLVc+6dwV6XEE=
 		</data>
 		<key>ACK-SDK.momd/VersionInfo.plist</key>
 		<data>
-		V+zn7IlHncWiMOy+PNNgR0EC43E=
+		gcrJUyEBbCkxNBqsEmi1lfhz5Ew=
 		</data>
 		<key>ACKAboutViewController.nib</key>
 		<data>
-		6QI3kHdfMJx4afl+7MQLoxWXuts=
+		uvOV2DgNml9LeGP39z7Umblsf0o=
 		</data>
 		<key>ATC-iOS-Info.plist</key>
 		<data>
@@ -70,11 +74,11 @@
 		</data>
 		<key>Headers/ACCurrentDeviceStore.h</key>
 		<data>
-		8qzGreMpl11TGETBtyLaLQCzmhY=
+		u+jJ9jqrPTu674PMuHvXc5gcTbc=
 		</data>
 		<key>Headers/ACKBLEDevice.h</key>
 		<data>
-		qcaNWIuGTLgFwaOm+AEzGi3P1W4=
+		5cp50MNPQIvEXB+7+VQXZg27qh0=
 		</data>
 		<key>Headers/ACKBluetoothDeviceController.h</key>
 		<data>
@@ -82,7 +86,7 @@
 		</data>
 		<key>Headers/ACKBluetoothPairingController.h</key>
 		<data>
-		jg1hp55+HdPVC68iHMLew0rfniQ=
+		5b7GffgqyHtDLPr7VhXx04Aas7c=
 		</data>
 		<key>Headers/ACKConstants.h</key>
 		<data>
@@ -118,7 +122,7 @@
 		</data>
 		<key>Headers/ACKEcgMonitorDelegate.h</key>
 		<data>
-		3G60QFwKLOGbnB1a9lOL0/l4jqU=
+		8Q/qcwF3pdyS+XuGEmM+tMJmNrA=
 		</data>
 		<key>Headers/ACKEcgMonitorViewController.h</key>
 		<data>
@@ -186,7 +190,7 @@
 		</data>
 		<key>Headers/ACKPDFMetadata.h</key>
 		<data>
-		ils/M45Q+upASCtOFXelR+4g6jw=
+		2OVX49xpUtZeqfoCGD46F851W7Q=
 		</data>
 		<key>Headers/ACKPDFReport.h</key>
 		<data>
@@ -218,7 +222,7 @@
 		</data>
 		<key>Headers/ACKTypes.h</key>
 		<data>
-		ZlpBMqnOgFMypElXtGWcqIl1hS0=
+		8LE66ZkPe0tQ4WkyOBWxoIJlPTY=
 		</data>
 		<key>Headers/ACKUIConfiguration.h</key>
 		<data>
@@ -238,7 +242,7 @@
 		</data>
 		<key>Headers/AliveCorKitLite-Swift.h</key>
 		<data>
-		hg8+v3UiB5z27xTMJ78oxNUtpFI=
+		XGWXy2aaHduyu4MVIuLGSMBSLqk=
 		</data>
 		<key>Headers/AliveCorKitLite.h</key>
 		<data>
@@ -282,7 +286,7 @@
 		</data>
 		<key>Info.plist</key>
 		<data>
-		53JsnbYAiGS7z8k8U6Ek81/dsH0=
+		8u4hciO4knEfc+Uw3D0V3qQ/IXU=
 		</data>
 		<key>KardiaAI-iOS-Info.plist</key>
 		<data>
@@ -294,27 +298,27 @@
 		</data>
 		<key>Modules/AliveCorKitLite.swiftmodule/x86_64-apple-ios-simulator.abi.json</key>
 		<data>
-		jf1PYXfNchoPbNHuNPizDbCPtAU=
+		A9M1HYgY+8jWLslrztpcQxq1Tx4=
 		</data>
 		<key>Modules/AliveCorKitLite.swiftmodule/x86_64-apple-ios-simulator.private.swiftinterface</key>
 		<data>
-		L9lKPLqwF/TnG/QkqE9vLSHnE6c=
+		lc9cclvjZ3PfwhFwwiFLST5uLzw=
 		</data>
 		<key>Modules/AliveCorKitLite.swiftmodule/x86_64-apple-ios-simulator.swiftdoc</key>
 		<data>
-		h7tWIu39t9x2rM0qKcUqd2e3qFQ=
+		ldGCGL08i5hqPT8xPiLU3bA4qQE=
 		</data>
 		<key>Modules/AliveCorKitLite.swiftmodule/x86_64-apple-ios-simulator.swiftinterface</key>
 		<data>
-		L9lKPLqwF/TnG/QkqE9vLSHnE6c=
+		lc9cclvjZ3PfwhFwwiFLST5uLzw=
 		</data>
 		<key>Modules/AliveCorKitLite.swiftmodule/x86_64-apple-ios-simulator.swiftmodule</key>
 		<data>
-		6Ovx4GefVmBq5xqGYT7MecQt9l0=
+		/3C1BfWKgLAASmiYAeBd5fSekrw=
 		</data>
 		<key>Modules/module.modulemap</key>
 		<data>
-		kdnUln1AabXYGImlJmJAhxkc5Pw=
+		H3Foi5IwQIj6n7GXGUmo3GD/7BY=
 		</data>
 		<key>PrivacyInfo.xcprivacy</key>
 		<data>
@@ -326,7 +330,7 @@
 		</data>
 		<key>UniversalMonitor-iOS-Info.plist</key>
 		<data>
-		TFjl+ZF0H4KZ0O/O7MZulYk/ABM=
+		7cuRJo+vyjYNVm0F3zkCH06euag=
 		</data>
 	</dict>
 	<key>files2</key>
@@ -335,98 +339,105 @@
 		<dict>
 			<key>hash2</key>
 			<data>
-			Wy9BcGp23PBcjHX+yoI9MqFlTGsELVW7GD/A3PGPb9A=
+			OGYS830v0LbRKKYALrbQJdYKXIOa3ui554Ohkz0lVpo=
 			</data>
 		</dict>
 		<key>ACK-SDK.momd/ACK-SDK 11.mom</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			aTULosl2+ZYowvPDTPkT+wrzehd50QiWT7B8bv56yog=
+			aFLEosZyEgu/rRYZCbbKcT0hTqau/7pM/q2UGQliX/s=
 			</data>
 		</dict>
 		<key>ACK-SDK.momd/ACK-SDK 12.mom</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			mJr0CzZoUTSw4jCCMhAwxL5damw105aubtItdOHEsLs=
+			RS+Ohk3hg/zFIcWzJgReXuenvrNSk7714XpLL/+TLZw=
 			</data>
 		</dict>
 		<key>ACK-SDK.momd/ACK-SDK 13.mom</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			RfDIM385SwCdJrxCESltTpYjHQ361s/ADDdMjNufVqw=
+			IIMVIsz9cWW1du00dRLad3VE9aPs+TruAXpV8I0ggDQ=
 			</data>
 		</dict>
 		<key>ACK-SDK.momd/ACK-SDK 14.mom</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			C8s5z+HBNCiEqXrE3ipRzBPNUPyT45v2R/Tm0P+g27I=
+			UtsrB4MaKzTxUV8xbsy3kOOWlBD48/XTTYYQvqUtoC8=
 			</data>
 		</dict>
-		<key>ACK-SDK.momd/ACK-SDK 14.omo</key>
+		<key>ACK-SDK.momd/ACK-SDK 15.mom</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			/auCuZcugZ3doz+ED7XHRICyw7atECeYrhJiVzAD2GM=
+			x1A55D7dDzcTrtOT+zGYDIzDCYwlRep0SPunDZIOKtQ=
+			</data>
+		</dict>
+		<key>ACK-SDK.momd/ACK-SDK 15.omo</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			DGgbB+/RG5B8goKPN2VVkoYs4AQhjzjOqXdS7iBPozc=
 			</data>
 		</dict>
 		<key>ACK-SDK.momd/ACK-SDK 2.mom</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			Yf3vIUqxfRzMbUlZqfmVFmSIHh/Pnn24TKdsBcGJIuA=
+			b2vEwpt9qmFp1hFcgpxHT5F+7b5F/NBVlHxJAQhfnQI=
 			</data>
 		</dict>
 		<key>ACK-SDK.momd/ACK-SDK 3.mom</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			LwsOV2vfXRtM+yjgwNNKuTnC52si3Sq+TA999rwrWwM=
+			px6IvS19Ej5NShBPjBVOpwYxGB2Q6VDqaC85JI+eUec=
 			</data>
 		</dict>
 		<key>ACK-SDK.momd/ACK-SDK 4.mom</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			I3AmGJtOgKwHQ3JnKmbYAmOdHymkaabnX4ttnov2ye4=
+			tU88kZmgHcHLdlKMeLD9aOubGkEMl/70K1SmT5SyFUQ=
 			</data>
 		</dict>
 		<key>ACK-SDK.momd/ACK-SDK 5.mom</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			BNHm1LCCIT+HKYDVoGmvvgjIrPaRoygcNiyAtP0eH9s=
+			QQ5vTAs4RB4GCJ8t73PvokWv9aBiyA/67/gJsPZal6w=
 			</data>
 		</dict>
 		<key>ACK-SDK.momd/ACK-SDK 6.mom</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			4whdxY3jbmXU0UZeI9XhqGGX9VZQpSHTpzfmA2iGjv8=
+			aJi/ofktALN/os70NcjTUjD3umWpljXotf7aZ6E60NA=
 			</data>
 		</dict>
 		<key>ACK-SDK.momd/ACK-SDK.mom</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			n9KcYYy5FzTu81rHTaeKPGLr87JWOKLZPWnoH7ja/Bw=
+			XjSeQj1QcOUGgoE0urg0S/eKdFhXIymTNopL+eW5tOg=
 			</data>
 		</dict>
 		<key>ACK-SDK.momd/VersionInfo.plist</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			m8h+tzcBxKBf9SZZrvZnPIKgtkN0/JW3SvvIlJE7f2I=
+			MSpJ9/jn+G8yJw6nTPxvY2KSmLsyFGJacz+9pwwnugs=
 			</data>
 		</dict>
 		<key>ACKAboutViewController.nib</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			RQEhugXTE8VfQSNx9ViaPu1I8j9ZFvUoD0X6k1uDrhY=
+			gjYX9qIUPcq9QUWxlQ4QnCBUn0n7vqJrJ6BxxsZAWEs=
 			</data>
 		</dict>
 		<key>ATC-iOS-Info.plist</key>
@@ -447,14 +458,14 @@
 		<dict>
 			<key>hash2</key>
 			<data>
-			y4eHKsFdA9Hm8X/NapAhw2rG7qUkE0VqK+WxzrITjEY=
+			7FdZ+KknmZBFGulH4tpdvpOIs+E0YZmwEOPX/IzfC5o=
 			</data>
 		</dict>
 		<key>Headers/ACKBLEDevice.h</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			Qy1mBt966mChyvlNu1+1WK33B3JjosRe2cWddWkZcnY=
+			aVIerJSRLPLzqB031jKMVMwzIcfUWnRMATsVYPIOTv0=
 			</data>
 		</dict>
 		<key>Headers/ACKBluetoothDeviceController.h</key>
@@ -468,7 +479,7 @@
 		<dict>
 			<key>hash2</key>
 			<data>
-			aocLuozcItIi8o6hF0/EQ+NLAEwjjiUPqNZra7rJZYE=
+			5DOGW3aFwU+RBF2yWEQ0mzmbGGC0+G7lndAL7Ztrh7o=
 			</data>
 		</dict>
 		<key>Headers/ACKConstants.h</key>
@@ -531,7 +542,7 @@
 		<dict>
 			<key>hash2</key>
 			<data>
-			Eblt/DLlKiRk+9BAREw3rOU3Jjzhygz5xo9VcKTQxn0=
+			lIrhCDgQQZfKbeJu6jPazKcm1mNtXytadoTXK5I+bxA=
 			</data>
 		</dict>
 		<key>Headers/ACKEcgMonitorViewController.h</key>
@@ -650,7 +661,7 @@
 		<dict>
 			<key>hash2</key>
 			<data>
-			PRNm8KOaoHYmOQN4VyrllhmU7HSSglGVIVFmO/C3uZk=
+			AQPEl+0xMsTQHwTF7T13v6IAkrBhYJgjQ6Gq6pYunCQ=
 			</data>
 		</dict>
 		<key>Headers/ACKPDFReport.h</key>
@@ -706,7 +717,7 @@
 		<dict>
 			<key>hash2</key>
 			<data>
-			mmmEOEbCS0mJy1cy1dDGv34GhQgJHsCak/KaYoMl+hc=
+			CAm4vzb3uKRKMUvMCgpr6Rk10Ftux3CAN5UBHN2CP4o=
 			</data>
 		</dict>
 		<key>Headers/ACKUIConfiguration.h</key>
@@ -741,7 +752,7 @@
 		<dict>
 			<key>hash2</key>
 			<data>
-			7QkVuVlFa/Dz9rRt8exmJFVXP78nYm7yoG3CIiu7FD4=
+			yxYTKDjagqPaDdzSk6Ob/tgE442dqM5eodaC5a0kzsY=
 			</data>
 		</dict>
 		<key>Headers/AliveCorKitLite.h</key>
@@ -832,42 +843,42 @@
 		<dict>
 			<key>hash2</key>
 			<data>
-			MhyKbB4eW5dKbqFQo/gNCj0WBlm6BehWGbNf7YtpaLU=
+			uLSQsqYuBxDLZCVrRzBECu8SjdeVSbJ5+F/OxMaFOIs=
 			</data>
 		</dict>
 		<key>Modules/AliveCorKitLite.swiftmodule/x86_64-apple-ios-simulator.private.swiftinterface</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			9CAtOI/10mzJApZsDpPEtqwsL21C7ro8NWRmgfvsE8Q=
+			nRX66UVSkoHPo0Ev94vLMuaLp91uFOmdBwjn6fMWOkw=
 			</data>
 		</dict>
 		<key>Modules/AliveCorKitLite.swiftmodule/x86_64-apple-ios-simulator.swiftdoc</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			gKRaSN/1ezOgOxgiZbMFuoLQMrzTIT9phpkLzMzkQvQ=
+			jGIWQZq0caPanXWZDG2U/vJB9yylRGXhXDPEMlHmx9I=
 			</data>
 		</dict>
 		<key>Modules/AliveCorKitLite.swiftmodule/x86_64-apple-ios-simulator.swiftinterface</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			9CAtOI/10mzJApZsDpPEtqwsL21C7ro8NWRmgfvsE8Q=
+			nRX66UVSkoHPo0Ev94vLMuaLp91uFOmdBwjn6fMWOkw=
 			</data>
 		</dict>
 		<key>Modules/AliveCorKitLite.swiftmodule/x86_64-apple-ios-simulator.swiftmodule</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			LfCvXa27JfwFMHECBEQZLE8MQLA8vcFmjmkr8WsG8x4=
+			KarKdDKx1NOqkb9/xhNePP4Sn3GxiOmYiiZ+dfO5iRg=
 			</data>
 		</dict>
 		<key>Modules/module.modulemap</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			Z9jsM1XkMOF2Cj4OxO3dTCnq52O/7Zu2FWm0PQ6FTFQ=
+			ApbBTludm4JZwwe4q/MvAJE7ypG8ngjCsz6MIhCgVxk=
 			</data>
 		</dict>
 		<key>PrivacyInfo.xcprivacy</key>
@@ -888,7 +899,7 @@
 		<dict>
 			<key>hash2</key>
 			<data>
-			HSVspZc5IxLfcK2FaBYbeCqwW6MaOMETu+FRZ5IqAJ0=
+			k/aIIrdv1k1/EOQi9c1fyqOYtiq4+fye2gx1wK/q6po=
 			</data>
 		</dict>
 	</dict>

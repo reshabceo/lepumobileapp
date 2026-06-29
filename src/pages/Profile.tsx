@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, User, Mail, Phone, Calendar, MapPin, Droplet, Heart, AlertCircle, Pill, UserCircle, LogOut, Ruler, Scale, Edit2, Crown } from 'lucide-react';
+import { ArrowLeft, User, Mail, Phone, Calendar, MapPin, Droplet, Heart, AlertCircle, Pill, UserCircle, LogOut, Ruler, Scale, Edit2, Crown, ExternalLink, BookOpen } from 'lucide-react';
 import { ABHALinking } from '../components/ABHALinking';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase, getPatientRiskCriteria } from '../lib/supabase';
@@ -532,6 +532,17 @@ const Profile = () => {
                   </button>
                 </div>
                 <div className="space-y-3">
+                  <p className="text-[11px] text-slate-400 leading-relaxed">
+                    Information below is entered by you or your care team. It is not a diagnosis.
+                    {' '}
+                    <button
+                      type="button"
+                      onClick={() => navigate('/medical-disclaimer')}
+                      className="text-blue-400 underline underline-offset-2 hover:text-blue-300"
+                    >
+                      Medical Disclaimer
+                    </button>
+                  </p>
                   {/* Care setting — set at signup; only your doctor can change it. */}
                   <div className="flex items-start gap-3">
                     <Heart className="w-5 h-5 text-violet-400 mt-0.5 flex-shrink-0" />
@@ -637,10 +648,16 @@ const Profile = () => {
             {/* Vital High Risk Section */}
             <Card className="bg-[#1A243D] border border-red-500/30 shadow-sm rounded-3xl">
               <CardContent className="p-6">
-                <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                <h3 className="text-lg font-semibold text-white mb-1 flex items-center gap-2">
                   <AlertCircle className="w-5 h-5 text-red-400" />
                   Vital High Risk Thresholds
                 </h3>
+                <p className="text-[11px] text-slate-400 mb-4 leading-relaxed">
+                  {riskCriteria
+                    ? 'Limits set by your assigned doctor for remote monitoring alerts.'
+                    : 'Default monitoring limits shown until your doctor sets custom values.'}
+                  {' '}These are alert thresholds, not medical advice.
+                </p>
                 <div className="space-y-4">
                   {riskCriteria ? (
                     <>
@@ -679,10 +696,79 @@ const Profile = () => {
                       )}
                     </>
                   ) : (
-                    <div className="text-center py-4 bg-[#121B32] rounded-lg">
-                      <p className="text-sm text-gray-400 italic">No custom risk criteria set by doctor.</p>
-                    </div>
+                    <>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="bg-[#121B32] p-3 rounded-lg border border-red-500/20">
+                          <p className="text-xs text-red-200/60 mb-1">Blood Pressure (default)</p>
+                          <p className="text-white font-medium">&gt;140/90 mmHg</p>
+                        </div>
+                        <div className="bg-[#121B32] p-3 rounded-lg border border-red-500/20">
+                          <p className="text-xs text-red-200/60 mb-1">Heart Rate (default)</p>
+                          <p className="text-white font-medium">&gt;100 BPM</p>
+                        </div>
+                        <div className="bg-[#121B32] p-3 rounded-lg border border-red-500/20">
+                          <p className="text-xs text-red-200/60 mb-1">SpO2 (default)</p>
+                          <p className="text-white font-medium">&lt;95%</p>
+                        </div>
+                      </div>
+                      <div className="text-center py-2">
+                        <p className="text-sm text-gray-400 italic">No custom risk criteria set by doctor yet.</p>
+                      </div>
+                    </>
                   )}
+
+                  {/* Medical source citations — Guideline 1.4.1 */}
+                  <div className="bg-[#121B32] border border-slate-700/40 rounded-xl p-4 space-y-2">
+                    <div className="flex items-center gap-2 text-slate-300">
+                      <BookOpen className="w-4 h-4 text-blue-400 shrink-0" />
+                      <p className="text-xs font-semibold uppercase tracking-wide">Sources & References</p>
+                    </div>
+                    <ul className="text-[11px] text-slate-400 space-y-2 leading-relaxed">
+                      <li>
+                        <span className="text-slate-300">Blood pressure (140/90 mmHg default):</span>{' '}
+                        American Heart Association —{' '}
+                        <a
+                          href="https://www.heart.org/en/health-topics/high-blood-pressure/understanding-blood-pressure-readings"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-400 inline-flex items-center gap-0.5 hover:text-blue-300"
+                        >
+                          Understanding Blood Pressure Readings <ExternalLink className="w-3 h-3" />
+                        </a>
+                      </li>
+                      <li>
+                        <span className="text-slate-300">Heart rate (&gt;100 BPM default):</span>{' '}
+                        American Heart Association —{' '}
+                        <a
+                          href="https://www.heart.org/en/health-topics/arrhythmia/about-arrhythmia/tachycardia"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-400 inline-flex items-center gap-0.5 hover:text-blue-300"
+                        >
+                          Tachycardia (fast heart rate) <ExternalLink className="w-3 h-3" />
+                        </a>
+                      </li>
+                      <li>
+                        <span className="text-slate-300">SpO2 (&lt;95% default):</span>{' '}
+                        WHO —{' '}
+                        <a
+                          href="https://www.who.int/health-topics/pulse-oximetry"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-400 inline-flex items-center gap-0.5 hover:text-blue-300"
+                        >
+                          Pulse Oximetry <ExternalLink className="w-3 h-3" />
+                        </a>
+                      </li>
+                    </ul>
+                    <button
+                      type="button"
+                      onClick={() => navigate('/medical-disclaimer')}
+                      className="text-[11px] text-blue-400 underline underline-offset-2 hover:text-blue-300"
+                    >
+                      View full Medical Disclaimer & device regulatory information
+                    </button>
+                  </div>
                 </div>
               </CardContent>
             </Card>

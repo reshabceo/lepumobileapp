@@ -1,46 +1,59 @@
-# iPhone-Only Configuration Summary
+# iPhone-Only Configuration
 
-## Changes Made
+Monitraq is an **iPhone-only** app. It is not a native iPad (Universal) app.
 
-### ✅ Removed iPad-Specific Settings
+## Xcode / project settings (verified)
 
-1. **Info.plist** - Removed iPad orientation settings:
-   - Removed `UISupportedInterfaceOrientations~ipad` key and array
-   - Kept only iPhone orientations: Portrait, LandscapeLeft, LandscapeRight
+| Setting | Value | Meaning |
+|--------|--------|---------|
+| `TARGETED_DEVICE_FAMILY` | `1` | iPhone only |
+| `SUPPORTED_PLATFORMS` | `iphoneos iphonesimulator` | No iPadOS target |
+| `SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD` | `NO` | Not “Designed for iPad” on Mac |
+| `SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD` | `NO` | Not visionOS iPad mode |
+| `SUPPORTS_MACCATALYST` | `NO` | No Mac Catalyst |
+| `LSRequiresIPhoneOS` | `true` | iPhone OS required |
+| `UIRequiresFullScreen` | `true` | No iPad Split View / Slide Over |
 
-### ✅ Verified Xcode Project Settings
+**Info.plist:** no `UISupportedInterfaceOrientations~ipad` key (iPad-specific orientations removed).
 
-The project is already configured for iPhone-only:
-- `TARGETED_DEVICE_FAMILY = 1` (1 = iPhone only)
-- `SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO`
-- `SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO`
-- `SUPPORTED_PLATFORMS = "iphoneos iphonesimulator"`
+## App Store Connect (required when submitting)
 
-## App Store Connect Configuration
+1. **General → App Information**
+   - Device support should show **iPhone** only (not Universal).
+   - Do **not** upload iPad screenshots or iPad app previews.
 
-When submitting to App Store Connect, ensure:
+2. **Pricing and Availability**
+   - Territories: India + United States (as configured).
 
-1. **Device Support**: Select "iPhone" only (not Universal or iPad)
-2. **Screenshots**: Only upload iPhone screenshots (no iPad screenshots needed)
-3. **App Preview**: Only iPhone previews (if using)
+3. **App Review Information → Notes**
+   - Paste text from `APP_STORE_REVIEW_NOTES.md`.
+   - Include: *“This is an iPhone-only app (TARGETED_DEVICE_FAMILY = 1). Please review on iPhone. The app is not optimized for native iPad layout.”*
 
-## Verification
+4. **Build**
+   - Upload a new build after bumping **Build** number in Xcode (`CURRENT_PROJECT_VERSION`).
+   - Select the new build on the version page before submitting.
 
-To verify iPhone-only configuration:
+## Important: iPhone apps on iPad
 
-1. Open the project in Xcode
-2. Select your target → General tab
-3. Check "Supported Destinations" - should only show iPhone
-4. Build and verify it only builds for iPhone
+Apple may still install an iPhone-only app on iPad in **compatibility mode** (scaled iPhone window). Reviewers sometimes test on iPad even for iPhone-only apps.
 
-## Next Steps
+That is why the **Health AI data sharing** dialog is scrollable (`max-h` + `overflow-y-auto`) so content is not cut off on smaller or scaled viewports.
 
-1. Clean build folder: Product → Clean Build Folder (Shift+Cmd+K)
-2. Rebuild the project
-3. Verify it only builds for iPhone
-4. Submit to App Store Connect with iPhone-only device support
+You cannot fully remove the app from the iPad App Store listing while keeping iPhone distribution — but the binary is iPhone-only and must not declare iPad as a supported device family.
+
+## Verify in Xcode before archive
+
+1. Open `ios/App/App.xcworkspace`
+2. Select target **App** → **General**
+3. **Supported Destinations** should list **iPhone** only
+4. **Signing & Capabilities** → Team + Automatic signing
+5. **Product → Clean Build Folder** (⇧⌘K)
+6. **Product → Archive** → Distribute to App Store Connect
+
+## Build number
+
+Current build: check `CURRENT_PROJECT_VERSION` in `ios/App/App.xcodeproj/project.pbxproj` (increment for each App Store submission).
 
 ---
 
-**Status**: ✅ Configuration complete - App is now iPhone-only
-
+**Status:** iPhone-only native target. Rebuild and upload a new IPA after any change to this configuration.

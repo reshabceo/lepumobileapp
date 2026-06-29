@@ -18,13 +18,23 @@
 @end
 
 NS_ASSUME_NONNULL_BEGIN
+
 @class ACBLEDevice;
 @class ACKBluetoothDeviceProperties;
 
-
+typedef NS_ENUM(NSInteger, ACKBLEDeviceType) {
+   ACKBLEDeviceTypeUnknown = 0,
+   ACKBLEDeviceTypeKardiaCard,
+   ACKBLEDeviceTypeKardia6L,
+   ACKBLEDeviceTypeK1000,
+   ACKBLEDeviceTypeKardia6LMax,
+} NS_SWIFT_NAME(ACKBLEDevice.Type);
 
 
 @interface ACKBLEDevice : NSObject
+
+/// The mapped device type, exposed as an enum Swift can use.
+@property (nonatomic, assign, readonly) ACKBLEDeviceType deviceType;
 
 - (instancetype)initWithACBLEDevice:(ACBLEDevice *) device andBleDeviceHandler:(nullable id<BLEDeviceDelegateHandler>) handler;
 

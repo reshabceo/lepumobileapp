@@ -54,6 +54,24 @@ NS_ASSUME_NONNULL_BEGIN
 /// @param device The connected device.
 - (void)didPairDevice:(ACKDevice *)device;
 
+/**
+ * Asks the delegate whether connecting to a given device type is allowed.
+ *
+ * This is called before initiating connection or pairing when a device of the
+ * specified type is discovered, and the SDK may adjust scan/pairing behavior
+ * based on the answer.
+ *
+ * @param bluetoothDeviceController       The Bluetooth pairing controller requesting permission to connect.
+ * @param deviceType           The device type the pairing controller is about to connect to.
+ * @param configuredDeviceType The device type currently configured for this pairing controller.
+ *
+ * @return YES to allow connecting/scanning for the given device type; NO to
+ *         prevent connection and keep the current pairing/scan behavior unchanged.
+ */
+- (BOOL)bluetoothDeviceController:(ACKBluetoothPairingController * _Nonnull)bluetoothDeviceController
+        isAllowDiscoverDeviceType:(ACKDeviceType _Nonnull)deviceType
+             configuredDeviceType:(ACKDeviceType _Nonnull)configuredDeviceType;
+
 @end
 
 /**

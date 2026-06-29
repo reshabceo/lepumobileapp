@@ -27,6 +27,7 @@ import {
   Shield,
   Crown,
   Lock,
+  Droplets,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
@@ -673,7 +674,7 @@ export const HealthDashboard = () => {
           <div>
             <p className="text-[11px] text-slate-400 font-semibold uppercase tracking-wider">Have a Healthy Day</p>
             <h1 className="text-lg font-black tracking-tight text-white mt-0.5">
-              {patientProfile?.full_name || "John Doe"}
+              {patientProfile?.full_name || "Your Profile"}
             </h1>
           </div>
         </div>
@@ -1137,7 +1138,7 @@ export const HealthDashboard = () => {
               )}
             </button>
 
-            {/* CGM Monitor */}
+            {/* CGM Monitor (Dexcom) */}
             <button
               onClick={() => goPaidFeature("/cgm-monitor", "CGM Monitor")}
               className="relative overflow-hidden flex-shrink-0 w-36 snap-start bg-[#1A243D] hover:bg-[#1A243D]/80 border border-slate-700/40 p-4 rounded-3xl flex flex-col items-center justify-center gap-2.5 transition-all text-center group shadow-md"
@@ -1145,7 +1146,26 @@ export const HealthDashboard = () => {
               <BarChart3 className={`h-7 w-7 text-green-400 ${isFreeTier ? "opacity-40" : "group-hover:scale-105 transition-transform"}`} />
               <div>
                 <h4 className="font-extrabold text-xs text-white">CGM Monitor</h4>
-                <p className="text-[9px] text-slate-400 font-semibold mt-0.5">Glucose Levels</p>
+                <p className="text-[9px] text-slate-400 font-semibold mt-0.5">Dexcom Glucose</p>
+              </div>
+              {isFreeTier && (
+                <span className="pointer-events-none absolute inset-0 rounded-3xl bg-slate-950/55 backdrop-blur-[1.5px] flex flex-col items-center justify-center border border-amber-400/35">
+                  <span className="inline-flex items-center justify-center h-9 w-9 rounded-full bg-gradient-to-br from-amber-100/25 via-orange-300/15 to-yellow-200/20 border border-amber-300/45 shadow-[0_0_22px_rgba(251,191,36,0.24)] transition-transform duration-200 group-hover:scale-110">
+                    <Lock className="h-5 w-5 text-amber-200" />
+                  </span>
+                </span>
+              )}
+            </button>
+
+            {/* Abbott CGM (FreeStyle Libre via Junction) */}
+            <button
+              onClick={() => goPaidFeature("/abbott-cgm", "Abbott CGM")}
+              className="relative overflow-hidden flex-shrink-0 w-36 snap-start bg-[#1A243D] hover:bg-[#1A243D]/80 border border-slate-700/40 p-4 rounded-3xl flex flex-col items-center justify-center gap-2.5 transition-all text-center group shadow-md"
+            >
+              <Droplets className={`h-7 w-7 text-amber-400 ${isFreeTier ? "opacity-40" : "group-hover:scale-105 transition-transform"}`} />
+              <div>
+                <h4 className="font-extrabold text-xs text-white">Abbott CGM</h4>
+                <p className="text-[9px] text-slate-400 font-semibold mt-0.5">FreeStyle Libre</p>
               </div>
               {isFreeTier && (
                 <span className="pointer-events-none absolute inset-0 rounded-3xl bg-slate-950/55 backdrop-blur-[1.5px] flex flex-col items-center justify-center border border-amber-400/35">

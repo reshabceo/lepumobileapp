@@ -2,6 +2,11 @@
 
 This document provides a technical overview of how the AliveCor SDK is integrated into the Monitraq mobile application for 6-lead ECG recordings.
 
+## SDK Version
+- **iOS**: AliveCorKitLite **1.7.3** (`ios/App/Frameworks/`)
+- **Android**: AliveCorKitLite-core **1.7.3** (`android/app/libs/AliveCorKitLite-core-1.7.3-ec954cb3.aar`)
+- **Bundle ID**: `com.monitraq.mobile` (iOS and Android)
+
 ## 🚀 Features
 - **Turnkey Recording UI**: Uses the official AliveCor recording activity for medical-grade user experience.
 - **6-Lead Support**: Configured for KardiaMobile 6L (TRIANGLE device) with leads I, II, III, aVR, aVL, and aVF.
@@ -13,7 +18,7 @@ The integration uses a multi-layer approach:
 1. **Frontend (`src/pages/KardiaSixLeadECG.tsx`)**: Orchestrates the UI, requests permissions, and triggers the recording flow.
 2. **Bridge (`src/lib/alivecor-sdk-bridge.ts`)**: A TypeScript wrapper that exposes native plugin methods to the web layer.
 3. **Capacitor Plugin (`android/.../AliveCorPlugin.java`)**: The native Java implementation that manages the AliveCor SDK lifecycle.
-4. **Android SDK**: `alivecor-Android-SDK-1.6.10` binaries (AARs) integrated into the Android project.
+4. **Android SDK**: `AliveCorKitLite-core-1.7.3-ec954cb3.aar` integrated into the Android project.
 
 ## 📦 Dependencies
 The following dependencies are critical for the SDK to run without crashes:

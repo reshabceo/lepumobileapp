@@ -1,12 +1,12 @@
 Pod::Spec.new do |s|
   s.name             = 'AliveCorKitLite'
-  s.version          = '1.6.10'
+  s.version          = '1.7.3'
   s.summary          = 'AliveCor SDK for iOS'
   s.description      = 'Kardia SDK for performing ECG recordings.'
   s.homepage         = 'https://www.alivecor.com'
   s.license          = { :type => 'Commercial', :text => 'Copyright AliveCor, Inc.' }
   s.author           = { 'AliveCor' => 'support@alivecor.com' }
-  s.platform         = :ios, '14.0'
+  s.platform         = :ios, '15.0'
   s.source           = { :path => '.' }
   s.vendored_frameworks = 'AliveCorKitLite.xcframework'
   s.resource_bundles = {

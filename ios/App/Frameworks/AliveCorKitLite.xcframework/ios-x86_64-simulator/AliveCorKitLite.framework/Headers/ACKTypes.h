@@ -101,7 +101,7 @@ extern ACKDeviceType _Nonnull ACKDeviceTypeSakuraOne;
 extern ACKDeviceType _Nonnull ACKDeviceTypeCard;
 extern ACKDeviceType _Nonnull ACKDeviceTypeK1000;
 extern ACKDeviceType _Nonnull ACKDeviceTypeK6LMax;
-
+extern ACKDeviceType _Nonnull ACKDeviceTypeTriangleWildCard;
 /**
  * Supported UI/localization language codes.
  */

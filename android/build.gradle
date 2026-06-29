@@ -7,7 +7,7 @@ buildscript {
         mavenCentral()
     }
     dependencies {
-        classpath 'com.android.tools.build:gradle:8.5.1'
+        classpath 'com.android.tools.build:gradle:8.13.2'
         classpath 'com.google.gms:google-services:4.4.2'
         // Kotlin Gradle plugin 2.2.0 — MUST match the Kotlin version the AliveCor SDK
         // AAR was compiled with (confirmed from ThirdPartyAppSDKTest/build.gradle).
@@ -49,6 +49,8 @@ subprojects {
             force "org.jetbrains.kotlin:kotlin-stdlib:2.2.0"
             force "org.jetbrains.kotlin:kotlin-stdlib-jdk7:2.2.0"
             force "org.jetbrains.kotlin:kotlin-stdlib-jdk8:2.2.0"
+            // Align with AliveCor SDK 1.7.3 — avoids missing m3_ref_palette_dynamic_* colors at link time
+            force "com.google.android.material:material:1.13.0"
         }
     }
 

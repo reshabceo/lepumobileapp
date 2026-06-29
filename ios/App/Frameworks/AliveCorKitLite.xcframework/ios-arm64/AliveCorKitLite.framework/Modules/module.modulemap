@@ -7,5 +7,4 @@ framework module AliveCorKitLite {
 
 module AliveCorKitLite.Swift {
   header "AliveCorKitLite-Swift.h"
-  requires objc
 }

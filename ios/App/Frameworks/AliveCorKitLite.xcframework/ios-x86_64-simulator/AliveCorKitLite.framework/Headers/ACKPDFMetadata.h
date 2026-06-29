@@ -44,6 +44,9 @@ NS_ASSUME_NONNULL_BEGIN
 /// The patient’s sex. A Boolean value where `YES` indicates male.
 @property (nonatomic, copy, nullable) NSNumber *male;
 
+/// Show or hide the gender's label from the cover page.
+@property (nonatomic) BOOL isGenderHidden;
+
 /// Indicates whether the ECG was recorded by a registered user (`YES`) or a guest (`NO`).
 @property (nonatomic, copy, nullable) NSNumber *recordedByUser;
 

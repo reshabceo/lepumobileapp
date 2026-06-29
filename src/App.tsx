@@ -34,6 +34,7 @@ const BPReadingsHistory = lazy(() => import("./pages/BPReadingsHistory"));
 const ECGMonitor = lazy(() => import("./pages/ECGMonitor"));
 const O2RingMonitor = lazy(() => import("./pages/O2RingMonitor"));
 const CGMMonitor = lazy(() => import("./pages/CGMMonitor"));
+const AbbottCGMMonitor = lazy(() => import("./pages/AbbottCGMMonitor"));
 const BPResultScreen = lazy(() => import("./pages/BPResult"));
 const DoctorAssignmentPage = lazy(() => import("./pages/DoctorAssignmentPage").then(m => ({ default: m.DoctorAssignmentPage })));
 const PatientReportsView = lazy(() => import("./components/PatientReportsView"));
@@ -181,6 +182,11 @@ const App = () => (
                 <Route path="/cgm-monitor" element={
                   <ProtectedRoute>
                     <RequiresPaid featureLabel="CGM monitoring"><CGMMonitor /></RequiresPaid>
+                  </ProtectedRoute>
+                } />
+                <Route path="/abbott-cgm" element={
+                  <ProtectedRoute>
+                    <RequiresPaid featureLabel="Abbott CGM monitoring"><AbbottCGMMonitor /></RequiresPaid>
                   </ProtectedRoute>
                 } />
                 <Route path="/o2ring-monitor" element={

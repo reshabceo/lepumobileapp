@@ -128,7 +128,7 @@ export const ServicesRecords = () => {
             <div>
               <p className="text-[11px] text-slate-400 font-semibold uppercase tracking-wider">Have a Healthy Day</p>
               <h1 className="text-lg font-black tracking-tight text-white mt-0.5">
-                {patientProfile?.full_name || "John Doe"}
+                {patientProfile?.full_name || "Your Profile"}
               </h1>
             </div>
           </div>
@@ -146,7 +146,7 @@ export const ServicesRecords = () => {
                   />
                 ) : (
                   <div className="w-full h-full bg-gradient-to-tr from-indigo-500 to-purple-550 flex items-center justify-center text-white font-bold text-lg">
-                    {patientProfile?.full_name?.charAt(0) || "J"}
+                    {patientProfile?.full_name?.charAt(0) || "?"}
                   </div>
                 )}
               </div>

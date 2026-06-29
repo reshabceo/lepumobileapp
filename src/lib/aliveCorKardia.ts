@@ -25,10 +25,38 @@ export function buildAliveCorIngestPayload(
     const leadArrays = leadNames.map((name) => leads[name] || []);
     const minLength = Math.min(...leadArrays.map((arr) => arr.length));
 
+    // Sanitize: replace null / NaN / undefined samples with interpolated neighbors.
+    // Android JSArray serialization can produce nulls that get stored as 0 in DB,
+    // causing all-flat ECG waveforms in the history view.
+    const sanitizeLead = (arr: (number | null | undefined)[]): number[] => {
+      const out: number[] = new Array(arr.length).fill(0);
+      for (let i = 0; i < arr.length; i++) {
+        const v = arr[i];
+        if (v !== null && v !== undefined && isFinite(v as number)) {
+          out[i] = v as number;
+        } else {
+          // Linear interpolation from nearest valid neighbors
+          let prev = 0, next = 0;
+          for (let p = i - 1; p >= 0; p--) {
+            const pv = arr[p];
+            if (pv !== null && pv !== undefined && isFinite(pv as number)) { prev = pv as number; break; }
+          }
+          for (let n = i + 1; n < arr.length; n++) {
+            const nv = arr[n];
+            if (nv !== null && nv !== undefined && isFinite(nv as number)) { next = nv as number; break; }
+          }
+          out[i] = (prev + next) / 2;
+        }
+      }
+      return out;
+    };
+
+    const cleanLeads = leadArrays.map(sanitizeLead);
+
     const interleaved: number[] = [];
     for (let i = 0; i < minLength; i++) {
       for (let j = 0; j < 6; j++) {
-        interleaved.push(leadArrays[j][i]);
+        interleaved.push(cleanLeads[j][i]);
       }
     }
 

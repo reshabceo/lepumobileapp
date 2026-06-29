@@ -12,23 +12,26 @@
 NS_ASSUME_NONNULL_BEGIN
 
 extern NSString * const ACCurrentDeviceTriangleUUIDNone;
-extern NSString * const ACCurrentDeviceMobileUUIDNone;
 extern NSString * const ACCurrentDeviceK1000UUIDNone;
 extern NSString * const ACCurrentDeviceK6LMaxUUIDNone;
+extern NSString * const ACCurrentDeviceCardUUIDNone;
+extern NSString * const ACCurrentDeviceMobileUUIDNone;
 extern NSString * const ACCurrentDeviceBandUUIDNone;
-extern NSString * const ACCurrentDeviceTripodUUIDNone;
 extern NSString * const ACCurrentDeviceSakuraOneUUIDNone;
+extern NSString * const ACCurrentDeviceTriangleWildCardUUIDNone;
 
 
 extern NSString * const ACCurrentDeviceNameTriangle;
-extern NSString * const ACCurrentDeviceNameMobile;
-extern NSString * const ACCurrentDeviceNameBand;
-extern NSString * const ACCurrentDeviceNameTripod;
-extern NSString * const ACCurrentDeviceNameSakuraOne;
-extern NSString * const ACCurrentDeviceNameUnknown;
-extern NSString * const ACCurrentDeviceNameCard;
 extern NSString * const ACCurrentDeviceNameK1000;
 extern NSString * const ACCurrentDeviceNameK6LMax;
+extern NSString * const ACCurrentDeviceNameCard;
+extern NSString * const ACCurrentDeviceNameMobile;
+extern NSString * const ACCurrentDeviceNameBand;
+extern NSString * const ACCurrentDeviceNameSakuraOne;
+extern NSString * const ACCurrentDeviceNameTriangleWildCard;
+extern NSString * const ACCurrentDeviceNameUnknown;
+
+
 
 
 typedef NS_ENUM(NSInteger, ACCurrentDeviceLead) {
@@ -61,7 +64,6 @@ typedef NS_ENUM(NSInteger, ACCurrentDeviceLead) {
 + (instancetype)deviceK6LMaxWithUniqueId:(NSString *)uniqueID;
 + (instancetype)deviceMobile;
 + (instancetype)deviceBand;
-//+ (instancetype)deviceTripod;
 + (instancetype)deviceSakuraOne;
 
 + (ACKDeviceType)sourceForDeviceName:(NSString *)name;
@@ -84,6 +86,10 @@ typedef NS_ENUM(NSInteger, ACCurrentDeviceLead) {
 + (void)clearACKDeviceStore;
 + (void)setLeadsConfig:(ACKLeadsConfig)leadsConfig;
 + (ACKLeadsConfig)fetchLeadsConfigForDeviceType:(ACKDeviceType)deviceType;
+
++ (void)resetForBleACKDeviceType:(ACKDeviceType)deviceType;
++ (void)confirmForBleACKDeviceType:(ACKDeviceType)deviceType uuid:(NSString *)uuid;
+
 @end
 
 NS_ASSUME_NONNULL_END

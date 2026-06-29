@@ -27,6 +27,14 @@
         </trust-anchors>
     </domain-config>
 
+    <!-- Monitraq AliveCor auth backend -->
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="true">monitraq.com</domain>
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </domain-config>
+
     <!-- Localhost / dev server -->
     <domain-config cleartextTrafficPermitted="true">
         <domain includeSubdomains="true">localhost</domain>

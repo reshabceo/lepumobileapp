@@ -177,8 +177,9 @@ export async function storeEcgRecording(ecgData: {
 
 // --- AliveCor / Kardia SDK integration ---
 
-const ALIVECOR_BACKEND_URL =
-  import.meta.env.VITE_ALIVECOR_BACKEND_URL || 'https://alivecorapi.monitraq.com';
+const ALIVECOR_BACKEND_URL = (
+  import.meta.env.VITE_ALIVECOR_BACKEND_URL || 'https://alivecor.monitraq.com'
+).replace(/\/$/, '');
 
 /** Use either waveform_mv (single strip / interleaved) or waveform_leads (I–aVF object). */
 export interface AliveCorEcgData {
@@ -230,7 +231,13 @@ async function aliveCorFetch(path: string, body: Record<string, unknown>) {
       }
       return response.data;
     } catch (err: any) {
-      console.error('[aliveCorFetch] Native HTTP POST error:', err);
+      console.error('[aliveCorFetch] Native HTTP POST error:', err, 'url:', url);
+      const code = err?.code || err?.errorMessage || err?.message;
+      if (code === 'NSURLErrorDomain' || String(code).includes('-1004') || String(code).includes('Could not connect')) {
+        throw new Error(
+          `Cannot reach AliveCor backend at ${ALIVECOR_BACKEND_URL}. Check network and rebuild the app after updating VITE_ALIVECOR_BACKEND_URL.`,
+        );
+      }
       throw err;
     }
   } else {
@@ -290,7 +297,13 @@ export async function aliveCorGet(path: string) {
       }
       return response.data;
     } catch (err: any) {
-      console.error('[aliveCorGet] Native HTTP GET error:', err);
+      console.error('[aliveCorGet] Native HTTP GET error:', err, 'url:', url);
+      const code = err?.code || err?.errorMessage || err?.message;
+      if (code === 'NSURLErrorDomain' || String(code).includes('-1004') || String(code).includes('Could not connect')) {
+        throw new Error(
+          `Cannot reach AliveCor backend at ${ALIVECOR_BACKEND_URL}. Check network and rebuild the app after updating VITE_ALIVECOR_BACKEND_URL.`,
+        );
+      }
       throw err;
     }
   } else {
@@ -324,6 +337,7 @@ export async function aliveCorGet(path: string) {
  * The backend forwards the request to the kardia-auth-server container.
  */
 export async function getAliveCorToken(patientId: string): Promise<{ jwt: string; patientMrn: string }> {
+  console.log(`[getAliveCorToken] Using backend: ${ALIVECOR_BACKEND_URL}`);
   const result = await aliveCorFetch('/api/alivecor/token', { patientId });
   return {
     jwt: result.jwt,
@@ -419,7 +433,7 @@ export async function getPatientRiskCriteria(patientId: string) {
 
 /**
  * Check if the AliveCor backend is reachable (no auth required).
- * Uses: GET https://alivecorapi.monitraq.com/api/health
+ * Uses: GET {VITE_ALIVECOR_BACKEND_URL}/api/health
  */
 export async function checkAliveCorBackendHealth(): Promise<{ ok: boolean; configured: boolean }> {
   try {

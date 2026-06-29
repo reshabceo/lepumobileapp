@@ -139,12 +139,13 @@
 - (void)ecgMonitorViewController:(ACKEcgMonitorViewController * _Nonnull)viewController connectedDevice:(ACKDevice * _Nonnull)connectedDevice batteryLevelDetected:(NSInteger)batteryLevel;
 
 /**
- * Asks the delegate whether K1000 lead controls should be enabled (Kiwi).
+ * Asks the delegate whether the lead selection should be displayed.
  *
  * @param viewController The ECG monitoring view controller.
- * @return YES to enable K1000 lead controls; NO otherwise.
+ * @return YES to display lead selection; NO otherwise.
  */
-- (BOOL)ecgMonitorViewShouldEnableLeadForKiwi:(ACKEcgMonitorViewController * _Nonnull)viewController;
+- (BOOL)ecgMonitorViewControllerShouldDisplayLeadSelection:(ACKEcgMonitorViewController * _Nonnull)viewController deviceType:(ACKDeviceType _Nonnull)deviceType;
+
 
 /**
  * Reports an audio-related error encountered during recording.
@@ -190,24 +191,44 @@
  */
 - (void)ecgMonitorViewController:(ACKEcgMonitorViewController * _Nonnull)viewController didReceiveEcgFrame:(struct ECGFrame)ecgFrame;
 
-#if !KARDIACORE
+#pragma mark - Internal (AliveCor use only)
+/// - Warning: AliveCor internal use only.
+
 /**
  * Reports a pairing error encountered while connecting to a device.
  *
  * @param viewController The ECG monitoring view controller.
  * @param error          The pairing error.
+ * @param completion     The delegate must call the completion block to restart device scanning.
  */
-- (void)ecgMonitorViewController:(ACKEcgMonitorViewController * _Nonnull)viewController didEncounterInvalidDeviceError:(nullable ACKError *)error;
-#endif
+- (void)ecgMonitorViewController:(ACKEcgMonitorViewController * _Nonnull)viewController
+  didEncounterInvalidDeviceError:(nullable ACKError *)error
+                      completion:(void (^ _Nonnull)(void))completion;
 
-#pragma mark - Internal (AliveCor use only)
+/**
+ * Asks the delegate whether connecting to a given device type is allowed.
+ *
+ * This is called before initiating connection or pairing when a device of the
+ * specified type is discovered, and the SDK may adjust scan/pairing behavior
+ * based on the answer.
+ *
+ * @param viewController       The ECG monitoring view controller.
+ * @param deviceType           The device type the monitor is about to connect to.
+ * @param configuredDeviceType The device type currently configured for this monitor.
+ *
+ * @return YES to allow connecting/scanning for the given device type; NO to
+ *         prevent connection and keep the current pairing/scan behavior unchanged.
+ */
+- (BOOL)ecgMonitorViewController:(ACKEcgMonitorViewController * _Nonnull)viewController
+       isAllowDiscoverDeviceType:(ACKDeviceType _Nonnull)deviceType
+            configuredDeviceType:(ACKDeviceType _Nonnull)configuredDeviceType;
 
-/// - Warning: AliveCor internal use only.
-/// Asks the delegate for the device instance corresponding to a device type,
-/// used to display battery percentage on the monitoring screen.
+/// Asks the delegate for a device's battery percentage corresponding to a device type, used to display battery percentage on the monitoring screen.
+/// The return value should be an integer percentage in the range 0–100. Return -1 if the
+/// battery level is unknown.
 /// @param viewController The ECG monitoring view controller.
 /// @param deviceType     The currently selected device type.
-- (ACKDevice * _Nullable)ecgMonitorViewController:(ACKEcgMonitorViewController * _Nonnull)viewController deviceForType:(ACKDeviceType _Nonnull)deviceType;
+- (NSInteger)ecgMonitorViewController:(ACKEcgMonitorViewController * _Nonnull)viewController initialBatteryPercentageForDeviceType:(ACKDeviceType _Nonnull)deviceType;
 
 /// - Warning: AliveCor internal use only.
 /// Asks whether tutorial support is enabled.

@@ -5,7 +5,7 @@ import android.util.Log;
 import android.app.Activity;
 import androidx.activity.result.ActivityResult;
 import com.alivecor.api.AliveCorDevice;
-import com.alivecor.api.AliveCorKit;
+import com.alivecor.api.AliveCorKitLite;
 import com.alivecor.api.InitListener;
 import com.alivecor.ecg.record.RecordActivityResult;
 import com.alivecor.api.AliveCorEcg;
@@ -44,6 +44,9 @@ import java.util.HashSet;
 import java.util.Set;
 import java.security.KeyStore;
 import java.util.Enumeration;
+import android.util.Base64;
+import org.json.JSONObject;
+import com.alivecor.api.AliveCorServer;
 
 @CapacitorPlugin(name = "AliveCorSDK", permissions = {
         @Permission(alias = "bluetooth", strings = {
@@ -55,6 +58,7 @@ import java.util.Enumeration;
 })
 public class AliveCorPlugin extends Plugin {
     private static final String TAG = "AliveCorPlugin";
+    private static final String APP_NAME = "Monitraq Mobile";
     private static final String PREF_NAME = "AliveCorPrefs";
     private static final String KEY_PAIRED_DEVICE = "paired_device_id";
     private static final String KEY_BATTERY = "last_battery";
@@ -64,7 +68,7 @@ public class AliveCorPlugin extends Plugin {
     private ScanCallback scanCallback;
     private String pairedDeviceId = null;
     private final Handler handler = new Handler(Looper.getMainLooper());
-    // Track SDK init state ourselves – AliveCorKit.get() throws if not initialized
+    // Track SDK init state ourselves – AliveCorKitLite.get() throws if not initialized
     private static boolean sdkInitialized = false;
     private static boolean isInitializing = false;
 
@@ -84,6 +88,90 @@ public class AliveCorPlugin extends Plugin {
      */
     private boolean isKitReady() {
         return sdkInitialized;
+    }
+
+    /** AliveCorKitLite 1.7.3 initialize() arg order: appName, bundleId, partnerId. */
+    private static class SdkInitParams {
+        final AliveCorServer server;
+        final String appName;
+        final String bundleId;
+        final String partnerId;
+        final boolean isDebug;
+
+        SdkInitParams(AliveCorServer server, String appName, String bundleId, String partnerId, boolean isDebug) {
+            this.server = server;
+            this.appName = appName;
+            this.bundleId = bundleId;
+            this.partnerId = partnerId;
+            this.isDebug = isDebug;
+        }
+    }
+
+    private SdkInitParams resolveInitParams(PluginCall call, String jwt) {
+        String bundleId = call.getString("bundleId", getContext().getPackageName());
+        String partnerId = call.getString("partnerId", null);
+        if (partnerId == null || partnerId.isEmpty()) {
+            partnerId = extractJwtClaim(jwt, "partnerId");
+        }
+        if (partnerId == null || partnerId.isEmpty()) {
+            partnerId = extractJwtClaim(jwt, "partner_id");
+        }
+        if (partnerId == null || partnerId.isEmpty()) {
+            Log.w(TAG, "partnerId missing from call and JWT — SDK auth may fail");
+            partnerId = "";
+        }
+
+        String jwtBundleId = extractJwtClaim(jwt, "bundleId");
+        if (jwtBundleId == null || jwtBundleId.isEmpty()) {
+            jwtBundleId = extractJwtClaim(jwt, "bundle_id");
+        }
+        if (jwtBundleId != null && !jwtBundleId.isEmpty() && !jwtBundleId.equals(bundleId)) {
+            Log.w(TAG, "JWT bundleId (" + jwtBundleId + ") differs from app bundleId (" + bundleId + ")");
+        }
+
+        boolean isDebug = call.getBoolean("isDebugMode", false);
+        String environment = call.getString("environment", isDebug ? "sandbox" : "production");
+        AliveCorServer server = "production".equalsIgnoreCase(environment)
+                ? AliveCorServer.PRODUCTION_US
+                : AliveCorServer.STAGING_US;
+
+        Log.d(TAG, "SDK init params: server=" + server + ", appName=" + APP_NAME + ", bundleId=" + bundleId
+                + ", partnerId=" + (partnerId.isEmpty() ? "(empty)" : partnerId.substring(0, Math.min(partnerId.length(), 8)) + "...")
+                + ", isDebug=" + isDebug + ", sdkVersion=" + AliveCorKitLite.getVersion());
+
+        return new SdkInitParams(server, APP_NAME, bundleId, partnerId, isDebug);
+    }
+
+    private static String extractJwtClaim(String jwt, String claim) {
+        if (jwt == null || jwt.isEmpty()) {
+            return null;
+        }
+        try {
+            String[] parts = jwt.split("\\.");
+            if (parts.length < 2) {
+                return null;
+            }
+            String payloadJson = new String(Base64.decode(parts[1], Base64.URL_SAFE | Base64.NO_WRAP));
+            JSONObject payload = new JSONObject(payloadJson);
+            if (payload.has(claim) && !payload.isNull(claim)) {
+                return payload.getString(claim);
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "Could not read JWT claim '" + claim + "': " + e.getMessage());
+        }
+        return null;
+    }
+
+    private void runSdkInitialize(String jwt, SdkInitParams params, InitListener listener) {
+        AliveCorKitLite.initialize(
+                getContext(),
+                jwt,
+                listener,
+                params.server,
+                params.appName,
+                params.bundleId,
+                params.partnerId,
+                params.isDebug);
     }
 
     // ── Nuclear self-healing: wipe ALL non-safe SharedPreferences + Keystore key ─
@@ -188,8 +276,6 @@ public class AliveCorPlugin extends Plugin {
     @PluginMethod
     public void initialize(PluginCall call) {
         String jwt = call.getString("jwt");
-        boolean isDebug = call.getBoolean("isDebugMode", false);
-        String bundleId = call.getString("bundleId", getContext().getPackageName());
 
         if (jwt == null) {
             call.reject("JWT is required for initialization");
@@ -198,8 +284,6 @@ public class AliveCorPlugin extends Plugin {
 
         Log.d(TAG, "initialize() called with JWT: " + jwt.substring(0, Math.min(jwt.length(), 15)) + "...");
 
-        // If already initialized, resolve immediately — re-calling initialize() may
-        // swallow callbacks
         if (isKitReady()) {
             Log.d(TAG, "AliveCorKit already initialized, skipping re-init");
             call.resolve();
@@ -213,81 +297,74 @@ public class AliveCorPlugin extends Plugin {
         }
 
         isInitializing = true;
+        SdkInitParams params = resolveInitParams(call, jwt);
 
         try {
-            AliveCorKit.initialize(
-                    getContext(),
-                    jwt,
-                    new InitListener() {
-                        @Override
-                        public void onInitComplete() {
-                            Log.d(TAG, "AliveCor SDK Initialized successfully");
-                            sdkInitialized = true;
-                            isInitializing = false;
-                            call.resolve();
-                        }
+            runSdkInitialize(jwt, params, new InitListener() {
+                @Override
+                public void onInitComplete() {
+                    Log.d(TAG, "AliveCor SDK Initialized successfully (v" + AliveCorKitLite.getVersion() + ")");
+                    sdkInitialized = true;
+                    isInitializing = false;
+                    call.resolve();
+                }
 
-                        @Override
-                        public void onInitError(Throwable throwable) {
-                            Log.e(TAG, "AliveCor SDK Initialization failed", throwable);
-                            sdkInitialized = false;
-                            isInitializing = false;
+                @Override
+                public void onInitError(Throwable throwable) {
+                    Log.e(TAG, "AliveCor SDK Initialization failed", throwable);
+                    sdkInitialized = false;
+                    isInitializing = false;
 
-                            // ── Self-heal: AEADBadTagException means corrupted keystore ──
-                            if (isAeadBadTagException(throwable)) {
-                                Log.w(TAG, "🩺 Detected AEADBadTagException — clearing corrupted prefs and retrying...");
-                                clearCorruptedAliveCorPrefs();
-                                // Retry once after clearing
-                                retryInitialize(jwt, bundleId, isDebug, call, false);
-                            } else {
-                                call.reject("Initialization failed: " + throwable.getMessage());
-                            }
-                        }
-                    },
-                    bundleId,
-                    "Monitraq Mobile",
-                    "1.0.0",
-                    isDebug);
+                    if (isAeadBadTagException(throwable)) {
+                        Log.w(TAG, "Detected AEADBadTagException — clearing corrupted prefs and retrying...");
+                        clearCorruptedAliveCorPrefs();
+                        retryInitialize(jwt, params, call, null);
+                    } else {
+                        call.reject("Initialization failed: " + throwable.getMessage());
+                    }
+                }
+            });
         } catch (Exception e) {
-            Log.e(TAG, "AliveCorKit.initialize() threw: " + e.getMessage());
+            Log.e(TAG, "AliveCorKitLite.initialize() threw: " + e.getMessage());
             isInitializing = false;
             call.reject("Failed to initialize: " + e.getMessage());
         }
     }
 
     /** One-shot retry of initialize() after clearing corrupted prefs. */
-    private void retryInitialize(String jwt, String bundleId, boolean isDebug,
-                                  PluginCall call, boolean isRecordingFlow) {
+    private void retryInitialize(String jwt, SdkInitParams params, PluginCall call, Runnable onSuccess) {
         isInitializing = true;
         try {
-            AliveCorKit.initialize(
-                    getContext(),
-                    jwt,
-                    new InitListener() {
-                        @Override
-                        public void onInitComplete() {
-                            Log.d(TAG, "✅ AliveCorKit retry init SUCCESS");
-                            sdkInitialized = true;
-                            isInitializing = false;
-                            call.resolve();
-                        }
+            runSdkInitialize(jwt, params, new InitListener() {
+                @Override
+                public void onInitComplete() {
+                    Log.d(TAG, "AliveCorKit retry init SUCCESS (v" + AliveCorKitLite.getVersion() + ")");
+                    sdkInitialized = true;
+                    isInitializing = false;
+                    if (call != null) {
+                        call.resolve();
+                    }
+                    if (onSuccess != null) {
+                        getActivity().runOnUiThread(onSuccess);
+                    }
+                }
 
-                        @Override
-                        public void onInitError(Throwable throwable) {
-                            Log.e(TAG, "❌ AliveCorKit retry init FAILED", throwable);
-                            sdkInitialized = false;
-                            isInitializing = false;
-                            call.reject("SDK initialization failed after self-heal. Error: " + throwable.getMessage());
-                        }
-                    },
-                    bundleId,
-                    "Monitraq Mobile",
-                    "1.0.0",
-                    isDebug);
+                @Override
+                public void onInitError(Throwable throwable) {
+                    Log.e(TAG, "AliveCorKit retry init FAILED", throwable);
+                    sdkInitialized = false;
+                    isInitializing = false;
+                    if (call != null) {
+                        call.reject("SDK initialization failed after self-heal. Error: " + throwable.getMessage());
+                    }
+                }
+            });
         } catch (Exception e) {
             Log.e(TAG, "retryInitialize threw: " + e.getMessage());
             isInitializing = false;
-            call.reject("SDK initialization failed internally on retry: " + e.getMessage());
+            if (call != null) {
+                call.reject("SDK initialization failed internally on retry: " + e.getMessage());
+            }
         }
     }
 
@@ -316,7 +393,7 @@ public class AliveCorPlugin extends Plugin {
                 com.alivecor.api.AliveCorDevice activeDevice = com.alivecor.api.AliveCorDevice.TRIANGLE;
 
                 Log.d(TAG, "Launching AliveCor recording intent with TRIANGLE device and patientId: " + patientId);
-                Intent intent = AliveCorKit.get().getRecordIntent(activeDevice, patientId);
+                Intent intent = AliveCorKitLite.get().getRecordIntent(activeDevice);
 
                 // Allow the user to select/change device if needed (triggers discovery UI)
                 intent.putExtra(com.alivecor.ecg.record.RecordEkgConstants.EXTRA_PROMPT_DEVICE, true);
@@ -359,54 +436,37 @@ public class AliveCorPlugin extends Plugin {
         }
 
         isInitializing = true;
-        String environment = call.getString("environment", "sandbox");
-        com.alivecor.pro.AliveCorServer server = "production".equalsIgnoreCase(environment)
-                ? com.alivecor.pro.AliveCorServer.PRODUCTION_US
-                : com.alivecor.pro.AliveCorServer.STAGING_US;
+        SdkInitParams params = resolveInitParams(call, jwt);
 
-        // ── PRE-CLEAR: always wipe AliveCor prefs + Keystore keys before init ──
-        // Strategy: clear BEFORE every initialize() call, not after it fails.
-        // This eliminates AEADBadTagException entirely — Tink never finds a stale
-        // encrypted keyset to fail to decrypt; it always creates a fresh one.
-        // The prefs are just a network-config cache (not user data) so clearing
-        // them on each init is safe and forces a fresh config fetch from the server.
-        Log.d(TAG, "🧹 [pre-init] Pre-clearing AliveCor prefs to prevent AEADBadTagException...");
-        clearCorruptedAliveCorPrefs();
-
-        Log.d(TAG, "Initializing AliveCorKit before recording with JWT: " + jwt.substring(0, Math.min(jwt.length(), 15))
-                + "... (env: " + environment + ")");
+        Log.d(TAG, "Initializing AliveCorKit before recording with JWT: "
+                + jwt.substring(0, Math.min(jwt.length(), 15)) + "...");
         try {
-            AliveCorKit.initialize(
-                    getContext(),
-                    jwt,
-                    new InitListener() {
-                        @Override
-                        public void onInitComplete() {
-                            Log.d(TAG, "AliveCorKit init complete — starting recording");
-                            sdkInitialized = true;
-                            isInitializing = false;
-                            getActivity().runOnUiThread(() -> {
-                                startRecordingAction.run();
-                            });
-                        }
+            runSdkInitialize(jwt, params, new InitListener() {
+                @Override
+                public void onInitComplete() {
+                    Log.d(TAG, "AliveCorKit init complete — starting recording");
+                    sdkInitialized = true;
+                    isInitializing = false;
+                    getActivity().runOnUiThread(startRecordingAction);
+                }
 
-                        @Override
-                        public void onInitError(Throwable throwable) {
-                            Log.e(TAG, "AliveCorKit init error: " + throwable.getMessage(), throwable);
-                            sdkInitialized = false;
-                            isInitializing = false;
-                            call.reject("SDK initialization failed. Please check your internet connection. Error: "
-                                    + throwable.getMessage());
-                        }
-                    },
+                @Override
+                public void onInitError(Throwable throwable) {
+                    Log.e(TAG, "AliveCorKit init error: " + throwable.getMessage(), throwable);
+                    sdkInitialized = false;
+                    isInitializing = false;
 
-                    bundleId,
-                    "Monitraq Mobile",
-                    "1.0.0",
-                    server,
-                    isDebug);
+                    if (isAeadBadTagException(throwable)) {
+                        Log.w(TAG, "Detected AEADBadTagException during recording init — self-healing...");
+                        clearCorruptedAliveCorPrefs();
+                        retryInitialize(jwt, params, call, startRecordingAction);
+                    } else {
+                        call.reject("SDK initialization failed. Please check your internet connection. Error: "
+                                + throwable.getMessage());
+                    }
+                }
+            });
         } catch (Exception e) {
-            // AliveCorKit.initialize() can throw if called while already initializing
             Log.e(TAG, "initialize() threw: " + e.getMessage(), e);
             isInitializing = false;
             call.reject("SDK initialization failed internally: " + e.getMessage());
@@ -455,9 +515,9 @@ public class AliveCorPlugin extends Plugin {
                 RecordActivityResult recordResult = null;
                 if (data != null) {
                     try {
-                        recordResult = AliveCorKit.get().getRecordActivityResult(data);
+                        recordResult = AliveCorKitLite.get().getRecordActivityResult(data);
                     } catch (Exception e) {
-                        Log.w(TAG, "AliveCorKit.get().getRecordActivityResult threw: " + e.getMessage(), e);
+                        Log.w(TAG, "AliveCorKitLite.get().getRecordActivityResult threw: " + e.getMessage(), e);
                     }
                 }
 
@@ -840,14 +900,27 @@ public class AliveCorPlugin extends Plugin {
     private void extractWaveformFromAtc(String atcPath, JSObject ret) {
         if (atcPath == null) return;
         try {
+            // SDK 1.7.3: native ATC parsing lives in libatc.so (+ libecgcore.so dependency).
+            // Previous code called System.loadLibrary("atc_jni") which maps to libatc_jni.so
+            // — a file that does NOT exist in the AAR.  The silent catch then let ATCReader's
+            // own <clinit> attempt the load, which threw UnsatisfiedLinkError and was swallowed,
+            // leaving all leads empty (zero-filled placeholder stored in DB).
             try {
-                System.loadLibrary("atc_jni");
-                Log.d(TAG, "[atc] Successfully loaded atc_jni explicitly.");
+                System.loadLibrary("ecgcore"); // libecgcore.so — dependency of libatc.so
+                Log.d(TAG, "[atc] Successfully loaded ecgcore.");
             } catch (Throwable t) {
-                Log.w(TAG, "[atc] Explicit loadLibrary failed (ignoring): " + t.getMessage());
+                Log.w(TAG, "[atc] ecgcore load warning (may already be loaded): " + t.getMessage());
             }
+            try {
+                System.loadLibrary("atc"); // libatc.so — correct name in SDK 1.7.3 AAR
+                Log.d(TAG, "[atc] Successfully loaded atc (libatc.so).");
+            } catch (Throwable t) {
+                Log.w(TAG, "[atc] atc load warning (may already be loaded): " + t.getMessage());
+            }
+
             Log.d(TAG, "[atc] Attempting to parse ATC file: " + atcPath);
             ATCReader reader = new ATCReader(atcPath);
+            Log.d(TAG, "[atc] ATCReader created. readSucceeded=" + reader.readSucceeded() + ", numLeads=" + reader.numLeads());
             if (reader.readSucceeded()) {
                 JSObject leads = new JSObject();
                 com.alivecor.ecgcore.ECGLead[] leadTypes = {
@@ -862,13 +935,23 @@ public class AliveCorPlugin extends Plugin {
                     if (signal != null) {
                         double[] samples = signal.getMVSamples();
                         if (samples != null && samples.length > 0) {
+                            // Count non-zero samples for diagnostics
+                            int nonZero = 0;
+                            for (double s : samples) if (Math.abs(s) > 1e-9) nonZero++;
+                            Log.d(TAG, "[atc] Lead " + leadNames[i] + ": " + samples.length +
+                                " samples, nonZero=" + nonZero +
+                                ", min=" + samples[0] + ", max=" + samples[samples.length - 1]);
                             JSArray jsSamples = new JSArray();
                             for (double s : samples) {
                                 jsSamples.put(s);
                             }
                             leads.put(leadNames[i], jsSamples);
                             parsedAny = true;
+                        } else {
+                            Log.w(TAG, "[atc] Lead " + leadNames[i] + ": null or empty samples");
                         }
+                    } else {
+                        Log.w(TAG, "[atc] Lead " + leadNames[i] + ": getECGSamples returned null");
                     }
                 }
 
@@ -881,7 +964,7 @@ public class AliveCorPlugin extends Plugin {
 
                 // ── LOCAL CLASSIFICATION FALLBACK ──
                 try {
-                    com.alivecor.api.EkgAnalyzer classifier = com.alivecor.api.AliveCorKit.get().getClassifier();
+                    com.alivecor.api.EkgAnalyzer classifier = com.alivecor.api.AliveCorKitLite.get().getClassifier();
                     if (classifier != null) {
                         com.alivecor.ecgcore.ECGSignal leadISignal = reader.getECGSamples(com.alivecor.ecgcore.ECGLead.LEAD_I);
                         if (leadISignal != null) {
@@ -949,7 +1032,7 @@ public class AliveCorPlugin extends Plugin {
                 } catch (Exception ex) {}
 
             } else {
-                Log.w(TAG, "[atc] ATCReader reported that reading the file failed.");
+                Log.w(TAG, "[atc] ATCReader reported that reading the file failed. readStatus=" + reader.readStatus());
             }
         } catch (UnsatisfiedLinkError e) {
             Log.e(TAG, "[atc] UnsatisfiedLinkError - ATC JNI libraries missing on this target architecture.", e);
@@ -959,6 +1042,7 @@ public class AliveCorPlugin extends Plugin {
             Log.e(TAG, "[atc] General exception while parsing ATC file", e);
         }
     }
+
 
     /**
      * Estimates the number of R-peaks (beats) in an ECG signal using a simple

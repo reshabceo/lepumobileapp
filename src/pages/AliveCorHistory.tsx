@@ -4,18 +4,19 @@ import { ArrowLeft, Activity, Calendar, Heart, Timer, RefreshCw, FileText } from
 import { useAuth } from "@/contexts/AuthContext";
 import { getAliveCorToken, getAliveCorRecordings, getAliveCorRecordingDetail, db, supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip } from "recharts";
-import { Download, Star, X, Info } from "lucide-react";
+import { ECGSixLeadView, getLeadsFromRecording } from "@/components/ECGLeadCanvas";
+import { Download, Star } from "lucide-react";
 
 const AliveCorHistory = () => {
   const navigate = useNavigate();
   const { user, isLoading: authLoading } = useAuth();
   const { toast } = useToast();
   const [recordings, setRecordings] = useState<any[]>([]);
+  const [patientName, setPatientName] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
@@ -23,6 +24,7 @@ const AliveCorHistory = () => {
   const [selectedRecording, setSelectedRecording] = useState<any | null>(null);
   const [isDetailLoading, setIsDetailLoading] = useState(false);
   const [recordingDetail, setRecordingDetail] = useState<any | null>(null);
+  // selectedLead kept for potential future use but rendering is now canvas-based
   const [selectedLead, setSelectedLead] = useState<string>("I");
 
   const fetchRecordings = async () => {
@@ -33,6 +35,7 @@ const AliveCorHistory = () => {
       // 1. Get patient profile to get the ID
       const { data: profile } = await db.getPatientProfile(user.id);
       if (!profile) throw new Error("Patient profile not found");
+      setPatientName(profile.full_name || "");
 
       // 2. Get AliveCor token which also returns the MRN (needed for other things maybe)
       const { patientMrn } = await getAliveCorToken(profile.id);
@@ -214,113 +217,7 @@ const AliveCorHistory = () => {
       });
     }
     setIsDetailLoading(false);
-  };  const prepareChartData = (detail: any, lead: string = "I") => {
-    if (!detail) return [];
-    
-    const ecg = detail.ecg_recordings || detail;
-    const config = detail.lead_config || ecg.lead_config;
-    
-    // Check all possible fields for leads/waveform data
-    const mv = ecg.mv_data_json || detail.waveform_mv || ecg.waveform_mv || detail.mv_data_json;
-    const leadsData = detail.waveform_leads || ecg.waveform_leads || detail.leads || ecg.leads;
-    
-    let leadsObj: Record<string, number[]> = {};
-    
-    if (leadsData && typeof leadsData === 'object' && !Array.isArray(leadsData)) {
-      leadsObj = leadsData;
-    } else if (mv) {
-      if (Array.isArray(mv)) {
-        // If mv is a flat array, check if we also have leadsData
-        if (leadsData && typeof leadsData === 'object' && !Array.isArray(leadsData)) {
-          leadsObj = leadsData;
-        } else {
-          // If the config is six, and we have a flat array, let's split it!
-          if (config === 'six') {
-            const isInterleaved = mv.length % 6 === 0 && mv.length >= 6;
-            if (isInterleaved) {
-              // De-interleave the 6 leads
-              const leads = ["I", "II", "III", "aVR", "aVL", "aVF"];
-              leads.forEach((l) => {
-                leadsObj[l] = [];
-              });
-              for (let i = 0; i < mv.length; i++) {
-                const leadName = ["I", "II", "III", "aVR", "aVL", "aVF"][i % 6];
-                leadsObj[leadName].push(mv[i]);
-              }
-            } else {
-              // Fallback to sequential split or simple duplication
-              const leadLen = Math.floor(mv.length / 6);
-              if (leadLen > 0) {
-                leadsObj = {
-                  I: mv.slice(0, leadLen),
-                  II: mv.slice(leadLen, leadLen * 2),
-                  III: mv.slice(leadLen * 2, leadLen * 3),
-                  aVR: mv.slice(leadLen * 3, leadLen * 4),
-                  aVL: mv.slice(leadLen * 4, leadLen * 5),
-                  aVF: mv.slice(leadLen * 5),
-                };
-              } else {
-                leadsObj = {
-                  I: mv, II: mv, III: mv, aVR: mv, aVL: mv, aVF: mv
-                };
-              }
-            }
-          } else {
-            leadsObj = { I: mv };
-          }
-        }
-      } else {
-        leadsObj = mv as Record<string, number[]>;
-      }
-    } else if (leadsData) {
-      leadsObj = leadsData;
-    }
-    
-    let samples: number[] = leadsObj[lead] || [];
-    
-    // Dynamic expansion of lightweight placeholder baselines for visual consistency
-    if (samples.length < 100) {
-      samples = Array(1500).fill(0);
-    }
-    
-    // Limit to first 1500 points (~5 seconds at 300Hz) for performance
-    return samples.slice(0, 1500).map((val, idx) => ({
-      time: idx,
-      value: val
-    }));
-  };
-
-  const getAvailableLeads = (detail: any) => {
-    if (!detail) return ["I"];
-    const ecg = detail.ecg_recordings || detail;
-    const config = detail.lead_config || ecg.lead_config;
-    if (config === 'six') {
-      return ["I", "II", "III", "aVR", "aVL", "aVF"];
-    }
-    
-    const mv = ecg.mv_data_json || detail.waveform_mv || ecg.waveform_mv || detail.mv_data_json;
-    const leadsData = detail.waveform_leads || ecg.waveform_leads || detail.leads || ecg.leads;
-    
-    let leads: any = {};
-    if (leadsData && typeof leadsData === 'object' && !Array.isArray(leadsData)) {
-      leads = leadsData;
-    } else if (mv) {
-      if (Array.isArray(mv)) {
-        if (leadsData && typeof leadsData === 'object' && !Array.isArray(leadsData)) {
-          leads = leadsData;
-        } else {
-          return ["I"];
-        }
-      } else {
-        leads = mv;
-      }
-    } else if (leadsData) {
-      leads = leadsData;
-    }
-    
-    const possibleLeads = ["I", "II", "III", "aVR", "aVL", "aVF"];
-    return possibleLeads.filter(l => !!leads[l]);
-  };
+  };  // Lead extraction delegated to ECGLeadCanvas utility (getLeadsFromRecording)
 
   useEffect(() => {
     // 1. Initial fetch on mount / user session load
@@ -499,7 +396,7 @@ const AliveCorHistory = () => {
                 <div className="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center">
                   <Activity size={14} className="text-slate-600" />
                 </div>
-                <span className="font-medium text-slate-700">Md Sahil</span>
+                <span className="font-medium text-slate-700">{patientName || "Patient"}</span>
               </div>
               
               {(selectedRecording?.average_heart_rate || selectedRecording?.heart_rate || selectedRecording?.bpm) && (
@@ -517,68 +414,27 @@ const AliveCorHistory = () => {
           </div>
 
           {/* ECG Grid Content */}
-          <div className="flex-1 overflow-y-auto bg-[#F8F9FA] relative scrollbar-hide">
-            {/* Calibration Marker */}
-            <div className="sticky top-2 left-1/2 -translate-x-1/2 z-10">
-              <div className="bg-white/90 backdrop-blur shadow-sm border border-slate-100 rounded-full px-3 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-tighter">
-                25mm/s, 10mm/mV
+          <div className="flex-1 relative overflow-hidden">
+            {isDetailLoading ? (
+              <div className="absolute inset-0 flex flex-col items-center justify-center space-y-3 bg-white/60 backdrop-blur-sm z-30">
+                <RefreshCw className="w-10 h-10 text-rose-500 animate-spin" />
+                <p className="text-sm font-bold text-slate-400 animate-pulse uppercase tracking-widest">Processing Waveform...</p>
               </div>
-            </div>
-
-            <div className="ecg-paper-grid min-h-full py-4 overflow-x-auto scrollbar-thin">
-              {isDetailLoading ? (
-                <div className="absolute inset-0 flex flex-col items-center justify-center space-y-3 bg-white/60 backdrop-blur-sm z-30">
-                  <RefreshCw className="w-10 h-10 text-rose-500 animate-spin" />
-                  <p className="text-sm font-bold text-slate-400 animate-pulse uppercase tracking-widest">Processing Waveform...</p>
-                </div>
-              ) : recordingDetail ? (
-                <div className="space-y-0 px-2" style={{ minWidth: "2000px" }}>
-                  {getAvailableLeads(recordingDetail).map((lead) => (
-                    <div key={lead} className="h-[120px] relative border-b border-slate-100/50 last:border-none">
-                      <div className="absolute top-1/2 -translate-y-1/2 left-2 z-10">
-                        <span className="text-xs font-black text-slate-900 opacity-60">
-                          {lead}
-                        </span>
-                      </div>
-                      <ResponsiveContainer width="100%" height="100%">
-                        <LineChart 
-                          data={prepareChartData(recordingDetail, lead)}
-                          margin={{ top: 10, right: 10, left: 10, bottom: 10 }}
-                        >
-                          <XAxis dataKey="time" hide />
-                          <YAxis hide domain={['auto', 'auto']} />
-                          <Line 
-                            type="monotone" 
-                            dataKey="value" 
-                            stroke="#334155" 
-                            strokeWidth={1.2} 
-                            dot={false} 
-                            isAnimationActive={false}
-                          />
-                        </LineChart>
-                      </ResponsiveContainer>
-                    </div>
-                  ))}
-                </div>
+            ) : (() => {
+              const ecgLeads = getLeadsFromRecording(recordingDetail);
+              return ecgLeads ? (
+                <ECGSixLeadView
+                  leads={ecgLeads}
+                  heartRate={selectedRecording?.average_heart_rate || selectedRecording?.heart_rate || selectedRecording?.bpm}
+                  theme="light"
+                />
               ) : (
-                <div className="flex flex-col items-center justify-center py-40 text-slate-300">
+                <div className="flex flex-col items-center justify-center h-full py-40 text-slate-300">
                   <Activity size={48} className="opacity-20 mb-4" />
                   <p className="text-sm font-bold">Waveform Data Unavailable</p>
                 </div>
-              )}
-
-            </div>
-
-            {/* Heart Rate Badge Overlay - absolute position at top right of waves card container */}
-            {(selectedRecording?.average_heart_rate || selectedRecording?.heart_rate || selectedRecording?.bpm) && !isDetailLoading && (
-              <div className="absolute top-4 right-4 z-20">
-                <div className="bg-white/95 backdrop-blur shadow-xl border border-slate-100/80 rounded-full px-4 py-2 flex items-center gap-2">
-                  <Heart size={16} className="text-rose-500 fill-rose-500 animate-pulse" />
-                  <span className="font-bold text-slate-800">{selectedRecording.average_heart_rate || selectedRecording.heart_rate || selectedRecording.bpm}</span>
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">bpm</span>
-                </div>
-              </div>
-            )}
+              );
+            })()}
           </div>
 
           {/* Footer Controls */}
@@ -603,24 +459,6 @@ const AliveCorHistory = () => {
         </DialogContent>
       </Dialog>
 
-      <style>{`
-        .ecg-paper-grid {
-          background-color: #F8F9FA;
-          background-image: 
-            linear-gradient(to right, #E2E8F0 1px, transparent 1px),
-            linear-gradient(to bottom, #E2E8F0 1px, transparent 1px),
-            linear-gradient(to right, #CBD5E1 1px, transparent 1px),
-            linear-gradient(to bottom, #CBD5E1 1px, transparent 1px);
-          background-size: 5px 5px, 5px 5px, 25px 25px, 25px 25px;
-        }
-        .scrollbar-hide::-webkit-scrollbar {
-          display: none;
-        }
-        .scrollbar-hide {
-          -ms-overflow-style: none;
-          scrollbar-width: none;
-        }
-      `}</style>
     </div>
   );
 };
