@@ -62,6 +62,7 @@ const ServicesRecords = lazy(() => import("./pages/ServicesRecords").then(m => (
 const MyThresholds = lazy(() => import("./components/MyThresholds"));
 const MyCareTeam = lazy(() => import("./pages/MyCareTeam"));
 const ConsentManagement = lazy(() => import("./pages/ConsentManagement").then(m => ({ default: m.ConsentManagement })));
+const PrivacyConsent = lazy(() => import("./pages/PrivacyConsent"));
 const CareContextHistory = lazy(() => import("./pages/CareContextHistory").then(m => ({ default: m.CareContextHistory })));
 
 const queryClient = new QueryClient();
@@ -237,6 +238,11 @@ const App = () => (
                   <div className="min-h-screen bg-background p-4">
                     <PatientInsuranceProfile />
                   </div>
+                </ProtectedRoute>
+              } />
+              <Route path="/privacy-consent" element={
+                <ProtectedRoute>
+                  <PrivacyConsent />
                 </ProtectedRoute>
               } />
               <Route path="/manual-vitals" element={

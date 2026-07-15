@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, User, Mail, Phone, Calendar, MapPin, Droplet, Heart, AlertCircle, Pill, UserCircle, LogOut, Ruler, Scale, Edit2 } from 'lucide-react';
+import { ArrowLeft, User, Mail, Phone, Calendar, MapPin, Droplet, Heart, AlertCircle, Pill, UserCircle, LogOut, Ruler, Scale, Edit2, Shield, ChevronRight } from 'lucide-react';
 import { ABHALinking } from '../components/ABHALinking';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase, getPatientRiskCriteria } from '../lib/supabase';
@@ -675,6 +675,25 @@ const Profile = () => {
                     </div>
                   </div>
                 </div>
+              </CardContent>
+            </Card>
+
+            {/* Privacy & Consent (DPDP) */}
+            <Card className="bg-[#1A243D] border border-slate-700/40 shadow-sm rounded-3xl">
+              <CardContent className="p-6">
+                <button
+                  onClick={() => navigate('/privacy-consent')}
+                  className="w-full flex items-center justify-between"
+                >
+                  <span className="flex items-center gap-2 text-lg font-semibold text-white">
+                    <Shield className="w-5 h-5 text-green-400" />
+                    Privacy &amp; Consent
+                  </span>
+                  <ChevronRight className="w-5 h-5 text-slate-400" />
+                </button>
+                <p className="text-xs text-slate-400 mt-2 text-left">
+                  See how your data is used and grant or withdraw consent (DPDP Act 2023).
+                </p>
               </CardContent>
             </Card>
 
