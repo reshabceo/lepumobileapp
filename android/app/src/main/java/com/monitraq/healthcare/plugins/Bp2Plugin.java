@@ -1,4 +1,4 @@
-package com.monitraq.mobile.plugins;
+package com.monitraq.healthcare.plugins;
 
 import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;

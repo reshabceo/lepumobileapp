@@ -1,4 +1,4 @@
-package com.monitraq.mobile;
+package com.monitraq.healthcare;
 
 import android.Manifest;
 import android.content.pm.PackageManager;
@@ -14,9 +14,9 @@ import androidx.core.splashscreen.SplashScreen;
 
 import com.getcapacitor.BridgeActivity;
 import com.monitraq.wellue.WelluePlugin;
-import com.monitraq.mobile.plugins.Bp2Plugin;
-import com.monitraq.mobile.plugins.AliveCorPlugin;
-import com.monitraq.mobile.plugins.CameraBridgePlugin;
+import com.monitraq.healthcare.plugins.Bp2Plugin;
+import com.monitraq.healthcare.plugins.AliveCorPlugin;
+import com.monitraq.healthcare.plugins.CameraBridgePlugin;
 
 public class MainActivity extends BridgeActivity {
 

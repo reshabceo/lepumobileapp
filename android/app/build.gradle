@@ -13,7 +13,7 @@ apply plugin: 'kotlin-android'
 apply plugin: 'kotlin-parcelize'
 
 android {
-    namespace "com.monitraq.mobile"
+    namespace "com.monitraq.healthcare"
     compileSdk rootProject.ext.compileSdkVersion
     
     compileOptions {
@@ -22,7 +22,7 @@ android {
     }
     
     defaultConfig {
-        applicationId "com.monitraq.mobile"
+        applicationId "com.monitraq.healthcare"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 30
@@ -46,11 +46,11 @@ android {
     productFlavors {
         production {
             dimension "environment"
-            applicationId "com.monitraq.mobile"
+            applicationId "com.monitraq.healthcare"
         }
         staging {
             dimension "environment"
-            applicationId "com.monitraq.mobile"
+            applicationId "com.monitraq.healthcare"
         }
     }
     signingConfigs {

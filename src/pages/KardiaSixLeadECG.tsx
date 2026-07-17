@@ -464,13 +464,13 @@ const KardiaSixLeadECG: React.FC = () => {
       
       setRecordingPhase("preparing");
 
-      console.log(`[ALIVECOR] Starting 6-lead recording | patientId=${targetPatientMrn} | bundleId=com.monitraq.mobile | env=sandbox`);
+      console.log(`[ALIVECOR] Starting 6-lead recording | patientId=${targetPatientMrn} | bundleId=com.monitraq.healthcare | env=sandbox`);
       let result = await aliveCorSDK.startSixLeadRecording({
         jwt: jwtToken!,
         mainsFrequencyHz: 50,
         environment: "sandbox",
         patientId: targetPatientMrn,
-        bundleId: "com.monitraq.mobile"
+        bundleId: "com.monitraq.healthcare"
       });
 
       if (!result.success) {

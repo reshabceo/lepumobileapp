@@ -1,4 +1,4 @@
-package com.monitraq.mobile.plugins
+package com.monitraq.healthcare.plugins
 
 import android.app.Notification
 import android.app.NotificationChannel
@@ -12,8 +12,8 @@ import android.os.IBinder
 import android.os.PowerManager
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
-import com.monitraq.mobile.MainActivity
-import com.monitraq.mobile.R
+import com.monitraq.healthcare.MainActivity
+import com.monitraq.healthcare.R
 
 /**
  * Foreground service running gomobile `mobile.Bridge` (RTSP → WHIP).
@@ -22,8 +22,8 @@ import com.monitraq.mobile.R
 class CameraBridgeService : Service() {
 
     companion object {
-        const val ACTION_START = "com.monitraq.mobile.camera_bridge.START"
-        const val ACTION_STOP = "com.monitraq.mobile.camera_bridge.STOP"
+        const val ACTION_START = "com.monitraq.healthcare.camera_bridge.START"
+        const val ACTION_STOP = "com.monitraq.healthcare.camera_bridge.STOP"
         const val EXTRA_RTSP = "rtsp_url"
         const val EXTRA_SFU = "sfu_origin"
         const val EXTRA_PATIENT = "patient_id"

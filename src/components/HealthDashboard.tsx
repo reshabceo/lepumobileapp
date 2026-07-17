@@ -135,13 +135,14 @@ export const HealthDashboard = () => {
 
 
 
-  // Safety timeout - force stop loading after 5 seconds
+  // Soft timeout: if profile is slow, stop blocking the spinner but keep retrying.
+  // A hard 5s error screen previously caused App Review "error after login" rejections.
   useEffect(() => {
-    if (vitalsLoading) {
+    if (vitalsLoading && !patientProfile) {
       loadingTimeoutRef.current = setTimeout(() => {
-        console.warn('⚠️ HealthDashboard: Loading timeout - forcing stop');
+        console.warn('⚠️ HealthDashboard: Loading taking longer than expected — showing retry UI');
         setForceStopLoading(true);
-      }, 5000);
+      }, 20000);
     } else {
       setForceStopLoading(false);
       if (loadingTimeoutRef.current) {
@@ -154,7 +155,7 @@ export const HealthDashboard = () => {
         clearTimeout(loadingTimeoutRef.current);
       }
     };
-  }, [vitalsLoading]);
+  }, [vitalsLoading, patientProfile]);
 
   const {
     connectedDevice,
@@ -632,20 +633,23 @@ export const HealthDashboard = () => {
   if ((vitalsError || forceStopLoading) && !patientProfile) {
     return (
       <div className="bg-[#080D1A] min-h-screen text-white flex items-center justify-center p-6">
-        <div className="max-w-md w-full bg-[#1A243D] border border-red-500/20 rounded-3xl p-8 text-center shadow-xl">
-          <div className="bg-red-500/10 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 border border-red-500/20">
-            <AlertCircle className="h-10 w-10 text-red-500" />
+        <div className="max-w-md w-full bg-[#1A243D] border border-indigo-500/20 rounded-3xl p-8 text-center shadow-xl">
+          <div className="bg-indigo-500/10 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 border border-indigo-500/20">
+            <AlertCircle className="h-10 w-10 text-indigo-400" />
           </div>
-          <h3 className="text-2xl font-bold text-white mb-2">Request Timeout</h3>
+          <h3 className="text-2xl font-bold text-white mb-2">Still Syncing</h3>
           <p className="text-slate-400 mb-8 leading-relaxed">
-            The application is taking longer than usual to load. This might be due to a poor connection or session sync issue.
+            Your account signed in successfully. We are still loading your health profile. Please retry — this can take a moment on a slower connection.
           </p>
           <button
-            onClick={() => window.location.reload()}
-            className="w-full bg-red-600 hover:bg-red-700 text-white py-4 rounded-xl font-bold transition-all shadow-md shadow-red-900/30 flex items-center justify-center gap-2"
+            onClick={() => {
+              setForceStopLoading(false);
+              window.location.reload();
+            }}
+            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-4 rounded-xl font-bold transition-all shadow-md shadow-indigo-900/30 flex items-center justify-center gap-2"
           >
             <RefreshCw className="h-5 w-5" />
-            Reload App Properly
+            Retry Loading Profile
           </button>
         </div>
       </div>

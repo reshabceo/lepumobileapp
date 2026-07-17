@@ -171,8 +171,23 @@ export const useRealTimeVitals = () => {
                     setError(null);
                     fetchVitalsInBackground(profileData.id);
                 } else if (!hasCache) {
+                    // Retry a few times — App Review / slow networks often need this after login
+                    for (let attempt = 1; attempt <= 3 && isMounted; attempt++) {
+                        await new Promise((r) => setTimeout(r, 1500 * attempt));
+                        const { data: retryData } = await db.getPatientProfile(user.id);
+                        if (retryData) {
+                            const profileToCache = { ...retryData, _cached_at: Date.now() };
+                            localStorage.setItem(cacheKey, JSON.stringify(profileToCache));
+                            setPatientProfile(retryData);
+                            setLoading(false);
+                            setError(null);
+                            fetchVitalsInBackground(retryData.id);
+                            return;
+                        }
+                    }
                     setPatientProfile(null);
                     setLoading(false);
+                    setError('Unable to load patient profile. Please try again.');
                 }
             } catch (err) {
                 console.warn('Profile refresh threw:', err);

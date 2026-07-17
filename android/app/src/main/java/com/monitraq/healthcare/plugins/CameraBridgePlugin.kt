@@ -1,4 +1,4 @@
-package com.monitraq.mobile.plugins
+package com.monitraq.healthcare.plugins
 
 import android.content.Intent
 import android.os.Handler

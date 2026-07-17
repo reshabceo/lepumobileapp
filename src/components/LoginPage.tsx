@@ -90,9 +90,17 @@ export const LoginPage = () => {
         navigate('/dashboard');
       }
     } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'Invalid credentials';
+      const friendly =
+        /failed to fetch|network|timeout|load failed/i.test(message)
+          ? 'Network error. Please check your connection and try again.'
+          : message;
       toast({
         title: "Login Failed",
-        description: error instanceof Error ? error.message : 'Invalid credentials',
+        description: friendly,
         variant: "destructive",
       });
     } finally {
