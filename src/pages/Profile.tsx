@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, User, Mail, Phone, Calendar, MapPin, Droplet, Heart, AlertCircle, Pill, UserCircle, LogOut, Ruler, Scale, Edit2, Crown, ExternalLink, BookOpen } from 'lucide-react';
+import { ArrowLeft, User, Mail, Phone, Calendar, MapPin, Droplet, Heart, AlertCircle, Pill, UserCircle, LogOut, Ruler, Scale, Edit2, Crown, ExternalLink, BookOpen, Trash2, Loader2 } from 'lucide-react';
 import { ABHALinking } from '../components/ABHALinking';
 import { useAuth } from '../contexts/AuthContext';
-import { supabase, getPatientRiskCriteria } from '../lib/supabase';
+import { supabase, getPatientRiskCriteria, auth } from '../lib/supabase';
 import { useSubscriptionTier } from '@/hooks/useSubscriptionTier';
 import { Button } from '../components/ui/button';
 import { Card, CardContent } from '../components/ui/card';
@@ -59,6 +59,8 @@ const Profile = () => {
   const [emergencyModalOpen, setEmergencyModalOpen] = useState(false);
   const [heightModalOpen, setHeightModalOpen] = useState(false);
   const [weightModalOpen, setWeightModalOpen] = useState(false);
+  const [deleteAccountOpen, setDeleteAccountOpen] = useState(false);
+  const [deletingAccount, setDeletingAccount] = useState(false);
 
   // Form states
   const [personalForm, setPersonalForm] = useState({
@@ -187,6 +189,32 @@ const Profile = () => {
     } catch (error) {
       console.error('Logout failed:', error);
       toast.error('Failed to logout');
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    setDeletingAccount(true);
+    try {
+      const { error } = await auth.deleteOwnAccount();
+      if (error) {
+        throw error;
+      }
+      setDeleteAccountOpen(false);
+      try {
+        await logout();
+      } catch {
+        /* session may already be cleared */
+      }
+      toast.success('Your account has been permanently deleted');
+      navigate('/');
+    } catch (error: any) {
+      console.error('Account deletion failed:', error);
+      toast.error(
+        error?.message ||
+          'Failed to delete account. Please try again or contact support.'
+      );
+    } finally {
+      setDeletingAccount(false);
     }
   };
 
@@ -808,9 +836,17 @@ const Profile = () => {
               </CardContent>
             </Card>
 
-            {/* Logout Button */}
+            {/* Delete Account + Logout */}
             <Card className="bg-[#1A243D] border border-slate-700/40 shadow-sm rounded-3xl">
-              <CardContent className="p-6">
+              <CardContent className="p-6 space-y-3">
+                <Button
+                  onClick={() => setDeleteAccountOpen(true)}
+                  variant="outline"
+                  className="w-full border-red-500/40 bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 font-semibold py-6 flex items-center justify-center gap-2"
+                >
+                  <Trash2 className="w-5 h-5" />
+                  Delete Account
+                </Button>
                 <Button
                   onClick={handleLogout}
                   className="w-full bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white font-semibold py-6 flex items-center justify-center gap-2"
@@ -822,6 +858,42 @@ const Profile = () => {
             </Card>
           </div>
         </div>
+
+        {/* Delete Account Confirmation */}
+        <Dialog open={deleteAccountOpen} onOpenChange={(open) => !deletingAccount && setDeleteAccountOpen(open)}>
+          <DialogContent className="bg-[#1A243D] border border-slate-700/40 text-white max-w-sm rounded-3xl">
+            <DialogHeader>
+              <DialogTitle className="text-white">Delete Account?</DialogTitle>
+              <DialogDescription className="text-slate-400">
+                This permanently deletes your Monitraq account and associated health data. This action cannot be undone.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="flex flex-col gap-2 sm:flex-col">
+              <Button
+                onClick={handleDeleteAccount}
+                disabled={deletingAccount}
+                className="w-full bg-red-600 hover:bg-red-700 text-white font-semibold"
+              >
+                {deletingAccount ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Deleting…
+                  </>
+                ) : (
+                  'Yes, Delete My Account'
+                )}
+              </Button>
+              <Button
+                onClick={() => setDeleteAccountOpen(false)}
+                disabled={deletingAccount}
+                variant="outline"
+                className="w-full border-slate-600 bg-transparent text-white hover:bg-slate-800"
+              >
+                Cancel
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {/* Personal Info Modal */}
         <Dialog open={personalModalOpen} onOpenChange={setPersonalModalOpen}>

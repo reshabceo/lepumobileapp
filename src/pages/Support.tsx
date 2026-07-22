@@ -105,7 +105,7 @@ const Support = () => {
     {
       category: 'Account & Profile',
       question: 'Can I delete my account?',
-      answer: 'Yes, you can delete your account by contacting our support team. Go to Contact Us or email support@monitraq.com with your account deletion request. Note that account deletion is permanent and all your data will be removed in accordance with our Privacy Policy.'
+      answer: 'Yes. Open Profile, tap Delete Account above Sign Out, and confirm. This permanently deletes your account and associated data in accordance with our Privacy Policy.'
     },
     
     // Healthcare Features

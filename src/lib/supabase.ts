@@ -685,6 +685,41 @@ export const auth = {
     return { error }
   },
 
+  /** Permanently delete the signed-in user's account and patient data (App Store 5.1.1(v)). */
+  deleteOwnAccount: async () => {
+    const { data, error } = await supabase.rpc('delete_own_account')
+    if (error) {
+      console.error('❌ delete_own_account RPC error:', error)
+      return { data: null, error }
+    }
+    // Clear local session / cached profile after server-side delete
+    try {
+      const keysToRemove: string[] = []
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i)
+        if (!key) continue
+        if (
+          key.startsWith('sb-') ||
+          key.startsWith('patient_profile_') ||
+          key.startsWith('pending_') ||
+          key === 'awaiting_otp_verification' ||
+          key === 'from_otp_verification'
+        ) {
+          keysToRemove.push(key)
+        }
+      }
+      keysToRemove.forEach((k) => localStorage.removeItem(k))
+    } catch {
+      /* ignore */
+    }
+    try {
+      await supabase.auth.signOut()
+    } catch {
+      /* user may already be gone */
+    }
+    return { data, error: null }
+  },
+
   // Get current user
   getCurrentUser: async () => {
     try {
